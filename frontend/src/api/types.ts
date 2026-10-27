@@ -108,3 +108,52 @@ export interface ApprovalRequest {
   head_range?: LineRange | null
   base_range?: LineRange | null
 }
+
+export type ThreadScope = 'review' | 'file' | 'unit'
+export type ThreadStatus = 'open' | 'resolved'
+export type Side = 'head' | 'base'
+
+export interface Comment {
+  id: string
+  thread_id: string
+  author: Reviewer
+  body: string
+  created_at: string
+  edited_at: string | null
+  deleted: boolean
+  mine: boolean
+}
+
+export interface ThreadAnchor {
+  revision_id: number
+  line_offset: number | null
+  outdated: boolean
+  unit_id: number | null
+  file_line: number | null
+}
+
+export interface Thread {
+  id: string
+  scope: ThreadScope
+  path: string | null
+  kind: string | null
+  qualified_name: string | null
+  side: Side | null
+  status: ThreadStatus
+  created_by: Reviewer
+  created_at: string
+  line_text: string | null
+  context_before: string[]
+  context_after: string[]
+  anchor: ThreadAnchor | null
+  comments: Comment[]
+}
+
+export interface NewThreadRequest {
+  scope: ThreadScope
+  body: string
+  unit_id?: number
+  path?: string
+  side?: Side
+  line_offset?: number
+}

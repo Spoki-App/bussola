@@ -3,7 +3,7 @@ from typing import Protocol
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from rtool.storage.models import Approval, Repo, Review, Reviewer, ReviewSession, Revision, RowApproval, UnitSnapshot
+from rtool.storage.models import Approval, Comment, Repo, Review, Reviewer, ReviewSession, Revision, RowApproval, Thread, ThreadAnchor, UnitSnapshot
 
 
 class ReviewRepository(Protocol):
@@ -35,6 +35,17 @@ class ApprovalRepository(Protocol):
     def row_approvals(self, review_id: int, reviewer_id: int) -> list[RowApproval]: ...
     def add_row_approvals(self, rows: list[RowApproval]) -> list[RowApproval]: ...
     def selection(self, selection_id: str) -> list[RowApproval]: ...
+
+
+class ThreadRepository(Protocol):
+    def threads(self, review_id: int) -> list[Thread]: ...
+    def get_thread(self, thread_id: str) -> Thread | None: ...
+    def add_thread(self, thread: Thread) -> Thread: ...
+    def comments(self, thread_ids: list[str]) -> list[Comment]: ...
+    def get_comment(self, comment_id: str) -> Comment | None: ...
+    def add_comment(self, comment: Comment) -> Comment: ...
+    def anchors(self, thread_ids: list[str]) -> list[ThreadAnchor]: ...
+    def add_anchor(self, anchor: ThreadAnchor) -> ThreadAnchor: ...
 
 
 class SqlReviewRepository:
@@ -151,11 +162,48 @@ class SqlApprovalRepository:
         return list(self._session.scalars(select(RowApproval).where(RowApproval.selection_id == selection_id)))
 
 
+class SqlThreadRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def threads(self, review_id: int) -> list[Thread]:
+        return list(self._session.scalars(select(Thread).where(Thread.review_id == review_id).order_by(Thread.created_at)))
+
+    def get_thread(self, thread_id: str) -> Thread | None:
+        return self._session.get(Thread, thread_id)
+
+    def add_thread(self, thread: Thread) -> Thread:
+        self._session.add(thread)
+        self._session.flush()
+        return thread
+
+    def comments(self, thread_ids: list[str]) -> list[Comment]:
+        return list(self._session.scalars(select(Comment).where(Comment.thread_id.in_(thread_ids)).order_by(Comment.created_at)))
+
+    def get_comment(self, comment_id: str) -> Comment | None:
+        return self._session.get(Comment, comment_id)
+
+    def add_comment(self, comment: Comment) -> Comment:
+        self._session.add(comment)
+        self._session.flush()
+        return comment
+
+    def anchors(self, thread_ids: list[str]) -> list[ThreadAnchor]:
+        query = select(ThreadAnchor).where(ThreadAnchor.thread_id.in_(thread_ids)).order_by(ThreadAnchor.revision_id)
+        return list(self._session.scalars(query))
+
+    def add_anchor(self, anchor: ThreadAnchor) -> ThreadAnchor:
+        self._session.add(anchor)
+        self._session.flush()
+        return anchor
+
+
 class Store:
     def __init__(self, session: Session) -> None:
         self.session = session
         self.reviews: ReviewRepository = SqlReviewRepository(session)
         self.approvals: ApprovalRepository = SqlApprovalRepository(session)
+        self.threads: ThreadRepository = SqlThreadRepository(session)
 
     def commit(self) -> None:
         self.session.commit()

@@ -1,0 +1,86 @@
+from collections.abc import Sequence
+from dataclasses import dataclass
+
+from rtool.review.keys import key_of
+from rtool.review.rows import Side, unit_lines
+from rtool.storage.models import Review, Revision, Thread, ThreadAnchor, UnitSnapshot
+from rtool.storage.repositories import Store
+
+CONTEXT_LINES = 3
+UNIT_SCOPE = "unit"
+OPEN_STATUS = "open"
+
+
+@dataclass(frozen=True)
+class AnchorTarget:
+    snapshot: UnitSnapshot
+    line_offset: int
+
+
+def side_text(snapshot: UnitSnapshot, side: str) -> list[str]:
+    if side == Side.BASE:
+        return [line.text for line in unit_lines(snapshot.base_text, snapshot.base_lines)]
+    return [line.text for line in unit_lines(snapshot.head_text, snapshot.head_lines)]
+
+
+def side_hash(snapshot: UnitSnapshot, side: str) -> str | None:
+    return snapshot.base_hash if side == Side.BASE else snapshot.head_hash
+
+
+def surrounding(lines: Sequence[str], offset: int) -> tuple[list[str], list[str]]:
+    return list(lines[max(0, offset - CONTEXT_LINES) : offset]), list(lines[offset + 1 : offset + 1 + CONTEXT_LINES])
+
+
+def reanchor_threads(store: Store, review: Review, previous: Revision | None, revision: Revision) -> None:
+    del previous
+    threads = [thread for thread in store.threads.threads(review.id) if thread.scope == UNIT_SCOPE and thread.status == OPEN_STATUS]
+    if not threads:
+        return
+    latest = _latest_anchors(store, [thread.id for thread in threads])
+    snapshots = store.reviews.snapshots(revision.id)
+    for thread in threads:
+        target = locate(thread, latest.get(thread.id), snapshots)
+        if target is not None:
+            thread.path, thread.kind, thread.qualified_name = key_of(target.snapshot)
+        store.threads.add_anchor(_anchor(thread, revision.id, target))
+
+
+def locate(thread: Thread, last: ThreadAnchor | None, snapshots: list[UnitSnapshot]) -> AnchorTarget | None:
+    side = thread.side or Side.HEAD
+    key = (thread.path, thread.kind, thread.qualified_name)
+    last_hash = last.unit_hash if last else thread.unit_hash
+    last_offset = last.line_offset if last and last.line_offset is not None else thread.line_offset or 0
+    same_key = next((snapshot for snapshot in snapshots if key_of(snapshot) == key and side_hash(snapshot, side) is not None), None)
+    if same_key is not None and side_hash(same_key, side) == last_hash and last is not None and not last.outdated:
+        return AnchorTarget(same_key, last_offset)
+    if same_key is not None:
+        offset = find_line(thread, side_text(same_key, side), last_offset)
+        return None if offset is None else AnchorTarget(same_key, offset)
+    moved = next((snapshot for snapshot in snapshots if last_hash is not None and side_hash(snapshot, side) == last_hash), None)
+    return None if moved is None else AnchorTarget(moved, last_offset)
+
+
+def find_line(thread: Thread, lines: Sequence[str], previous_offset: int) -> int | None:
+    wanted = (thread.line_text or "").strip()
+    matches = [index for index, line in enumerate(lines) if line.strip() == wanted]
+    if not matches:
+        return None
+    return max(matches, key=lambda index: (_context_score(thread, lines, index), -abs(index - previous_offset)))
+
+
+def _context_score(thread: Thread, lines: Sequence[str], index: int) -> int:
+    before, after = surrounding(lines, index)
+    score = sum(1 for wanted, actual in zip(reversed(thread.context_before), reversed(before), strict=False) if wanted.strip() == actual.strip())
+    return score + sum(1 for wanted, actual in zip(thread.context_after, after, strict=False) if wanted.strip() == actual.strip())
+
+
+def _latest_anchors(store: Store, thread_ids: list[str]) -> dict[str, ThreadAnchor]:
+    return {anchor.thread_id: anchor for anchor in store.threads.anchors(thread_ids)}
+
+
+def _anchor(thread: Thread, revision_id: int, target: AnchorTarget | None) -> ThreadAnchor:
+    if target is None:
+        return ThreadAnchor(thread.id, revision_id, thread.path, thread.kind, thread.qualified_name, None, None, outdated=True)
+    snapshot = target.snapshot
+    side = thread.side or Side.HEAD
+    return ThreadAnchor(thread.id, revision_id, snapshot.path, snapshot.kind, snapshot.qualified_name, side_hash(snapshot, side), target.line_offset)

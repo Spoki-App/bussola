@@ -2,7 +2,7 @@ import { useCallback, useRef, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useApprove, useFinishReview, useRefresh, useReview, useUnits } from '../api/hooks'
-import type { DiffRow, ReviewDetail, Unit, UnitFilter } from '../api/types'
+import type { DiffRow, ReviewDetail, Unit, UnitDiff, UnitFilter } from '../api/types'
 import { ErrorNote, ProgressBar } from '../components/Badges'
 import { FileTree } from '../components/FileTree'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
@@ -12,9 +12,10 @@ import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, groupByFile, next
 
 export interface ReviewExtensions {
   onComment?: (target: CommentTarget) => void
-  renderWidgets?: (unit: Unit, rows: DiffRow[], changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
+  renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   unitFooter?: (unit: Unit) => ReactNode
-  sidePanel?: ReactNode
+  fileActions?: (path: string) => ReactNode
+  sidePanel?: { label: string; content: ReactNode }
   headerActions?: ReactNode
 }
 
@@ -22,6 +23,8 @@ interface Props {
   reviewId: number
   extensions?: ReviewExtensions
 }
+
+const WIDE_LAYOUT_PX = 1400
 
 function scrollToElement(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -93,6 +96,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const [focusedIndex, setFocusedIndex] = useState(0)
   const actions = useRef(new Map<number, UnitActions>())
   const refresh = useRefresh(reviewId)
+  const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= WIDE_LAYOUT_PX)
 
   const register = useCallback((unitId: number, unitActions: UnitActions | null) => {
     if (unitActions) {
@@ -154,9 +158,16 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
             </button>
           ))}
         </div>
-        <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r refresh</p>
+        <div className="summary-row">
+          <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r refresh</p>
+          {extensions.sidePanel && (
+            <button type="button" aria-pressed={panelOpen} onClick={() => { setPanelOpen(!panelOpen) }}>
+              {panelOpen ? `Hide ${extensions.sidePanel.label}` : `Show ${extensions.sidePanel.label}`}
+            </button>
+          )}
+        </div>
       </section>
-      <div className="review-layout">
+      <div className={`review-layout${panelOpen && extensions.sidePanel ? ' with-panel' : ''}`}>
         <aside className="sidebar">
           <FileTree groups={groups} onSelect={(path) => { scrollToElement(`file-${path}`) }} />
         </aside>
@@ -165,7 +176,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           {units.data && unitList.length === 0 && <p className="muted">{filter === 'all' ? 'No changes between the branches.' : 'Nothing to review here.'}</p>}
           {groups.map((group) => (
             <section key={group.path} id={`file-${group.path}`} className="file-section">
-              <FileHeader reviewId={reviewId} path={group.path} oldPath={group.oldPath} complete={group.complete} />
+              <FileHeader reviewId={reviewId} path={group.path} oldPath={group.oldPath} complete={group.complete} actions={extensions.fileActions?.(group.path)} />
               {group.units.map((unit) => (
                 <UnitCard
                   key={unit.id}
@@ -182,13 +193,21 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
             </section>
           ))}
         </main>
-        {extensions.sidePanel && <aside className="side-panel">{extensions.sidePanel}</aside>}
+        {panelOpen && extensions.sidePanel && <aside className="side-panel">{extensions.sidePanel.content}</aside>}
       </div>
     </div>
   )
 }
 
-function FileHeader({ reviewId, path, oldPath, complete }: { reviewId: number; path: string; oldPath: string | null; complete: boolean }) {
+interface FileHeaderProps {
+  reviewId: number
+  path: string
+  oldPath: string | null
+  complete: boolean
+  actions?: ReactNode
+}
+
+function FileHeader({ reviewId, path, oldPath, complete, actions }: FileHeaderProps) {
   const approve = useApprove(reviewId)
   return (
     <div className="file-header">
@@ -196,11 +215,14 @@ function FileHeader({ reviewId, path, oldPath, complete }: { reviewId: number; p
         {oldPath && <span className="muted">{`${oldPath} → `}</span>}
         {path}
       </h2>
-      {!complete && (
-        <button type="button" disabled={approve.isPending} onClick={() => { approve.mutate({ path }) }}>
-          Approve file
-        </button>
-      )}
+      <div className="file-actions">
+        {actions}
+        {!complete && (
+          <button type="button" disabled={approve.isPending} onClick={() => { approve.mutate({ path }) }}>
+            Approve file
+          </button>
+        )}
+      </div>
     </div>
   )
 }

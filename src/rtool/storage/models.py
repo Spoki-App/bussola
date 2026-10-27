@@ -147,3 +147,51 @@ class ReviewSession(Base):
     revision_id: Mapped[int] = mapped_column(ForeignKey("revisions.id"))
     id: Mapped[str] = mapped_column(primary_key=True, default_factory=new_id)
     completed_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+
+
+class Thread(Base):
+    __tablename__ = "threads"
+
+    review_id: Mapped[int] = mapped_column(ForeignKey("reviews.id"), index=True)
+    scope: Mapped[str] = mapped_column()
+    created_by: Mapped[int] = mapped_column(ForeignKey("reviewers.id"))
+    created_revision_id: Mapped[int] = mapped_column(ForeignKey("revisions.id"))
+    path: Mapped[str | None] = mapped_column(default=None)
+    kind: Mapped[str | None] = mapped_column(default=None)
+    qualified_name: Mapped[str | None] = mapped_column(default=None)
+    side: Mapped[str | None] = mapped_column(default=None)
+    unit_hash: Mapped[str | None] = mapped_column(default=None)
+    line_offset: Mapped[int | None] = mapped_column(default=None)
+    line_text: Mapped[str | None] = mapped_column(default=None)
+    context_before: Mapped[list[str]] = mapped_column(JSON, default_factory=list)
+    context_after: Mapped[list[str]] = mapped_column(JSON, default_factory=list)
+    status: Mapped[str] = mapped_column(default="open")
+    id: Mapped[str] = mapped_column(primary_key=True, default_factory=new_id)
+    created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    thread_id: Mapped[str] = mapped_column(ForeignKey("threads.id"), index=True)
+    author_id: Mapped[int] = mapped_column(ForeignKey("reviewers.id"))
+    body: Mapped[str] = mapped_column()
+    id: Mapped[str] = mapped_column(primary_key=True, default_factory=new_id)
+    created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+    edited_at: Mapped[datetime | None] = mapped_column(default=None)
+    deleted_at: Mapped[datetime | None] = mapped_column(default=None)
+
+
+class ThreadAnchor(Base):
+    __tablename__ = "thread_anchors"
+    __table_args__ = (UniqueConstraint("thread_id", "revision_id"),)
+
+    thread_id: Mapped[str] = mapped_column(ForeignKey("threads.id"), index=True)
+    revision_id: Mapped[int] = mapped_column(ForeignKey("revisions.id"))
+    path: Mapped[str | None] = mapped_column()
+    kind: Mapped[str | None] = mapped_column()
+    qualified_name: Mapped[str | None] = mapped_column()
+    unit_hash: Mapped[str | None] = mapped_column()
+    line_offset: Mapped[int | None] = mapped_column()
+    outdated: Mapped[bool] = mapped_column(default=False)
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)

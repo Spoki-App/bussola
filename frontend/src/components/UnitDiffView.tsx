@@ -105,8 +105,8 @@ export function UnitDiffView({ diff, selectable, selected, onRowClick, onLineNum
       gutterEvents={{
         onClick: ({ change, side }) => {
           const row = change ? index.rowOf(change) : undefined
-          if (row && side && onLineNumberClick) {
-            onLineNumberClick(row, side)
+          if (row && onLineNumberClick) {
+            onLineNumberClick(row, side ?? (row.change === 'removed' ? 'old' : 'new'))
           }
         },
       }}

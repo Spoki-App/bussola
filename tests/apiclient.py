@@ -56,3 +56,13 @@ class ApiClient:
 
 def _unit_name(unit: Json) -> str:
     return f"{unit['path']}::{unit['qualified_name']}" if unit["qualified_name"] else unit["path"]
+
+
+def comment_on(api: ApiClient, review_id: int, name: str, line_offset: int, body: str = "Why?") -> Json:
+    payload = {"scope": "unit", "unit_id": api.unit(review_id, name)["id"], "line_offset": line_offset, "body": body}
+    return api.call("POST", f"/reviews/{review_id}/threads", 201, payload)
+
+
+def thread_anchor(api: ApiClient, review_id: int, thread_id: str) -> Json:
+    threads = api.call("GET", f"/reviews/{review_id}/threads")
+    return next(thread for thread in threads if thread["id"] == thread_id)

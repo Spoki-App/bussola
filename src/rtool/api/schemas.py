@@ -4,9 +4,10 @@ from typing import Annotated
 from pydantic import BaseModel, Field, model_validator
 
 from rtool.review.diffs import DiffMode
-from rtool.review.rows import LineChange
+from rtool.review.rows import LineChange, Side
 from rtool.review.scope import ChangeType
 from rtool.review.states import UnitState
+from rtool.review.threads import ThreadScope, ThreadStatus
 
 LineRangeIn = Annotated[tuple[int, int], Field(description="Inclusive file line range")]
 
@@ -166,3 +167,56 @@ class SessionOut(BaseModel):
     id: str
     revision_id: int
     completed_at: datetime
+
+
+class ThreadIn(BaseModel):
+    scope: ThreadScope
+    body: str
+    unit_id: int | None = None
+    path: str | None = None
+    side: Side = Side.HEAD
+    line_offset: int | None = None
+
+
+class ThreadPatch(BaseModel):
+    status: ThreadStatus
+
+
+class CommentIn(BaseModel):
+    body: str
+
+
+class CommentOut(BaseModel):
+    id: str
+    thread_id: str
+    author: ReviewerOut
+    body: str
+    created_at: datetime
+    edited_at: datetime | None
+    deleted: bool
+    mine: bool
+
+
+class ThreadAnchorOut(BaseModel):
+    revision_id: int
+    line_offset: int | None
+    outdated: bool
+    unit_id: int | None
+    file_line: int | None
+
+
+class ThreadOut(BaseModel):
+    id: str
+    scope: ThreadScope
+    path: str | None
+    kind: str | None
+    qualified_name: str | None
+    side: Side | None
+    status: ThreadStatus
+    created_by: ReviewerOut
+    created_at: datetime
+    line_text: str | None
+    context_before: list[str]
+    context_after: list[str]
+    anchor: ThreadAnchorOut | None
+    comments: list[CommentOut]

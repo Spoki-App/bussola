@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/hooks'
-import type { DiffMode, DiffRow, Unit } from '../api/types'
+import type { DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
 import { isTodo, unitTitle } from '../review/logic'
 import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
 import { ErrorNote, KindBadge, StateBadge } from './Badges'
@@ -17,6 +17,7 @@ export interface CommentTarget {
   unit: Unit
   row: DiffRow
   side: GutterSide
+  mode: DiffMode
 }
 
 interface Props {
@@ -26,7 +27,7 @@ interface Props {
   onFocus: () => void
   register: (unitId: number, actions: UnitActions | null) => void
   onComment?: (target: CommentTarget) => void
-  renderWidgets?: (unit: Unit, rows: DiffRow[], changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
+  renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   footer?: ReactNode
 }
 
@@ -76,8 +77,8 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
   const commentOnFirstChange = () => {
     setExpanded(true)
     const row = rows.find((candidate) => candidate.change !== 'context') ?? rows.at(0)
-    if (row && onComment) {
-      onComment({ unit, row, side: row.change === 'removed' ? 'old' : 'new' })
+    if (row && onComment && diff.data) {
+      onComment({ unit, row, side: row.change === 'removed' ? 'old' : 'new', mode: diff.data.mode })
     }
   }
 
@@ -165,8 +166,8 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
               selectable={unit.row_approvable}
               selected={selected}
               onRowClick={onRowClick}
-              onLineNumberClick={onComment ? (row, side) => { onComment({ unit, row, side }) } : undefined}
-              widgets={renderWidgets ? (changeKeyOf) => renderWidgets(unit, diff.data.rows, changeKeyOf) : undefined}
+              onLineNumberClick={onComment ? (row, side) => { onComment({ unit, row, side, mode: diff.data.mode }) } : undefined}
+              widgets={renderWidgets ? (changeKeyOf) => renderWidgets(unit, diff.data, changeKeyOf) : undefined}
             />
           )}
           {footer}
