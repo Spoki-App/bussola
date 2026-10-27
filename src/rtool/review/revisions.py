@@ -1,0 +1,68 @@
+from collections.abc import Callable
+from dataclasses import dataclass
+
+from rtool.config import load_repo_config
+from rtool.git import GitRepo
+from rtool.review.refs import resolve_review_commits
+from rtool.review.scope import UnitChange, compute_scope
+from rtool.storage.models import Review, Revision, UnitSnapshot
+from rtool.storage.repositories import Store
+from rtool.storage.unit_cache import SqlUnitCache
+from rtool.units.extract import FileUnitExtractor
+
+type RevisionHook = Callable[[Store, Review, Revision | None, Revision], None]
+
+
+@dataclass(frozen=True)
+class RefreshResult:
+    revision: Revision
+    created: bool
+
+
+def refresh_review(store: Store, review: Review, repo: GitRepo, *, fetch: bool = False, hooks: tuple[RevisionHook, ...] = ()) -> RefreshResult:
+    if fetch:
+        fetch_review_remotes(repo, review)
+    commits = resolve_review_commits(repo, review.head_ref, review.base_ref)
+    previous = store.reviews.latest_revision(review.id)
+    if previous is not None and (previous.head_sha, previous.base_sha, previous.merge_base_sha) == (commits.head_sha, commits.base_sha, commits.merge_base_sha):
+        return RefreshResult(previous, created=False)
+    extractor = FileUnitExtractor(load_repo_config(repo.root), SqlUnitCache(store.session))
+    changes = compute_scope(repo, commits.merge_base_sha, commits.head_sha, extractor)
+    revision = Revision(
+        review_id=review.id,
+        number=previous.number + 1 if previous else 1,
+        head_sha=commits.head_sha,
+        base_sha=commits.base_sha,
+        merge_base_sha=commits.merge_base_sha,
+    )
+    store.reviews.add_revision(revision, [snapshot_from(change) for change in changes])
+    for hook in hooks:
+        hook(store, review, previous, revision)
+    return RefreshResult(revision, created=True)
+
+
+def fetch_review_remotes(repo: GitRepo, review: Review) -> None:
+    remotes = {remote for ref in (review.head_ref, review.base_ref) if (remote := repo.upstream_remote(ref)) is not None}
+    for remote in sorted(remotes):
+        repo.fetch(remote)
+
+
+def snapshot_from(change: UnitChange) -> UnitSnapshot:
+    base, head = change.base, change.head
+    return UnitSnapshot(
+        revision_id=0,
+        path=change.key.path,
+        old_path=change.old_path,
+        kind=change.key.kind.value,
+        qualified_name=change.key.qualified_name,
+        base_hash=change.base_hash,
+        head_hash=change.head_hash,
+        base_text=base.text if base else None,
+        head_text=head.text if head else None,
+        base_lines=list(base.line_numbers) if base else [],
+        head_lines=list(head.line_numbers) if head else [],
+        base_start=base.start_line if base else None,
+        base_end=base.end_line if base else None,
+        head_start=head.start_line if head else None,
+        head_end=head.end_line if head else None,
+    )

@@ -1,21 +1,44 @@
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from rtool.api import API_PREFIX, build_api_router
-from rtool.config import STATIC_DIR
+from rtool.api.state import AppState, attach_state
+from rtool.config import AppSettings
+from rtool.errors import ConflictError, ForbiddenError, InvalidRequestError, NotFoundError
+from rtool.git import GitError, InvalidRefError
+from rtool.identity import GitConfigIdentity
+from rtool.review.refs import NoBaseBranchError
+from rtool.storage.database import Database
 
 INDEX_FILE = "index.html"
 ASSETS_DIR = "assets"
+ERROR_STATUS: dict[type[Exception], int] = {
+    NotFoundError: status.HTTP_404_NOT_FOUND,
+    ConflictError: status.HTTP_409_CONFLICT,
+    ForbiddenError: status.HTTP_403_FORBIDDEN,
+    InvalidRequestError: status.HTTP_400_BAD_REQUEST,
+    InvalidRefError: status.HTTP_400_BAD_REQUEST,
+    NoBaseBranchError: status.HTTP_400_BAD_REQUEST,
+    GitError: status.HTTP_400_BAD_REQUEST,
+}
 
 
-def create_app(static_dir: Path = STATIC_DIR) -> FastAPI:
-    app = FastAPI(title="rtool", docs_url=None, redoc_url=None)
+def create_app(settings: AppSettings) -> FastAPI:
+    app = FastAPI(title="rtool", docs_url=None, redoc_url=None, openapi_url=None)
+    attach_state(app, AppState(settings, Database.open(settings.data_dir), GitConfigIdentity(settings.identity_dir)))
+    for error_type in ERROR_STATUS:
+        app.add_exception_handler(error_type, _handle_error)
     app.include_router(build_api_router())
-    _mount_frontend(app, static_dir)
+    _mount_frontend(app, settings.static_dir)
     return app
+
+
+async def _handle_error(_request: Request, error: Exception) -> JSONResponse:
+    code = next((code for error_type, code in ERROR_STATUS.items() if isinstance(error, error_type)), status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return JSONResponse({"detail": str(error)}, status_code=code)
 
 
 def _mount_frontend(app: FastAPI, static_dir: Path) -> None:

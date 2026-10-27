@@ -1,3 +1,6 @@
+from pathlib import Path
+
+import pytest
 from typer.testing import CliRunner
 
 from rtool.cli import app
@@ -6,17 +9,19 @@ from tests.gitrepo import GitFixture
 runner = CliRunner()
 
 
-def test_status_prints_units_in_scope(git_repo: GitFixture) -> None:
+def test_status_prints_unit_states(git_repo: GitFixture, data_dir: Path) -> None:
     git_repo.commit({"app.py": "def f():\n    return 1\n"})
     git_repo.branch("feature")
     git_repo.commit({"app.py": "def f():\n    return 2\n"})
 
     result = runner.invoke(app, ["status", "feature", "--repo", str(git_repo.root)])
 
-    assert result.exit_code == 0
-    assert result.output.split() == ["modified", "function", "app.py::f"]
+    assert result.exit_code == 0, result.output
+    assert result.output.split() == ["new", "function", "app.py::f"]
+    assert (data_dir / "rtool.db").is_file()
 
 
+@pytest.mark.usefixtures("data_dir")
 def test_status_uses_rtool_toml_base_branch(git_repo: GitFixture) -> None:
     git_repo.commit({".rtool.toml": 'base_branch = "trunk"\n', "a.txt": "a\n"})
     git_repo.branch("trunk")
@@ -25,10 +30,25 @@ def test_status_uses_rtool_toml_base_branch(git_repo: GitFixture) -> None:
 
     result = runner.invoke(app, ["status", "feature", "--repo", str(git_repo.root)])
 
-    assert result.exit_code == 0
-    assert result.output.split() == ["modified", "file", "a.txt"]
+    assert result.exit_code == 0, result.output
+    assert result.output.split() == ["new", "file", "a.txt"]
 
 
+@pytest.mark.usefixtures("data_dir")
+def test_refresh_reports_new_and_unchanged_revisions(git_repo: GitFixture) -> None:
+    git_repo.commit({"a.txt": "a\n"})
+    git_repo.branch("feature")
+    git_repo.commit({"a.txt": "b\n"})
+    arguments = ["refresh", "feature", "--base", "main", "--repo", str(git_repo.root)]
+
+    first = runner.invoke(app, arguments)
+    second = runner.invoke(app, arguments)
+
+    assert first.output.startswith("Revision 1 (new)")
+    assert second.output.startswith("Revision 1 (unchanged)")
+
+
+@pytest.mark.usefixtures("data_dir")
 def test_status_rejects_option_like_refs(git_repo: GitFixture) -> None:
     git_repo.commit({"a.txt": "a\n"})
 

@@ -1,4 +1,5 @@
 import tomllib
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
@@ -24,3 +25,12 @@ def load_repo_config(root: Path) -> RepoConfig:
     if not path.is_file():
         return RepoConfig()
     return RepoConfig.model_validate(tomllib.loads(path.read_text(encoding="utf-8")))
+
+
+@dataclass(frozen=True)
+class AppSettings:
+    data_dir: Path
+    static_dir: Path = STATIC_DIR
+    identity_dir: Path | None = None
+    token: str | None = None
+    allowed_hosts: frozenset[str] = field(default_factory=frozenset)

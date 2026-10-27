@@ -61,6 +61,8 @@ reportExplicitAny = false
 reportUnusedCallResult = false
 reportImplicitOverride = false
 reportUnannotatedClassAttribute = false
+reportUnsafeMultipleInheritance = false
+reportMissingSuperCall = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

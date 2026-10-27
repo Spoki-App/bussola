@@ -1,11 +1,12 @@
 from fastapi import APIRouter
 
-from rtool.api import health
+from rtool.api import approvals, health, repos, reviews, units
 
 API_PREFIX = "/api"
 
 
 def build_api_router() -> APIRouter:
     router = APIRouter(prefix=API_PREFIX)
-    router.include_router(health.router)
+    for module in (health, repos, reviews, units, approvals):
+        router.include_router(module.router)
     return router

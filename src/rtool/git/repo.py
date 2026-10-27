@@ -11,6 +11,10 @@ from rtool.git.errors import GitError, InvalidRefError
 GIT = "git"
 SUBMODULE_MODE = "160000"
 RAW_RECORD_PREFIX = ":"
+DEFAULT_REMOTE = "origin"
+LOCAL_PREFIX = "refs/heads/"
+REMOTE_PREFIX = "refs/remotes/"
+SYMBOLIC_HEAD = "/HEAD"
 GIT_ENV = {"GIT_TERMINAL_PROMPT": "0", "LC_ALL": "C", "GIT_OPTIONAL_LOCKS": "0"}
 
 
@@ -79,6 +83,34 @@ class GitRepo:
         output = self.run("diff", "--no-color", "--no-ext-diff", "--raw", "-z", "-M", "--no-abbrev", self.resolve_commit(base), self.resolve_commit(head))
         return parse_raw_diff(output.decode("utf-8", errors="surrogateescape"))
 
+    def remotes(self) -> list[str]:
+        return self.run("remote").decode().split()
+
+    def upstream_remote(self, ref: str) -> str | None:
+        remotes = self.remotes()
+        prefix = next((remote for remote in remotes if ref.startswith(f"{remote}/")), None)
+        if prefix is not None:
+            return prefix
+        try:
+            upstream = self.run("rev-parse", "--abbrev-ref", "--symbolic-full-name", "--end-of-options", f"{ref}@{{upstream}}").decode().strip()
+        except GitError:
+            return DEFAULT_REMOTE if DEFAULT_REMOTE in remotes else None
+        return next((remote for remote in remotes if upstream.startswith(f"{remote}/")), None)
+
+    def fetch(self, remote: str) -> None:
+        if remote not in self.remotes():
+            raise InvalidRefError(remote)
+        self.run("fetch", "--prune", "--quiet", "--end-of-options", remote)
+
+    def branches(self) -> tuple[list[str], list[str]]:
+        output = self.run("for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes").decode().split("\n")
+        local = sorted(ref.removeprefix(LOCAL_PREFIX) for ref in output if ref.startswith(LOCAL_PREFIX))
+        remote = sorted(ref.removeprefix(REMOTE_PREFIX) for ref in output if ref.startswith(REMOTE_PREFIX) and not ref.endswith(SYMBOLIC_HEAD))
+        return local, remote
+
+    def config_value(self, key: str) -> str | None:
+        return read_git_config(self.root, key)
+
     def blob_reader(self) -> BlobReader:
         process = subprocess.Popen([GIT, "cat-file", "--batch"], cwd=self.root, env=_git_env(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         return BlobReader(process)
@@ -99,6 +131,12 @@ def parse_raw_diff(output: str) -> list[FileChange]:
         new = None if status == ChangeStatus.DELETED else BlobRef(new_path, new_id, new_mode)
         changes.append(FileChange(status, old, new))
     return changes
+
+
+def read_git_config(cwd: Path, key: str) -> str | None:
+    result = subprocess.run([GIT, "config", "--get", key], cwd=cwd, env=_git_env(), capture_output=True, check=False)
+    value = result.stdout.decode(errors="replace").strip()
+    return value if result.returncode == 0 and value else None
 
 
 def _git_env() -> dict[str, str]:

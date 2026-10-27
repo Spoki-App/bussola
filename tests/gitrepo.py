@@ -1,4 +1,5 @@
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 
 from rtool.git import GitRepo
@@ -24,7 +25,7 @@ class GitFixture:
     def git(self, *args: str) -> str:
         return subprocess.run(["git", *args], cwd=self.root, check=True, capture_output=True, text=True).stdout.strip()
 
-    def write(self, files: dict[str, FileContent]) -> None:
+    def write(self, files: Mapping[str, FileContent]) -> None:
         for path, content in files.items():
             target = self.root / path
             if content is None:
@@ -36,7 +37,7 @@ class GitFixture:
             else:
                 target.write_text(content)
 
-    def commit(self, files: dict[str, FileContent], message: str = "change") -> str:
+    def commit(self, files: Mapping[str, FileContent], message: str = "change") -> str:
         self.write(files)
         self.git("add", "-A")
         self.git("commit", "-q", "--allow-empty", "-m", message)

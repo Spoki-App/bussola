@@ -1,7 +1,7 @@
 from tree_sitter import Language, Node
 
 from rtool.units.extractors.base import SourceLines, Span, build_units
-from rtool.units.extractors.treesitter import node_text, parse, span_for
+from rtool.units.extractors.treesitter import node_text, parse, span_for, with_name
 from rtool.units.model import Unit, UnitKind
 
 EXPORT_STATEMENT = "export_statement"
@@ -34,21 +34,24 @@ class EcmaScriptExtractor:
 
 
 def _top_level_span(siblings: list[Node], index: int) -> Span | None:
-    node = siblings[index]
-    declaration = _unwrap_export(node)
+    declaration = _unwrap_export(siblings[index])
     if declaration is None:
         return None
     kind = declaration.type
+    name_node = declaration.child_by_field_name("name")
     if kind in FUNCTION_DECLARATIONS or kind in FUNCTION_VALUES:
-        return span_for(siblings, index, UnitKind.FUNCTION, _declared_name(declaration))
-    if kind in CLASS_DECLARATIONS:
+        span = span_for(siblings, index, UnitKind.FUNCTION, _declared_name(declaration))
+    elif kind in CLASS_DECLARATIONS:
         name = _declared_name(declaration)
-        return span_for(siblings, index, UnitKind.CLASS, name, _methods(declaration.child_by_field_name("body"), name))
-    if kind in TYPE_DECLARATIONS:
-        return span_for(siblings, index, UnitKind.TYPE, _declared_name(declaration))
-    if kind in VARIABLE_DECLARATIONS and (name := _function_variable_name(declaration)) is not None:
-        return span_for(siblings, index, UnitKind.FUNCTION, name)
-    return None
+        span = span_for(siblings, index, UnitKind.CLASS, name, _methods(declaration.child_by_field_name("body"), name))
+    elif kind in TYPE_DECLARATIONS:
+        span = span_for(siblings, index, UnitKind.TYPE, _declared_name(declaration))
+    elif kind in VARIABLE_DECLARATIONS and (variable := _function_variable(declaration)) is not None:
+        name_node = variable
+        span = span_for(siblings, index, UnitKind.FUNCTION, node_text(variable))
+    else:
+        return None
+    return with_name(span, name_node)
 
 
 def _unwrap_export(node: Node) -> Node | None:
@@ -61,7 +64,7 @@ def _declared_name(declaration: Node) -> str:
     return node_text(declaration.child_by_field_name("name")) or DEFAULT_EXPORT_NAME
 
 
-def _function_variable_name(declaration: Node) -> str | None:
+def _function_variable(declaration: Node) -> Node | None:
     declarators = [child for child in declaration.named_children if child.type == VARIABLE_DECLARATOR]
     if len(declarators) != 1:
         return None
@@ -69,7 +72,7 @@ def _function_variable_name(declaration: Node) -> str | None:
     value = declarators[0].child_by_field_name("value")
     if name is None or name.type != IDENTIFIER or value is None or value.type not in FUNCTION_VALUES:
         return None
-    return node_text(name)
+    return name
 
 
 def _methods(body: Node | None, class_name: str) -> tuple[Span, ...]:
@@ -77,7 +80,7 @@ def _methods(body: Node | None, class_name: str) -> tuple[Span, ...]:
         return ()
     siblings = body.named_children
     return tuple(
-        span_for(siblings, index, UnitKind.METHOD, f"{class_name}.{_method_name(node)}")
+        with_name(span_for(siblings, index, UnitKind.METHOD, f"{class_name}.{_method_name(node)}"), node.child_by_field_name("name"))
         for index, node in enumerate(siblings)
         if node.type == METHOD_DEFINITION
     )

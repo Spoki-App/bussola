@@ -1,6 +1,6 @@
 from tree_sitter import Language, Node, Parser
 
-from rtool.units.extractors.base import Span
+from rtool.units.extractors.base import NameLocation, Span
 from rtool.units.model import UnitKind
 
 COMMENT = "comment"
@@ -24,6 +24,13 @@ def last_row(node: Node) -> int:
 
 def span_for(siblings: list[Node], index: int, kind: UnitKind, qualified_name: str, children: tuple[Span, ...] = ()) -> Span:
     return Span(kind, qualified_name, _leading_comment_row(siblings, index), last_row(siblings[index]), children)
+
+
+def with_name(span: Span, name_node: Node | None) -> Span:
+    if name_node is None or name_node.start_point.row != name_node.end_point.row:
+        return span
+    location = NameLocation(name_node.start_point.row, name_node.start_point.column, name_node.end_point.column)
+    return Span(span.kind, span.qualified_name, span.start_row, span.end_row, span.children, location)
 
 
 def _leading_comment_row(siblings: list[Node], index: int) -> int:

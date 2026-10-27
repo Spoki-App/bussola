@@ -1,0 +1,149 @@
+import uuid
+from datetime import UTC, datetime
+from typing import Any, ClassVar
+
+from sqlalchemy import JSON, DateTime, Dialect, ForeignKey, Index, Text, TypeDecorator, UniqueConstraint
+from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, mapped_column
+
+type LineNumbers = list[int | None]
+
+
+def utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+def new_id() -> str:
+    return uuid.uuid4().hex
+
+
+class UtcDateTime(TypeDecorator[datetime]):
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+        return value.astimezone(UTC).replace(tzinfo=None) if value else None
+
+    def process_result_value(self, value: Any, dialect: Dialect) -> datetime | None:
+        return value.replace(tzinfo=UTC) if isinstance(value, datetime) else None
+
+
+class Base(MappedAsDataclass, DeclarativeBase):
+    type_annotation_map: ClassVar[dict[Any, Any]] = {datetime: UtcDateTime(), LineNumbers: JSON(), str: Text()}
+
+
+class Repo(Base):
+    __tablename__ = "repos"
+
+    path: Mapped[str] = mapped_column(unique=True)
+    root_commit: Mapped[str] = mapped_column(index=True)
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+
+
+class Reviewer(Base):
+    __tablename__ = "reviewers"
+
+    email: Mapped[str] = mapped_column(unique=True)
+    name: Mapped[str] = mapped_column()
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+
+
+class Review(Base):
+    __tablename__ = "reviews"
+    __table_args__ = (UniqueConstraint("repo_id", "head_ref", "base_ref"),)
+
+    repo_id: Mapped[int] = mapped_column(ForeignKey("repos.id"), index=True)
+    head_ref: Mapped[str] = mapped_column()
+    base_ref: Mapped[str] = mapped_column()
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+
+
+class Revision(Base):
+    __tablename__ = "revisions"
+    __table_args__ = (UniqueConstraint("review_id", "number"),)
+
+    review_id: Mapped[int] = mapped_column(ForeignKey("reviews.id"), index=True)
+    number: Mapped[int] = mapped_column()
+    head_sha: Mapped[str] = mapped_column()
+    base_sha: Mapped[str] = mapped_column()
+    merge_base_sha: Mapped[str] = mapped_column()
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+
+
+class UnitSnapshot(Base):
+    __tablename__ = "unit_snapshots"
+
+    revision_id: Mapped[int] = mapped_column(ForeignKey("revisions.id"), index=True)
+    path: Mapped[str] = mapped_column()
+    old_path: Mapped[str | None] = mapped_column()
+    kind: Mapped[str] = mapped_column()
+    qualified_name: Mapped[str] = mapped_column()
+    base_hash: Mapped[str | None] = mapped_column()
+    head_hash: Mapped[str | None] = mapped_column()
+    base_text: Mapped[str | None] = mapped_column()
+    head_text: Mapped[str | None] = mapped_column()
+    base_lines: Mapped[LineNumbers] = mapped_column()
+    head_lines: Mapped[LineNumbers] = mapped_column()
+    base_start: Mapped[int | None] = mapped_column(default=None)
+    base_end: Mapped[int | None] = mapped_column(default=None)
+    head_start: Mapped[int | None] = mapped_column(default=None)
+    head_end: Mapped[int | None] = mapped_column(default=None)
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+
+
+class ParsedBlob(Base):
+    __tablename__ = "parsed_blobs"
+
+    object_id: Mapped[str] = mapped_column(primary_key=True)
+    extractor: Mapped[str] = mapped_column(primary_key=True)
+    extractor_version: Mapped[int] = mapped_column(primary_key=True)
+    units: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
+
+
+class Approval(Base):
+    __tablename__ = "approvals"
+    __table_args__ = (Index("ix_approvals_review_reviewer", "review_id", "reviewer_id"),)
+
+    review_id: Mapped[int] = mapped_column(ForeignKey("reviews.id"))
+    reviewer_id: Mapped[int] = mapped_column(ForeignKey("reviewers.id"))
+    path: Mapped[str] = mapped_column()
+    kind: Mapped[str] = mapped_column()
+    qualified_name: Mapped[str] = mapped_column()
+    head_hash: Mapped[str | None] = mapped_column()
+    base_hash: Mapped[str | None] = mapped_column()
+    approved_text: Mapped[str | None] = mapped_column()
+    revision_id: Mapped[int] = mapped_column(ForeignKey("revisions.id"))
+    id: Mapped[str] = mapped_column(primary_key=True, default_factory=new_id)
+    created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+    revoked_at: Mapped[datetime | None] = mapped_column(default=None)
+
+
+class RowApproval(Base):
+    __tablename__ = "row_approvals"
+    __table_args__ = (Index("ix_row_approvals_review_reviewer", "review_id", "reviewer_id"),)
+
+    review_id: Mapped[int] = mapped_column(ForeignKey("reviews.id"))
+    reviewer_id: Mapped[int] = mapped_column(ForeignKey("reviewers.id"))
+    path: Mapped[str] = mapped_column()
+    kind: Mapped[str] = mapped_column()
+    qualified_name: Mapped[str] = mapped_column()
+    side: Mapped[str] = mapped_column()
+    row_hash: Mapped[str] = mapped_column()
+    line_text: Mapped[str] = mapped_column()
+    selection_id: Mapped[str] = mapped_column(index=True)
+    revision_id: Mapped[int] = mapped_column(ForeignKey("revisions.id"))
+    id: Mapped[str] = mapped_column(primary_key=True, default_factory=new_id)
+    created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+    revoked_at: Mapped[datetime | None] = mapped_column(default=None)
+
+
+class ReviewSession(Base):
+    __tablename__ = "review_sessions"
+
+    review_id: Mapped[int] = mapped_column(ForeignKey("reviews.id"), index=True)
+    reviewer_id: Mapped[int] = mapped_column(ForeignKey("reviewers.id"))
+    revision_id: Mapped[int] = mapped_column(ForeignKey("revisions.id"))
+    id: Mapped[str] = mapped_column(primary_key=True, default_factory=new_id)
+    completed_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
