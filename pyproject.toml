@@ -1,0 +1,66 @@
+[project]
+name = "rtool"
+version = "0.1.0"
+description = "Local, per-function code review on git branches"
+authors = [
+    { name = "Davide Candita", email = "davide.candita@spoki.it" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.20.1",
+    "fastapi>=0.162.0",
+    "platformdirs>=4.13.6",
+    "pydantic>=2",
+    "sqlalchemy>=2",
+    "tree-sitter>=0.26.0",
+    "tree-sitter-javascript>=0.25.0",
+    "tree-sitter-python>=0.25.0",
+    "tree-sitter-typescript>=0.23.2",
+    "typer>=0.27.3",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+rtool = "rtool.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.15,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.40.2",
+    "httpx2>=2.16.0",
+    "pytest>=9.1.1",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+line-length = 160
+target-version = "py312"
+extend-exclude = ["frontend", "src/rtool/static"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "RET", "PTH", "PL", "RUF", "S", "T20"]
+ignore = ["S603", "S607"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR2004"]
+
+[tool.ruff.lint.pylint]
+max-args = 5
+max-statements = 60
+
+[tool.basedpyright]
+include = ["src", "tests"]
+exclude = ["src/rtool/static", "frontend", "**/__pycache__"]
+pythonVersion = "3.12"
+typeCheckingMode = "recommended"
+reportAny = false
+reportExplicitAny = false
+reportUnusedCallResult = false
+reportImplicitOverride = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
