@@ -13,6 +13,7 @@ from rtool.forge.github import GitHubAdapter
 from rtool.git import GitError, InvalidRefError
 from rtool.identity import GitConfigIdentity
 from rtool.review.refs import NoBaseBranchError
+from rtool.security import install_security
 from rtool.storage.database import Database
 
 INDEX_FILE = "index.html"
@@ -35,6 +36,7 @@ def create_app(settings: AppSettings, forge: ForgeAdapter | None = None) -> Fast
     attach_state(app, state)
     for error_type in ERROR_STATUS:
         app.add_exception_handler(error_type, _handle_error)
+    install_security(app, settings)
     app.include_router(build_api_router())
     _mount_frontend(app, settings.static_dir)
     return app

@@ -1,3 +1,4 @@
+import os
 import threading
 import webbrowser
 from collections.abc import Generator
@@ -19,6 +20,7 @@ from rtool.review.overview import unit_views
 from rtool.review.refs import NoBaseBranchError, default_base_ref
 from rtool.review.repos import register_repo
 from rtool.review.revisions import refresh_review
+from rtool.security import LOCAL_HOSTS, allowed_hosts_for, new_token
 from rtool.storage.database import Database, default_data_dir
 from rtool.storage.models import Review
 from rtool.storage.repositories import Store
@@ -27,6 +29,7 @@ BROWSER_OPEN_DELAY_SECONDS = 1.0
 USAGE_ERROR_EXIT_CODE = 2
 SHORT_SHA_LENGTH = 12
 CLI_ERRORS = (GitError, InvalidRefError, NoBaseBranchError, DomainError)
+TOKEN_ENV = "RTOOL_TOKEN"
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -48,10 +51,13 @@ def serve(
     no_open: Annotated[bool, typer.Option("--no-open", help="Do not open the browser")] = False,
 ) -> None:
     """Start the review UI."""
+    if host not in LOCAL_HOSTS:
+        typer.secho(f"warning: listening on {host} exposes your repositories to other machines on the network", fg=typer.colors.YELLOW, err=True)
     identity_dir = repo or Path.cwd()
-    settings = AppSettings(data_dir=default_data_dir(), identity_dir=identity_dir)
+    token = os.environ.get(TOKEN_ENV) or new_token()
+    settings = AppSettings(data_dir=default_data_dir(), identity_dir=identity_dir, token=token, allowed_hosts=allowed_hosts_for(host, port))
     _register_if_repo(settings.data_dir, identity_dir)
-    url = f"http://{host}:{port}/"
+    url = f"http://{host}:{port}/?token={token}"
     if not no_open:
         threading.Timer(BROWSER_OPEN_DELAY_SECONDS, webbrowser.open, args=[url]).start()
     typer.echo(f"rtool listening on {url}")

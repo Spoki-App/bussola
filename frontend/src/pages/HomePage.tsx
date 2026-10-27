@@ -69,7 +69,7 @@ function RepoSection({ repo }: { repo: Repo }) {
             <ProgressBar percent={progressPercent(review)} label={`Progress of ${review.head_ref}`} />
             <span className="muted">{`${String(review.approved)}/${String(review.total)} approved`}</span>
             <span className="muted">{`${String(review.total - review.approved)} to review`}</span>
-            {review.open_threads > 0 && <span className="muted">{`${String(review.open_threads)} open threads`}</span>}
+            {review.open_threads > 0 && <span className="muted">{`${String(review.open_threads)} open thread${review.open_threads === 1 ? '' : 's'}`}</span>}
           </li>
         ))}
       </ul>

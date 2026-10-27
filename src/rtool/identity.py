@@ -19,6 +19,7 @@ class GitConfigIdentity:
 
     def current(self) -> Identity:
         user = getpass.getuser()
-        email = read_git_config(self._cwd, "user.email") or f"{user}@{FALLBACK_EMAIL_DOMAIN}"
-        name = read_git_config(self._cwd, "user.name") or user
+        cwd = self._cwd if self._cwd.is_dir() else Path.home()
+        email = read_git_config(cwd, "user.email") or f"{user}@{FALLBACK_EMAIL_DOMAIN}"
+        name = read_git_config(cwd, "user.name") or user
         return Identity(email, name)

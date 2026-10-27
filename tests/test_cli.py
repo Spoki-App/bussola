@@ -56,3 +56,14 @@ def test_status_rejects_option_like_refs(git_repo: GitFixture) -> None:
 
     assert result.exit_code == 2
     assert "Not a valid commit reference" in result.output
+
+
+@pytest.mark.usefixtures("data_dir")
+def test_rtool_toml_file_level_and_ignore_globs(git_repo: GitFixture) -> None:
+    git_repo.commit({".rtool.toml": 'file_level = ["generated/*.py"]\nignore = ["docs/**"]\n', "a.txt": "a\n"})
+    git_repo.branch("feature")
+    git_repo.commit({"generated/models.py": "def f():\n    pass\n", "docs/guide.md": "hi\n", "app.py": "def g():\n    pass\n"})
+
+    result = runner.invoke(app, ["status", "feature", "--base", "main", "--repo", str(git_repo.root)])
+
+    assert sorted(result.output.splitlines()) == sorted(["new             function app.py::g", "new             file     generated/models.py"])
