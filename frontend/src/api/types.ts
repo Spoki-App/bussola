@@ -1,0 +1,110 @@
+export type UnitState = 'approved' | 'approved_moved' | 'changed' | 'partial' | 'removed' | 'new'
+export type UnitFilter = 'all' | 'todo' | 'since_last'
+export type DiffMode = 'base' | 'approved'
+export type LineChange = 'context' | 'added' | 'removed'
+export type ChangeType = 'added' | 'modified' | 'removed'
+export type LineRange = [number, number]
+
+export interface Reviewer {
+  id: number
+  email: string
+  name: string
+}
+
+export interface Repo {
+  id: number
+  path: string
+  name: string
+  root_commit: string
+  missing: boolean
+}
+
+export interface Refs {
+  local: string[]
+  remote: string[]
+  default_base: string | null
+}
+
+export interface Revision {
+  id: number
+  number: number
+  head_sha: string
+  base_sha: string
+  merge_base_sha: string
+  created_at: string
+}
+
+export interface Review {
+  id: number
+  repo_id: number
+  repo_path: string
+  head_ref: string
+  base_ref: string
+  latest_revision: Revision | null
+  counts: Record<UnitState, number>
+  total: number
+  approved: number
+  open_threads: number
+  last_session_at: string | null
+}
+
+export interface ReviewDetail extends Review {
+  revisions: Revision[]
+}
+
+export interface Unit {
+  id: number
+  revision_id: number
+  path: string
+  old_path: string | null
+  kind: string
+  qualified_name: string
+  state: UnitState
+  change_type: ChangeType
+  base_changed: boolean
+  approval_id: string | null
+  row_approvable: boolean
+  rows_total: number
+  rows_approved: number
+  base_start: number | null
+  base_end: number | null
+  head_start: number | null
+  head_end: number | null
+  binary: boolean
+  open_threads: number
+  default_diff_mode: DiffMode
+}
+
+export interface DiffRow {
+  change: LineChange
+  old_index: number | null
+  new_index: number | null
+  old_line: number | null
+  new_line: number | null
+  text: string
+  row_hash: string | null
+  approved: boolean
+  selection_id: string | null
+}
+
+export interface UnitDiff {
+  unit_id: number
+  mode: DiffMode
+  available_modes: DiffMode[]
+  approved_text_unavailable: boolean
+  binary: boolean
+  unified: string
+  rows: DiffRow[]
+}
+
+export interface RefreshResult {
+  revision: Revision
+  created: boolean
+}
+
+export interface ApprovalRequest {
+  unit_id?: number
+  path?: string
+  head_range?: LineRange | null
+  base_range?: LineRange | null
+}
