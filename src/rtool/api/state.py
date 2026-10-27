@@ -4,6 +4,7 @@ from typing import cast
 from fastapi import FastAPI, Request
 
 from rtool.config import AppSettings
+from rtool.forge.base import ForgeAdapter
 from rtool.identity import GitConfigIdentity
 from rtool.storage.database import Database
 
@@ -13,6 +14,7 @@ class AppState:
     settings: AppSettings
     database: Database
     identity: GitConfigIdentity
+    forge: ForgeAdapter
 
 
 def attach_state(app: FastAPI, state: AppState) -> None:

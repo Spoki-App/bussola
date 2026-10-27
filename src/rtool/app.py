@@ -8,6 +8,8 @@ from rtool.api import API_PREFIX, build_api_router
 from rtool.api.state import AppState, attach_state
 from rtool.config import AppSettings
 from rtool.errors import ConflictError, ForbiddenError, InvalidRequestError, NotFoundError
+from rtool.forge.base import ForgeAdapter, ForgeError
+from rtool.forge.github import GitHubAdapter
 from rtool.git import GitError, InvalidRefError
 from rtool.identity import GitConfigIdentity
 from rtool.review.refs import NoBaseBranchError
@@ -23,12 +25,14 @@ ERROR_STATUS: dict[type[Exception], int] = {
     InvalidRefError: status.HTTP_400_BAD_REQUEST,
     NoBaseBranchError: status.HTTP_400_BAD_REQUEST,
     GitError: status.HTTP_400_BAD_REQUEST,
+    ForgeError: status.HTTP_502_BAD_GATEWAY,
 }
 
 
-def create_app(settings: AppSettings) -> FastAPI:
+def create_app(settings: AppSettings, forge: ForgeAdapter | None = None) -> FastAPI:
     app = FastAPI(title="rtool", docs_url=None, redoc_url=None, openapi_url=None)
-    attach_state(app, AppState(settings, Database.open(settings.data_dir), GitConfigIdentity(settings.identity_dir)))
+    state = AppState(settings, Database.open(settings.data_dir), GitConfigIdentity(settings.identity_dir), forge or GitHubAdapter())
+    attach_state(app, state)
     for error_type in ERROR_STATUS:
         app.add_exception_handler(error_type, _handle_error)
     app.include_router(build_api_router())

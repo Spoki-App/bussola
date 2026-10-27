@@ -97,6 +97,11 @@ class GitRepo:
             return DEFAULT_REMOTE if DEFAULT_REMOTE in remotes else None
         return next((remote for remote in remotes if upstream.startswith(f"{remote}/")), None)
 
+    def remote_url(self, remote: str) -> str | None:
+        if remote not in self.remotes():
+            return None
+        return self.run("remote", "get-url", "--", remote).decode().strip() or None
+
     def fetch(self, remote: str) -> None:
         if remote not in self.remotes():
             raise InvalidRefError(remote)

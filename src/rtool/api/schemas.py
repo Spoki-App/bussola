@@ -220,3 +220,55 @@ class ThreadOut(BaseModel):
     context_after: list[str]
     anchor: ThreadAnchorOut | None
     comments: list[CommentOut]
+
+
+class ForgeStatusOut(BaseModel):
+    available: bool
+    authenticated: bool
+    message: str
+
+
+class PullRequestOut(BaseModel):
+    number: int
+    title: str
+    url: str
+    head_sha: str
+    head_ref: str
+    base_ref: str
+
+
+class ForgeLinkOut(BaseModel):
+    provider: str
+    repository: str
+    pr_number: int
+
+
+class ForgeOut(BaseModel):
+    status: ForgeStatusOut
+    repository: str | None
+    link: ForgeLinkOut | None
+    pull_request: PullRequestOut | None
+    candidates: list[PullRequestOut]
+    pending_comments: int
+    head_matches: bool | None
+    error: str | None
+
+
+class ForgeLinkIn(BaseModel):
+    pr_number: int = Field(gt=0)
+
+
+class PublishIn(BaseModel):
+    draft: bool = False
+
+
+class PublishOutcomeOut(BaseModel):
+    comment_ids: list[str]
+    status: str
+    detail: str
+    url: str | None
+
+
+class PublishOut(BaseModel):
+    review_url: str | None
+    outcomes: list[PublishOutcomeOut]

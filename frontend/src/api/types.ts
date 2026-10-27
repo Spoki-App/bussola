@@ -157,3 +157,35 @@ export interface NewThreadRequest {
   side?: Side
   line_offset?: number
 }
+
+export interface PullRequest {
+  number: number
+  title: string
+  url: string
+  head_sha: string
+  head_ref: string
+  base_ref: string
+}
+
+export interface ForgeOverview {
+  status: { available: boolean; authenticated: boolean; message: string }
+  repository: string | null
+  link: { provider: string; repository: string; pr_number: number } | null
+  pull_request: PullRequest | null
+  candidates: PullRequest[]
+  pending_comments: number
+  head_matches: boolean | null
+  error: string | null
+}
+
+export interface PublishOutcome {
+  comment_ids: string[]
+  status: 'published' | 'updated' | 'skipped' | 'failed'
+  detail: string
+  url: string | null
+}
+
+export interface PublishResult {
+  review_url: string | null
+  outcomes: PublishOutcome[]
+}

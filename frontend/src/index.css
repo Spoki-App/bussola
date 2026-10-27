@@ -694,3 +694,54 @@ button.link {
 .snippet-target {
   font-weight: 700;
 }
+
+.popover-anchor {
+  position: relative;
+}
+
+.popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 10;
+  width: min(420px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.popover p {
+  margin: 0;
+}
+
+.stack {
+  display: grid;
+  gap: 8px;
+}
+
+.stack > button {
+  justify-self: start;
+  white-space: normal;
+  text-align: left;
+}
+
+.outcomes {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.outcome-failed strong {
+  color: var(--danger);
+}
+
+.outcome-skipped strong {
+  color: var(--warning);
+}
+
+.outcome-published strong,
+.outcome-updated strong {
+  color: var(--success);
+}

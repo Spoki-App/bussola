@@ -3,7 +3,21 @@ from typing import Protocol
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from rtool.storage.models import Approval, Comment, Repo, Review, Reviewer, ReviewSession, Revision, RowApproval, Thread, ThreadAnchor, UnitSnapshot
+from rtool.storage.models import (
+    Approval,
+    Comment,
+    ForgeLink,
+    PublishedComment,
+    Repo,
+    Review,
+    Reviewer,
+    ReviewSession,
+    Revision,
+    RowApproval,
+    Thread,
+    ThreadAnchor,
+    UnitSnapshot,
+)
 
 
 class ReviewRepository(Protocol):
@@ -46,6 +60,13 @@ class ThreadRepository(Protocol):
     def add_comment(self, comment: Comment) -> Comment: ...
     def anchors(self, thread_ids: list[str]) -> list[ThreadAnchor]: ...
     def add_anchor(self, anchor: ThreadAnchor) -> ThreadAnchor: ...
+
+
+class ForgeRepository(Protocol):
+    def link(self, review_id: int) -> ForgeLink | None: ...
+    def save_link(self, link: ForgeLink) -> ForgeLink: ...
+    def published(self, comment_ids: list[str]) -> dict[str, PublishedComment]: ...
+    def save_published(self, published: PublishedComment) -> PublishedComment: ...
 
 
 class SqlReviewRepository:
@@ -198,12 +219,39 @@ class SqlThreadRepository:
         return anchor
 
 
+class SqlForgeRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def link(self, review_id: int) -> ForgeLink | None:
+        return self._session.scalar(select(ForgeLink).where(ForgeLink.review_id == review_id))
+
+    def save_link(self, link: ForgeLink) -> ForgeLink:
+        existing = self.link(link.review_id)
+        if existing is None:
+            self._session.add(link)
+            self._session.flush()
+            return link
+        existing.provider, existing.repository, existing.pr_number = link.provider, link.repository, link.pr_number
+        return existing
+
+    def published(self, comment_ids: list[str]) -> dict[str, PublishedComment]:
+        rows = self._session.scalars(select(PublishedComment).where(PublishedComment.comment_id.in_(comment_ids)))
+        return {row.comment_id: row for row in rows}
+
+    def save_published(self, published: PublishedComment) -> PublishedComment:
+        merged = self._session.merge(published)
+        self._session.flush()
+        return merged
+
+
 class Store:
     def __init__(self, session: Session) -> None:
         self.session = session
         self.reviews: ReviewRepository = SqlReviewRepository(session)
         self.approvals: ApprovalRepository = SqlApprovalRepository(session)
         self.threads: ThreadRepository = SqlThreadRepository(session)
+        self.forge: ForgeRepository = SqlForgeRepository(session)
 
     def commit(self) -> None:
         self.session.commit()

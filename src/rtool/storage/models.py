@@ -195,3 +195,25 @@ class ThreadAnchor(Base):
     line_offset: Mapped[int | None] = mapped_column()
     outdated: Mapped[bool] = mapped_column(default=False)
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
+
+
+class ForgeLink(Base):
+    __tablename__ = "forge_links"
+
+    review_id: Mapped[int] = mapped_column(ForeignKey("reviews.id"), unique=True)
+    provider: Mapped[str] = mapped_column()
+    repository: Mapped[str] = mapped_column()
+    pr_number: Mapped[int] = mapped_column()
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+
+
+class PublishedComment(Base):
+    __tablename__ = "published_comments"
+
+    comment_id: Mapped[str] = mapped_column(ForeignKey("comments.id"), primary_key=True)
+    provider: Mapped[str] = mapped_column()
+    remote_id: Mapped[str | None] = mapped_column()
+    remote_url: Mapped[str | None] = mapped_column()
+    published_body_hash: Mapped[str] = mapped_column()
+    published_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
