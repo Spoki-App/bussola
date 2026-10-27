@@ -60,6 +60,7 @@ reportAny = false
 reportExplicitAny = false
 reportUnusedCallResult = false
 reportImplicitOverride = false
+reportUnannotatedClassAttribute = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
