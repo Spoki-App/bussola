@@ -10,23 +10,41 @@ import { ReviewTitle } from '../components/ReviewTitle'
 import { Link } from '../Link'
 import { navigate } from '../navigation'
 import { progressPercent } from '../review/logic'
+import { REVIEW_FILTER_LABELS, loadReviewFilter, matchesReviewFilter, saveReviewFilter, type ReviewFilter } from '../review/reviewFilter'
 import { defaultReviewRefs, reviewFormProblem } from '../review/newReview'
 
 
 export function HomePage() {
   const repos = useRepos()
+  const [filter, setFilter] = useState<ReviewFilter>(loadReviewFilter)
+  const choose = (option: ReviewFilter) => {
+    setFilter(option)
+    saveReviewFilter(option)
+  }
   return (
     <div className="page">
-      <h1>Repositories</h1>
+      <div className="home-header">
+        <h1>Repositories</h1>
+        <div className="segmented" role="tablist" aria-label="Show reviews">
+          {(Object.keys(REVIEW_FILTER_LABELS) as ReviewFilter[]).map((option) => (
+            <button key={option} type="button" role="tab" aria-selected={filter === option} className={filter === option ? 'active' : ''} onClick={() => { choose(option) }}>
+              {REVIEW_FILTER_LABELS[option]}
+            </button>
+          ))}
+        </div>
+      </div>
       {repos.error && <ErrorNote message={describeError(repos.error)} />}
-      {repos.data?.length === 0 && <p className="muted">No repositories yet. Add one from Menu (top right), or run `rtool serve` inside a repository.</p>}
-      {repos.data?.map((repo) => <RepoSection key={repo.id} repo={repo} />)}
+      {repos.data?.length === 0 && <p className="muted">No repositories yet. Add one from Settings (top right), or run `rtool serve` inside a repository.</p>}
+      {repos.data?.map((repo) => <RepoSection key={repo.id} repo={repo} filter={filter} />)}
     </div>
   )
 }
 
-function RepoSection({ repo }: { repo: Repo }) {
+function RepoSection({ repo, filter }: { repo: Repo; filter: ReviewFilter }) {
   const reviews = useReviews(repo.id)
+  const all = reviews.data ?? []
+  const shown = all.filter((review) => matchesReviewFilter(review, filter))
+  const hidden = all.length - shown.length
   const [creating, setCreating] = useState(false)
   const [showPulls, setShowPulls] = useState(false)
   return (
@@ -51,7 +69,7 @@ function RepoSection({ repo }: { repo: Repo }) {
       {creating && <NewReviewForm repoId={repo.id} />}
       {reviews.error && <ErrorNote message={describeError(reviews.error)} />}
       <ul className="review-list">
-        {reviews.data?.map((review) => (
+        {shown.map((review) => (
           <li key={review.id}>
             <Link to={`/reviews/${String(review.id)}`} className="review-link">
               <ReviewTitle review={review} />
@@ -63,6 +81,7 @@ function RepoSection({ repo }: { repo: Repo }) {
           </li>
         ))}
       </ul>
+      {hidden > 0 && <p className="muted hidden-reviews">{`${String(hidden)} review${hidden === 1 ? '' : 's'} hidden by the filter.`}</p>}
     </section>
   )
 }

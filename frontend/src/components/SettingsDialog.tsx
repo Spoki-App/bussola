@@ -5,19 +5,19 @@ import { AddRepoForm } from './AddRepoForm'
 import { CodeFontPanel } from './CodeFontPanel'
 import { OpenPullRequestForm } from './OpenPullRequestForm'
 
-export function AppMenu() {
+export function SettingsButton() {
   const [open, setOpen] = useState(false)
   return (
     <>
       <button type="button" aria-haspopup="dialog" aria-expanded={open} title="Open a pull request, add a repository, choose the code font" onClick={() => { setOpen(true) }}>
-        Menu
+        Settings
       </button>
-      {open && <MenuDialog onClose={() => { setOpen(false) }} />}
+      {open && <SettingsModal onClose={() => { setOpen(false) }} />}
     </>
   )
 }
 
-function MenuDialog({ onClose }: { onClose: () => void }) {
+function SettingsModal({ onClose }: { onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
@@ -35,19 +35,19 @@ function MenuDialog({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <dialog ref={dialog} className="picker app-menu" aria-labelledby="app-menu-title" onClose={onClose}>
+    <dialog ref={dialog} className="picker settings-dialog" aria-labelledby="settings-dialog-title" onClose={onClose}>
       <header className="picker-header">
-        <h2 id="app-menu-title">Menu</h2>
+        <h2 id="settings-dialog-title">Settings</h2>
         <button type="button" className="link" onClick={close}>
           Close
         </button>
       </header>
-      <section aria-labelledby="menu-pull-request">
-        <h3 id="menu-pull-request">Open pull request</h3>
+      <section aria-labelledby="settings-pull-request">
+        <h3 id="settings-pull-request">Open pull request</h3>
         <OpenPullRequestForm onOpened={close} />
       </section>
-      <section aria-labelledby="menu-repository">
-        <h3 id="menu-repository">Add repository</h3>
+      <section aria-labelledby="settings-repository">
+        <h3 id="settings-repository">Add repository</h3>
         <AddRepoForm
           onAdded={() => {
             close()
@@ -55,8 +55,8 @@ function MenuDialog({ onClose }: { onClose: () => void }) {
           }}
         />
       </section>
-      <section aria-labelledby="menu-code-font">
-        <h3 id="menu-code-font">Code font</h3>
+      <section aria-labelledby="settings-code-font">
+        <h3 id="settings-code-font">Code font</h3>
         <CodeFontPanel />
       </section>
     </dialog>

@@ -1345,27 +1345,40 @@ button.danger {
   background: var(--bg-subtle);
 }
 
-.app-menu {
+.settings-dialog {
   width: min(640px, calc(100vw - 32px));
   height: auto;
   max-height: calc(100vh - 64px);
   overflow-y: auto;
 }
 
-.app-menu section + section {
+.settings-dialog section + section {
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
 
-.app-menu h3 {
+.settings-dialog h3 {
   margin: 0 0 4px;
   font-size: 14px;
 }
 
-.app-menu .inline-form {
+.settings-dialog .inline-form {
   margin: 4px 0;
 }
 
-.app-menu .inline-form input {
+.settings-dialog .inline-form input {
   min-width: 200px;
+}
+
+.home-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hidden-reviews {
+  margin: 4px 0 0;
+  font-size: 12px;
 }

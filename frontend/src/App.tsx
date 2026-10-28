@@ -1,7 +1,7 @@
 import { useMe } from './api/hooks'
 import { OpenPullRequestRoute } from './OpenPullRequestRoute'
 import { ReviewRoute } from './ReviewRoute'
-import { AppMenu } from './components/AppMenu'
+import { SettingsButton } from './components/SettingsDialog'
 import { HomePage } from './pages/HomePage'
 import { Link } from './Link'
 import { usePathname } from './navigation'
@@ -24,7 +24,7 @@ export default function App() {
         </Link>
         <span className="spacer" />
         {me.data && <span className="muted">{`${me.data.name} <${me.data.email}>`}</span>}
-        <AppMenu />
+        <SettingsButton />
       </header>
       {reviewMatch ? (
         <ReviewRoute key={reviewMatch[1]} reviewId={Number(reviewMatch[1])} />
