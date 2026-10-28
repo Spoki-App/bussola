@@ -9,8 +9,8 @@ export function GitHubButton({ reviewId }: { reviewId: number }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="popover-anchor">
-      <button type="button" aria-expanded={open} onClick={() => { setOpen(!open) }}>
-        GitHub
+      <button type="button" aria-expanded={open} title="Link this review to a GitHub pull request and send your comments there." onClick={() => { setOpen(!open) }}>
+        GitHub comments
       </button>
       {open && (
         <div className="popover" role="dialog" aria-label="Send comments to GitHub">

@@ -33,17 +33,23 @@ function scrollToElement(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+const CHECK_TITLE = 'Look at the branch for commits made since the last check and record them as a new revision of this review.'
+const FETCH_TITLE = 'Run git fetch before checking, to get commits that exist only on the remote.'
+const PULL_FETCH_TITLE = 'Download the latest commits of the pull request from GitHub before checking.'
+const MARK_TITLE = 'Remember this point. The "Since my last review" filter will then show only what changes after now. Nothing is approved or closed.'
+
 function ReviewHeader({ review, extra }: { review: ReviewDetail; extra?: ReactNode }) {
   const [fetchRemote, setFetchRemote] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const refresh = useRefresh(review.id)
   const finish = useFinishReview(review.id)
   const revision = review.latest_revision
+  const isPullRequest = review.pull_request !== null
 
   const runRefresh = () => {
     refresh.mutate(fetchRemote, {
       onSuccess: (result) => {
-        setMessage(result.created ? `Revision ${String(result.revision.number)} recorded.` : 'No new commits.')
+        setMessage(result.created ? `New commits found: revision ${String(result.revision.number)} recorded.` : 'No new commits.')
       },
     })
   }
@@ -62,33 +68,36 @@ function ReviewHeader({ review, extra }: { review: ReviewDetail; extra?: ReactNo
             <a href={review.pull_request.url} target="_blank" rel="noreferrer">
               View on GitHub
             </a>
-            {review.pull_request.author && ` · by ${review.pull_request.author}`}
-            {' · Refresh with fetch pulls the latest commits of the pull request'}
+            {review.pull_request.author && ` \u00b7 by ${review.pull_request.author}`}
           </p>
         )}
         {revision && (
           <p className="muted">
-            {`Revision ${String(revision.number)} · ${shortSha(revision.head_sha)} · refreshed ${new Date(revision.created_at).toLocaleString()}`}
+            {`Revision ${String(revision.number)} \u00b7 ${shortSha(revision.head_sha)} \u00b7 checked ${new Date(revision.created_at).toLocaleString()}`}
+            {` \u00b7 ${review.last_session_at ? `marked as reviewed ${new Date(review.last_session_at).toLocaleString()}` : 'not marked as reviewed yet'}`}
           </p>
         )}
       </div>
       <div className="review-actions">
-        <label className="checkbox">
-          <input type="checkbox" checked={fetchRemote} onChange={(event) => { setFetchRemote(event.target.checked) }} />
-          fetch
-        </label>
-        <button type="button" onClick={runRefresh} disabled={refresh.isPending} title="Refresh (r)">
-          {refresh.isPending ? 'Refreshing...' : 'Refresh'}
-        </button>
+        <div className="action-group">
+          <button type="button" onClick={runRefresh} disabled={refresh.isPending} title={`${CHECK_TITLE} Shortcut: r`}>
+            {refresh.isPending ? 'Checking...' : 'Check for new commits'}
+          </button>
+          <label className="checkbox" title={isPullRequest ? PULL_FETCH_TITLE : FETCH_TITLE}>
+            <input type="checkbox" checked={fetchRemote} onChange={(event) => { setFetchRemote(event.target.checked) }} />
+            {isPullRequest ? 'fetch the pull request first' : 'also fetch from remote'}
+          </label>
+        </div>
         <button
           type="button"
           className="primary"
+          title={MARK_TITLE}
           disabled={finish.isPending}
           onClick={() => {
-            finish.mutate(undefined, { onSuccess: () => { setMessage('Review session saved. "Since my last review" now starts here.') } })
+            finish.mutate(undefined, { onSuccess: () => { setMessage('Marked as reviewed. "Since my last review" now shows only what changes after this point.') } })
           }}
         >
-          Finish review
+          Mark as reviewed
         </button>
         {extra}
       </div>
@@ -171,7 +180,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           ))}
         </div>
         <div className="summary-row">
-          <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r refresh. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>
+          <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r check for new commits. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>
           {extensions.sidePanel && (
             <button type="button" aria-pressed={panelOpen} onClick={() => { setPanelOpen(!panelOpen) }}>
               {panelOpen ? `Hide ${extensions.sidePanel.label}` : `Show ${extensions.sidePanel.label}`}

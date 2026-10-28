@@ -6,7 +6,7 @@ Local, per-function code review for git branches. `rtool serve` opens a review U
 - An approval is tied to the **content** of a unit, not to a commit. After new commits, a rebase or a force-push, a unit with the same content stays approved.
 - When an approved unit changes, you see the diff between the version you approved and the current one.
 - Module-level code and whole files can also be approved **one selection of lines at a time**.
-- "Since my last review" shows only what appeared or changed after you last clicked "Finish review".
+- "Since my last review" shows only what appeared or changed after you last clicked "Mark as reviewed".
 - Comment threads are anchored to lines and follow them when the code moves. They can be sent to the GitHub pull request.
 
 Python (`.py`, `.pyi`), TypeScript (`.ts`), TSX and JavaScript (`.js`, `.jsx`, `.mjs`, `.cjs`) are parsed with tree-sitter. Everything else is reviewed as whole files.
@@ -42,6 +42,12 @@ rtool refresh feature/x --fetch
 
 ### Reviewing
 
+The review header has three actions:
+
+- **Check for new commits** looks at the branch for commits made since the last check and records them as a new revision. Approvals of units that did not change are kept. Tick **also fetch from remote** to run `git fetch` first; on a pull request review the option reads **fetch the pull request first** and downloads its latest commits.
+- **Mark as reviewed** remembers where you are. It approves and closes nothing; the **Since my last review** filter then shows only what changes after this point.
+- **GitHub comments** links the review to a pull request and sends your comments there (see below).
+
 | State | Meaning |
 |---|---|
 | New | Not approved yet |
@@ -55,7 +61,7 @@ A unit's own name does not count towards its content, so renaming a function wit
 
 To approve part of a module or file, click changed lines in its diff (shift-click extends the selection) and press "Approve selection". An approved line needs review again if it or the line next to it changes.
 
-Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve or revoke (or approve the selected lines), `c` comment, `r` refresh.
+Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve or revoke (or approve the selected lines), `c` comment, `r` check for new commits.
 
 ### Comments
 
@@ -67,7 +73,7 @@ For a repository with a GitHub remote, **Pull requests** on its card lists the o
 
 - **Review** downloads the pull request's code with `git fetch` into `refs/rtool/pull/<number>`, so your branches are not touched. It then starts a review against the pull request's base branch, already linked to the pull request.
 - **Sync reviews** fetches the latest commits of every pull request you are reviewing in that repository and records new revisions. Pull requests that were closed or merged are marked as such.
-- On a pull request review, **Refresh** with **fetch** does the same for that one pull request.
+- On a pull request review, **Check for new commits** with **fetch the pull request first** does the same for that one pull request.
 
 rtool only contacts GitHub when you press one of these buttons.
 
