@@ -4,6 +4,7 @@ import type { PullSyncResult } from '../api/types'
 import { Link } from '../Link'
 import { navigate } from '../navigation'
 import { ErrorNote } from './Badges'
+import { ExternalLink } from './ExternalLink'
 import { CommentCount } from './CommentCount'
 
 function syncSummary(result: PullSyncResult): string {
@@ -49,9 +50,9 @@ export function PullRequestsPanel({ repoId }: { repoId: number }) {
         {data.pulls.map(({ pull, review_id: reviewId }) => (
           <li key={pull.number}>
             <div className="pull-info">
-              <a href={pull.url} target="_blank" rel="noreferrer">
+              <ExternalLink href={pull.url}>
                 <span className="pr-number">{`#${String(pull.number)}`}</span> {pull.title}
-              </a>
+              </ExternalLink>
               <span className="muted">
                 {`${pull.author} · `}
                 <code>{pull.head_ref}</code>

@@ -1,3 +1,5 @@
+import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, status
@@ -30,9 +32,10 @@ ERROR_STATUS: dict[type[Exception], int] = {
 }
 
 
-def create_app(settings: AppSettings, forge: ForgeAdapter | None = None) -> FastAPI:
+def create_app(settings: AppSettings, forge: ForgeAdapter | None = None, url_opener: Callable[[str], object] | None = None) -> FastAPI:
     app = FastAPI(title="rtool", docs_url=None, redoc_url=None, openapi_url=None)
-    state = AppState(settings, Database.open(settings.data_dir), GitConfigIdentity(settings.identity_dir), forge or GitHubAdapter())
+    database = Database.open(settings.data_dir)
+    state = AppState(settings, database, GitConfigIdentity(settings.identity_dir), forge or GitHubAdapter(), url_opener or webbrowser.open_new_tab)
     attach_state(app, state)
     for error_type in ERROR_STATUS:
         app.add_exception_handler(error_type, _handle_error)

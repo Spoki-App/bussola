@@ -4,6 +4,7 @@ import { describeError } from '../api/client'
 import { useForge, useLinkPullRequest, usePublish } from '../api/forge'
 import type { ForgeOverview, PublishResult } from '../api/types'
 import { ErrorNote } from './Badges'
+import { ExternalLink } from './ExternalLink'
 
 export function GitHubButton({ reviewId }: { reviewId: number }) {
   const [open, setOpen] = useState(false)
@@ -83,7 +84,7 @@ function PublishSection({ reviewId, overview }: { reviewId: number; overview: Fo
     <div className="stack">
       {pull ? (
         <p>
-          <a href={pull.url} target="_blank" rel="noreferrer">{`#${String(pull.number)} ${pull.title}`}</a>
+          <ExternalLink href={pull.url}>{`#${String(pull.number)} ${pull.title}`}</ExternalLink>
         </p>
       ) : (
         <p>{`Linked to #${String(overview.link?.pr_number ?? 0)}`}</p>
@@ -109,9 +110,9 @@ function PublishSummary({ result }: { result: PublishResult }) {
   return (
     <div className="stack">
       {result.review_url && (
-        <a href={result.review_url} target="_blank" rel="noreferrer">
+        <ExternalLink href={result.review_url}>
           Open the review on GitHub
-        </a>
+        </ExternalLink>
       )}
       <ul className="outcomes">
         {result.outcomes.map((outcome) => (
@@ -120,9 +121,9 @@ function PublishSummary({ result }: { result: PublishResult }) {
             {outcome.url && (
               <>
                 {' '}
-                <a href={outcome.url} target="_blank" rel="noreferrer">
+                <ExternalLink href={outcome.url}>
                   view
-                </a>
+                </ExternalLink>
               </>
             )}
           </li>

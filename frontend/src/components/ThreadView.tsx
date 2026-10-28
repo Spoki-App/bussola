@@ -4,6 +4,7 @@ import { describeError } from '../api/client'
 import { useDeleteComment, useDeleteThread, useEditComment, useReply, useSetThreadStatus } from '../api/threads'
 import type { Comment, Thread } from '../api/types'
 import { ErrorNote } from './Badges'
+import { ExternalLink } from './ExternalLink'
 import { Composer } from './Composer'
 import { Markdown } from './Markdown'
 
@@ -112,9 +113,9 @@ function CommentItem({ reviewId, comment }: { reviewId: number; comment: Comment
         <span className="muted">{new Date(comment.created_at).toLocaleString()}</span>
         {comment.edited_at && <span className="muted">(edited)</span>}
         {comment.remote_url && (
-          <a className="github-link" href={comment.remote_url} target="_blank" rel="noreferrer" title="This comment is on GitHub">
+          <ExternalLink className="github-link" href={comment.remote_url} title="This comment is on GitHub">
             GitHub
-          </a>
+          </ExternalLink>
         )}
         <span className="spacer" />
         {comment.mine && !editing && (

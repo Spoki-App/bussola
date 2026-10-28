@@ -4,6 +4,7 @@ import { describeError } from '../api/client'
 import { useApprove, useFinishReview, useRefresh, useReview, useUnits } from '../api/hooks'
 import type { DiffRow, ReviewDetail, Unit, UnitDiff, UnitFilter } from '../api/types'
 import { ErrorNote, ProgressBar } from '../components/Badges'
+import { ExternalLink } from '../components/ExternalLink'
 import { FileTree } from '../components/FileTree'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
@@ -66,9 +67,9 @@ function ReviewHeader({ review, extra }: { review: ReviewDetail; extra?: ReactNo
         </h1>
         {review.pull_request?.url && (
           <p className="muted">
-            <a href={review.pull_request.url} target="_blank" rel="noreferrer">
+            <ExternalLink href={review.pull_request.url}>
               View on GitHub
-            </a>
+            </ExternalLink>
             {review.pull_request.author && ` \u00b7 by ${review.pull_request.author}`}
           </p>
         )}

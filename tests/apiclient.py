@@ -11,14 +11,16 @@ type Json = Any
 
 
 class ApiClient:
-    def __init__(self, client: TestClient, git: GitFixture) -> None:
+    def __init__(self, client: TestClient, git: GitFixture, opened_urls: list[str]) -> None:
         self.client = client
         self.git = git
+        self.opened_urls = opened_urls
 
     @classmethod
     def create(cls, git: GitFixture, data_dir: Path) -> "ApiClient":
         settings = AppSettings(data_dir=data_dir, static_dir=data_dir / "static", identity_dir=git.root)
-        return cls(TestClient(create_app(settings)), git)
+        opened: list[str] = []
+        return cls(TestClient(create_app(settings, url_opener=opened.append)), git, opened)
 
     def call(self, method: str, url: str, expected: int = 200, body: Json = None) -> Json:
         response = self.client.request(method, f"/api{url}", json=body)

@@ -121,6 +121,7 @@ The server is meant for one person on one machine.
 - **Session token:** every API call needs the session token cookie (HttpOnly, SameSite=Strict).
 - **Host check:** requests whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` are rejected, which blocks DNS rebinding.
 - **Git refs and files:** refs are validated with `git rev-parse --verify --end-of-options` before use. File contents are read only from the git object database.
+- **Opening links:** GitHub links are opened by the server in your default browser, as a new tab, so they work even when the rtool page runs in an app-style window. The server only opens `https://github.com` addresses.
 - **Outbound traffic:** the only network access is `git fetch` when you ask for it and `gh` when you use the GitHub panel.
 
 ## Development

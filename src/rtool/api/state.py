@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import cast
 
@@ -15,6 +16,7 @@ class AppState:
     database: Database
     identity: GitConfigIdentity
     forge: ForgeAdapter
+    url_opener: Callable[[str], object]
 
 
 def attach_state(app: FastAPI, state: AppState) -> None:
