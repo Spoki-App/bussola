@@ -1,5 +1,5 @@
 import hashlib
-from collections import Counter
+from collections import Counter, OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -10,6 +10,7 @@ from rtool.units.model import UnitKind
 
 ROW_APPROVABLE_KINDS = frozenset({UnitKind.MODULE, UnitKind.FILE})
 ROW_HASH_SEPARATOR = "\0"
+DIFF_CACHE_SIZE = 16
 
 
 class Side(StrEnum):
@@ -35,6 +36,9 @@ class DiffLine:
     old_index: int | None
     new_index: int | None
     text: str
+
+
+_diff_cache: OrderedDict[tuple[int, int, str], tuple[DiffLine, ...]] = OrderedDict()
 
 
 @dataclass(frozen=True)
@@ -66,6 +70,25 @@ def unit_lines(text: str | None, line_numbers: Sequence[int | None]) -> list[Uni
 
 
 def diff_lines(old: Sequence[str], new: Sequence[str]) -> list[DiffLine]:
+    key = _content_key(old, new)
+    cached = _diff_cache.get(key)
+    if cached is None:
+        cached = _diff_cache[key] = _compute_diff_lines(old, new)
+        while len(_diff_cache) > DIFF_CACHE_SIZE:
+            _diff_cache.popitem(last=False)
+    _diff_cache.move_to_end(key)
+    return list(cached)
+
+
+def _content_key(old: Sequence[str], new: Sequence[str]) -> tuple[int, int, str]:
+    digest = hashlib.sha256()
+    for line in (*old, ROW_HASH_SEPARATOR, *new):
+        digest.update(line.encode())
+        digest.update(b"\n")
+    return len(old), len(new), digest.hexdigest()
+
+
+def _compute_diff_lines(old: Sequence[str], new: Sequence[str]) -> tuple[DiffLine, ...]:
     matcher = SequenceMatcher(None, [line.rstrip() for line in old], [line.rstrip() for line in new], autojunk=False)
     result: list[DiffLine] = []
     for tag, old_start, old_end, new_start, new_end in matcher.get_opcodes():
@@ -74,7 +97,7 @@ def diff_lines(old: Sequence[str], new: Sequence[str]) -> list[DiffLine]:
             continue
         result.extend(DiffLine(LineChange.REMOVED, index, None, old[index]) for index in range(old_start, old_end))
         result.extend(DiffLine(LineChange.ADDED, None, index, new[index]) for index in range(new_start, new_end))
-    return result
+    return tuple(result)
 
 
 def changed_rows(base: Sequence[str], head: Sequence[str], lines: Sequence[DiffLine] | None = None) -> list[ChangedRow]:
