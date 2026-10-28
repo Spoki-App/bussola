@@ -46,3 +46,7 @@ export function useEditComment(reviewId: number) {
 export function useDeleteComment(reviewId: number) {
   return useThreadMutation(reviewId, (commentId: string) => deleteJson<Comment>(`/comments/${commentId}`))
 }
+
+export function useDeleteThread(reviewId: number) {
+  return useThreadMutation(reviewId, (threadId: string) => deleteJson<{ id: string; deleted: boolean }>(`/threads/${threadId}`))
+}

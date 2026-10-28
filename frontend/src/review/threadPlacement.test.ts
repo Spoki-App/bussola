@@ -49,6 +49,7 @@ function thread(side: Thread['side'], offset: number | null, lineCount = 1, outd
     context_after: [],
     anchor: { revision_id: 1, line_offset: offset, outdated, unit_id: outdated ? null : 1, file_line: null, end_file_line: null },
     comments: [],
+    can_delete: false,
   }
 }
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { describeError } from '../api/client'
-import { useDeleteComment, useEditComment, useReply, useSetThreadStatus } from '../api/threads'
+import { useDeleteComment, useDeleteThread, useEditComment, useReply, useSetThreadStatus } from '../api/threads'
 import type { Comment, Thread } from '../api/types'
 import { ErrorNote } from './Badges'
 import { Composer } from './Composer'
@@ -17,7 +17,9 @@ export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
   const [collapsed, setCollapsed] = useState(thread.status === 'resolved')
   const reply = useReply(reviewId)
   const setStatus = useSetThreadStatus(reviewId)
-  const failure = reply.error ?? setStatus.error
+  const remove = useDeleteThread(reviewId)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const failure = reply.error ?? setStatus.error ?? remove.error
   const resolved = thread.status === 'resolved'
 
   return (
@@ -34,10 +36,27 @@ export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
         )}
         <span className="muted">{`${String(thread.comments.length)} comment${thread.comments.length === 1 ? '' : 's'}`}</span>
         <span className="spacer" />
+        {thread.can_delete && !confirmingDelete && (
+          <button type="button" onClick={() => { setConfirmingDelete(true) }}>
+            Delete
+          </button>
+        )}
         <button type="button" disabled={setStatus.isPending} onClick={() => { setStatus.mutate({ threadId: thread.id, status: resolved ? 'open' : 'resolved' }) }}>
           {resolved ? 'Reopen' : 'Resolve'}
         </button>
       </div>
+      {confirmingDelete && (
+        <div className="confirm" role="alertdialog" aria-label="Delete thread">
+          <span>Delete this thread? Comments already sent to GitHub stay there.</span>
+          <span className="spacer" />
+          <button type="button" onClick={() => { setConfirmingDelete(false) }}>
+            Cancel
+          </button>
+          <button type="button" className="danger" disabled={remove.isPending} onClick={() => { remove.mutate(thread.id) }}>
+            Delete thread
+          </button>
+        </div>
+      )}
       {!collapsed && (
         <>
           {showSnippet && thread.line_text !== null && <Snippet thread={thread} />}

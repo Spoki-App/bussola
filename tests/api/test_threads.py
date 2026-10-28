@@ -133,3 +133,58 @@ def test_range_must_stay_inside_the_unit(api: ApiClient, git_repo: GitFixture) -
     unit_id = api.unit(review, "app.py::total")["id"]
 
     api.call("POST", f"/reviews/{review}/threads", 400, {"scope": "unit", "unit_id": unit_id, "line_offset": 2, "line_count": 5, "body": "x"})
+
+
+def test_author_can_delete_a_thread_and_it_disappears_everywhere(api: ApiClient, git_repo: GitFixture) -> None:
+    review = start(git_repo, api)
+    thread = comment_on(api, review, "app.py::total", 2)
+
+    deleted = api.call("DELETE", f"/threads/{thread['id']}")
+
+    assert deleted == {"id": thread["id"], "deleted": True}
+    assert api.call("GET", f"/reviews/{review}/threads") == []
+    assert (api.call("GET", f"/reviews/{review}")["open_threads"], api.unit(review, "app.py::total")["open_threads"]) == (0, 0)
+    api.call("POST", f"/threads/{thread['id']}/comments", 404, {"body": "late reply"})
+
+
+def test_threads_report_whether_they_can_be_deleted(api: ApiClient, git_repo: GitFixture) -> None:
+    review = start(git_repo, api)
+    thread = comment_on(api, review, "app.py::total", 2)
+
+    mine = thread_anchor(api, review, thread["id"])["can_delete"]
+    git_repo.git("config", "user.email", "bob@example.com")
+    theirs = thread_anchor(api, review, thread["id"])["can_delete"]
+
+    assert (mine, theirs) == (True, False)
+
+
+def test_only_the_author_can_delete_a_thread(api: ApiClient, git_repo: GitFixture) -> None:
+    review = start(git_repo, api)
+    thread = comment_on(api, review, "app.py::total", 2)
+
+    git_repo.git("config", "user.email", "bob@example.com")
+    error = api.call("DELETE", f"/threads/{thread['id']}", 403)
+
+    assert "threads you started" in error["detail"]
+
+
+def test_thread_with_replies_from_others_cannot_be_deleted(api: ApiClient, git_repo: GitFixture) -> None:
+    review = start(git_repo, api)
+    thread = comment_on(api, review, "app.py::total", 2)
+    git_repo.git("config", "user.email", "bob@example.com")
+    api.call("POST", f"/threads/{thread['id']}/comments", 201, {"body": "I disagree"})
+    git_repo.git("config", "user.email", "alice@example.com")
+
+    error = api.call("DELETE", f"/threads/{thread['id']}", 403)
+
+    assert "Resolve it instead" in error["detail"]
+    assert thread_anchor(api, review, thread["id"])["can_delete"] is False
+
+
+def test_deleted_threads_are_not_published(api: ApiClient, git_repo: GitFixture) -> None:
+    review = start(git_repo, api)
+    thread = api.call("POST", f"/reviews/{review}/threads", 201, {"scope": "review", "body": "Draft thought"})
+
+    api.call("DELETE", f"/threads/{thread['id']}")
+
+    assert api.call("GET", f"/reviews/{review}")["total_threads"] == 0

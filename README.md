@@ -59,7 +59,7 @@ Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve
 
 ### Comments
 
-Click a line number to start a thread on that line. To comment on several lines, drag over their line numbers or shift-click another line number; the thread is sent to GitHub as a multi-line comment. Use "Comment on file" in a file header, or the conversation panel for comments on the whole review. Comments are Markdown. When the code changes, a thread moves with its line. It follows a renamed unit, and becomes outdated, showing the original snippet, when its line is gone.
+Click a line number to start a thread on that line. To comment on several lines, drag over their line numbers or shift-click another line number; the thread is sent to GitHub as a multi-line comment. Use "Comment on file" in a file header, or the conversation panel for comments on the whole review. Comments are Markdown. You can edit or delete your own comments, and delete a thread you started as long as nobody else replied to it (otherwise resolve it). Deleted threads disappear from rtool but stay on GitHub if they were already sent. When the code changes, a thread moves with its line. It follows a renamed unit, and becomes outdated, showing the original snippet, when its line is gone.
 
 ### Reviewing GitHub pull requests
 

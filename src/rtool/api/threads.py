@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from rtool.api.deps import ReviewerDep, StoreDep, resolve_revision, snapshot_of
-from rtool.api.schemas import CommentIn, CommentOut, ReviewerOut, ThreadAnchorOut, ThreadIn, ThreadOut, ThreadPatch
+from rtool.api.schemas import CommentIn, CommentOut, ReviewerOut, ThreadAnchorOut, ThreadDeletedOut, ThreadIn, ThreadOut, ThreadPatch
 from rtool.errors import NotFoundError
 from rtool.review.anchoring import line_count
 from rtool.review.context import ReviewContext
@@ -14,8 +14,10 @@ from rtool.review.threads import (
     ThreadStatus,
     ThreadView,
     add_comment,
+    can_delete,
     create_thread,
     delete_comment,
+    delete_thread,
     edit_comment,
     get_thread,
     thread_views,
@@ -85,6 +87,13 @@ def patch_thread(thread_id: str, body: ThreadPatch, context: ThreadContextDep) -
     return _single_view(context, thread.id, None)
 
 
+@router.delete("/threads/{thread_id}")
+def remove_thread(thread_id: str, context: ThreadContextDep) -> ThreadDeletedOut:
+    thread = delete_thread(context, get_thread(context, thread_id))
+    context.store.commit()
+    return ThreadDeletedOut(id=thread.id, deleted=True)
+
+
 @router.patch("/comments/{comment_id}")
 def patch_comment(comment_id: str, body: CommentIn, context: CommentContextDep) -> CommentOut:
     comment = edit_comment(context, _comment(context.store, comment_id), body.body)
@@ -126,6 +135,7 @@ def thread_out(context: ReviewContext, view: ThreadView) -> ThreadOut:
             end_file_line=view.end_file_line,
         ),
         comments=[comment_out(context, comment) for comment in view.comments],
+        can_delete=can_delete(context, thread, view.comments),
     )
 
 

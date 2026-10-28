@@ -236,6 +236,12 @@ class ThreadOut(BaseModel):
     context_after: list[str]
     anchor: ThreadAnchorOut | None
     comments: list[CommentOut]
+    can_delete: bool
+
+
+class ThreadDeletedOut(BaseModel):
+    id: str
+    deleted: bool
 
 
 class ForgeStatusOut(BaseModel):

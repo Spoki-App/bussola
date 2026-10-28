@@ -152,6 +152,7 @@ export interface Thread {
   context_after: string[]
   anchor: ThreadAnchor | null
   comments: Comment[]
+  can_delete: boolean
 }
 
 export interface NewThreadRequest {

@@ -189,10 +189,12 @@ class SqlThreadRepository:
         self._session = session
 
     def threads(self, review_id: int) -> list[Thread]:
-        return list(self._session.scalars(select(Thread).where(Thread.review_id == review_id).order_by(Thread.created_at)))
+        query = select(Thread).where(Thread.review_id == review_id, Thread.deleted_at.is_(None)).order_by(Thread.created_at)
+        return list(self._session.scalars(query))
 
     def get_thread(self, thread_id: str) -> Thread | None:
-        return self._session.get(Thread, thread_id)
+        thread = self._session.get(Thread, thread_id)
+        return thread if thread is not None and thread.deleted_at is None else None
 
     def add_thread(self, thread: Thread) -> Thread:
         self._session.add(thread)

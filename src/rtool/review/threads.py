@@ -82,6 +82,19 @@ def delete_comment(context: ReviewContext, comment: Comment) -> Comment:
     return comment
 
 
+def can_delete(context: ReviewContext, thread: Thread, comments: list[Comment]) -> bool:
+    return thread.created_by == context.reviewer.id and all(comment.author_id == context.reviewer.id for comment in comments if comment.deleted_at is None)
+
+
+def delete_thread(context: ReviewContext, thread: Thread) -> Thread:
+    if thread.created_by != context.reviewer.id:
+        raise ForbiddenError("You can only delete threads you started")
+    if not can_delete(context, thread, context.store.threads.comments([thread.id])):
+        raise ForbiddenError("Others replied to this thread, so it cannot be deleted. Resolve it instead.")
+    thread.deleted_at = utcnow()
+    return thread
+
+
 def thread_views(context: ReviewContext, revision: Revision) -> list[ThreadView]:
     threads = [thread for thread in context.store.threads.threads(context.review.id) if thread.created_revision_id <= revision.id]
     ids = [thread.id for thread in threads]

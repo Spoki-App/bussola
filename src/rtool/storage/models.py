@@ -168,6 +168,7 @@ class Thread(Base):
     status: Mapped[str] = mapped_column(default="open")
     id: Mapped[str] = mapped_column(primary_key=True, default_factory=new_id)
     created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+    deleted_at: Mapped[datetime | None] = mapped_column(default=None)
 
 
 class Comment(Base):
