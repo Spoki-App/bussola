@@ -10,14 +10,13 @@ import { FileCommentButton } from './components/FileCommentButton'
 import { GitHubButton } from './components/GitHubButton'
 import { ThreadPanel } from './components/ThreadPanel'
 import { ThreadView } from './components/ThreadView'
-import type { CommentTarget } from './components/UnitCard'
 import { ReviewPage } from './pages/ReviewPage'
-import { draftAnchor, isInline, threadRow } from './review/threadPlacement'
+import { draftEndRow, draftRequest, draftRowKeys, isInline, nextDraft, threadRow, type Draft } from './review/threadPlacement'
 
 export function ReviewRoute({ reviewId }: { reviewId: number }) {
   const review = useReview(reviewId)
   const threads = useThreads(reviewId, review.data?.latest_revision?.id)
-  const [draft, setDraft] = useState<CommentTarget | null>(null)
+  const [draft, setDraft] = useState<Draft | null>(null)
   const create = useCreateThread(reviewId)
   const inline = (threads.data ?? []).filter(isInline)
   const openCount = (threads.data ?? []).filter((thread) => thread.status === 'open').length
@@ -33,17 +32,18 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
     for (const thread of inline.filter((candidate: Thread) => candidate.anchor?.unit_id === unit.id)) {
       place(threadRow(thread, diff), <ThreadView key={thread.id} reviewId={reviewId} thread={thread} />)
     }
-    const anchor = draft?.unit.id === unit.id ? draftAnchor(draft) : null
-    if (draft && anchor) {
+    if (draft?.unitId === unit.id && draft.mode === diff.mode) {
+      const request = draftRequest(draft)
       place(
-        draft.row,
+        draftEndRow(draft, diff.rows),
         <div key="draft" className="thread draft">
+          {request.line_count > 1 && <p className="muted draft-range">{`Commenting on ${String(request.line_count)} lines`}</p>}
           <Composer
             submitLabel="Start thread"
             autoFocus
             busy={create.isPending}
             onCancel={() => { setDraft(null) }}
-            onSubmit={(body) => { create.mutate({ scope: 'unit', unit_id: unit.id, body, ...anchor }, { onSuccess: () => { setDraft(null) } }) }}
+            onSubmit={(body) => { create.mutate({ scope: 'unit', unit_id: unit.id, body, ...request }, { onSuccess: () => { setDraft(null) } }) }}
           />
           {create.error && <ErrorNote message={describeError(create.error)} />}
         </div>,
@@ -56,7 +56,8 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
     <ReviewPage
       reviewId={reviewId}
       extensions={{
-        onComment: (target) => { setDraft(draftAnchor(target) ? target : null) },
+        onComment: (target) => { setDraft(nextDraft(draft, target, target.extend)) },
+        highlightRows: (unit, diff) => (draft?.unitId === unit.id && draft.mode === diff.mode ? draftRowKeys(draft, diff.rows) : undefined),
         renderWidgets,
         fileActions: (path) => <FileCommentButton reviewId={reviewId} path={path} />,
         headerActions: <GitHubButton reviewId={reviewId} />,

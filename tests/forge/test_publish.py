@@ -191,3 +191,27 @@ def test_patch_ranges_cover_each_hunk_side() -> None:
 
     assert ranges.right == ((1, 4),)
     assert ranges.left == ((1, 2), (10, 10))
+
+
+def test_thread_on_several_lines_becomes_a_multi_line_review_comment(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
+    review = setup_review(api, git_repo, fake_gh)
+    link(api, review)
+    comment_on(api, review, "app.py::total", (1, 2), "Merge these")
+
+    publish(api, review)
+
+    assert fake_gh.api_posts("/reviews")[0]["input"]["comments"] == [
+        {"path": "app.py", "start_line": 2, "start_side": "RIGHT", "line": 3, "side": "RIGHT", "body": "Merge these"}
+    ]
+
+
+def test_range_leaving_the_pull_request_diff_names_its_lines(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
+    review = setup_review(api, git_repo, fake_gh, patch=NARROW_PATCH)
+    link(api, review)
+    comment_on(api, review, "app.py::total", (1, 3), "Simplify")
+
+    publish(api, review)
+
+    body = fake_gh.api_posts("/pulls/7/comments")[0]["input"]["body"]
+    assert body.startswith("On `total`, lines 2-4:")
+    assert "    count = len(items)\n    result = sum(items)\n    return result" in body

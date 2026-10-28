@@ -16,7 +16,8 @@ interface Props {
   selectable: boolean
   selected: ReadonlySet<string>
   onRowClick: (row: DiffRow, extend: boolean) => void
-  onLineNumberClick?: (row: DiffRow, side: GutterSide) => void
+  onLineNumberClick?: (row: DiffRow, side: GutterSide, extend: boolean) => void
+  highlighted?: ReadonlySet<string>
   widgets?: (rowFor: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
 }
 
@@ -95,7 +96,7 @@ function renderSegments(segments: Segment[], hunks: HunkData[], expand: (id: str
   })
 }
 
-export function UnitDiffView({ diff, selectable, selected, onRowClick, onLineNumberClick, widgets }: Props) {
+export function UnitDiffView({ diff, selectable, selected, onRowClick, onLineNumberClick, widgets, highlighted }: Props) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const index = useMemo(() => buildIndex(diff.rows), [diff.rows])
   const widgetMap = widgets ? widgets(index.changeKeyOf) : undefined
@@ -142,14 +143,17 @@ export function UnitDiffView({ diff, selectable, selected, onRowClick, onLineNum
         if (rows.some((row) => row?.placeholder)) {
           classes.push('row-placeholder')
         }
+        if (highlighted && rows.some((row) => row && highlighted.has(rowKey(row)))) {
+          classes.push('row-commented')
+        }
         return classes.join(' ')
       }}
       renderGutter={({ change, side }) => gutterNumber(index.rowOf(change), side)}
       gutterEvents={{
-        onClick: ({ change, side }) => {
+        onClick: ({ change, side }, event: MouseEvent<HTMLElement>) => {
           const row = change ? index.rowOf(change) : undefined
           if (row && onLineNumberClick) {
-            onLineNumberClick(row, side ?? (row.change === 'removed' ? 'old' : 'new'))
+            onLineNumberClick(row, side ?? (row.change === 'removed' ? 'old' : 'new'), event.shiftKey)
           }
         },
       }}

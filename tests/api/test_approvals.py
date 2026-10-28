@@ -169,6 +169,6 @@ def test_hidden_child_units_are_shown_as_a_readable_placeholder(api: ApiClient, 
     rows = api.diff(review, "app.py")["rows"]
 
     placeholders = [row for row in rows if row["placeholder"]]
-    assert [row["text"] for row in placeholders] == ["\u22ef functions and classes, reviewed in their own cards"]
+    assert [row["text"] for row in placeholders] == ["\u22ef"]
     assert placeholders[0]["old_line"] is None
     assert placeholders[0]["new_line"] is None

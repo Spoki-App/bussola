@@ -6,11 +6,7 @@ from rtool.storage.models import Approval, UnitSnapshot
 from rtool.units.model import UnitKind
 from rtool.units.normalize import UNIT_PLACEHOLDER
 
-DEFAULT_PLACEHOLDER_LABEL = "\u22ef code reviewed in its own cards"
-PLACEHOLDER_LABELS = {
-    UnitKind.MODULE: "\u22ef functions and classes, reviewed in their own cards",
-    UnitKind.CLASS: "\u22ef methods, reviewed in their own cards",
-}
+PLACEHOLDER_LABEL = "\u22ef"
 
 
 class DiffMode(StrEnum):
@@ -47,15 +43,14 @@ def build_diff(snapshot: UnitSnapshot, mode: DiffMode, approval: Approval | None
     else:
         old = unit_lines(snapshot.base_text, snapshot.base_lines)
     rows = _rows(old, new, with_hashes=mode == DiffMode.BASE and UnitKind(snapshot.kind) in ROW_APPROVABLE_KINDS)
-    rows = [_labelled(row, UnitKind(snapshot.kind)) for row in rows]
+    rows = [_labelled(row) for row in rows]
     return UnitDiff(mode, rows, _unified(snapshot.old_path or snapshot.path, snapshot.path, rows), binary)
 
 
-def _labelled(row: DiffRow, kind: UnitKind) -> DiffRow:
+def _labelled(row: DiffRow) -> DiffRow:
     if row.text != UNIT_PLACEHOLDER:
         return row
-    label = PLACEHOLDER_LABELS.get(kind, DEFAULT_PLACEHOLDER_LABEL)
-    return DiffRow(row.change, row.old_index, row.new_index, row.old_line, row.new_line, label, row.row_hash, placeholder=True)
+    return DiffRow(row.change, row.old_index, row.new_index, row.old_line, row.new_line, PLACEHOLDER_LABEL, row.row_hash, placeholder=True)
 
 
 def _rows(old: list[UnitLine], new: list[UnitLine], *, with_hashes: bool) -> list[DiffRow]:

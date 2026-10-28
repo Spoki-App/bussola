@@ -1,20 +1,38 @@
 import { describe, expect, it } from 'vitest'
 
-import type { DiffRow, Thread, UnitDiff } from '../api/types'
-import { draftAnchor, isInline, threadRow } from './threadPlacement'
+import type { DiffRow, Thread, Unit, UnitDiff } from '../api/types'
 import type { CommentTarget } from '../components/UnitCard'
+import { rowKey } from './selection'
+import { draftAnchor, draftEndRow, draftRequest, draftRowKeys, isInline, nextDraft, threadRow } from './threadPlacement'
 
-const rows: DiffRow[] = [
-  { change: 'context', old_index: 0, new_index: 0, old_line: 1, new_line: 1, text: 'a', row_hash: null, approved: false, selection_id: null, placeholder: false },
-  { change: 'removed', old_index: 1, new_index: null, old_line: 2, new_line: null, text: 'b', row_hash: 'x', approved: false, selection_id: null, placeholder: false },
-  { change: 'added', old_index: null, new_index: 1, old_line: null, new_line: 2, text: 'c', row_hash: 'y', approved: false, selection_id: null, placeholder: false },
-]
+function row(change: DiffRow['change'], oldIndex: number | null, newIndex: number | null, text: string): DiffRow {
+  return {
+    change,
+    old_index: oldIndex,
+    new_index: newIndex,
+    old_line: oldIndex === null ? null : oldIndex + 1,
+    new_line: newIndex === null ? null : newIndex + 1,
+    text,
+    row_hash: change === 'context' ? null : text,
+    approved: false,
+    selection_id: null,
+    placeholder: false,
+  }
+}
+
+const rows: DiffRow[] = [row('context', 0, 0, 'a'), row('removed', 1, null, 'b'), row('added', null, 1, 'c'), row('added', null, 2, 'd'), row('context', 2, 3, 'e')]
+const unit = { id: 1 } as Unit
+
+function target(index: number, extend = false, mode: CommentTarget['mode'] = 'base'): CommentTarget {
+  const picked = rows[index]
+  return { unit, row: picked, side: picked.change === 'removed' ? 'old' : 'new', mode, extend }
+}
 
 function diff(mode: UnitDiff['mode']): UnitDiff {
   return { unit_id: 1, mode, available_modes: ['base'], approved_text_unavailable: false, binary: false, unified: '', rows }
 }
 
-function thread(side: Thread['side'], offset: number | null, outdated = false): Thread {
+function thread(side: Thread['side'], offset: number | null, lineCount = 1, outdated = false): Thread {
   return {
     id: 't',
     scope: 'unit',
@@ -26,36 +44,68 @@ function thread(side: Thread['side'], offset: number | null, outdated = false): 
     created_by: { id: 1, email: 'a@b.c', name: 'A' },
     created_at: '',
     line_text: 'b',
+    line_count: lineCount,
     context_before: [],
     context_after: [],
-    anchor: { revision_id: 1, line_offset: offset, outdated, unit_id: outdated ? null : 1, file_line: null },
+    anchor: { revision_id: 1, line_offset: offset, outdated, unit_id: outdated ? null : 1, file_line: null, end_file_line: null },
     comments: [],
   }
 }
 
 describe('draftAnchor', () => {
-  const target = (row: DiffRow, side: CommentTarget['side'], mode: CommentTarget['mode']) => ({ unit: {} as CommentTarget['unit'], row, side, mode })
-
   it('anchors removed lines on the base side only in base mode', () => {
-    expect(draftAnchor(target(rows[1], 'old', 'base'))).toEqual({ side: 'base', line_offset: 1 })
-    expect(draftAnchor(target(rows[1], 'old', 'approved'))).toBeNull()
+    expect(draftAnchor(target(1))).toEqual({ side: 'base', line_offset: 1 })
+    expect(draftAnchor(target(1, false, 'approved'))).toBeNull()
   })
 
   it('anchors other lines on the head side', () => {
-    expect(draftAnchor(target(rows[2], 'new', 'base'))).toEqual({ side: 'head', line_offset: 1 })
-    expect(draftAnchor(target(rows[0], 'old', 'approved'))).toEqual({ side: 'head', line_offset: 0 })
+    expect(draftAnchor(target(2))).toEqual({ side: 'head', line_offset: 1 })
+    expect(draftAnchor(target(0, false, 'approved'))).toEqual({ side: 'head', line_offset: 0 })
+  })
+})
+
+describe('nextDraft', () => {
+  it('starts a one-line draft on click', () => {
+    expect(draftRequest(nextDraft(null, target(2), false) ?? fail())).toEqual({ side: 'head', line_offset: 1, line_count: 1 })
+  })
+
+  it('extends from the first clicked line in either direction on shift-click', () => {
+    const first = nextDraft(null, target(3), false)
+    const extended = nextDraft(first, target(0, true), true) ?? fail()
+
+    expect(draftRequest(extended)).toEqual({ side: 'head', line_offset: 0, line_count: 3 })
+    expect(draftRowKeys(extended, rows)).toEqual(new Set([rowKey(rows[0]), rowKey(rows[2]), rowKey(rows[3])]))
+    expect(draftEndRow(extended, rows)?.text).toBe('d')
+  })
+
+  it('ignores shift-clicks on lines of the other side', () => {
+    const first = nextDraft(null, target(2), false)
+
+    expect(nextDraft(first, target(1, true), true)).toEqual(first)
+  })
+
+  it('starts over when shift-clicking in another unit', () => {
+    const first = nextDraft(null, target(2), false)
+    const other = { ...target(3, true), unit: { id: 2 } as Unit }
+
+    expect(nextDraft(first, other, true)?.unitId).toBe(2)
   })
 })
 
 describe('threadRow and isInline', () => {
-  it('places head threads on the head line and base threads only in base mode', () => {
+  it('places threads under their last line', () => {
     expect(threadRow(thread('head', 1), diff('base'))?.text).toBe('c')
+    expect(threadRow(thread('head', 1, 2), diff('base'))?.text).toBe('d')
     expect(threadRow(thread('base', 1), diff('base'))?.text).toBe('b')
     expect(threadRow(thread('base', 1), diff('approved'))).toBeUndefined()
   })
 
   it('keeps outdated threads out of the diff', () => {
     expect(isInline(thread('head', 1))).toBe(true)
-    expect(isInline(thread('head', null, true))).toBe(false)
+    expect(isInline(thread('head', null, 1, true))).toBe(false)
   })
 })
+
+function fail(): never {
+  throw new Error('expected a draft')
+}

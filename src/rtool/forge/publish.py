@@ -109,8 +109,9 @@ def _plan_new_thread(context: ReviewContext, view: ThreadView, comments: list[Co
     path = thread.path or ""
     if thread.scope == ThreadScope.UNIT:
         side = DiffSide.LEFT if thread.side == Side.BASE else DiffSide.RIGHT
-        if view.file_line is not None and not view.outdated and path in ranges and ranges[path].contains(side, view.file_line):
-            plan.inline.append((comments, InlineComment(path, view.file_line, side, body)))
+        start, end = view.file_line, view.end_file_line or view.file_line
+        if start is not None and end is not None and not view.outdated and path in ranges and ranges[path].contains(side, start, end):
+            plan.inline.append((comments, InlineComment(path, end, side, body, start_line=start)))
             return
         body = f"{_unit_location(view)}{body}"
     if path in ranges:
@@ -207,7 +208,9 @@ def _body_hash(context: ReviewContext, comment: Comment) -> str:
 def _unit_location(view: ThreadView) -> str:
     thread = view.thread
     name = f"`{thread.qualified_name}`" if thread.qualified_name else "this file"
-    where = f"Outdated comment on {name}" if view.outdated or view.file_line is None else f"On {name}, line {view.file_line}"
+    end = view.end_file_line
+    lines = f"lines {view.file_line}-{end}" if end is not None and end != view.file_line else f"line {view.file_line}"
+    where = f"Outdated comment on {name}" if view.outdated or view.file_line is None else f"On {name}, {lines}"
     snippet = f"\n\n```\n{thread.line_text}\n```" if thread.line_text else ""
     return f"{where}:{snippet}\n\n"
 

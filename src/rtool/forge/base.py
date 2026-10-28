@@ -40,9 +40,10 @@ class LineRanges:
     right: tuple[tuple[int, int], ...] = ()
     left: tuple[tuple[int, int], ...] = ()
 
-    def contains(self, side: DiffSide, line: int) -> bool:
+    def contains(self, side: DiffSide, line: int, end_line: int | None = None) -> bool:
         ranges = self.right if side == DiffSide.RIGHT else self.left
-        return any(start <= line <= end for start, end in ranges)
+        last = line if end_line is None else end_line
+        return any(start <= line and last <= end for start, end in ranges)
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,7 @@ class InlineComment:
     line: int
     side: DiffSide
     body: str
+    start_line: int | None = None
 
 
 @dataclass(frozen=True)

@@ -9,6 +9,8 @@ from rtool.review.scope import ChangeType
 from rtool.review.states import UnitState
 from rtool.review.threads import ThreadScope, ThreadStatus
 
+MAX_THREAD_LINES = 500
+
 LineRangeIn = Annotated[tuple[int, int], Field(description="Inclusive file line range")]
 
 
@@ -187,6 +189,7 @@ class ThreadIn(BaseModel):
     path: str | None = None
     side: Side = Side.HEAD
     line_offset: int | None = None
+    line_count: int = Field(default=1, ge=1, le=MAX_THREAD_LINES)
 
 
 class ThreadPatch(BaseModel):
@@ -214,6 +217,7 @@ class ThreadAnchorOut(BaseModel):
     outdated: bool
     unit_id: int | None
     file_line: int | None
+    end_file_line: int | None
 
 
 class ThreadOut(BaseModel):
@@ -227,6 +231,7 @@ class ThreadOut(BaseModel):
     created_by: ReviewerOut
     created_at: datetime
     line_text: str | None
+    line_count: int
     context_before: list[str]
     context_after: list[str]
     anchor: ThreadAnchorOut | None

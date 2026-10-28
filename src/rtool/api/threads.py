@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, status
 from rtool.api.deps import ReviewerDep, StoreDep, resolve_revision, snapshot_of
 from rtool.api.schemas import CommentIn, CommentOut, ReviewerOut, ThreadAnchorOut, ThreadIn, ThreadOut, ThreadPatch
 from rtool.errors import NotFoundError
+from rtool.review.anchoring import line_count
 from rtool.review.context import ReviewContext
 from rtool.review.rows import Side
 from rtool.review.threads import (
@@ -63,7 +64,7 @@ def post_thread(body: ThreadIn, context: ReviewContextDep) -> ThreadOut:
     revision = context.store.reviews.get_revision(snapshot.revision_id) if snapshot else resolve_revision(context, None)
     if revision is None:
         raise NotFoundError("Revision not found")
-    request = NewThread(body.scope, body.body, snapshot, body.path, body.side, body.line_offset)
+    request = NewThread(body.scope, body.body, snapshot, body.path, body.side, body.line_offset, body.line_count)
     thread = create_thread(context, revision, request)
     context.store.commit()
     return _single_view(context, thread.id, revision.id)
@@ -111,12 +112,18 @@ def thread_out(context: ReviewContext, view: ThreadView) -> ThreadOut:
         created_by=_reviewer_out(context.store, thread.created_by),
         created_at=thread.created_at,
         line_text=thread.line_text,
+        line_count=line_count(thread),
         context_before=thread.context_before,
         context_after=thread.context_after,
         anchor=None
         if anchor is None
         else ThreadAnchorOut(
-            revision_id=anchor.revision_id, line_offset=anchor.line_offset, outdated=anchor.outdated, unit_id=view.unit_id, file_line=view.file_line
+            revision_id=anchor.revision_id,
+            line_offset=anchor.line_offset,
+            outdated=anchor.outdated,
+            unit_id=view.unit_id,
+            file_line=view.file_line,
+            end_file_line=view.end_file_line,
         ),
         comments=[comment_out(context, comment) for comment in view.comments],
     )

@@ -5,7 +5,7 @@ import shutil
 import subprocess
 from typing import Any
 
-from rtool.forge.base import ForgeError, ForgeStatus, LineRanges, PullRequest, RemoteComment, ReviewSubmission, SubmittedReview
+from rtool.forge.base import ForgeError, ForgeStatus, InlineComment, LineRanges, PullRequest, RemoteComment, ReviewSubmission, SubmittedReview
 
 GH = "gh"
 PROVIDER = "github"
@@ -80,7 +80,7 @@ class GitHubAdapter:
         payload: JsonObject = {
             "commit_id": submission.commit_id,
             "body": submission.body,
-            "comments": [{"path": item.path, "line": item.line, "side": item.side.value, "body": item.body} for item in submission.comments],
+            "comments": [_inline_payload(item) for item in submission.comments],
         }
         if not submission.draft:
             payload["event"] = "COMMENT"
@@ -136,6 +136,13 @@ def parse_patch_ranges(patch: str) -> LineRanges:
         if old_count:
             left.append((old_start, old_start + old_count - 1))
     return LineRanges(tuple(right), tuple(left))
+
+
+def _inline_payload(item: InlineComment) -> JsonObject:
+    payload: JsonObject = {"path": item.path, "line": item.line, "side": item.side.value, "body": item.body}
+    if item.start_line is not None and item.start_line != item.line:
+        payload.update(start_line=item.start_line, start_side=item.side.value)
+    return payload
 
 
 def _match_comments(submission: ReviewSubmission, remote: list[JsonObject]) -> list[RemoteComment]:

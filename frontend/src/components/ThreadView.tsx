@@ -29,6 +29,9 @@ export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
         <strong>{thread.comments.at(0)?.author.name ?? thread.created_by.name}</strong>
         {resolved && <span className="badge state-approved">Resolved</span>}
         {thread.anchor?.outdated && <span className="badge state-changed">Outdated</span>}
+        {thread.line_count > 1 && thread.anchor?.file_line != null && thread.anchor.end_file_line != null && (
+          <span className="muted">{`lines ${String(thread.anchor.file_line)}-${String(thread.anchor.end_file_line)}`}</span>
+        )}
         <span className="muted">{`${String(thread.comments.length)} comment${thread.comments.length === 1 ? '' : 's'}`}</span>
         <span className="spacer" />
         <button type="button" disabled={setStatus.isPending} onClick={() => { setStatus.mutate({ threadId: thread.id, status: resolved ? 'open' : 'resolved' }) }}>
@@ -62,7 +65,11 @@ function Snippet({ thread }: { thread: Thread }) {
           {line || ' '}
         </div>
       ))}
-      <div className="snippet-target">{thread.line_text || ' '}</div>
+      {(thread.line_text ?? '').split('\n').map((line, index) => (
+        <div key={`t${String(index)}`} className="snippet-target">
+          {line || ' '}
+        </div>
+      ))}
       {thread.context_after.map((line, index) => (
         <div key={`a${String(index)}`} className="muted">
           {line || ' '}

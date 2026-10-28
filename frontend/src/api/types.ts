@@ -133,6 +133,7 @@ export interface ThreadAnchor {
   outdated: boolean
   unit_id: number | null
   file_line: number | null
+  end_file_line: number | null
 }
 
 export interface Thread {
@@ -146,6 +147,7 @@ export interface Thread {
   created_by: Reviewer
   created_at: string
   line_text: string | null
+  line_count: number
   context_before: string[]
   context_after: string[]
   anchor: ThreadAnchor | null
@@ -159,6 +161,7 @@ export interface NewThreadRequest {
   path?: string
   side?: Side
   line_offset?: number
+  line_count?: number
 }
 
 export interface PullRequest {

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from rtool.errors import ForbiddenError, InvalidRequestError, NotFoundError
-from rtool.review.anchoring import side_hash, side_text, surrounding
+from rtool.review.anchoring import LINE_SEPARATOR, line_count, side_hash, side_text, surrounding
 from rtool.review.context import ReviewContext
 from rtool.review.keys import key_of
 from rtool.review.rows import Side, unit_lines
@@ -30,6 +30,7 @@ class NewThread:
     path: str | None = None
     side: Side = Side.HEAD
     line_offset: int | None = None
+    line_count: int = 1
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,7 @@ class ThreadView:
     anchor: ThreadAnchor | None
     unit_id: int | None
     file_line: int | None
+    end_file_line: int | None = None
 
     @property
     def outdated(self) -> bool:
@@ -117,8 +119,10 @@ def _view(
     if snapshot is None:
         return ThreadView(thread, comments, anchor, None, None)
     lines = unit_lines(snapshot.base_text, snapshot.base_lines) if thread.side == Side.BASE else unit_lines(snapshot.head_text, snapshot.head_lines)
-    file_line = lines[anchor.line_offset].file_line if anchor.line_offset < len(lines) else None
-    return ThreadView(thread, comments, anchor, snapshot.id, file_line)
+    if anchor.line_offset >= len(lines):
+        return ThreadView(thread, comments, anchor, snapshot.id, None)
+    last = min(anchor.line_offset + line_count(thread) - 1, len(lines) - 1)
+    return ThreadView(thread, comments, anchor, snapshot.id, lines[anchor.line_offset].file_line, lines[last].file_line)
 
 
 def _anchor_new_unit_thread(thread: Thread, request: NewThread) -> None:
@@ -126,14 +130,15 @@ def _anchor_new_unit_thread(thread: Thread, request: NewThread) -> None:
     if snapshot is None or request.line_offset is None:
         raise InvalidRequestError("Unit threads need a unit and a line")
     lines = side_text(snapshot, request.side)
-    if not 0 <= request.line_offset < len(lines):
-        raise InvalidRequestError("The line is outside the unit")
-    before, after = surrounding(lines, request.line_offset)
+    last = request.line_offset + request.line_count - 1
+    if request.line_count < 1 or not 0 <= request.line_offset <= last < len(lines):
+        raise InvalidRequestError("The lines are outside the unit")
+    before, after = surrounding(lines, request.line_offset, request.line_count)
     thread.path, thread.kind, thread.qualified_name = key_of(snapshot)
     thread.side = request.side.value
     thread.unit_hash = side_hash(snapshot, request.side)
     thread.line_offset = request.line_offset
-    thread.line_text = lines[request.line_offset].rstrip()
+    thread.line_text = LINE_SEPARATOR.join(line.rstrip() for line in lines[request.line_offset : last + 1])
     thread.context_before = [line.rstrip() for line in before]
     thread.context_after = [line.rstrip() for line in after]
 

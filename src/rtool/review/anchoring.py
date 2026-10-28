@@ -7,6 +7,7 @@ from rtool.storage.models import Review, Revision, Thread, ThreadAnchor, UnitSna
 from rtool.storage.repositories import Store
 
 CONTEXT_LINES = 3
+LINE_SEPARATOR = "\n"
 UNIT_SCOPE = "unit"
 OPEN_STATUS = "open"
 
@@ -27,8 +28,17 @@ def side_hash(snapshot: UnitSnapshot, side: str) -> str | None:
     return snapshot.base_hash if side == Side.BASE else snapshot.head_hash
 
 
-def surrounding(lines: Sequence[str], offset: int) -> tuple[list[str], list[str]]:
-    return list(lines[max(0, offset - CONTEXT_LINES) : offset]), list(lines[offset + 1 : offset + 1 + CONTEXT_LINES])
+def surrounding(lines: Sequence[str], offset: int, line_count: int = 1) -> tuple[list[str], list[str]]:
+    last = offset + line_count - 1
+    return list(lines[max(0, offset - CONTEXT_LINES) : offset]), list(lines[last + 1 : last + 1 + CONTEXT_LINES])
+
+
+def selected_lines(thread: Thread) -> list[str]:
+    return (thread.line_text or "").split(LINE_SEPARATOR)
+
+
+def line_count(thread: Thread) -> int:
+    return len(selected_lines(thread))
 
 
 def reanchor_threads(store: Store, review: Review, previous: Revision | None, revision: Revision) -> None:
@@ -61,7 +71,7 @@ def locate(thread: Thread, last: ThreadAnchor | None, snapshots: list[UnitSnapsh
 
 
 def find_line(thread: Thread, lines: Sequence[str], previous_offset: int) -> int | None:
-    wanted = (thread.line_text or "").strip()
+    wanted = selected_lines(thread)[0].strip()
     matches = [index for index, line in enumerate(lines) if line.strip() == wanted]
     if not matches:
         return None
@@ -69,7 +79,7 @@ def find_line(thread: Thread, lines: Sequence[str], previous_offset: int) -> int
 
 
 def _context_score(thread: Thread, lines: Sequence[str], index: int) -> int:
-    before, after = surrounding(lines, index)
+    before, after = surrounding(lines, index, line_count(thread))
     score = sum(1 for wanted, actual in zip(reversed(thread.context_before), reversed(before), strict=False) if wanted.strip() == actual.strip())
     return score + sum(1 for wanted, actual in zip(thread.context_after, after, strict=False) if wanted.strip() == actual.strip())
 

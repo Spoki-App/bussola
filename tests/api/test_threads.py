@@ -110,3 +110,26 @@ def test_comments_must_not_be_empty(api: ApiClient, git_repo: GitFixture) -> Non
     review = start(git_repo, api)
 
     api.call("POST", f"/reviews/{review}/threads", 400, {"scope": "review", "body": "   "})
+
+
+def test_thread_on_several_lines_keeps_its_range_when_lines_move(api: ApiClient, git_repo: GitFixture) -> None:
+    review = start(git_repo, api)
+    thread = comment_on(api, review, "app.py::total", (1, 2))
+
+    created = thread_anchor(api, review, thread["id"])
+    git_repo.commit({"app.py": BODY.replace("    count = len(items)\n", "    items = list(items)\n    count = len(items)\n") + OTHER})
+    api.refresh(review)
+    moved = thread_anchor(api, review, thread["id"])
+
+    assert created["line_count"] == 2
+    assert created["line_text"] == "    count = len(items)\n    result = sum(items)"
+    assert created["context_after"] == ["    return result"]
+    assert (created["anchor"]["file_line"], created["anchor"]["end_file_line"]) == (2, 3)
+    assert (moved["anchor"]["file_line"], moved["anchor"]["end_file_line"]) == (3, 4)
+
+
+def test_range_must_stay_inside_the_unit(api: ApiClient, git_repo: GitFixture) -> None:
+    review = start(git_repo, api)
+    unit_id = api.unit(review, "app.py::total")["id"]
+
+    api.call("POST", f"/reviews/{review}/threads", 400, {"scope": "unit", "unit_id": unit_id, "line_offset": 2, "line_count": 5, "body": "x"})

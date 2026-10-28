@@ -58,8 +58,9 @@ def _unit_name(unit: Json) -> str:
     return f"{unit['path']}::{unit['qualified_name']}" if unit["qualified_name"] else unit["path"]
 
 
-def comment_on(api: ApiClient, review_id: int, name: str, line_offset: int, body: str = "Why?") -> Json:
-    payload = {"scope": "unit", "unit_id": api.unit(review_id, name)["id"], "line_offset": line_offset, "body": body}
+def comment_on(api: ApiClient, review_id: int, name: str, lines: int | tuple[int, int], body: str = "Why?") -> Json:
+    line_offset, line_count = (lines, 1) if isinstance(lines, int) else lines
+    payload = {"scope": "unit", "unit_id": api.unit(review_id, name)["id"], "line_offset": line_offset, "line_count": line_count, "body": body}
     return api.call("POST", f"/reviews/{review_id}/threads", 201, payload)
 
 

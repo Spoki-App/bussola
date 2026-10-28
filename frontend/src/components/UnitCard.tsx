@@ -18,6 +18,7 @@ export interface CommentTarget {
   row: DiffRow
   side: GutterSide
   mode: DiffMode
+  extend: boolean
 }
 
 interface Props {
@@ -28,12 +29,13 @@ interface Props {
   register: (unitId: number, actions: UnitActions | null) => void
   onComment?: (target: CommentTarget) => void
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
+  highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
   footer?: ReactNode
 }
 
 const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', base: 'Base → head' }
 
-export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, renderWidgets, footer }: Props) {
+export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, renderWidgets, highlightRows, footer }: Props) {
   const [expanded, setExpanded] = useState(isTodo(unit.state))
   const [mode, setMode] = useState<DiffMode | undefined>(undefined)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
@@ -78,7 +80,7 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
     setExpanded(true)
     const row = rows.find((candidate) => candidate.change !== 'context') ?? rows.at(0)
     if (row && onComment && diff.data) {
-      onComment({ unit, row, side: row.change === 'removed' ? 'old' : 'new', mode: diff.data.mode })
+      onComment({ unit, row, side: row.change === 'removed' ? 'old' : 'new', mode: diff.data.mode, extend: false })
     }
   }
 
@@ -166,7 +168,8 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
               selectable={unit.row_approvable}
               selected={selected}
               onRowClick={onRowClick}
-              onLineNumberClick={onComment ? (row, side) => { onComment({ unit, row, side, mode: diff.data.mode }) } : undefined}
+              onLineNumberClick={onComment ? (row, side, extend) => { onComment({ unit, row, side, mode: diff.data.mode, extend }) } : undefined}
+              highlighted={highlightRows?.(unit, diff.data)}
               widgets={renderWidgets ? (changeKeyOf) => renderWidgets(unit, diff.data, changeKeyOf) : undefined}
             />
           )}
