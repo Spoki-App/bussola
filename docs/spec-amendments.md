@@ -175,3 +175,18 @@ POST   /pulls/open                             {url} -> the pull request review 
 - **Link:** `https://github.com/<owner>/<repository>/pull/<number>`, scheme optional, any suffix (`/files`, `#discussion_r...`) ignored. Anything else is rejected with 400.
 - **Repository:** the registered repositories are checked first, then the repositories found by the home scan of A3; a repository matches when any of its remotes points to `<owner>/<repository>` (case-insensitive). The first match from the scan is registered. No match gives 404. The pull request is fetched from the matching remote, not necessarily `origin`.
 - **UI:** an "Open pull request" field on the home page, and the client route `/github.com/<owner>/<repository>/pull/<number>`, which opens the review and replaces itself in the browser history.
+
+## A9. GitHub-style rendering of comments and descriptions
+
+Comments and pull request descriptions are rendered the way GitHub renders them, in the browser:
+
+- GitHub Flavored Markdown with GitHub's line breaks (a single newline is a line break), alerts (`> [!NOTE]`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION`), code highlighting, mermaid diagrams (drawn by the mermaid library with `securityLevel: strict`, loaded only when a diagram is shown) and `owner/repository#number` links.
+- Raw HTML is parsed and then sanitized with GitHub's allow list (`rehype-sanitize` default schema); HTML comments are dropped.
+- Images attached on GitHub need a signed-in user. They are loaded through:
+
+```
+GET    /forge/asset?url=                       an image attached on GitHub, downloaded with the gh token
+```
+
+- Only `https://github.com/user-attachments/assets/<uuid>` and `https://github.com/<owner>/<repository>/assets/<id>/<uuid>` are accepted (400 otherwise). The token comes from `gh auth token` at each download, is sent only to `github.com` (not on the redirect to the storage host) and is never stored. Only images up to 25 MB are returned (502 otherwise), with `Content-Security-Policy: sandbox` and `nosniff`; up to 64 images are kept in memory.
+- This adds image downloads from GitHub to the outbound traffic of section 15.

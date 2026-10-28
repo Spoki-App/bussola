@@ -105,6 +105,12 @@ class Conversation:
     threads: list[RemoteThread]
 
 
+@dataclass(frozen=True)
+class Asset:
+    content_type: str
+    data: bytes
+
+
 class ForgeAdapter(Protocol):
     provider: str
 
@@ -120,3 +126,4 @@ class ForgeAdapter(Protocol):
     def update_comment(self, repository: str, remote_id: str, body: str) -> None: ...
     def pull_request_conversation(self, repository: str, number: int) -> Conversation: ...
     def set_thread_resolved(self, thread_id: str, resolved: bool) -> None: ...
+    def download_asset(self, url: str) -> Asset: ...

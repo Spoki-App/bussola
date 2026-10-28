@@ -1,6 +1,7 @@
+from collections import OrderedDict
 from dataclasses import asdict
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response
 
 from rtool.api.deps import ContextDep, repo_of, resolve_revision
 from rtool.api.schemas import (
@@ -15,7 +16,7 @@ from rtool.api.schemas import (
 )
 from rtool.api.state import app_state
 from rtool.api.views import publish_out
-from rtool.forge.base import PullRequest
+from rtool.forge.base import Asset, PullRequest
 from rtool.forge.links import ForgeOverview, forge_overview, link_pull_request
 from rtool.forge.publish import publish_comments, require_link
 from rtool.forge.pulls import sync_conversation
@@ -23,6 +24,24 @@ from rtool.review.context import ReviewContext
 from rtool.review.repos import open_repo
 
 router = APIRouter(tags=["forge"])
+
+ASSET_CACHE_SIZE = 64
+ASSET_HEADERS = {
+    "Cache-Control": "private, max-age=86400",
+    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+    "X-Content-Type-Options": "nosniff",
+}
+_assets: OrderedDict[str, Asset] = OrderedDict()
+
+
+@router.get("/forge/asset")
+def forge_asset(url: str, request: Request) -> Response:
+    asset = _assets.get(url) or app_state(request).forge.download_asset(url)
+    _assets[url] = asset
+    _assets.move_to_end(url)
+    while len(_assets) > ASSET_CACHE_SIZE:
+        _assets.popitem(last=False)
+    return Response(asset.data, media_type=asset.content_type, headers=ASSET_HEADERS)
 
 
 @router.get("/reviews/{review_id}/forge")

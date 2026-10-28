@@ -3,9 +3,13 @@ import os
 import re
 import shutil
 import subprocess
+import urllib.error
+import urllib.request
 from typing import Any
 
+from rtool.errors import InvalidRequestError
 from rtool.forge.base import (
+    Asset,
     Conversation,
     DiffSide,
     ForgeError,
@@ -76,6 +80,9 @@ mutation($threadId: ID!) {
 }
 """
 ISSUE_COMMENT_PREFIX = "issue-"
+ASSET_URL = re.compile(r"https://github\.com/(?:user-attachments/assets/[0-9a-f-]{36}|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/assets/\d+/[0-9a-f-]{36})")
+MAX_ASSET_BYTES = 25 * 1024 * 1024
+IMAGE_TYPE_PREFIX = "image/"
 REVIEW_PREFIX = "review-"
 
 type JsonObject = dict[str, Any]
@@ -165,6 +172,22 @@ class GitHubAdapter:
         mutation = RESOLVE_THREAD_MUTATION if resolved else UNRESOLVE_THREAD_MUTATION
         self._json(["api", "graphql", "-f", f"query={mutation}", "-f", f"threadId={thread_id}"])
 
+    def download_asset(self, url: str) -> Asset:
+        if not ASSET_URL.fullmatch(url):
+            raise InvalidRequestError("Only GitHub attachment links can be downloaded")
+        token = self._run(["auth", "token"]).stdout.decode().strip()
+        request = urllib.request.Request(url)
+        request.add_unredirected_header("Authorization", f"Bearer {token}")
+        try:
+            with open_url(request, GH_TIMEOUT_SECONDS) as response:
+                content_type: str = response.headers.get_content_type()
+                data: bytes = response.read(MAX_ASSET_BYTES + 1)
+        except (urllib.error.URLError, TimeoutError) as error:
+            raise ForgeError(f"Could not download {url}: {error}") from error
+        if len(data) > MAX_ASSET_BYTES or not content_type.startswith(IMAGE_TYPE_PREFIX):
+            raise ForgeError(f"{url} is not an image rtool can show")
+        return Asset(content_type, data)
+
     def _json(self, args: list[str], payload: JsonObject | None = None) -> Any:
         result = self._run(args, payload=payload)
         try:
@@ -186,6 +209,10 @@ class GitHubAdapter:
         if check and result.returncode != 0:
             raise ForgeError(result.stderr.decode(errors="replace").strip() or f"gh {args[0]} failed")
         return result
+
+
+def open_url(request: urllib.request.Request, timeout: float) -> Any:
+    return urllib.request.build_opener().open(request, timeout=timeout)
 
 
 def parse_patch_ranges(patch: str) -> LineRanges:

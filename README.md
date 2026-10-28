@@ -66,7 +66,7 @@ Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve
 
 ### Comments
 
-Click a line number to start a thread on that line. To comment on several lines, drag over their line numbers or shift-click another line number; the thread is sent to GitHub as a multi-line comment. Use "Comment on file" in a file header, or the conversation panel for comments on the whole review. Comments are Markdown. You can edit or delete your own comments, and delete a thread you started as long as nobody else replied to it (otherwise resolve it). Deleted threads disappear from rtool but stay on GitHub if they were already sent. When the code changes, a thread moves with its line. It follows a renamed unit, and becomes outdated, showing the original snippet, when its line is gone.
+Click a line number to start a thread on that line. To comment on several lines, drag over their line numbers or shift-click another line number; the thread is sent to GitHub as a multi-line comment. Use "Comment on file" in a file header, or the conversation panel for comments on the whole review. Comments and pull request descriptions are rendered like on GitHub: GitHub Flavored Markdown (tables, task lists, line breaks), `> [!NOTE]` style alerts, safe HTML, highlighted code, mermaid diagrams, `owner/repo#123` links, and images attached on GitHub (downloaded through rtool with your `gh` login, since GitHub only serves them to signed-in users). You can edit or delete your own comments, and delete a thread you started as long as nobody else replied to it (otherwise resolve it). Deleted threads disappear from rtool but stay on GitHub if they were already sent. When the code changes, a thread moves with its line. It follows a renamed unit, and becomes outdated, showing the original snippet, when its line is gone.
 
 ### Reviewing GitHub pull requests
 
@@ -124,7 +124,8 @@ The server is meant for one person on one machine.
 - **Host check:** requests whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` are rejected, which blocks DNS rebinding.
 - **Git refs and files:** refs are validated with `git rev-parse --verify --end-of-options` before use. File contents are read only from the git object database.
 - **Opening links:** GitHub links are opened by the server in your default browser, as a new tab, so they work even when the rtool page runs in an app-style window. The server only opens `https://github.com` addresses.
-- **Outbound traffic:** the only network access is `git fetch` when you ask for it and `gh` when you use the GitHub panel or have a pull request review open.
+- **Outbound traffic:** the only network access is `git fetch` when you ask for it, `gh` when you sync or have a pull request review open, and downloads of images attached on GitHub shown in comments and descriptions.
+- **Rendered Markdown:** HTML in comments and descriptions is sanitized with GitHub's rules before it is shown. Attached images are served from `/api/forge/asset` only for `https://github.com/.../assets/...` links and only when they are images, with a sandboxing Content-Security-Policy.
 
 ## Development
 
