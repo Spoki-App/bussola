@@ -128,7 +128,7 @@ class SqlApprovalRepository(_SqlRepository):
 
     def approvals_of(self, review_ids: list[int], reviewer_id: int) -> list[Approval]:
         query = select(Approval).where(Approval.review_id.in_(review_ids), Approval.reviewer_id == reviewer_id).order_by(Approval.created_at)
-        return list(self._session.scalars(query))
+        return list(self._session.scalars(query.options(defer(Approval.approved_text))))
 
     def get_approval(self, approval_id: str) -> Approval | None:
         return self._session.get(Approval, approval_id)

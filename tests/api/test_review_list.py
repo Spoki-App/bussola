@@ -43,3 +43,22 @@ def test_listing_reviews_does_not_query_per_review(api: ApiClient, git_repo: Git
 
     assert list_reviews(api, repo) == with_one
     assert [review["total"] for review in api.call("GET", f"/repos/{repo}/reviews")] == [1, 1, 1]
+
+
+def test_a_diff_reads_only_its_own_approved_text(api: ApiClient, git_repo: GitFixture) -> None:
+    git_repo.commit({"app.py": "def one():\n    return 1\n\n\ndef two():\n    return 2\n"})
+    git_repo.branch("feature")
+    git_repo.commit({"app.py": "def one():\n    return 10\n\n\ndef two():\n    return 20\n"})
+    review = api.start_review()
+    api.approve(review, "app.py::one")
+    api.approve(review, "app.py::two")
+    git_repo.commit({"app.py": "def one():\n    return 11\n\n\ndef two():\n    return 21\n"})
+    api.refresh(review)
+
+    with counted_queries() as statements:
+        diff = api.diff(review, "app.py::one")
+
+    texts = [statement for statement in statements if "approved_text" in statement]
+    assert diff["mode"] == "approved"
+    assert len(texts) == 1
+    assert "WHERE approvals.id" in texts[0]
