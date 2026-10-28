@@ -24,8 +24,8 @@ class UnitTarget:
     count: int
 
 
-def import_conversation(context: ReviewContext, adapter: ForgeAdapter, link: ForgeLink, revision: Revision) -> int:
-    conversation = adapter.pull_request_conversation(link.repository, link.pr_number)
+def import_conversation(context: ReviewContext, adapter: ForgeAdapter, link: ForgeLink, revision: Revision, conversation: Conversation | None = None) -> int:
+    conversation = conversation or adapter.pull_request_conversation(link.repository, link.pr_number)
     importer = _Importer(context, adapter.provider, conversation, revision)
     for note in conversation.notes:
         importer.import_note(note)
@@ -128,7 +128,7 @@ class _Importer:
 
     def _new_thread(self, remote: RemoteThread) -> Thread:
         thread = self._thread(remote.comments[0], ThreadScope.FILE, remote.path)
-        target = find_unit_target(self._unit_snapshots(), remote) if self.conversation.head_sha == self.revision.head_sha else None
+        target = find_unit_target(self._unit_snapshots(), remote) if self.conversation.pull.head_sha == self.revision.head_sha else None
         if target is not None:
             thread.scope = ThreadScope.UNIT.value
             anchor_to_unit(thread, target.snapshot, target.side, target.line_offset, target.count)

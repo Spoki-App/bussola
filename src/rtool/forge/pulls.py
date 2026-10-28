@@ -112,26 +112,28 @@ class ForgeSession:
 def review_pull_request(session: ForgeSession, repo: Repo, number: int, repository: str | None = None) -> Review:
     store, adapter, git_repo = session.store, session.adapter, session.git_repo
     remote = require_remote(adapter, git_repo, repository)
-    pull = adapter.pull_request(remote.repository, number)
+    conversation = adapter.pull_request_conversation(remote.repository, number)
+    pull = conversation.pull
     head_ref, base_ref = fetch_pull_request(git_repo, remote, pull)
     review = _review_for(store, repo, remote.repository, pull) or store.reviews.find_or_add_review(repo.id, head_ref, base_ref)
     review.head_ref, review.base_ref = head_ref, base_ref
     link = _save_link(store, review, adapter.provider, remote.repository, pull)
     result = refresh_review(store, review, git_repo)
-    import_conversation(ReviewContext(store, review, session.reviewer), adapter, link, result.revision)
+    import_conversation(ReviewContext(store, review, session.reviewer), adapter, link, result.revision, conversation)
     return review
 
 
 def sync_review(session: ForgeSession, review: Review, link: ForgeLink) -> RefreshResult | None:
     store, adapter, git_repo = session.store, session.adapter, session.git_repo
     remote = require_remote(adapter, git_repo, link.repository)
-    pull = adapter.pull_request(link.repository, link.pr_number)
+    conversation = adapter.pull_request_conversation(link.repository, link.pr_number)
+    pull = conversation.pull
     _save_link(store, review, adapter.provider, link.repository, pull)
     if pull.state != OPEN_STATE:
         return None
     review.head_ref, review.base_ref = fetch_pull_request(git_repo, remote, pull)
     result = refresh_review(store, review, git_repo)
-    import_conversation(ReviewContext(store, review, session.reviewer), adapter, link, result.revision)
+    import_conversation(ReviewContext(store, review, session.reviewer), adapter, link, result.revision, conversation)
     return result
 
 
@@ -139,9 +141,10 @@ def sync_conversation(context: ReviewContext, adapter: ForgeAdapter, link: Forge
     revision = context.store.reviews.latest_revision(context.review.id)
     if revision is None:
         raise ConflictError("This review has no revision yet")
-    pull = adapter.pull_request(link.repository, link.pr_number)
+    conversation = adapter.pull_request_conversation(link.repository, link.pr_number)
+    pull = conversation.pull
     _save_link(context.store, context.review, adapter.provider, link.repository, pull)
-    changes = import_conversation(context, adapter, link, revision)
+    changes = import_conversation(context, adapter, link, revision, conversation)
     return ConversationSync(changes, pull.head_sha != revision.head_sha, pull.state)
 
 

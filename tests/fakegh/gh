@@ -83,7 +83,12 @@ def main():
         return
     if args[:2] == ["api", "graphql"] and any("pullRequest(number" in arg for arg in args):
         conversation = state.get("conversation", {})
-        pull = {"headRefOid": conversation.get("headRefOid", ""), **{key: {"nodes": conversation.get(key, [])} for key in ("comments", "reviews", "reviewThreads")}}
+        number = int(next(arg.split("=", 1)[1] for arg in args if arg.startswith("number=")))
+        found = [pr for pr in state["prs"] if pr["number"] == number]
+        pull = None
+        if found:
+            pull = {key: value for key, value in found[0].items() if key not in ("comments", "reviewThreads")}
+            pull.update({key: {"nodes": conversation.get(key, [])} for key in ("comments", "reviews", "reviewThreads")})
         print(json.dumps({"data": {"viewer": {"login": state.get("viewer", "alice-gh")}, "repository": {"pullRequest": pull}}}))
         return
     if args[:2] == ["api", "graphql"]:

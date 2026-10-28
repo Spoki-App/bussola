@@ -98,7 +98,7 @@ class RemoteThread:
 @dataclass(frozen=True)
 class Conversation:
     viewer: str
-    head_sha: str
+    pull: PullRequest
     notes: list[RemoteNote]
     threads: list[RemoteThread]
 

@@ -56,7 +56,8 @@ query($owner: String!, $name: String!, $number: Int!) {
   viewer { login }
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      headRefOid
+      number title url state isDraft body headRefOid headRefName baseRefName
+      author { login }
       comments(first: 100) { nodes { databaseId author { login } body createdAt url } }
       reviews(first: 100) { nodes { databaseId author { login } body submittedAt url } }
       reviewThreads(first: 100) {
@@ -163,7 +164,7 @@ class GitHubAdapter:
         notes += [_note(item, REVIEW_PREFIX, "submittedAt") for item in _nodes(pull.get("reviews")) if str(item.get("body") or "").strip()]
         threads = [_remote_thread(item) for item in _nodes(pull.get("reviewThreads"))]
         viewer: JsonObject = data.get("viewer") or {}
-        return Conversation(str(viewer.get("login", "")), str(pull.get("headRefOid", "")), sorted(notes, key=lambda note: note.created_at), threads)
+        return Conversation(str(viewer.get("login", "")), _pull_request(pull), sorted(notes, key=lambda note: note.created_at), threads)
 
     def set_thread_resolved(self, thread_id: str, resolved: bool) -> None:
         mutation = RESOLVE_THREAD_MUTATION if resolved else UNRESOLVE_THREAD_MUTATION

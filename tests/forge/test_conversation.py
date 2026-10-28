@@ -22,9 +22,9 @@ def review_thread(line: int | None, *notes: dict[str, Any], resolved: bool = Fal
     return {"id": thread_id, "isResolved": resolved, "path": "app.py", "line": line, "startLine": line, "diffSide": "RIGHT", "comments": {"nodes": list(notes)}}
 
 
-def set_conversation(github: GitHubSandbox, head: str, threads: list[dict[str, Any]], comments: list[dict[str, Any]] | None = None) -> None:
+def set_conversation(github: GitHubSandbox, threads: list[dict[str, Any]], comments: list[dict[str, Any]] | None = None) -> None:
     reviews = [note(77, "carol", "Looks good overall"), note(78, "carol", "")]
-    conversation = {"headRefOid": head, "reviewThreads": threads, "comments": comments or [], "reviews": reviews}
+    conversation = {"reviewThreads": threads, "comments": comments or [], "reviews": reviews}
     github.fake_gh.configure(conversation=conversation, viewer="alice-gh")
 
 
@@ -38,8 +38,8 @@ def threads(api: ApiClient, review: int) -> list[Json]:
 
 
 def test_github_comments_are_imported_when_reviewing_a_pull_request(api: ApiClient, github: GitHubSandbox) -> None:
-    head = github.open_pull_request({"app.py": FIRST})
-    set_conversation(github, head, [review_thread(2, note(501, "bob", "Why sum?"), note(502, "alice-gh", "Because"))], [note(900, "bob", "Nice PR")])
+    github.open_pull_request({"app.py": FIRST})
+    set_conversation(github, [review_thread(2, note(501, "bob", "Why sum?"), note(502, "alice-gh", "Because"))], [note(900, "bob", "Nice PR")])
 
     review = start_review(api)
 
@@ -56,13 +56,13 @@ def test_github_comments_are_imported_when_reviewing_a_pull_request(api: ApiClie
 
 
 def test_syncing_again_adds_only_new_replies_and_follows_resolution(api: ApiClient, github: GitHubSandbox) -> None:
-    head = github.open_pull_request({"app.py": FIRST})
+    github.open_pull_request({"app.py": FIRST})
     first = note(501, "bob", "Why sum?")
-    set_conversation(github, head, [review_thread(2, first)])
+    set_conversation(github, [review_thread(2, first)])
     review = start_review(api)
     repo = api.call("GET", "/repos")[0]["id"]
 
-    set_conversation(github, head, [review_thread(2, first, note(503, "bob", "Never mind"), resolved=True)])
+    set_conversation(github, [review_thread(2, first, note(503, "bob", "Never mind"), resolved=True)])
     api.call("POST", f"/repos/{repo}/pulls/sync")
 
     inline = next(thread for thread in threads(api, review) if thread["scope"] == "unit")
@@ -72,8 +72,8 @@ def test_syncing_again_adds_only_new_replies_and_follows_resolution(api: ApiClie
 
 
 def test_outdated_github_comments_become_file_threads(api: ApiClient, github: GitHubSandbox) -> None:
-    head = github.open_pull_request({"app.py": FIRST})
-    set_conversation(github, head, [review_thread(None, note(501, "bob", "This was on old code"))])
+    github.open_pull_request({"app.py": FIRST})
+    set_conversation(github, [review_thread(None, note(501, "bob", "This was on old code"))])
 
     review = start_review(api)
 
@@ -83,7 +83,8 @@ def test_outdated_github_comments_become_file_threads(api: ApiClient, github: Gi
 
 def test_lines_are_not_anchored_when_github_has_another_head(api: ApiClient, github: GitHubSandbox) -> None:
     github.open_pull_request({"app.py": FIRST})
-    set_conversation(github, "0" * 40, [review_thread(2, note(501, "bob", "Why sum?"))])
+    github.fake_gh.configure(prs=[{**github.fake_gh.state()["prs"][0], "headRefOid": "0" * 40}])
+    set_conversation(github, [review_thread(2, note(501, "bob", "Why sum?"))])
 
     review = start_review(api)
 
@@ -91,8 +92,8 @@ def test_lines_are_not_anchored_when_github_has_another_head(api: ApiClient, git
 
 
 def test_reply_in_rtool_to_an_imported_thread_is_sent_as_a_github_reply(api: ApiClient, github: GitHubSandbox) -> None:
-    head = github.open_pull_request({"app.py": FIRST})
-    set_conversation(github, head, [review_thread(2, note(501, "bob", "Why sum?"))])
+    github.open_pull_request({"app.py": FIRST})
+    set_conversation(github, [review_thread(2, note(501, "bob", "Why sum?"))])
     review = start_review(api)
     inline = next(thread for thread in threads(api, review) if thread["scope"] == "unit")
     api.call("POST", f"/threads/{inline['id']}/comments", 201, {"body": "Because it is shorter"})
@@ -108,12 +109,12 @@ def test_reply_in_rtool_to_an_imported_thread_is_sent_as_a_github_reply(api: Api
 
 
 def test_check_with_fetch_on_a_pull_request_review_imports_new_comments(api: ApiClient, github: GitHubSandbox) -> None:
-    head = github.open_pull_request({"app.py": FIRST})
-    set_conversation(github, head, [])
+    github.open_pull_request({"app.py": FIRST})
+    set_conversation(github, [])
     review = start_review(api)
 
-    new_head = github.open_pull_request({"app.py": SECOND})
-    set_conversation(github, new_head, [review_thread(2, note(601, "bob", "Better"))])
+    github.open_pull_request({"app.py": SECOND})
+    set_conversation(github, [review_thread(2, note(601, "bob", "Better"))])
     api.call("POST", f"/reviews/{review}/refresh", body={"fetch": True})
 
     inline = next(thread for thread in threads(api, review) if thread["scope"] == "unit")
@@ -129,14 +130,14 @@ def inline_thread(api: ApiClient, review: int) -> Json:
 
 
 def test_sync_brings_new_replies_and_resolution_and_reports_changes(api: ApiClient, github: GitHubSandbox) -> None:
-    head = github.open_pull_request({"app.py": FIRST})
+    github.open_pull_request({"app.py": FIRST})
     first = note(501, "bob", "Why sum?")
-    set_conversation(github, head, [review_thread(2, first)])
+    set_conversation(github, [review_thread(2, first)])
     review = start_review(api)
 
     assert sync(api, review) == {"changes": 0, "new_commits": False, "state": "OPEN"}
 
-    set_conversation(github, head, [review_thread(2, first, note(503, "bob", "Never mind"), resolved=True)])
+    set_conversation(github, [review_thread(2, first, note(503, "bob", "Never mind"), resolved=True)])
     assert sync(api, review)["changes"] == 2
     inline = inline_thread(api, review)
     assert [comment["body"] for comment in inline["comments"]] == ["Why sum?", "Never mind"]
@@ -144,8 +145,8 @@ def test_sync_brings_new_replies_and_resolution_and_reports_changes(api: ApiClie
 
 
 def test_sync_reports_new_commits_without_fetching_them(api: ApiClient, github: GitHubSandbox) -> None:
-    head = github.open_pull_request({"app.py": FIRST})
-    set_conversation(github, head, [])
+    github.open_pull_request({"app.py": FIRST})
+    set_conversation(github, [])
     review = start_review(api)
     github.open_pull_request({"app.py": SECOND})
 
@@ -154,11 +155,11 @@ def test_sync_reports_new_commits_without_fetching_them(api: ApiClient, github: 
 
 
 def test_sync_follows_comments_edited_on_github(api: ApiClient, github: GitHubSandbox) -> None:
-    head = github.open_pull_request({"app.py": FIRST})
-    set_conversation(github, head, [review_thread(2, note(501, "bob", "Why sum?"))])
+    github.open_pull_request({"app.py": FIRST})
+    set_conversation(github, [review_thread(2, note(501, "bob", "Why sum?"))])
     review = start_review(api)
 
-    set_conversation(github, head, [review_thread(2, note(501, "bob", "Why sum and not len?"))])
+    set_conversation(github, [review_thread(2, note(501, "bob", "Why sum and not len?"))])
     assert sync(api, review)["changes"] == 1
 
     comment = inline_thread(api, review)["comments"][0]
@@ -168,21 +169,21 @@ def test_sync_follows_comments_edited_on_github(api: ApiClient, github: GitHubSa
 
 
 def test_local_edits_are_not_overwritten_by_github(api: ApiClient, github: GitHubSandbox) -> None:
-    head = github.open_pull_request({"app.py": FIRST})
-    set_conversation(github, head, [review_thread(2, note(501, "alice-gh", "Why sum?"))])
+    github.open_pull_request({"app.py": FIRST})
+    set_conversation(github, [review_thread(2, note(501, "alice-gh", "Why sum?"))])
     review = start_review(api)
     comment_id = inline_thread(api, review)["comments"][0]["id"]
     api.call("PATCH", f"/comments/{comment_id}", body={"body": "Why sum? Edited here"})
 
-    set_conversation(github, head, [review_thread(2, note(501, "alice-gh", "Edited on GitHub"))])
+    set_conversation(github, [review_thread(2, note(501, "alice-gh", "Edited on GitHub"))])
     sync(api, review)
 
     assert inline_thread(api, review)["comments"][0]["body"] == "Why sum? Edited here"
 
 
 def test_resolving_an_imported_thread_resolves_it_on_github(api: ApiClient, github: GitHubSandbox) -> None:
-    head = github.open_pull_request({"app.py": FIRST})
-    set_conversation(github, head, [review_thread(2, note(501, "bob", "Why sum?"))])
+    github.open_pull_request({"app.py": FIRST})
+    set_conversation(github, [review_thread(2, note(501, "bob", "Why sum?"))])
     review = start_review(api)
     thread_id = inline_thread(api, review)["id"]
 
@@ -200,8 +201,8 @@ def test_resolving_an_imported_thread_resolves_it_on_github(api: ApiClient, gith
 
 
 def test_resolving_a_thread_that_is_not_on_github_stays_local(api: ApiClient, github: GitHubSandbox) -> None:
-    head = github.open_pull_request({"app.py": FIRST})
-    set_conversation(github, head, [])
+    github.open_pull_request({"app.py": FIRST})
+    set_conversation(github, [])
     review = start_review(api)
     thread = api.call("POST", f"/reviews/{review}/threads", 201, {"scope": "review", "body": "Overall fine"})
     github.fake_gh.clear_log()
@@ -211,8 +212,8 @@ def test_resolving_a_thread_that_is_not_on_github_stays_local(api: ApiClient, gi
 
 
 def test_a_failed_resolution_on_github_keeps_the_thread_open(api: ApiClient, github: GitHubSandbox) -> None:
-    head = github.open_pull_request({"app.py": FIRST})
-    set_conversation(github, head, [review_thread(2, note(501, "bob", "Why sum?"))])
+    github.open_pull_request({"app.py": FIRST})
+    set_conversation(github, [review_thread(2, note(501, "bob", "Why sum?"))])
     review = start_review(api)
     thread_id = inline_thread(api, review)["id"]
     github.fake_gh.configure(fail_resolve=True)
@@ -220,3 +221,14 @@ def test_a_failed_resolution_on_github_keeps_the_thread_open(api: ApiClient, git
     api.call("PATCH", f"/threads/{thread_id}", 502, {"status": "resolved"})
 
     assert inline_thread(api, review)["status"] == "open"
+
+
+def test_sync_reads_the_pull_request_and_its_comments_in_one_call(api: ApiClient, github: GitHubSandbox) -> None:
+    github.open_pull_request({"app.py": FIRST})
+    set_conversation(github, [review_thread(2, note(501, "bob", "Why sum?"))])
+    review = start_review(api)
+    github.fake_gh.clear_log()
+
+    sync(api, review)
+
+    assert [call["args"][:2] for call in github.fake_gh.calls()] == [["api", "graphql"]]

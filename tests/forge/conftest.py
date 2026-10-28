@@ -21,6 +21,9 @@ class FakeGh:
         current.update(state)
         self.state_path.write_text(json.dumps(current))
 
+    def state(self) -> dict[str, Any]:
+        return json.loads(self.state_path.read_text())
+
     def calls(self) -> list[dict[str, Any]]:
         if not self.log_path.exists():
             return []
