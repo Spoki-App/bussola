@@ -2,7 +2,7 @@ from rtool.errors import ForbiddenError, InvalidRequestError, NotFoundError
 from rtool.review.context import ReviewContext
 from rtool.review.keys import key_of
 from rtool.review.overview import approval_set
-from rtool.review.rows import ROW_APPROVABLE_KINDS, Side, unit_lines
+from rtool.review.rows import ROW_APPROVABLE_KINDS, Side, side_lines
 from rtool.review.states import DONE_STATES, compute_statuses, snapshot_rows
 from rtool.storage.models import Approval, Revision, RowApproval, UnitSnapshot, new_id, utcnow
 from rtool.units.model import UnitKind
@@ -28,10 +28,7 @@ def approve_file(context: ReviewContext, revision: Revision, path: str) -> list[
 def approve_rows(context: ReviewContext, snapshot: UnitSnapshot, head_range: LineRange | None, base_range: LineRange | None) -> list[RowApproval]:
     if UnitKind(snapshot.kind) not in ROW_APPROVABLE_KINDS:
         raise InvalidRequestError("Only module and file units can be approved by selection")
-    file_lines = {
-        Side.HEAD: [line.file_line for line in unit_lines(snapshot.head_text, snapshot.head_lines)],
-        Side.BASE: [line.file_line for line in unit_lines(snapshot.base_text, snapshot.base_lines)],
-    }
+    file_lines = {side: [line.file_line for line in side_lines(snapshot, side)] for side in Side}
     ranges = {Side.HEAD: head_range, Side.BASE: base_range}
     already = approval_set(context).approved_rows_by_key().get(key_of(snapshot), set())
     selected = [row for row in snapshot_rows(snapshot) if _in_range(file_lines[row.side][row.index], ranges[row.side]) and row.row_hash not in already]

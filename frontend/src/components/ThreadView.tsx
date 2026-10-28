@@ -7,6 +7,7 @@ import { ErrorNote } from './Badges'
 import { ExternalLink } from './ExternalLink'
 import { Composer } from './Composer'
 import { Markdown } from './Markdown'
+import { plural } from '../review/text'
 
 interface Props {
   reviewId: number
@@ -35,7 +36,7 @@ export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
         {thread.line_count > 1 && thread.anchor?.file_line != null && thread.anchor.end_file_line != null && (
           <span className="muted">{`lines ${String(thread.anchor.file_line)}-${String(thread.anchor.end_file_line)}`}</span>
         )}
-        <span className="muted">{`${String(thread.comments.length)} comment${thread.comments.length === 1 ? '' : 's'}`}</span>
+        <span className="muted">{plural(thread.comments.length, 'comment')}</span>
         <span className="spacer" />
         {thread.can_delete && !confirmingDelete && (
           <button type="button" onClick={() => { setConfirmingDelete(true) }}>

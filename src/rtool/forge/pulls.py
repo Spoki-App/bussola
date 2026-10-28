@@ -9,7 +9,6 @@ from rtool.forge.conversation import import_conversation
 from rtool.git import GitError, GitRepo
 from rtool.git.repo import DEFAULT_REMOTE
 from rtool.review.context import ReviewContext
-from rtool.review.hooks import REVISION_HOOKS
 from rtool.review.repos import open_repo, register_repo
 from rtool.review.revisions import RefreshResult, refresh_review
 from rtool.storage.models import ForgeLink, Repo, Review, Reviewer, utcnow
@@ -68,11 +67,11 @@ def parse_pull_request_url(url: str) -> PullRequestAddress:
 
 def find_repo_for(store: Store, adapter: ForgeAdapter, repository: str, candidates: Callable[[], Iterable[Path]]) -> Repo:
     for repo in store.reviews.list_repos():
-        if Path(repo.path).is_dir() and _has_remote(adapter, open_repo(repo), repository):
+        if Path(repo.path).is_dir() and github_remote(adapter, open_repo(repo), repository) is not None:
             return repo
     for path in candidates():
         try:
-            matches = _has_remote(adapter, GitRepo(path), repository)
+            matches = github_remote(adapter, GitRepo(path), repository) is not None
         except GitError:
             continue
         if matches:
@@ -80,8 +79,8 @@ def find_repo_for(store: Store, adapter: ForgeAdapter, repository: str, candidat
     raise NotFoundError(f"No local clone of github.com/{repository} was found. Add its folder as a repository first.")
 
 
-def _has_remote(adapter: ForgeAdapter, git_repo: GitRepo, repository: str) -> bool:
-    return github_remote(adapter, git_repo, repository) is not None
+def is_pull_request_review(review: Review) -> bool:
+    return review.head_ref.startswith(PULL_REF_PREFIX)
 
 
 def pull_ref(number: int) -> str:
@@ -122,12 +121,10 @@ def review_pull_request(session: ForgeSession, repo: Repo, number: int, reposito
     remote = _require_remote(adapter, git_repo, repository)
     pull = adapter.pull_request(remote.repository, number)
     head_ref, base_ref = fetch_pull_request(git_repo, remote, pull)
-    review = _review_for(store, repo, remote.repository, pull) or store.reviews.find_review(repo.id, head_ref, base_ref)
-    if review is None:
-        review = store.reviews.add_review(Review(repo_id=repo.id, head_ref=head_ref, base_ref=base_ref))
+    review = _review_for(store, repo, remote.repository, pull) or store.reviews.find_or_add_review(repo.id, head_ref, base_ref)
     review.head_ref, review.base_ref = head_ref, base_ref
     link = _save_link(store, review, adapter.provider, remote.repository, pull)
-    result = refresh_review(store, review, git_repo, hooks=REVISION_HOOKS)
+    result = refresh_review(store, review, git_repo)
     import_conversation(ReviewContext(store, review, session.reviewer), adapter, link, result.revision)
     return review
 
@@ -158,7 +155,7 @@ def sync_review(session: ForgeSession, review: Review, link: ForgeLink) -> Refre
     if pull.state != OPEN_STATE:
         return None
     review.head_ref, review.base_ref = fetch_pull_request(git_repo, remote, pull)
-    result = refresh_review(store, review, git_repo, hooks=REVISION_HOOKS)
+    result = refresh_review(store, review, git_repo)
     import_conversation(ReviewContext(store, review, session.reviewer), adapter, link, result.revision)
     return result
 

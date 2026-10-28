@@ -55,6 +55,7 @@ class FileChange:
 class GitRepo:
     def __init__(self, root: Path) -> None:
         self.root = root
+        self._remotes: list[str] | None = None
 
     @classmethod
     def discover(cls, path: Path) -> Self:
@@ -84,7 +85,9 @@ class GitRepo:
         return parse_raw_diff(output.decode("utf-8", errors="surrogateescape"))
 
     def remotes(self) -> list[str]:
-        return self.run("remote").decode().split()
+        if self._remotes is None:
+            self._remotes = self.run("remote").decode().split()
+        return self._remotes
 
     def upstream_remote(self, ref: str) -> str | None:
         remotes = self.remotes()
@@ -162,6 +165,16 @@ def read_git_config(cwd: Path, key: str) -> str | None:
     result = subprocess.run([GIT, "config", "--get", key], cwd=cwd, env=_git_env(), capture_output=True, check=False)
     value = result.stdout.decode(errors="replace").strip()
     return value if result.returncode == 0 and value else None
+
+
+def read_git_config_values(cwd: Path, pattern: str) -> dict[str, str]:
+    result = subprocess.run([GIT, "config", "--get-regexp", pattern], cwd=cwd, env=_git_env(), capture_output=True, check=False)
+    values: dict[str, str] = {}
+    for line in result.stdout.decode(errors="replace").splitlines():
+        key, _, value = line.partition(" ")
+        if value.strip():
+            values[key] = value.strip()
+    return values
 
 
 def _git_env() -> dict[str, str]:

@@ -23,3 +23,14 @@ export function navigate(to: string, { replace = false }: { replace?: boolean } 
   }
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }
+
+const REVIEW_PATH = /^\/reviews\/(\d+)\/?$/
+
+export function reviewPath(reviewId: number): string {
+  return `/reviews/${String(reviewId)}`
+}
+
+export function reviewIdFromPath(pathname: string): number | null {
+  const match = REVIEW_PATH.exec(pathname)
+  return match ? Number(match[1]) : null
+}

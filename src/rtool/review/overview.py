@@ -27,8 +27,8 @@ def approval_set(context: ReviewContext, moment: datetime | None = None) -> Appr
     return ApprovalSet(approvals.approvals(review_id, reviewer_id), approvals.row_approvals(review_id, reviewer_id), moment)
 
 
-def unit_views(context: ReviewContext, revision: Revision, unit_filter: UnitFilter = UnitFilter.ALL) -> list[UnitView]:
-    snapshots = context.store.reviews.snapshots(revision.id)
+def unit_views(context: ReviewContext, revision: Revision, unit_filter: UnitFilter = UnitFilter.ALL, *, texts: bool = True) -> list[UnitView]:
+    snapshots = context.store.reviews.snapshots(revision.id, texts=texts)
     statuses = compute_statuses(snapshots, approval_set(context))
     views = [UnitView(snapshot, statuses[snapshot.id]) for snapshot in snapshots]
     if unit_filter == UnitFilter.TODO:

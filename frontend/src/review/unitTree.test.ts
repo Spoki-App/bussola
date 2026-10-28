@@ -23,8 +23,8 @@ function unit(id: number, kind: string, qualifiedName: string): Unit {
     head_start: 1,
     head_end: 2,
     binary: false,
+    image: false,
     open_threads: 0,
-    default_diff_mode: 'base',
   }
 }
 

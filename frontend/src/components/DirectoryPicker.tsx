@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 
 import { describeError } from '../api/client'
 import { useDirectories, useRepositoryScan } from '../api/hooks'
 import { displayPath, filterRepositories } from '../review/repositorySearch'
 import { ErrorNote } from './Badges'
+import { useModalDialog } from '../hooks/useModalDialog'
+import { Segmented } from './Segmented'
 
 interface Props {
   busy: boolean
@@ -17,22 +19,8 @@ type PickerTab = 'found' | 'browse'
 const TAB_LABELS: Record<PickerTab, string> = { found: 'Found in your home folder', browse: 'Browse folders' }
 
 export function DirectoryPicker({ busy, error, onSelect, onClose }: Props) {
-  const dialog = useRef<HTMLDialogElement>(null)
+  const { ref: dialog, close } = useModalDialog()
   const [tab, setTab] = useState<PickerTab>('found')
-
-  useEffect(() => {
-    const element = dialog.current
-    if (element && !element.open) {
-      element.showModal()
-    }
-    return () => {
-      element?.close()
-    }
-  }, [])
-
-  const close = () => {
-    dialog.current?.close()
-  }
 
   return (
     <dialog ref={dialog} className="picker" aria-labelledby="picker-title" onClose={onClose}>
@@ -42,13 +30,7 @@ export function DirectoryPicker({ busy, error, onSelect, onClose }: Props) {
           Close
         </button>
       </header>
-      <div className="segmented" role="tablist" aria-label="How to find the repository">
-        {(Object.keys(TAB_LABELS) as PickerTab[]).map((option) => (
-          <button key={option} type="button" role="tab" aria-selected={tab === option} className={tab === option ? 'active' : ''} onClick={() => { setTab(option) }}>
-            {TAB_LABELS[option]}
-          </button>
-        ))}
-      </div>
+      <Segmented label="How to find the repository" labels={TAB_LABELS} value={tab} onChange={setTab} />
       {tab === 'found' ? <FoundRepositories busy={busy} onSelect={onSelect} /> : <FolderBrowser busy={busy} onSelect={onSelect} />}
       {error ? <ErrorNote message={describeError(error)} /> : null}
     </dialog>

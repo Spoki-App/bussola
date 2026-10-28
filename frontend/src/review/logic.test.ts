@@ -23,8 +23,8 @@ function unit(id: number, path: string, state: UnitState, qualifiedName = `f${St
     head_start: 1,
     head_end: 2,
     binary: false,
+    image: false,
     open_threads: 0,
-    default_diff_mode: 'base',
   }
 }
 

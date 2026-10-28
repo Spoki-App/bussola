@@ -1,5 +1,4 @@
 from collections import OrderedDict
-from dataclasses import asdict
 
 from fastapi import APIRouter, Request, Response
 
@@ -10,14 +9,12 @@ from rtool.api.schemas import (
     ForgeLinkIn,
     ForgeLinkOut,
     ForgeOut,
-    ForgeStatusOut,
     PublishIn,
     PublishOut,
-    PullRequestOut,
 )
 from rtool.api.state import app_state
-from rtool.api.views import publish_out
-from rtool.forge.base import Asset, PullRequest
+from rtool.api.views import forge_status_out, publish_out, pull_request_out
+from rtool.forge.base import Asset
 from rtool.forge.links import ForgeOverview, forge_overview, link_pull_request
 from rtool.forge.publish import publish_comments, require_link
 from rtool.forge.pulls import sync_conversation
@@ -68,20 +65,15 @@ def sync(context: ContextDep, request: Request) -> ConversationSyncOut:
 
 def _overview(context: ReviewContext, request: Request) -> ForgeOut:
     revision = resolve_revision(context, None)
-    overview: ForgeOverview = forge_overview(context, app_state(request).forge, open_repo(repo_of(context)), revision)
+    overview: ForgeOverview = forge_overview(context, app_state(request).forge, open_repo(repo_of(context)))
     link = overview.link
     pull = overview.pull_request
     return ForgeOut(
-        status=ForgeStatusOut(**asdict(overview.status)),
+        status=forge_status_out(overview.status),
         repository=overview.repository,
         link=ForgeLinkOut(provider=link.provider, repository=link.repository, pr_number=link.pr_number) if link else None,
-        pull_request=_pull_out(pull) if pull else None,
-        candidates=[_pull_out(item) for item in overview.candidates],
-        pending_comments=overview.pending_comments,
+        pull_request=pull_request_out(pull) if pull else None,
+        candidates=[pull_request_out(item) for item in overview.candidates],
         head_matches=pull.head_sha == revision.head_sha if pull else None,
         error=overview.error,
     )
-
-
-def _pull_out(pull: PullRequest) -> PullRequestOut:
-    return PullRequestOut(**asdict(pull))

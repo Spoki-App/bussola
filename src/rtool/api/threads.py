@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
 
-from rtool.api.deps import ReviewerDep, StoreDep, resolve_revision, snapshot_of
+from rtool.api.deps import ContextDep, ReviewerDep, StoreDep, resolve_revision, review_context, snapshot_of
 from rtool.api.schemas import CommentIn, CommentOut, ReviewerOut, ThreadAnchorOut, ThreadDeletedOut, ThreadIn, ThreadOut, ThreadPatch
 from rtool.api.state import app_state
 from rtool.errors import NotFoundError
@@ -10,10 +10,9 @@ from rtool.forge.conversation import push_resolution
 from rtool.review.anchoring import line_count
 from rtool.review.context import ReviewContext
 from rtool.review.rows import Side
+from rtool.review.thread_types import ThreadScope, ThreadStatus
 from rtool.review.threads import (
     NewThread,
-    ThreadScope,
-    ThreadStatus,
     ThreadView,
     add_comment,
     can_delete,
@@ -30,40 +29,31 @@ from rtool.storage.repositories import Store
 router = APIRouter(tags=["threads"])
 
 
-def review_context_for(review_id: int, store: StoreDep, reviewer: ReviewerDep) -> ReviewContext:
-    review = store.reviews.get_review(review_id)
-    if review is None:
-        raise NotFoundError(f"Review {review_id} not found")
-    return ReviewContext(store, review, reviewer)
-
-
 def thread_context(thread_id: str, store: StoreDep, reviewer: ReviewerDep) -> ReviewContext:
     thread = store.threads.get_thread(thread_id)
     if thread is None:
         raise NotFoundError("Thread not found")
-    return review_context_for(thread.review_id, store, reviewer)
+    return review_context(thread.review_id, store, reviewer)
 
 
 def comment_context(comment_id: str, store: StoreDep, reviewer: ReviewerDep) -> ReviewContext:
-    comment = store.threads.get_comment(comment_id)
-    if comment is None:
-        raise NotFoundError("Comment not found")
-    return thread_context(comment.thread_id, store, reviewer)
+    return thread_context(_comment(store, comment_id).thread_id, store, reviewer)
 
 
-ReviewContextDep = Annotated[ReviewContext, Depends(review_context_for)]
 ThreadContextDep = Annotated[ReviewContext, Depends(thread_context)]
 CommentContextDep = Annotated[ReviewContext, Depends(comment_context)]
 
 
 @router.get("/reviews/{review_id}/threads")
-def list_threads(context: ReviewContextDep, revision_id: int | None = None) -> list[ThreadOut]:
+def list_threads(context: ContextDep, revision_id: int | None = None) -> list[ThreadOut]:
     revision = resolve_revision(context, revision_id)
-    return [thread_out(context, view) for view in thread_views(context, revision)]
+    views = thread_views(context, revision)
+    published = context.store.forge.published([comment.id for view in views for comment in view.comments])
+    return [thread_out(context, view, published) for view in views]
 
 
 @router.post("/reviews/{review_id}/threads", status_code=status.HTTP_201_CREATED)
-def post_thread(body: ThreadIn, context: ReviewContextDep) -> ThreadOut:
+def post_thread(body: ThreadIn, context: ContextDep) -> ThreadOut:
     snapshot = snapshot_of(context, body.unit_id) if body.unit_id is not None else None
     revision = context.store.reviews.get_revision(snapshot.revision_id) if snapshot else resolve_revision(context, None)
     if revision is None:
@@ -112,9 +102,10 @@ def remove_comment(comment_id: str, context: CommentContextDep) -> CommentOut:
     return comment_out(context, comment)
 
 
-def thread_out(context: ReviewContext, view: ThreadView) -> ThreadOut:
+def thread_out(context: ReviewContext, view: ThreadView, published: dict[str, PublishedComment] | None = None) -> ThreadOut:
     thread, anchor = view.thread, view.anchor
-    published = context.store.forge.published([comment.id for comment in view.comments])
+    if published is None:
+        published = context.store.forge.published([comment.id for comment in view.comments])
     return ThreadOut(
         id=thread.id,
         scope=ThreadScope(thread.scope),

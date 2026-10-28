@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 
 import { deleteJson, getJson, patchJson, postJson } from './client'
-import { keys } from './hooks'
+import { keys, useInvalidatingMutation } from './hooks'
 import type { Comment, NewThreadRequest, Thread, ThreadStatus } from './types'
 
 export const threadsKey = (reviewId: number) => ['threads', reviewId] as const
@@ -15,16 +15,7 @@ export function useThreads(reviewId: number, revisionId: number | undefined) {
 }
 
 function useThreadMutation<TArgs, TResult>(reviewId: number, mutationFn: (args: TArgs) => Promise<TResult>) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn,
-    onSuccess: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: threadsKey(reviewId) }),
-        client.invalidateQueries({ queryKey: keys.units(reviewId) }),
-        client.invalidateQueries({ queryKey: keys.review(reviewId) }),
-      ]),
-  })
+  return useInvalidatingMutation([threadsKey(reviewId), keys.units(reviewId), keys.review(reviewId)], mutationFn)
 }
 
 export function useCreateThread(reviewId: number) {

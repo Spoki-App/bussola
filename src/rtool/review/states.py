@@ -3,8 +3,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
+from rtool.review.anchoring import side_text
 from rtool.review.keys import KeyTuple, key_of
-from rtool.review.rows import ROW_APPROVABLE_KINDS, ChangedRow, changed_rows, unit_lines
+from rtool.review.rows import ROW_APPROVABLE_KINDS, ChangedRow, Side, changed_rows
 from rtool.storage.models import Approval, RowApproval, UnitSnapshot
 from rtool.units.model import UnitKind
 
@@ -59,9 +60,7 @@ class ApprovalSet:
 def snapshot_rows(snapshot: UnitSnapshot) -> list[ChangedRow]:
     if UnitKind(snapshot.kind) not in ROW_APPROVABLE_KINDS or (snapshot.base_text is None and snapshot.head_text is None):
         return []
-    base = [line.text for line in unit_lines(snapshot.base_text, snapshot.base_lines)]
-    head = [line.text for line in unit_lines(snapshot.head_text, snapshot.head_lines)]
-    return changed_rows(base, head)
+    return changed_rows(side_text(snapshot, Side.BASE), side_text(snapshot, Side.HEAD))
 
 
 def compute_statuses(snapshots: Iterable[UnitSnapshot], approval_set: ApprovalSet) -> dict[int, UnitStatus]:

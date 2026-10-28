@@ -1,16 +1,17 @@
-from rtool.review.anchoring import OPEN_STATUS, UNIT_SCOPE
-from rtool.storage.repositories import Store
+from collections.abc import Iterable
 
-type ThreadKey = tuple[str, str, str]
+from rtool.review.keys import KeyTuple
+from rtool.review.thread_types import ThreadScope, ThreadStatus
+from rtool.storage.models import Thread
 
 
-def open_thread_counts(store: Store, review_id: int) -> dict[ThreadKey | None, int]:
-    counts: dict[ThreadKey | None, int] = {}
-    for thread in store.threads.threads(review_id):
-        if thread.status != OPEN_STATUS:
+def open_thread_counts(threads: Iterable[Thread]) -> dict[KeyTuple | None, int]:
+    counts: dict[KeyTuple | None, int] = {}
+    for thread in threads:
+        if thread.status != ThreadStatus.OPEN:
             continue
         key = None
-        if thread.scope == UNIT_SCOPE and thread.path is not None and thread.kind is not None and thread.qualified_name is not None:
+        if thread.scope == ThreadScope.UNIT and thread.path is not None and thread.kind is not None and thread.qualified_name is not None:
             key = (thread.path, thread.kind, thread.qualified_name)
         counts[key] = counts.get(key, 0) + 1
     return counts

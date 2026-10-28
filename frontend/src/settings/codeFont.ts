@@ -1,3 +1,5 @@
+import { readStored, writeStored } from './storage'
+
 export interface CodeFont {
   family: string
   size: number
@@ -76,7 +78,7 @@ export function clampSize(size: number): number {
 
 export function loadCodeFont(): CodeFont {
   try {
-    const stored: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? 'null')
+    const stored: unknown = JSON.parse(readStored(STORAGE_KEY) ?? 'null')
     if (stored && typeof stored === 'object' && 'family' in stored && 'size' in stored && typeof stored.family === 'string' && typeof stored.size === 'number') {
       const ligatures = 'ligatures' in stored && typeof stored.ligatures === 'boolean' ? stored.ligatures : DEFAULT_CODE_FONT.ligatures
       const features = 'features' in stored && typeof stored.features === 'string' ? stored.features : DEFAULT_CODE_FONT.features
@@ -89,11 +91,7 @@ export function loadCodeFont(): CodeFont {
 }
 
 export function saveCodeFont(font: CodeFont): void {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(font))
-  } catch {
-    return
-  }
+  writeStored(STORAGE_KEY, JSON.stringify(font))
 }
 
 export function applyCodeFont(font: CodeFont): void {

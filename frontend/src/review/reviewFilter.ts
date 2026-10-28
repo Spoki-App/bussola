@@ -1,4 +1,5 @@
 import type { Review } from '../api/types'
+import { readStored, writeStored } from '../settings/storage'
 
 export type ReviewFilter = 'open' | 'merged' | 'closed' | 'all'
 
@@ -24,18 +25,10 @@ export function matchesReviewFilter(review: Review, filter: ReviewFilter): boole
 }
 
 export function loadReviewFilter(): ReviewFilter {
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY)
-    return isReviewFilter(stored) ? stored : DEFAULT_REVIEW_FILTER
-  } catch {
-    return DEFAULT_REVIEW_FILTER
-  }
+  const stored = readStored(STORAGE_KEY)
+  return isReviewFilter(stored) ? stored : DEFAULT_REVIEW_FILTER
 }
 
 export function saveReviewFilter(filter: ReviewFilter): void {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, filter)
-  } catch {
-    return
-  }
+  writeStored(STORAGE_KEY, filter)
 }

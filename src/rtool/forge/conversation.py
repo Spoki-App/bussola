@@ -5,10 +5,12 @@ from datetime import datetime
 
 from rtool.forge.base import Conversation, DiffSide, ForgeAdapter, RemoteNote, RemoteThread
 from rtool.forge.publish import body_hash, is_comment_id
+from rtool.review.anchoring import anchor_for
 from rtool.review.context import ReviewContext
-from rtool.review.rows import Side, unit_lines
-from rtool.review.threads import ThreadScope, ThreadStatus, anchor_to_unit
-from rtool.storage.models import Comment, ForgeLink, PublishedComment, Revision, Thread, ThreadAnchor, UnitSnapshot, utcnow
+from rtool.review.rows import Side, side_lines
+from rtool.review.thread_types import ThreadScope, ThreadStatus
+from rtool.review.threads import anchor_to_unit
+from rtool.storage.models import Comment, ForgeLink, PublishedComment, Revision, Thread, UnitSnapshot, utcnow
 
 GITHUB_EMAIL_DOMAIN = "users.noreply.github.com"
 UNKNOWN_AUTHOR = "ghost"
@@ -54,7 +56,7 @@ def find_unit_target(snapshots: list[UnitSnapshot], remote: RemoteThread) -> Uni
     for snapshot in snapshots:
         if remote.path not in {snapshot.path, snapshot.old_path}:
             continue
-        lines = unit_lines(snapshot.base_text, snapshot.base_lines) if side == Side.BASE else unit_lines(snapshot.head_text, snapshot.head_lines)
+        lines = side_lines(snapshot, side)
         numbers = [line.file_line for line in lines]
         if first in numbers and remote.line in numbers:
             start, end = numbers.index(first), numbers.index(remote.line)
@@ -85,7 +87,7 @@ class _Importer:
         if note.remote_id in self._known:
             self._follow_edit(note)
             return
-        thread = self._add_thread(self._thread(note, ThreadScope.REVIEW, None))
+        thread = self.context.store.threads.add_thread(self._thread(note, ThreadScope.REVIEW, None))
         self._add_comment(thread, note)
 
     def import_thread(self, remote: RemoteThread) -> None:
@@ -130,10 +132,9 @@ class _Importer:
         if target is not None:
             thread.scope = ThreadScope.UNIT.value
             anchor_to_unit(thread, target.snapshot, target.side, target.line_offset, target.count)
-        self._add_thread(thread)
+        self.context.store.threads.add_thread(thread)
         if target is not None:
-            anchor = ThreadAnchor(thread.id, self.revision.id, thread.path, thread.kind, thread.qualified_name, thread.unit_hash, thread.line_offset)
-            self.context.store.threads.add_anchor(anchor)
+            self.context.store.threads.add_anchor(anchor_for(thread, self.revision.id))
         return thread
 
     def _thread(self, first: RemoteNote, scope: ThreadScope, path: str | None) -> Thread:
@@ -145,9 +146,6 @@ class _Importer:
             path=path,
             created_at=_parse_time(first.created_at),
         )
-
-    def _add_thread(self, thread: Thread) -> Thread:
-        return self.context.store.threads.add_thread(thread)
 
     def _add_comment(self, thread: Thread, note: RemoteNote) -> None:
         comment = self.context.store.threads.add_comment(

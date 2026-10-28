@@ -2,11 +2,10 @@ from dataclasses import dataclass, field
 
 from rtool.errors import InvalidRequestError
 from rtool.forge.base import ForgeAdapter, ForgeError, ForgeStatus, PullRequest
-from rtool.forge.publish import pending_comment_count
 from rtool.git import GitRepo
 from rtool.git.repo import DEFAULT_REMOTE
 from rtool.review.context import ReviewContext
-from rtool.storage.models import ForgeLink, Revision
+from rtool.storage.models import ForgeLink
 
 
 @dataclass(frozen=True)
@@ -15,7 +14,6 @@ class ForgeOverview:
     repository: str | None
     link: ForgeLink | None
     pull_request: PullRequest | None
-    pending_comments: int
     candidates: list[PullRequest] = field(default_factory=list)
     error: str | None = None
 
@@ -31,20 +29,19 @@ def branch_name(git_repo: GitRepo, ref: str) -> str:
     return ref.removeprefix(f"{remote}/") if remote else ref
 
 
-def forge_overview(context: ReviewContext, adapter: ForgeAdapter, git_repo: GitRepo, revision: Revision) -> ForgeOverview:
+def forge_overview(context: ReviewContext, adapter: ForgeAdapter, git_repo: GitRepo) -> ForgeOverview:
     status = adapter.status()
     repository = review_repository(adapter, git_repo, context.review.head_ref)
     link = context.store.forge.link(context.review.id)
-    pending = pending_comment_count(context, revision)
     if not status.authenticated or repository is None:
-        return ForgeOverview(status, repository, link, None, pending)
+        return ForgeOverview(status, repository, link, None)
     try:
         if link is not None:
-            return ForgeOverview(status, repository, link, adapter.pull_request(link.repository, link.pr_number), pending)
+            return ForgeOverview(status, repository, link, adapter.pull_request(link.repository, link.pr_number))
         head, base = branch_name(git_repo, context.review.head_ref), branch_name(git_repo, context.review.base_ref)
-        return ForgeOverview(status, repository, None, None, pending, adapter.find_pull_requests(repository, head, base))
+        return ForgeOverview(status, repository, None, None, adapter.find_pull_requests(repository, head, base))
     except ForgeError as error:
-        return ForgeOverview(status, repository, link, None, pending, error=str(error))
+        return ForgeOverview(status, repository, link, None, error=str(error))
 
 
 def link_pull_request(context: ReviewContext, adapter: ForgeAdapter, git_repo: GitRepo, number: int) -> ForgeLink:

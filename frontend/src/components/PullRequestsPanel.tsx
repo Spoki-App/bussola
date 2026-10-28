@@ -2,7 +2,7 @@ import { describeError } from '../api/client'
 import { usePullRequests, useReviewPullRequest, useSyncPullRequests } from '../api/pulls'
 import type { PullSyncResult } from '../api/types'
 import { Link } from '../Link'
-import { navigate } from '../navigation'
+import { navigate, reviewPath } from '../navigation'
 import { ErrorNote } from './Badges'
 import { ExternalLink } from './ExternalLink'
 import { CommentCount } from './CommentCount'
@@ -67,12 +67,12 @@ export function PullRequestsPanel({ repoId }: { repoId: number }) {
                 type="button"
                 className="primary"
                 disabled={start.isPending}
-                onClick={() => { start.mutate(pull.number, { onSuccess: (review) => { navigate(`/reviews/${String(review.id)}`) } }) }}
+                onClick={() => { start.mutate(pull.number, { onSuccess: (review) => { navigate(reviewPath(review.id)) } }) }}
               >
                 {start.isPending && start.variables === pull.number ? 'Fetching...' : 'Review'}
               </button>
             ) : (
-              <Link to={`/reviews/${String(reviewId)}`} className="button-link">
+              <Link to={reviewPath(reviewId)} className="button-link">
                 Open review
               </Link>
             )}

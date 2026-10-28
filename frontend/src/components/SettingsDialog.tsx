@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 
 import { navigate } from '../navigation'
 import { AddRepoForm } from './AddRepoForm'
 import { CodeFontPanel } from './CodeFontPanel'
 import { OpenPullRequestForm } from './OpenPullRequestForm'
+import { useModalDialog } from '../hooks/useModalDialog'
 
 export function SettingsButton() {
   const [open, setOpen] = useState(false)
@@ -18,21 +19,7 @@ export function SettingsButton() {
 }
 
 function SettingsModal({ onClose }: { onClose: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null)
-
-  useEffect(() => {
-    const element = dialog.current
-    if (element && !element.open) {
-      element.showModal()
-    }
-    return () => {
-      element?.close()
-    }
-  }, [])
-
-  const close = () => {
-    dialog.current?.close()
-  }
+  const { ref: dialog, close } = useModalDialog()
 
   return (
     <dialog ref={dialog} className="picker settings-dialog" aria-labelledby="settings-dialog-title" onClose={onClose}>

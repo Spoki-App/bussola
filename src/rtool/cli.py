@@ -15,14 +15,12 @@ from rtool.errors import DomainError
 from rtool.git import GitError, GitRepo, InvalidRefError
 from rtool.identity import GitConfigIdentity
 from rtool.review.context import ReviewContext
-from rtool.review.hooks import REVISION_HOOKS
 from rtool.review.overview import unit_views
 from rtool.review.refs import NoBaseBranchError, default_base_ref
 from rtool.review.repos import register_repo
 from rtool.review.revisions import refresh_review
 from rtool.security import LOCAL_HOSTS, allowed_hosts_for, new_token
 from rtool.storage.database import Database, default_data_dir
-from rtool.storage.models import Review
 from rtool.storage.repositories import Store
 
 BROWSER_OPEN_DELAY_SECONDS = 1.0
@@ -68,7 +66,7 @@ def serve(
 def status(head: HeadArgument, base: BaseOption = None, repo: RepoOption = None) -> None:
     """Refresh the review of HEAD and print the state of each changed unit."""
     with _cli_errors(), _review_context(head, base, repo) as (context, git_repo):
-        result = refresh_review(context.store, context.review, git_repo, hooks=REVISION_HOOKS)
+        result = refresh_review(context.store, context.review, git_repo)
         views = unit_views(context, result.revision)
     for view in views:
         snapshot = view.snapshot
@@ -85,7 +83,7 @@ def refresh(
 ) -> None:
     """Record a new revision of the review of HEAD if any commit changed."""
     with _cli_errors(), _review_context(head, base, repo) as (context, git_repo):
-        result = refresh_review(context.store, context.review, git_repo, fetch=fetch, hooks=REVISION_HOOKS)
+        result = refresh_review(context.store, context.review, git_repo, fetch=fetch)
         units = len(context.store.reviews.snapshots(result.revision.id))
     outcome = "new" if result.created else "unchanged"
     revision = result.revision
@@ -101,7 +99,7 @@ def _review_context(head: str, base: str | None, repo_path: Path | None) -> Gene
     with Database.open(default_data_dir()).session() as session:
         store = Store(session)
         repo = register_repo(store, git_repo.root)
-        review = store.reviews.find_review(repo.id, head, base_ref) or store.reviews.add_review(Review(repo_id=repo.id, head_ref=head, base_ref=base_ref))
+        review = store.reviews.find_or_add_review(repo.id, head, base_ref)
         identity = GitConfigIdentity(git_repo.root).current()
         yield ReviewContext(store, review, store.reviews.reviewer(identity.email, identity.name)), git_repo
         store.commit()

@@ -1,13 +1,10 @@
 from fastapi import APIRouter
-from pydantic import BaseModel
+
+from rtool.api.schemas import HealthOut
 
 router = APIRouter(tags=["health"])
 
 
-class HealthResponse(BaseModel):
-    status: str
-
-
 @router.get("/health")
-def get_health() -> HealthResponse:
-    return HealthResponse(status="ok")
+def get_health() -> HealthOut:
+    return HealthOut(status="ok")

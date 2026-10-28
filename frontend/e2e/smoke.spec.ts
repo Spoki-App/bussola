@@ -14,7 +14,9 @@ test('review a branch: open it, approve a unit and comment on a line', async ({ 
   await card.getByRole('button', { name: 'Approve', exact: true }).click()
   await expect(card.getByText('Approved', { exact: true })).toBeVisible()
   await expect(page.getByText('1 / 1')).toBeVisible()
+  await expect(card.getByRole('button', { name: 'Expand unit' })).toBeVisible()
 
+  await card.getByRole('button', { name: 'Expand unit' }).click()
   await card.locator('td.diff-gutter', { hasText: /^2$/ }).first().click()
   await card.getByPlaceholder('Leave a comment (Markdown)').fill('Is `len` needed here?')
   await card.getByRole('button', { name: 'Start thread' }).click()

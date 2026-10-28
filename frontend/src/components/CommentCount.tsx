@@ -1,11 +1,9 @@
+import { plural } from '../review/text'
+
 interface Props {
   total: number
   unresolved: number
   totalLabel: string
-}
-
-function plural(count: number, word: string): string {
-  return `${String(count)} ${word}${count === 1 ? '' : 's'}`
 }
 
 export function CommentCount({ total, unresolved, totalLabel }: Props) {

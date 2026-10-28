@@ -1,16 +1,14 @@
-from collections.abc import Callable
 from dataclasses import dataclass
 
 from rtool.config import load_repo_config
 from rtool.git import GitRepo
+from rtool.review.anchoring import reanchor_threads
 from rtool.review.refs import resolve_review_commits
 from rtool.review.scope import UnitChange, compute_scope
 from rtool.storage.models import Review, Revision, UnitSnapshot
 from rtool.storage.repositories import Store
 from rtool.storage.unit_cache import SqlUnitCache
 from rtool.units.extract import FileUnitExtractor
-
-type RevisionHook = Callable[[Store, Review, Revision | None, Revision], None]
 
 
 @dataclass(frozen=True)
@@ -19,7 +17,7 @@ class RefreshResult:
     created: bool
 
 
-def refresh_review(store: Store, review: Review, repo: GitRepo, *, fetch: bool = False, hooks: tuple[RevisionHook, ...] = ()) -> RefreshResult:
+def refresh_review(store: Store, review: Review, repo: GitRepo, *, fetch: bool = False) -> RefreshResult:
     if fetch:
         fetch_review_remotes(repo, review)
     commits = resolve_review_commits(repo, review.head_ref, review.base_ref)
@@ -36,8 +34,7 @@ def refresh_review(store: Store, review: Review, repo: GitRepo, *, fetch: bool =
         merge_base_sha=commits.merge_base_sha,
     )
     store.reviews.add_revision(revision, [snapshot_from(change) for change in changes])
-    for hook in hooks:
-        hook(store, review, previous, revision)
+    reanchor_threads(store, review, revision)
     return RefreshResult(revision, created=True)
 
 

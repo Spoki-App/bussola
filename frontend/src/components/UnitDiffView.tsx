@@ -6,6 +6,7 @@ import type { DiffRow, UnitDiff } from '../api/types'
 import { collapsedUnified, segmentRows, type Segment } from '../review/collapse'
 import { highlightTokens, languageFor } from '../review/highlight'
 import { isSelectable, rowKey } from '../review/selection'
+import { plural } from '../review/text'
 
 const PLACEHOLDER_GUTTER = '⋯'
 const FILE_HEADER_LINES = 3
@@ -82,7 +83,7 @@ function gutterSide(row: DiffRow): GutterSide {
 
 function hiddenLabel(segment: Segment): string {
   const count = segment.end - segment.start + 1
-  return `Show ${String(count)} hidden line${count === 1 ? '' : 's'}`
+  return `Show ${plural(count, 'hidden line')}`
 }
 
 function renderSegments(segments: Segment[], hunks: HunkData[], expand: (id: string) => void) {

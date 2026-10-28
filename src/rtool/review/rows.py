@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from enum import StrEnum
 
+from rtool.storage.models import UnitSnapshot
 from rtool.units.model import UnitKind
 
 ROW_APPROVABLE_KINDS = frozenset({UnitKind.MODULE, UnitKind.FILE})
@@ -44,6 +45,16 @@ class ChangedRow:
     row_hash: str
 
 
+def is_binary(snapshot: UnitSnapshot) -> bool:
+    return snapshot.kind == UnitKind.FILE and snapshot.base_text is None and snapshot.head_text is None
+
+
+def side_lines(snapshot: UnitSnapshot, side: str) -> list[UnitLine]:
+    if side == Side.BASE:
+        return unit_lines(snapshot.base_text, snapshot.base_lines)
+    return unit_lines(snapshot.head_text, snapshot.head_lines)
+
+
 def unit_lines(text: str | None, line_numbers: Sequence[int | None]) -> list[UnitLine]:
     if text is None:
         return []
@@ -66,21 +77,21 @@ def diff_lines(old: Sequence[str], new: Sequence[str]) -> list[DiffLine]:
     return result
 
 
-def changed_rows(base: Sequence[str], head: Sequence[str]) -> list[ChangedRow]:
+def changed_rows(base: Sequence[str], head: Sequence[str], lines: Sequence[DiffLine] | None = None) -> list[ChangedRow]:
     occurrences: Counter[tuple[str, ...]] = Counter()
     rows: list[ChangedRow] = []
-    for line in diff_lines(base, head):
+    for line in diff_lines(base, head) if lines is None else lines:
         if line.change == LineChange.ADDED and line.new_index is not None:
-            side, index, lines = Side.HEAD, line.new_index, head
+            side, index, texts = Side.HEAD, line.new_index, head
         elif line.change == LineChange.REMOVED and line.old_index is not None:
-            side, index, lines = Side.BASE, line.old_index, base
+            side, index, texts = Side.BASE, line.old_index, base
         else:
             continue
-        identity = (side.value, _clean(lines[index]), _neighbour(lines, index - 1), _neighbour(lines, index + 1))
+        identity = (side.value, _clean(texts[index]), _neighbour(texts, index - 1), _neighbour(texts, index + 1))
         occurrence = occurrences[identity]
         occurrences[identity] += 1
         digest = hashlib.sha256(ROW_HASH_SEPARATOR.join((*identity, str(occurrence))).encode()).hexdigest()
-        rows.append(ChangedRow(side, index, lines[index], digest))
+        rows.append(ChangedRow(side, index, texts[index], digest))
     return rows
 
 

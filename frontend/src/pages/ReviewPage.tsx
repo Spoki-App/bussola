@@ -18,13 +18,13 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
 import { buildUnitTree } from '../review/unitTree'
 import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, groupByFile, nextTodoIndex, progressPercent, shortSha } from '../review/logic'
+import { Segmented } from '../components/Segmented'
 
 export interface ReviewExtensions {
   onComment?: (target: CommentTarget) => void
   onCommentSelectEnd?: () => void
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
-  unitFooter?: (unit: Unit) => ReactNode
   fileActions?: (path: string) => ReactNode
   sidePanel?: { label: string; content: ReactNode }
 }
@@ -185,13 +185,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           ))}
           {data.open_threads > 0 && <span className="count-chip">{`Open threads: ${String(data.open_threads)}`}</span>}
         </p>
-        <div className="segmented" role="tablist" aria-label="Filter units">
-          {(Object.keys(FILTER_LABELS) as UnitFilter[]).map((option) => (
-            <button key={option} type="button" role="tab" aria-selected={filter === option} className={filter === option ? 'active' : ''} onClick={() => { setFilter(option) }}>
-              {FILTER_LABELS[option]}
-            </button>
-          ))}
-        </div>
+        <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
         <div className="summary-row">
           <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>
           {extensions.sidePanel && (
@@ -226,7 +220,6 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                     onCommentSelectEnd={extensions.onCommentSelectEnd}
                     renderWidgets={extensions.renderWidgets}
                     highlightRows={extensions.highlightRows}
-                    footer={extensions.unitFooter?.(unit)}
                   />
                 )}
               />

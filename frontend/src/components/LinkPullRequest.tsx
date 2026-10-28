@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function LinkPullRequest({ reviewId, unsent, onLinked }: Props) {
-  const forge = useForge(reviewId, true)
+  const forge = useForge(reviewId)
   if (forge.isPending) {
     return <p className="muted">Checking GitHub...</p>
   }

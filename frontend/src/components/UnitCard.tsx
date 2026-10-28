@@ -3,7 +3,6 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { describeError } from '../api/client'
 import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/hooks'
 import type { DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
-import { isImagePath } from '../review/images'
 import { isTodo, unitTitle } from '../review/logic'
 import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
 import { lastSegment } from '../review/unitTree'
@@ -35,15 +34,13 @@ interface Props {
   onCommentSelectEnd?: () => void
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
-  footer?: ReactNode
   nested?: boolean
 }
 
 const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', base: 'Base → head' }
 
-export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, footer, nested = false }: Props) {
+export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, nested = false }: Props) {
   const todo = isTodo(unit.state)
-  const image = isImagePath(unit.path)
   const [expanded, setExpanded] = useState(todo)
   const [wasTodo, setWasTodo] = useState(todo)
   if (todo !== wasTodo) {
@@ -53,7 +50,7 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
   const [mode, setMode] = useState<DiffMode | undefined>(undefined)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [anchor, setAnchor] = useState<string | null>(null)
-  const diff = useUnitDiff(reviewId, unit.id, mode, expanded)
+  const diff = useUnitDiff(reviewId, unit, mode, expanded)
   const approve = useApprove(reviewId)
   const revoke = useRevoke(reviewId)
   const revokeSelections = useRevokeSelections(reviewId)
@@ -174,11 +171,11 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
       {expanded && (
         <div className="unit-body">
           {diff.data?.approved_text_unavailable && <p className="diff-note">The approved version is too large to keep, so only the base diff is available.</p>}
-          {unit.row_approvable && !unit.binary && isTodo(unit.state) && <p className="hint">Click changed lines to select them, shift-click to extend, then approve the selection.</p>}
+          {unit.row_approvable && isTodo(unit.state) && <p className="hint">Click changed lines to select them, shift-click to extend, then approve the selection.</p>}
           {diff.isPending && <p className="diff-note">Loading diff...</p>}
           {diff.error && <ErrorNote message={describeError(diff.error)} />}
-          {image && <ImagePreview reviewId={reviewId} unit={unit} />}
-          {diff.data && !(image && diff.data.binary) && (
+          {unit.image && <ImagePreview reviewId={reviewId} unit={unit} />}
+          {diff.data && !(unit.image && diff.data.binary) && (
             <UnitDiffView
               diff={diff.data}
               path={unit.path}
@@ -191,7 +188,6 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
               widgets={renderWidgets ? (changeKeyOf) => renderWidgets(unit, diff.data, changeKeyOf) : undefined}
             />
           )}
-          {footer}
         </div>
       )}
     </article>

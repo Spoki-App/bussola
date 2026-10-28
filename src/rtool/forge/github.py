@@ -112,8 +112,7 @@ class GitHubAdapter:
 
     def open_pull_requests(self, repository: str) -> list[PullRequest]:
         owner, name = _repo(repository).split("/")
-        args = ["api", "graphql", "-f", f"query={OPEN_PULLS_QUERY}", "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"limit={PR_LIST_LIMIT}"]
-        response = self._json(args)
+        response = self._graphql(OPEN_PULLS_QUERY, owner=owner, name=name, limit=PR_LIST_LIMIT)
         try:
             nodes = response["data"]["repository"]["pullRequests"]["nodes"]
         except (KeyError, TypeError) as error:
@@ -124,8 +123,8 @@ class GitHubAdapter:
         return _pull_request(self._json(["pr", "view", str(number), "--repo", _repo(repository), "--json", PR_FIELDS]))
 
     def diff_ranges(self, repository: str, number: int) -> dict[str, LineRanges]:
-        pages = self._json(["api", "--paginate", "--slurp", f"repos/{_repo(repository)}/pulls/{number}/files"])
-        return {item["filename"]: parse_patch_ranges(item.get("patch") or "") for page in pages for item in page}
+        files = self._paginated(f"repos/{_repo(repository)}/pulls/{number}/files")
+        return {item["filename"]: parse_patch_ranges(item.get("patch") or "") for item in files}
 
     def submit_review(self, repository: str, number: int, submission: ReviewSubmission) -> SubmittedReview:
         payload: JsonObject = {
@@ -139,8 +138,8 @@ class GitHubAdapter:
         review_id = f"{REVIEW_PREFIX}{review['id']}" if "id" in review else None
         if not submission.comments:
             return SubmittedReview(review.get("html_url"), [], review_id)
-        pages = self._json(["api", "--paginate", "--slurp", f"repos/{_repo(repository)}/pulls/{number}/reviews/{review['id']}/comments"])
-        return SubmittedReview(review.get("html_url"), _match_comments(submission, [item for page in pages for item in page]), review_id)
+        comments = self._paginated(f"repos/{_repo(repository)}/pulls/{number}/reviews/{review['id']}/comments")
+        return SubmittedReview(review.get("html_url"), _match_comments(submission, comments), review_id)
 
     def create_file_comment(self, repository: str, number: int, commit_id: str, path: str, body: str) -> RemoteComment:
         payload = {"body": body, "commit_id": commit_id, "path": path, "subject_type": "file"}
@@ -155,8 +154,7 @@ class GitHubAdapter:
 
     def pull_request_conversation(self, repository: str, number: int) -> Conversation:
         owner, name = _repo(repository).split("/")
-        args = ["api", "graphql", "-f", f"query={CONVERSATION_QUERY}", "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={number}"]
-        response = self._json(args)
+        response = self._graphql(CONVERSATION_QUERY, owner=owner, name=name, number=number)
         try:
             data = response["data"]
             pull = data["repository"]["pullRequest"]
@@ -170,7 +168,7 @@ class GitHubAdapter:
 
     def set_thread_resolved(self, thread_id: str, resolved: bool) -> None:
         mutation = RESOLVE_THREAD_MUTATION if resolved else UNRESOLVE_THREAD_MUTATION
-        self._json(["api", "graphql", "-f", f"query={mutation}", "-f", f"threadId={thread_id}"])
+        self._graphql(mutation, threadId=thread_id)
 
     def download_asset(self, url: str) -> Asset:
         if not ASSET_URL.fullmatch(url):
@@ -187,6 +185,16 @@ class GitHubAdapter:
         if len(data) > MAX_ASSET_BYTES or not content_type.startswith(IMAGE_TYPE_PREFIX):
             raise ForgeError(f"{url} is not an image rtool can show")
         return Asset(content_type, data)
+
+    def _graphql(self, query: str, **variables: str | int) -> Any:
+        args = ["api", "graphql", "-f", f"query={query}"]
+        for name, value in variables.items():
+            args += ["-F" if isinstance(value, int) else "-f", f"{name}={value}"]
+        return self._json(args)
+
+    def _paginated(self, endpoint: str) -> list[JsonObject]:
+        pages: list[list[JsonObject]] = self._json(["api", "--paginate", "--slurp", endpoint])
+        return [item for page in pages for item in page]
 
     def _json(self, args: list[str], payload: JsonObject | None = None) -> Any:
         result = self._run(args, payload=payload)
@@ -290,14 +298,9 @@ def _pull_request(item: JsonObject) -> PullRequest:
         is_draft=bool(item.get("isDraft", False)),
         updated_at=item.get("updatedAt", ""),
         comment_count=_comment_count(item),
-        unresolved_threads=sum(1 for thread in _threads(item) if not thread.get("isResolved", False)),
+        unresolved_threads=sum(1 for thread in _nodes(item.get("reviewThreads")) if not thread.get("isResolved", False)),
         body=str(item.get("body") or ""),
     )
-
-
-def _threads(item: JsonObject) -> list[JsonObject]:
-    threads: JsonObject = item.get("reviewThreads") or {}
-    return list(threads.get("nodes") or [])
 
 
 def _total(connection: JsonObject | None) -> int:
@@ -305,7 +308,7 @@ def _total(connection: JsonObject | None) -> int:
 
 
 def _comment_count(item: JsonObject) -> int:
-    return _total(item.get("comments")) + sum(_total(thread.get("comments")) for thread in _threads(item))
+    return _total(item.get("comments")) + sum(_total(thread.get("comments")) for thread in _nodes(item.get("reviewThreads")))
 
 
 def _login(author: JsonObject | None) -> str:

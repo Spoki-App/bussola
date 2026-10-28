@@ -31,10 +31,6 @@ export function isTodo(state: UnitState): boolean {
   return TODO_STATES.has(state)
 }
 
-export function isApproved(state: UnitState): boolean {
-  return !isTodo(state)
-}
-
 export function groupByFile(units: Unit[]): FileGroup[] {
   const groups = new Map<string, FileGroup>()
   for (const unit of units) {

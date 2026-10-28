@@ -52,7 +52,7 @@ def test_github_comments_are_imported_when_reviewing_a_pull_request(api: ApiClie
     ]
     assert inline["comments"][0]["remote_url"] == "https://github.com/acme/widgets/pull/7#c501"
     assert sorted(comment["body"] for thread in imported if thread["scope"] == "review" for comment in thread["comments"]) == ["Looks good overall", "Nice PR"]
-    assert api.call("GET", f"/reviews/{review}/forge")["pending_comments"] == 0
+    assert api.call("GET", f"/reviews/{review}")["unsent_comments"] == 0
 
 
 def test_syncing_again_adds_only_new_replies_and_follows_resolution(api: ApiClient, github: GitHubSandbox) -> None:
@@ -164,7 +164,7 @@ def test_sync_follows_comments_edited_on_github(api: ApiClient, github: GitHubSa
     comment = inline_thread(api, review)["comments"][0]
     assert comment["body"] == "Why sum and not len?"
     assert comment["edited_at"] is not None
-    assert api.call("GET", f"/reviews/{review}/forge")["pending_comments"] == 0
+    assert api.call("GET", f"/reviews/{review}")["unsent_comments"] == 0
 
 
 def test_local_edits_are_not_overwritten_by_github(api: ApiClient, github: GitHubSandbox) -> None:

@@ -5,7 +5,7 @@ import { useOpenPullRequestLink } from './api/pulls'
 import { ErrorNote } from './components/Badges'
 import { ExternalLink } from './components/ExternalLink'
 import { Link } from './Link'
-import { navigate } from './navigation'
+import { navigate, reviewPath } from './navigation'
 
 export function OpenPullRequestRoute({ url }: { url: string }) {
   const open = useOpenPullRequestLink()
@@ -16,7 +16,7 @@ export function OpenPullRequestRoute({ url }: { url: string }) {
       return
     }
     started.current = true
-    open.mutate(url, { onSuccess: (review) => { navigate(`/reviews/${String(review.id)}`, { replace: true }) } })
+    open.mutate(url, { onSuccess: (review) => { navigate(reviewPath(review.id), { replace: true }) } })
   }, [open, url])
 
   return (

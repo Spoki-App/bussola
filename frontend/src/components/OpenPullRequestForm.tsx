@@ -2,7 +2,7 @@ import { useState, type SubmitEvent } from 'react'
 
 import { describeError } from '../api/client'
 import { useOpenPullRequestLink } from '../api/pulls'
-import { navigate } from '../navigation'
+import { navigate, reviewPath } from '../navigation'
 import { isPullRequestUrl } from '../review/pullRequestLink'
 import { ErrorNote } from './Badges'
 
@@ -14,7 +14,7 @@ export function OpenPullRequestForm({ onOpened }: { onOpened: () => void }) {
     open.mutate(url.trim(), {
       onSuccess: (review) => {
         onOpened()
-        navigate(`/reviews/${String(review.id)}`)
+        navigate(reviewPath(review.id))
       },
     })
   }

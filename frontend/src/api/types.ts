@@ -74,8 +74,8 @@ export interface Unit {
   head_start: number | null
   head_end: number | null
   binary: boolean
+  image: boolean
   open_threads: number
-  default_diff_mode: DiffMode
 }
 
 export interface DiffRow {
@@ -216,7 +216,6 @@ export interface ForgeOverview {
   link: { provider: string; repository: string; pr_number: number } | null
   pull_request: PullRequest | null
   candidates: PullRequest[]
-  pending_comments: number
   head_matches: boolean | null
   error: string | null
 }

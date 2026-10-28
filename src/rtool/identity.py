@@ -2,9 +2,10 @@ import getpass
 from dataclasses import dataclass
 from pathlib import Path
 
-from rtool.git import read_git_config
+from rtool.git import read_git_config_values
 
 FALLBACK_EMAIL_DOMAIN = "localhost"
+USER_KEYS = r"^user\.(email|name)$"
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,7 @@ class GitConfigIdentity:
     def current(self) -> Identity:
         user = getpass.getuser()
         cwd = self._cwd if self._cwd.is_dir() else Path.home()
-        email = read_git_config(cwd, "user.email") or f"{user}@{FALLBACK_EMAIL_DOMAIN}"
-        name = read_git_config(cwd, "user.name") or user
+        values = read_git_config_values(cwd, USER_KEYS)
+        email = values.get("user.email") or f"{user}@{FALLBACK_EMAIL_DOMAIN}"
+        name = values.get("user.name") or user
         return Identity(email, name)

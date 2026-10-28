@@ -1,8 +1,5 @@
 import type { SyncResult } from '../api/types'
-
-function plural(count: number, word: string): string {
-  return `${String(count)} ${word}${count === 1 ? '' : 's'}`
-}
+import { plural } from './text'
 
 export function syncMessage(result: SyncResult): string {
   const { refresh, published, publish_error: publishError } = result

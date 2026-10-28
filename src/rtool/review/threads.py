@@ -1,25 +1,14 @@
 from dataclasses import dataclass
-from enum import StrEnum
 
 from rtool.errors import ForbiddenError, InvalidRequestError, NotFoundError
-from rtool.review.anchoring import LINE_SEPARATOR, line_count, side_hash, side_text, surrounding
+from rtool.review.anchoring import LINE_SEPARATOR, anchor_for, line_count, side_hash, side_text, surrounding
 from rtool.review.context import ReviewContext
 from rtool.review.keys import key_of
-from rtool.review.rows import Side, unit_lines
+from rtool.review.rows import Side, side_lines
+from rtool.review.thread_types import ThreadScope
 from rtool.storage.models import Comment, Revision, Thread, ThreadAnchor, UnitSnapshot, utcnow
 
 MAX_BODY_LENGTH = 65536
-
-
-class ThreadScope(StrEnum):
-    REVIEW = "review"
-    FILE = "file"
-    UNIT = "unit"
-
-
-class ThreadStatus(StrEnum):
-    OPEN = "open"
-    RESOLVED = "resolved"
 
 
 @dataclass(frozen=True)
@@ -59,9 +48,7 @@ def create_thread(context: ReviewContext, revision: Revision, request: NewThread
     context.store.threads.add_thread(thread)
     context.store.threads.add_comment(Comment(thread_id=thread.id, author_id=context.reviewer.id, body=body))
     if request.scope == ThreadScope.UNIT:
-        context.store.threads.add_anchor(
-            ThreadAnchor(thread.id, revision.id, thread.path, thread.kind, thread.qualified_name, thread.unit_hash, thread.line_offset)
-        )
+        context.store.threads.add_anchor(anchor_for(thread, revision.id))
     return thread
 
 
@@ -105,7 +92,7 @@ def thread_views(context: ReviewContext, revision: Revision) -> list[ThreadView]
     for anchor in context.store.threads.anchors(ids):
         if anchor.revision_id <= revision.id:
             anchors[anchor.thread_id] = anchor
-    snapshots = {key_of(snapshot): snapshot for snapshot in context.store.reviews.snapshots(revision.id)}
+    snapshots = {key_of(snapshot): snapshot for snapshot in context.store.reviews.snapshots(revision.id, texts=False)}
     return [_view(thread, comments.get(thread.id, []), anchors.get(thread.id), revision, snapshots) for thread in threads]
 
 
@@ -131,7 +118,7 @@ def _view(
     snapshot = snapshots.get((anchor.path or "", anchor.kind or "", anchor.qualified_name or ""))
     if snapshot is None:
         return ThreadView(thread, comments, anchor, None, None)
-    lines = unit_lines(snapshot.base_text, snapshot.base_lines) if thread.side == Side.BASE else unit_lines(snapshot.head_text, snapshot.head_lines)
+    lines = side_lines(snapshot, thread.side or Side.HEAD)
     if anchor.line_offset >= len(lines):
         return ThreadView(thread, comments, anchor, snapshot.id, None)
     last = min(anchor.line_offset + line_count(thread) - 1, len(lines) - 1)

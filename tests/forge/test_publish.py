@@ -72,7 +72,7 @@ def test_publish_sends_one_review_with_inline_file_and_body_comments(api: ApiCli
     file_post = fake_gh.api_posts("/pulls/7/comments")[0]["input"]
     assert file_post == {"body": "Split this module", "commit_id": git_repo.git("rev-parse", "feature"), "path": "app.py", "subject_type": "file"}
     assert sorted(outcome["status"] for outcome in result["outcomes"]) == ["published", "published", "published"]
-    assert api.call("GET", f"/reviews/{review}/forge")["pending_comments"] == 0
+    assert api.call("GET", f"/reviews/{review}")["unsent_comments"] == 0
 
 
 def test_publishing_twice_sends_nothing_new(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:

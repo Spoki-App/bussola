@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query'
 
 import { deleteJson, getJson, postJson } from './client'
 import type {
@@ -27,6 +27,19 @@ export const keys = {
   diffs: (reviewId: number) => ['diff', reviewId] as const,
 }
 
+export function invalidate(client: QueryClient, queryKeys: readonly QueryKey[]) {
+  return Promise.all(queryKeys.map((queryKey) => client.invalidateQueries({ queryKey })))
+}
+
+export function useInvalidatingMutation<TArgs, TResult>(queryKeys: readonly QueryKey[], mutationFn: (args: TArgs) => Promise<TResult>) {
+  const client = useQueryClient()
+  return useMutation({ mutationFn, onSuccess: () => invalidate(client, queryKeys) })
+}
+
+function diffVersion(unit: Unit): string {
+  return [unit.state, unit.approval_id ?? '', String(unit.rows_approved), String(unit.base_changed)].join(':')
+}
+
 export function useMe() {
   return useQuery({ queryKey: ['me'], queryFn: () => getJson<Reviewer>('/me') })
 }
@@ -36,12 +49,7 @@ export function useRepos() {
 }
 
 export function useAddRepo() {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (path: string) => postJson<Repo>('/repos', { path }),
-    onSuccess: () =>
-      Promise.all([client.invalidateQueries({ queryKey: keys.repos }), client.invalidateQueries({ queryKey: ['repository-scan'] })]),
-  })
+  return useInvalidatingMutation([keys.repos, ['repository-scan']], (path: string) => postJson<Repo>('/repos', { path }))
 }
 
 export function useDirectories(path: string | undefined) {
@@ -64,8 +72,8 @@ export function useRepositoryScan() {
   })
 }
 
-export function useRefs(repoId: number, enabled: boolean) {
-  return useQuery({ queryKey: keys.refs(repoId), queryFn: () => getJson<Refs>(`/repos/${String(repoId)}/refs`), enabled })
+export function useRefs(repoId: number) {
+  return useQuery({ queryKey: keys.refs(repoId), queryFn: () => getJson<Refs>(`/repos/${String(repoId)}/refs`) })
 }
 
 export function useReviews(repoId: number) {
@@ -73,11 +81,7 @@ export function useReviews(repoId: number) {
 }
 
 export function useCreateReview(repoId: number) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (body: { head_ref: string; base_ref: string }) => postJson<ReviewDetail>(`/repos/${String(repoId)}/reviews`, body),
-    onSuccess: () => client.invalidateQueries({ queryKey: keys.reviews(repoId) }),
-  })
+  return useInvalidatingMutation([keys.reviews(repoId)], (body: { head_ref: string; base_ref: string }) => postJson<ReviewDetail>(`/repos/${String(repoId)}/reviews`, body))
 }
 
 export function useReview(reviewId: number) {
@@ -97,25 +101,16 @@ export function useUnits(reviewId: number, revisionId: number | undefined, filte
   })
 }
 
-export function useUnitDiff(reviewId: number, unitId: number, mode: DiffMode | undefined, enabled: boolean) {
+export function useUnitDiff(reviewId: number, unit: Unit, mode: DiffMode | undefined, enabled: boolean) {
   return useQuery({
-    queryKey: [...keys.diffs(reviewId), unitId, mode],
-    queryFn: () => getJson<UnitDiff>(`/reviews/${String(reviewId)}/units/${String(unitId)}/diff${mode ? `?mode=${mode}` : ''}`),
+    queryKey: [...keys.diffs(reviewId), unit.id, mode, diffVersion(unit)],
+    queryFn: () => getJson<UnitDiff>(`/reviews/${String(reviewId)}/units/${String(unit.id)}/diff${mode ? `?mode=${mode}` : ''}`),
     enabled,
   })
 }
 
 function useReviewMutation<TArgs, TResult>(reviewId: number, mutationFn: (args: TArgs) => Promise<TResult>) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn,
-    onSuccess: () =>
-      Promise.all([
-        client.invalidateQueries({ queryKey: keys.units(reviewId) }),
-        client.invalidateQueries({ queryKey: keys.diffs(reviewId) }),
-        client.invalidateQueries({ queryKey: keys.review(reviewId) }),
-      ]),
-  })
+  return useInvalidatingMutation([keys.units(reviewId), keys.review(reviewId)], mutationFn)
 }
 
 export function useApprove(reviewId: number) {

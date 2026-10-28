@@ -7,7 +7,8 @@ from rtool.errors import ConflictError
 from rtool.forge.base import DiffSide, ForgeAdapter, ForgeError, InlineComment, LineRanges, RemoteComment, ReviewSubmission
 from rtool.review.context import ReviewContext
 from rtool.review.rows import Side
-from rtool.review.threads import ThreadScope, ThreadView, thread_views
+from rtool.review.thread_types import ThreadScope
+from rtool.review.threads import ThreadView, thread_views
 from rtool.storage.models import Comment, ForgeLink, PublishedComment, Revision
 
 GROUP_SEPARATOR = "\n\n---\n\n"
@@ -188,12 +189,12 @@ class _Publisher:
             return
         records = self.context.store.forge.published([comment.id for comment in comments])
         for comment in comments:
-            records[comment.id].published_body_hash = _body_hash(self.context, comment)
+            records[comment.id].published_body_hash = body_hash(self.context, comment)
         self.outcomes.append(Outcome(_ids(comments), PublishStatus.UPDATED, "Edited on GitHub"))
 
     def record(self, comments: list[Comment], remote: RemoteComment) -> None:
         for comment in comments:
-            record = PublishedComment(comment.id, self.adapter.provider, remote.remote_id, remote.url, _body_hash(self.context, comment))
+            record = PublishedComment(comment.id, self.adapter.provider, remote.remote_id, remote.url, body_hash(self.context, comment))
             self.context.store.forge.save_published(record)
 
 
@@ -201,15 +202,11 @@ def is_comment_id(remote_id: str | None) -> bool:
     return remote_id is not None and remote_id.isdigit()
 
 
-def body_hash(context: ReviewContext, comment: Comment) -> str:
-    return _body_hash(context, comment)
-
-
 def _is_edited(context: ReviewContext, comment: Comment, record: PublishedComment) -> bool:
-    return record.published_body_hash != _body_hash(context, comment)
+    return record.published_body_hash != body_hash(context, comment)
 
 
-def _body_hash(context: ReviewContext, comment: Comment) -> str:
+def body_hash(context: ReviewContext, comment: Comment) -> str:
     return hashlib.sha256(render_comment(context, comment).encode()).hexdigest()
 
 

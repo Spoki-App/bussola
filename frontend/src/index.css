@@ -373,7 +373,7 @@ textarea {
 
 .review-actions {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
 }
 
@@ -605,6 +605,7 @@ textarea {
 
 .diff .diff-gutter {
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -944,25 +945,6 @@ button.link {
   text-align: left;
 }
 
-.outcomes {
-  margin: 0;
-  padding-left: 18px;
-  font-size: 12px;
-}
-
-.outcome-failed strong {
-  color: var(--danger);
-}
-
-.outcome-skipped strong {
-  color: var(--warning);
-}
-
-.outcome-published strong,
-.outcome-updated strong {
-  color: var(--success);
-}
-
 .picker {
   width: min(560px, calc(100vw - 32px));
   height: min(600px, calc(100vh - 64px));
@@ -1228,10 +1210,6 @@ button.link {
   font-size: 12px;
 }
 
-.diff .diff-gutter {
-  -webkit-user-select: none;
-}
-
 .confirm {
   display: flex;
   flex-wrap: wrap;
@@ -1247,10 +1225,6 @@ button.danger {
   background: var(--danger);
   border-color: var(--danger);
   color: var(--accent-text);
-}
-
-.review-actions {
-  align-items: flex-start;
 }
 
 .github-link {

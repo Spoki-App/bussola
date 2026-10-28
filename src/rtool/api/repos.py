@@ -7,11 +7,9 @@ from rtool.api.schemas import RefsOut, RepoIn, RepoOut, ReviewDetailOut, ReviewI
 from rtool.api.views import repo_out, review_detail_out, review_out
 from rtool.config import load_repo_config
 from rtool.review.context import ReviewContext
-from rtool.review.hooks import REVISION_HOOKS
 from rtool.review.refs import NoBaseBranchError, default_base_ref
 from rtool.review.repos import open_repo, register_repo
 from rtool.review.revisions import refresh_review
-from rtool.storage.models import Review
 
 router = APIRouter(tags=["repos"])
 
@@ -49,10 +47,8 @@ def create_review(body: ReviewIn, repo: RepoDep, store: StoreDep, reviewer: Revi
     git_repo = open_repo(repo)
     git_repo.resolve_commit(body.head_ref)
     git_repo.resolve_commit(body.base_ref)
-    review = store.reviews.find_review(repo.id, body.head_ref, body.base_ref)
-    if review is None:
-        review = store.reviews.add_review(Review(repo_id=repo.id, head_ref=body.head_ref, base_ref=body.base_ref))
+    review = store.reviews.find_or_add_review(repo.id, body.head_ref, body.base_ref)
     context = ReviewContext(store, review, reviewer)
-    refresh_review(store, review, git_repo, hooks=REVISION_HOOKS)
+    refresh_review(store, review, git_repo)
     store.commit()
     return review_detail_out(context, repo)

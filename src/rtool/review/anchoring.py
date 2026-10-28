@@ -2,14 +2,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from rtool.review.keys import key_of
-from rtool.review.rows import Side, unit_lines
+from rtool.review.rows import Side, side_lines
+from rtool.review.thread_types import ThreadScope, ThreadStatus
 from rtool.storage.models import Review, Revision, Thread, ThreadAnchor, UnitSnapshot
 from rtool.storage.repositories import Store
 
 CONTEXT_LINES = 3
 LINE_SEPARATOR = "\n"
-UNIT_SCOPE = "unit"
-OPEN_STATUS = "open"
 
 
 @dataclass(frozen=True)
@@ -19,9 +18,7 @@ class AnchorTarget:
 
 
 def side_text(snapshot: UnitSnapshot, side: str) -> list[str]:
-    if side == Side.BASE:
-        return [line.text for line in unit_lines(snapshot.base_text, snapshot.base_lines)]
-    return [line.text for line in unit_lines(snapshot.head_text, snapshot.head_lines)]
+    return [line.text for line in side_lines(snapshot, side)]
 
 
 def side_hash(snapshot: UnitSnapshot, side: str) -> str | None:
@@ -41,12 +38,15 @@ def line_count(thread: Thread) -> int:
     return len(selected_lines(thread))
 
 
-def reanchor_threads(store: Store, review: Review, previous: Revision | None, revision: Revision) -> None:
-    del previous
-    threads = [thread for thread in store.threads.threads(review.id) if thread.scope == UNIT_SCOPE and thread.status == OPEN_STATUS]
+def anchor_for(thread: Thread, revision_id: int) -> ThreadAnchor:
+    return ThreadAnchor(thread.id, revision_id, thread.path, thread.kind, thread.qualified_name, thread.unit_hash, thread.line_offset)
+
+
+def reanchor_threads(store: Store, review: Review, revision: Revision) -> None:
+    threads = [thread for thread in store.threads.threads(review.id) if thread.scope == ThreadScope.UNIT and thread.status == ThreadStatus.OPEN]
     if not threads:
         return
-    latest = _latest_anchors(store, [thread.id for thread in threads])
+    latest = {anchor.thread_id: anchor for anchor in store.threads.anchors([thread.id for thread in threads])}
     snapshots = store.reviews.snapshots(revision.id)
     for thread in threads:
         target = locate(thread, latest.get(thread.id), snapshots)
@@ -82,10 +82,6 @@ def _context_score(thread: Thread, lines: Sequence[str], index: int) -> int:
     before, after = surrounding(lines, index, line_count(thread))
     score = sum(1 for wanted, actual in zip(reversed(thread.context_before), reversed(before), strict=False) if wanted.strip() == actual.strip())
     return score + sum(1 for wanted, actual in zip(thread.context_after, after, strict=False) if wanted.strip() == actual.strip())
-
-
-def _latest_anchors(store: Store, thread_ids: list[str]) -> dict[str, ThreadAnchor]:
-    return {anchor.thread_id: anchor for anchor in store.threads.anchors(thread_ids)}
 
 
 def _anchor(thread: Thread, revision_id: int, target: AnchorTarget | None) -> ThreadAnchor:

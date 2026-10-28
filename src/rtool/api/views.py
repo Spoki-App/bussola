@@ -1,9 +1,12 @@
+from dataclasses import asdict
 from pathlib import Path
 
 from rtool.api.schemas import (
     ApprovalOut,
+    ForgeStatusOut,
     PublishOut,
     PublishOutcomeOut,
+    PullRequestOut,
     RepoOut,
     ReviewDetailOut,
     ReviewOut,
@@ -12,13 +15,14 @@ from rtool.api.schemas import (
     RowApprovalOut,
     UnitOut,
 )
+from rtool.forge.base import ForgeStatus, PullRequest
 from rtool.forge.publish import PublishResult, pending_comment_count
 from rtool.review.context import ReviewContext
-from rtool.review.diffs import DiffMode
+from rtool.review.images import image_type
 from rtool.review.overview import UnitView, count_states, unit_views
-from rtool.review.rows import ROW_APPROVABLE_KINDS
+from rtool.review.rows import ROW_APPROVABLE_KINDS, is_binary
 from rtool.review.scope import ChangeType
-from rtool.review.states import DONE_STATES, UnitState
+from rtool.review.states import DONE_STATES
 from rtool.review.threads_count import open_thread_counts
 from rtool.storage.models import Approval, Repo, Revision, RowApproval
 from rtool.units.model import UnitKind
@@ -40,9 +44,13 @@ def revision_out(revision: Revision) -> RevisionOut:
 
 
 def review_out(context: ReviewContext, repo: Repo) -> ReviewOut:
-    latest = context.store.reviews.latest_revision(context.review.id)
-    views = unit_views(context, latest) if latest else []
+    return _review_out(context, repo, context.store.reviews.latest_revision(context.review.id))
+
+
+def _review_out(context: ReviewContext, repo: Repo, latest: Revision | None) -> ReviewOut:
+    views = unit_views(context, latest, texts=False) if latest else []
     counts = count_states(views)
+    threads = context.store.threads.threads(context.review.id)
     last_session = context.store.reviews.last_session(context.review.id, context.reviewer.id)
     return ReviewOut(
         id=context.review.id,
@@ -54,8 +62,8 @@ def review_out(context: ReviewContext, repo: Repo) -> ReviewOut:
         counts=counts,
         total=len(views),
         approved=sum(counts[state] for state in DONE_STATES),
-        open_threads=sum(open_thread_counts(context.store, context.review.id).values()),
-        total_threads=len(context.store.threads.threads(context.review.id)),
+        open_threads=sum(open_thread_counts(threads).values()),
+        total_threads=len(threads),
         last_session_at=last_session.completed_at if last_session else None,
         pull_request=_pull_out(context),
     )
@@ -69,9 +77,9 @@ def _pull_out(context: ReviewContext) -> ReviewPullOut | None:
 
 
 def review_detail_out(context: ReviewContext, repo: Repo) -> ReviewDetailOut:
-    summary = review_out(context, repo)
-    revisions = [revision_out(revision) for revision in context.store.reviews.list_revisions(context.review.id)]
     latest = context.store.reviews.latest_revision(context.review.id)
+    summary = _review_out(context, repo, latest)
+    revisions = [revision_out(revision) for revision in context.store.reviews.list_revisions(context.review.id)]
     unsent = pending_comment_count(context, latest) if latest else 0
     return ReviewDetailOut(**summary.model_dump(), revisions=revisions, unsent_comments=unsent)
 
@@ -84,8 +92,7 @@ def publish_out(result: PublishResult) -> PublishOut:
 def unit_out(view: UnitView, open_threads: int) -> UnitOut:
     snapshot, status = view.snapshot, view.status
     kind = UnitKind(snapshot.kind)
-    binary = kind == UnitKind.FILE and snapshot.base_text is None and snapshot.head_text is None
-    has_approved_text = status.approval is not None and status.approval.approved_text is not None
+    binary = is_binary(snapshot)
     return UnitOut(
         id=snapshot.id,
         revision_id=snapshot.revision_id,
@@ -105,8 +112,8 @@ def unit_out(view: UnitView, open_threads: int) -> UnitOut:
         head_start=snapshot.head_start,
         head_end=snapshot.head_end,
         binary=binary,
+        image=image_type(snapshot.path) is not None,
         open_threads=open_threads,
-        default_diff_mode=DiffMode.APPROVED if status.state == UnitState.CHANGED and has_approved_text else DiffMode.BASE,
     )
 
 
@@ -130,3 +137,11 @@ def _change_type(base_hash: str | None, head_hash: str | None) -> ChangeType:
     if base_hash is None:
         return ChangeType.ADDED
     return ChangeType.REMOVED if head_hash is None else ChangeType.MODIFIED
+
+
+def pull_request_out(pull: PullRequest) -> PullRequestOut:
+    return PullRequestOut(**asdict(pull))
+
+
+def forge_status_out(status: ForgeStatus) -> ForgeStatusOut:
+    return ForgeStatusOut(**asdict(status))

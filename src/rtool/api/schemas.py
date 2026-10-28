@@ -7,7 +7,7 @@ from rtool.review.diffs import DiffMode
 from rtool.review.rows import LineChange, Side
 from rtool.review.scope import ChangeType
 from rtool.review.states import UnitState
-from rtool.review.threads import ThreadScope, ThreadStatus
+from rtool.review.thread_types import ThreadScope, ThreadStatus
 
 MAX_THREAD_LINES = 500
 
@@ -115,8 +115,8 @@ class UnitOut(BaseModel):
     head_start: int | None
     head_end: int | None
     binary: bool
+    image: bool
     open_threads: int
-    default_diff_mode: DiffMode
 
 
 class DiffRowOut(BaseModel):
@@ -282,7 +282,6 @@ class ForgeOut(BaseModel):
     link: ForgeLinkOut | None
     pull_request: PullRequestOut | None
     candidates: list[PullRequestOut]
-    pending_comments: int
     head_matches: bool | None
     error: str | None
 

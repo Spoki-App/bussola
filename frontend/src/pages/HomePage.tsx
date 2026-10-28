@@ -8,10 +8,12 @@ import { CommentCount } from '../components/CommentCount'
 import { PullRequestsPanel } from '../components/PullRequestsPanel'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { Link } from '../Link'
-import { navigate } from '../navigation'
+import { navigate, reviewPath } from '../navigation'
 import { progressPercent } from '../review/logic'
 import { REVIEW_FILTER_LABELS, loadReviewFilter, matchesReviewFilter, saveReviewFilter, type ReviewFilter } from '../review/reviewFilter'
 import { defaultReviewRefs, reviewFormProblem } from '../review/newReview'
+import { Segmented } from '../components/Segmented'
+import { plural } from '../review/text'
 
 
 export function HomePage() {
@@ -25,13 +27,7 @@ export function HomePage() {
     <div className="page">
       <div className="home-header">
         <h1>Repositories</h1>
-        <div className="segmented" role="tablist" aria-label="Show reviews">
-          {(Object.keys(REVIEW_FILTER_LABELS) as ReviewFilter[]).map((option) => (
-            <button key={option} type="button" role="tab" aria-selected={filter === option} className={filter === option ? 'active' : ''} onClick={() => { choose(option) }}>
-              {REVIEW_FILTER_LABELS[option]}
-            </button>
-          ))}
-        </div>
+        <Segmented label="Show reviews" labels={REVIEW_FILTER_LABELS} value={filter} onChange={choose} />
       </div>
       {repos.error && <ErrorNote message={describeError(repos.error)} />}
       {repos.data?.length === 0 && <p className="muted">No repositories yet. Add one from Settings (top right), or run `rtool serve` inside a repository.</p>}
@@ -71,7 +67,7 @@ function RepoSection({ repo, filter }: { repo: Repo; filter: ReviewFilter }) {
       <ul className="review-list">
         {shown.map((review) => (
           <li key={review.id}>
-            <Link to={`/reviews/${String(review.id)}`} className="review-link">
+            <Link to={reviewPath(review.id)} className="review-link">
               <ReviewTitle review={review} />
             </Link>
             <ProgressBar percent={progressPercent(review)} label={`Progress of ${review.head_ref}`} />
@@ -81,13 +77,13 @@ function RepoSection({ repo, filter }: { repo: Repo; filter: ReviewFilter }) {
           </li>
         ))}
       </ul>
-      {hidden > 0 && <p className="muted hidden-reviews">{`${String(hidden)} review${hidden === 1 ? '' : 's'} hidden by the filter.`}</p>}
+      {hidden > 0 && <p className="muted hidden-reviews">{`${plural(hidden, 'review')} hidden by the filter.`}</p>}
     </section>
   )
 }
 
 function NewReviewForm({ repoId }: { repoId: number }) {
-  const refs = useRefs(repoId, true)
+  const refs = useRefs(repoId)
   const create = useCreateReview(repoId)
   const [head, setHead] = useState<string | null>(null)
   const [base, setBase] = useState<string | null>(null)
@@ -103,7 +99,7 @@ function NewReviewForm({ repoId }: { repoId: number }) {
   const suggestions = `refs-${String(repoId)}`
   const submit = (event: SubmitEvent) => {
     event.preventDefault()
-    create.mutate({ head_ref: choice.head.trim(), base_ref: choice.base.trim() }, { onSuccess: (review) => { navigate(`/reviews/${String(review.id)}`) } })
+    create.mutate({ head_ref: choice.head.trim(), base_ref: choice.base.trim() }, { onSuccess: (review) => { navigate(reviewPath(review.id)) } })
   }
   return (
     <form className="inline-form" onSubmit={submit}>
