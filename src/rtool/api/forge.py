@@ -4,6 +4,7 @@ from dataclasses import asdict
 from fastapi import APIRouter, Request, Response
 
 from rtool.api.deps import ContextDep, repo_of, resolve_revision
+from rtool.api.images import image_response
 from rtool.api.schemas import (
     ConversationSyncOut,
     ForgeLinkIn,
@@ -26,11 +27,6 @@ from rtool.review.repos import open_repo
 router = APIRouter(tags=["forge"])
 
 ASSET_CACHE_SIZE = 64
-ASSET_HEADERS = {
-    "Cache-Control": "private, max-age=86400",
-    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
-    "X-Content-Type-Options": "nosniff",
-}
 _assets: OrderedDict[str, Asset] = OrderedDict()
 
 
@@ -41,7 +37,7 @@ def forge_asset(url: str, request: Request) -> Response:
     _assets.move_to_end(url)
     while len(_assets) > ASSET_CACHE_SIZE:
         _assets.popitem(last=False)
-    return Response(asset.data, media_type=asset.content_type, headers=ASSET_HEADERS)
+    return image_response(asset.data, asset.content_type)
 
 
 @router.get("/reviews/{review_id}/forge")

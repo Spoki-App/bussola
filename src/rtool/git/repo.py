@@ -5,7 +5,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Self
 
-from rtool.git.blobs import BlobReader
+from rtool.git.blobs import OBJECT_ID, BlobReader
 from rtool.git.errors import GitError, InvalidRefError
 
 GIT = "git"
@@ -127,6 +127,14 @@ class GitRepo:
 
     def config_value(self, key: str) -> str | None:
         return read_git_config(self.root, key)
+
+    def file_at(self, commit: str, path: str) -> bytes | None:
+        if not OBJECT_ID.fullmatch(commit):
+            raise InvalidRefError(commit)
+        try:
+            return self.run("cat-file", "blob", f"{commit}:{path}")
+        except GitError:
+            return None
 
     def blob_reader(self) -> BlobReader:
         process = subprocess.Popen([GIT, "cat-file", "--batch"], cwd=self.root, env=_git_env(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)

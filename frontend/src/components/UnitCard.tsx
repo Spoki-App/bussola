@@ -3,10 +3,12 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { describeError } from '../api/client'
 import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/hooks'
 import type { DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
+import { isImagePath } from '../review/images'
 import { isTodo, unitTitle } from '../review/logic'
 import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
 import { lastSegment } from '../review/unitTree'
 import { ErrorNote, KindBadge, StateBadge } from './Badges'
+import { ImagePreview } from './ImagePreview'
 import { UnitDiffView, type GutterSide } from './UnitDiffView'
 
 export interface UnitActions {
@@ -41,6 +43,7 @@ const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current'
 
 export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, footer, nested = false }: Props) {
   const todo = isTodo(unit.state)
+  const image = isImagePath(unit.path)
   const [expanded, setExpanded] = useState(todo)
   const [wasTodo, setWasTodo] = useState(todo)
   if (todo !== wasTodo) {
@@ -174,7 +177,8 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
           {unit.row_approvable && !unit.binary && isTodo(unit.state) && <p className="hint">Click changed lines to select them, shift-click to extend, then approve the selection.</p>}
           {diff.isPending && <p className="diff-note">Loading diff...</p>}
           {diff.error && <ErrorNote message={describeError(diff.error)} />}
-          {diff.data && (
+          {image && <ImagePreview reviewId={reviewId} unit={unit} />}
+          {diff.data && !(image && diff.data.binary) && (
             <UnitDiffView
               diff={diff.data}
               path={unit.path}

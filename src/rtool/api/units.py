@@ -1,15 +1,33 @@
-from fastapi import APIRouter
+from pathlib import PurePosixPath
 
-from rtool.api.deps import ContextDep, resolve_revision, snapshot_of
+from fastapi import APIRouter, Response
+
+from rtool.api.deps import ContextDep, repo_of, resolve_revision, snapshot_of
+from rtool.api.images import image_response
 from rtool.api.schemas import DiffOut, DiffRowOut, UnitOut
 from rtool.api.views import unit_out
+from rtool.errors import InvalidRequestError, NotFoundError
 from rtool.review.diffs import DiffMode, build_diff
 from rtool.review.keys import key_of
 from rtool.review.overview import UnitFilter, approval_set, unit_views
+from rtool.review.repos import open_repo
+from rtool.review.rows import Side
 from rtool.review.states import compute_statuses
 from rtool.review.threads_count import open_thread_counts
 
 router = APIRouter(tags=["units"])
+
+IMAGE_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".avif": "image/avif",
+    ".bmp": "image/bmp",
+    ".ico": "image/x-icon",
+    ".svg": "image/svg+xml",
+}
 
 
 @router.get("/reviews/{review_id}/units")
@@ -55,3 +73,18 @@ def get_diff(context: ContextDep, unit_id: int, mode: DiffMode | None = None) ->
         unified=diff.unified,
         rows=rows,
     )
+
+
+@router.get("/reviews/{review_id}/units/{unit_id}/image")
+def get_image(context: ContextDep, unit_id: int, side: Side) -> Response:
+    snapshot = snapshot_of(context, unit_id)
+    path = snapshot.old_path or snapshot.path if side == Side.BASE else snapshot.path
+    media_type = IMAGE_TYPES.get(PurePosixPath(path).suffix.lower())
+    revision = context.store.reviews.get_revision(snapshot.revision_id)
+    if media_type is None or revision is None:
+        raise InvalidRequestError(f"{path} is not an image rtool can show")
+    commit = revision.merge_base_sha if side == Side.BASE else revision.head_sha
+    data = open_repo(repo_of(context)).file_at(commit, path)
+    if data is None:
+        raise NotFoundError(f"{path} does not exist on the {side.value} side")
+    return image_response(data, media_type)
