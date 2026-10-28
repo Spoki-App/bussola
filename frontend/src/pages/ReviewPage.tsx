@@ -35,16 +35,16 @@ function scrollToElement(id: string) {
 
 const CHECK_TITLE = 'Look at the branch for commits made since the last check and record them as a new revision of this review.'
 const FETCH_TITLE = 'Run git fetch before checking, to get commits that exist only on the remote.'
-const PULL_FETCH_TITLE = 'Download the latest commits of the pull request from GitHub before checking.'
+const PULL_FETCH_TITLE = 'Download the latest commits and comments of the pull request from GitHub before checking.'
 const MARK_TITLE = 'Remember this point. The "Since my last review" filter will then show only what changes after now. Nothing is approved or closed.'
 
 function ReviewHeader({ review, extra }: { review: ReviewDetail; extra?: ReactNode }) {
-  const [fetchRemote, setFetchRemote] = useState(false)
+  const isPullRequest = review.pull_request !== null
+  const [fetchRemote, setFetchRemote] = useState(isPullRequest)
   const [message, setMessage] = useState<string | null>(null)
   const refresh = useRefresh(review.id)
   const finish = useFinishReview(review.id)
   const revision = review.latest_revision
-  const isPullRequest = review.pull_request !== null
 
   const runRefresh = () => {
     refresh.mutate(fetchRemote, {
@@ -85,7 +85,7 @@ function ReviewHeader({ review, extra }: { review: ReviewDetail; extra?: ReactNo
           </button>
           <label className="checkbox" title={isPullRequest ? PULL_FETCH_TITLE : FETCH_TITLE}>
             <input type="checkbox" checked={fetchRemote} onChange={(event) => { setFetchRemote(event.target.checked) }} />
-            {isPullRequest ? 'fetch the pull request first' : 'also fetch from remote'}
+            {isPullRequest ? 'fetch commits and comments from GitHub' : 'also fetch from remote'}
           </label>
         </div>
         <button

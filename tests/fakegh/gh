@@ -67,6 +67,11 @@ def main():
         log.write(json.dumps({"args": args, "input": payload}) + "\n")
     if args[:2] == ["auth", "status"]:
         sys.exit(0 if state.get("authenticated", True) else 1)
+    if args[:2] == ["api", "graphql"] and any("pullRequest(number" in arg for arg in args):
+        conversation = state.get("conversation", {})
+        pull = {"headRefOid": conversation.get("headRefOid", ""), **{key: {"nodes": conversation.get(key, [])} for key in ("comments", "reviews", "reviewThreads")}}
+        print(json.dumps({"data": {"viewer": {"login": state.get("viewer", "alice-gh")}, "repository": {"pullRequest": pull}}}))
+        return
     if args[:2] == ["api", "graphql"]:
         open_pulls = [pr for pr in state["prs"] if pr.get("state", "OPEN") == "OPEN"]
         print(json.dumps({"data": {"repository": {"pullRequests": {"nodes": open_pulls}}}}))

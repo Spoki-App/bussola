@@ -111,6 +111,11 @@ function CommentItem({ reviewId, comment }: { reviewId: number; comment: Comment
         <strong>{comment.author.name}</strong>
         <span className="muted">{new Date(comment.created_at).toLocaleString()}</span>
         {comment.edited_at && <span className="muted">(edited)</span>}
+        {comment.remote_url && (
+          <a className="github-link" href={comment.remote_url} target="_blank" rel="noreferrer" title="This comment is on GitHub">
+            GitHub
+          </a>
+        )}
         <span className="spacer" />
         {comment.mine && !editing && (
           <>

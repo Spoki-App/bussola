@@ -22,7 +22,7 @@ from rtool.review.threads import (
     get_thread,
     thread_views,
 )
-from rtool.storage.models import Comment, Reviewer
+from rtool.storage.models import Comment, PublishedComment, Reviewer
 from rtool.storage.repositories import Store
 
 router = APIRouter(tags=["threads"])
@@ -110,6 +110,7 @@ def remove_comment(comment_id: str, context: CommentContextDep) -> CommentOut:
 
 def thread_out(context: ReviewContext, view: ThreadView) -> ThreadOut:
     thread, anchor = view.thread, view.anchor
+    published = context.store.forge.published([comment.id for comment in view.comments])
     return ThreadOut(
         id=thread.id,
         scope=ThreadScope(thread.scope),
@@ -134,12 +135,12 @@ def thread_out(context: ReviewContext, view: ThreadView) -> ThreadOut:
             file_line=view.file_line,
             end_file_line=view.end_file_line,
         ),
-        comments=[comment_out(context, comment) for comment in view.comments],
+        comments=[comment_out(context, comment, published.get(comment.id)) for comment in view.comments],
         can_delete=can_delete(context, thread, view.comments),
     )
 
 
-def comment_out(context: ReviewContext, comment: Comment) -> CommentOut:
+def comment_out(context: ReviewContext, comment: Comment, published: PublishedComment | None = None) -> CommentOut:
     deleted = comment.deleted_at is not None
     return CommentOut(
         id=comment.id,
@@ -150,6 +151,7 @@ def comment_out(context: ReviewContext, comment: Comment) -> CommentOut:
         edited_at=comment.edited_at,
         deleted=deleted,
         mine=comment.author_id == context.reviewer.id,
+        remote_url=published.remote_url if published else None,
     )
 
 

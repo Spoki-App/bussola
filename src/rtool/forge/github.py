@@ -5,7 +5,20 @@ import shutil
 import subprocess
 from typing import Any
 
-from rtool.forge.base import ForgeError, ForgeStatus, InlineComment, LineRanges, PullRequest, RemoteComment, ReviewSubmission, SubmittedReview
+from rtool.forge.base import (
+    Conversation,
+    DiffSide,
+    ForgeError,
+    ForgeStatus,
+    InlineComment,
+    LineRanges,
+    PullRequest,
+    RemoteComment,
+    RemoteNote,
+    RemoteThread,
+    ReviewSubmission,
+    SubmittedReview,
+)
 
 GH = "gh"
 PROVIDER = "github"
@@ -33,6 +46,27 @@ REMOTE_PATTERNS = (
     re.compile(r"^(?:https?|ssh|git)://(?:[^@/]+@)?github\.com(?::\d+)?/(?P<repo>[^/]+/[^/]+?)(?:\.git)?/?$"),
 )
 HUNK_HEADER = re.compile(r"^@@ -(?P<old>\d+)(?:,(?P<old_count>\d+))? \+(?P<new>\d+)(?:,(?P<new_count>\d+))? @@", re.MULTILINE)
+
+CONVERSATION_QUERY = """
+query($owner: String!, $name: String!, $number: Int!) {
+  viewer { login }
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      headRefOid
+      comments(first: 100) { nodes { databaseId author { login } body createdAt url } }
+      reviews(first: 100) { nodes { databaseId author { login } body submittedAt url } }
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved path line startLine diffSide
+          comments(first: 100) { nodes { databaseId author { login } body createdAt url } }
+        }
+      }
+    }
+  }
+}
+"""
+ISSUE_COMMENT_PREFIX = "issue-"
+REVIEW_PREFIX = "review-"
 
 type JsonObject = dict[str, Any]
 
@@ -85,10 +119,11 @@ class GitHubAdapter:
         if not submission.draft:
             payload["event"] = "COMMENT"
         review = self._json(["api", "--method", "POST", f"repos/{_repo(repository)}/pulls/{number}/reviews", "--input", "-"], payload)
+        review_id = f"{REVIEW_PREFIX}{review['id']}" if "id" in review else None
         if not submission.comments:
-            return SubmittedReview(review.get("html_url"), [])
+            return SubmittedReview(review.get("html_url"), [], review_id)
         pages = self._json(["api", "--paginate", "--slurp", f"repos/{_repo(repository)}/pulls/{number}/reviews/{review['id']}/comments"])
-        return SubmittedReview(review.get("html_url"), _match_comments(submission, [item for page in pages for item in page]))
+        return SubmittedReview(review.get("html_url"), _match_comments(submission, [item for page in pages for item in page]), review_id)
 
     def create_file_comment(self, repository: str, number: int, commit_id: str, path: str, body: str) -> RemoteComment:
         payload = {"body": body, "commit_id": commit_id, "path": path, "subject_type": "file"}
@@ -100,6 +135,21 @@ class GitHubAdapter:
 
     def update_comment(self, repository: str, remote_id: str, body: str) -> None:
         self._json(["api", "--method", "PATCH", f"repos/{_repo(repository)}/pulls/comments/{_numeric(remote_id)}", "--input", "-"], {"body": body})
+
+    def pull_request_conversation(self, repository: str, number: int) -> Conversation:
+        owner, name = _repo(repository).split("/")
+        args = ["api", "graphql", "-f", f"query={CONVERSATION_QUERY}", "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"number={number}"]
+        response = self._json(args)
+        try:
+            data = response["data"]
+            pull = data["repository"]["pullRequest"]
+        except (KeyError, TypeError) as error:
+            raise ForgeError(f"GitHub did not return the comments of pull request #{number}") from error
+        notes = [_note(item, ISSUE_COMMENT_PREFIX, "createdAt") for item in _nodes(pull.get("comments"))]
+        notes += [_note(item, REVIEW_PREFIX, "submittedAt") for item in _nodes(pull.get("reviews")) if str(item.get("body") or "").strip()]
+        threads = [_remote_thread(item) for item in _nodes(pull.get("reviewThreads"))]
+        viewer: JsonObject = data.get("viewer") or {}
+        return Conversation(str(viewer.get("login", "")), str(pull.get("headRefOid", "")), sorted(notes, key=lambda note: note.created_at), threads)
 
     def _json(self, args: list[str], payload: JsonObject | None = None) -> Any:
         result = self._run(args, payload=payload)
@@ -136,6 +186,33 @@ def parse_patch_ranges(patch: str) -> LineRanges:
         if old_count:
             left.append((old_start, old_start + old_count - 1))
     return LineRanges(tuple(right), tuple(left))
+
+
+def _nodes(connection: JsonObject | None) -> list[JsonObject]:
+    return list((connection or {}).get("nodes") or [])
+
+
+def _note(item: JsonObject, prefix: str, time_field: str) -> RemoteNote:
+    return RemoteNote(
+        remote_id=f"{prefix}{item['databaseId']}",
+        author=_login(item.get("author")),
+        body=str(item.get("body") or ""),
+        created_at=str(item.get(time_field) or ""),
+        url=str(item.get("url") or ""),
+    )
+
+
+def _remote_thread(item: JsonObject) -> RemoteThread:
+    line = item.get("line")
+    start = item.get("startLine")
+    return RemoteThread(
+        path=str(item.get("path") or ""),
+        line=int(line) if line is not None else None,
+        start_line=int(start) if start is not None else None,
+        side=DiffSide.LEFT if item.get("diffSide") == DiffSide.LEFT else DiffSide.RIGHT,
+        resolved=bool(item.get("isResolved", False)),
+        comments=[_note(comment, "", "createdAt") for comment in _nodes(item.get("comments"))],
+    )
 
 
 def _inline_payload(item: InlineComment) -> JsonObject:

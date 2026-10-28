@@ -1,59 +1,10 @@
-from pathlib import Path
 from typing import Any
 
 import pytest
 
 from tests.apiclient import ApiClient
-from tests.forge.conftest import FakeGh
+from tests.forge.conftest import FIRST, SECOND, GitHubSandbox
 from tests.gitrepo import GitFixture
-
-GITHUB_URL = "git@github.com:acme/widgets.git"
-BASE = "def total(items):\n    return 0\n"
-FIRST = "def total(items):\n    return sum(items)\n"
-SECOND = "def total(items):\n    return sum(items, 0)\n"
-
-
-class GitHubSandbox:
-    def __init__(self, local: GitFixture, contributor: GitFixture, fake_gh: FakeGh) -> None:
-        self.local = local
-        self.contributor = contributor
-        self.fake_gh = fake_gh
-
-    def open_pull_request(self, files: dict[str, str], state: str = "OPEN", base: str = "main") -> str:
-        head = self.contributor.commit(files, "contribution")
-        self.contributor.git("push", "-q", "--force", "origin", "HEAD:refs/pull/7/head")
-        pull = {
-            "number": 7,
-            "title": "Sum the items",
-            "url": "https://github.com/acme/widgets/pull/7",
-            "headRefOid": head,
-            "headRefName": "sum-items",
-            "baseRefName": base,
-            "author": {"login": "bob"},
-            "state": state,
-            "isDraft": False,
-            "updatedAt": "2026-10-28T10:00:00Z",
-            "comments": {"totalCount": 2},
-            "reviewThreads": {"nodes": [{"isResolved": False, "comments": {"totalCount": 3}}, {"isResolved": True, "comments": {"totalCount": 1}}]},
-        }
-        self.fake_gh.configure(prs=[pull], files=[])
-        return head
-
-
-@pytest.fixture
-def github(tmp_path: Path, git_repo: GitFixture, fake_gh: FakeGh) -> GitHubSandbox:
-    bare = tmp_path / "widgets.git"
-    GitFixture(tmp_path).git("init", "-q", "--bare", "-b", "main", str(bare))
-    git_repo.commit({"app.py": BASE}, "base")
-    git_repo.git("remote", "add", "origin", GITHUB_URL)
-    git_repo.git("config", f"url.{bare}.insteadOf", GITHUB_URL)
-    git_repo.git("push", "-q", "origin", "main")
-    contributor = GitFixture(tmp_path / "contributor")
-    GitFixture(tmp_path).git("clone", "-q", str(bare), str(contributor.root))
-    contributor.git("config", "user.email", "bob@example.com")
-    contributor.git("config", "user.name", "Bob")
-    contributor.git("checkout", "-q", "-b", "sum-items")
-    return GitHubSandbox(git_repo, contributor, fake_gh)
 
 
 def register(api: ApiClient) -> int:

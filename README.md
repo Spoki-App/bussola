@@ -73,7 +73,8 @@ For a repository with a GitHub remote, **Pull requests** on its card lists the o
 
 - **Review** downloads the pull request's code with `git fetch` into `refs/rtool/pull/<number>`, so your branches are not touched. It then starts a review against the pull request's base branch, already linked to the pull request.
 - **Sync reviews** fetches the latest commits of every pull request you are reviewing in that repository and records new revisions. Pull requests that were closed or merged are marked as such.
-- On a pull request review, **Check for new commits** with **fetch the pull request first** does the same for that one pull request.
+- On a pull request review, **Check for new commits** with **fetch commits and comments from GitHub** (ticked by default) does the same for that one pull request.
+- Comments already on GitHub are brought into the review each time: line comments become threads on the same lines (or on the file when the line is outdated or outside the changed units), conversation comments and review summaries become review comments, and resolved threads stay resolved. Your own GitHub comments show as yours, and replying in rtool to an imported thread sends the reply to GitHub. Comments that came from GitHub link back to it. Edits made on GitHub to comments already imported are not picked up.
 
 rtool only contacts GitHub when you press one of these buttons.
 

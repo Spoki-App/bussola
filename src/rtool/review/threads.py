@@ -142,16 +142,20 @@ def _anchor_new_unit_thread(thread: Thread, request: NewThread) -> None:
     snapshot = request.snapshot
     if snapshot is None or request.line_offset is None:
         raise InvalidRequestError("Unit threads need a unit and a line")
-    lines = side_text(snapshot, request.side)
-    last = request.line_offset + request.line_count - 1
-    if request.line_count < 1 or not 0 <= request.line_offset <= last < len(lines):
+    anchor_to_unit(thread, snapshot, request.side, request.line_offset, request.line_count)
+
+
+def anchor_to_unit(thread: Thread, snapshot: UnitSnapshot, side: Side, line_offset: int, count: int) -> None:
+    lines = side_text(snapshot, side)
+    last = line_offset + count - 1
+    if count < 1 or not 0 <= line_offset <= last < len(lines):
         raise InvalidRequestError("The lines are outside the unit")
-    before, after = surrounding(lines, request.line_offset, request.line_count)
+    before, after = surrounding(lines, line_offset, count)
     thread.path, thread.kind, thread.qualified_name = key_of(snapshot)
-    thread.side = request.side.value
-    thread.unit_hash = side_hash(snapshot, request.side)
-    thread.line_offset = request.line_offset
-    thread.line_text = LINE_SEPARATOR.join(line.rstrip() for line in lines[request.line_offset : last + 1])
+    thread.side = side.value
+    thread.unit_hash = side_hash(snapshot, side)
+    thread.line_offset = line_offset
+    thread.line_text = LINE_SEPARATOR.join(line.rstrip() for line in lines[line_offset : last + 1])
     thread.context_before = [line.rstrip() for line in before]
     thread.context_after = [line.rstrip() for line in after]
 

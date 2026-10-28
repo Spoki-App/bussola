@@ -125,6 +125,7 @@ export interface Comment {
   edited_at: string | null
   deleted: boolean
   mine: boolean
+  remote_url: string | null
 }
 
 export interface ThreadAnchor {

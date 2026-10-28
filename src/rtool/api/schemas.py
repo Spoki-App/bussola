@@ -209,6 +209,7 @@ class CommentOut(BaseModel):
     edited_at: datetime | None
     deleted: bool
     mine: bool
+    remote_url: str | None = None
 
 
 class ThreadAnchorOut(BaseModel):

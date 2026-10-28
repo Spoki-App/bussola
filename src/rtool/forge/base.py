@@ -73,6 +73,34 @@ class RemoteComment:
 class SubmittedReview:
     url: str | None
     comments: list[RemoteComment]
+    remote_id: str | None = None
+
+
+@dataclass(frozen=True)
+class RemoteNote:
+    remote_id: str
+    author: str
+    body: str
+    created_at: str
+    url: str
+
+
+@dataclass(frozen=True)
+class RemoteThread:
+    path: str
+    line: int | None
+    start_line: int | None
+    side: DiffSide
+    resolved: bool
+    comments: list[RemoteNote]
+
+
+@dataclass(frozen=True)
+class Conversation:
+    viewer: str
+    head_sha: str
+    notes: list[RemoteNote]
+    threads: list[RemoteThread]
 
 
 class ForgeAdapter(Protocol):
@@ -88,3 +116,4 @@ class ForgeAdapter(Protocol):
     def create_file_comment(self, repository: str, number: int, commit_id: str, path: str, body: str) -> RemoteComment: ...
     def reply(self, repository: str, number: int, remote_id: str, body: str) -> RemoteComment: ...
     def update_comment(self, repository: str, remote_id: str, body: str) -> None: ...
+    def pull_request_conversation(self, repository: str, number: int) -> Conversation: ...

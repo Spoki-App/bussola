@@ -123,6 +123,16 @@ POST   /repos/{repo_id}/pulls/sync             fetch every linked open pull requ
 - **Refresh:** on a pull request review, a refresh with `fetch` syncs that pull request instead of fetching the remote's default refspecs.
 - **Network:** as in A2, GitHub is only contacted on an explicit user action.
 
+## A5. Importing pull request comments from GitHub
+
+This amends A2, where publishing was one-way: rtool now also reads the comments already on a linked pull request.
+
+- **Source:** one GraphQL query through `gh api graphql` returns the pull request head, conversation comments, review summaries and review threads (path, line, start line, side, resolved state, comments). It runs when a pull request review is started, on **Sync reviews**, and on a refresh with fetch of a linked review.
+- **Mapping:** a review thread becomes a unit thread on the same lines when the pull request head equals the reviewed head and the lines fall inside a changed unit; otherwise it becomes a file thread. Conversation comments and non-empty review summaries become review threads.
+- **Identity:** every imported comment is recorded in `published_comments` with its GitHub id (`issue-<id>` and `review-<id>` for comments that cannot be replied to), so nothing is imported twice and nothing imported is sent back. A review sent from rtool is recorded as `review-<id>` for the same reason.
+- **Authors:** the GitHub user running `gh` maps to the current reviewer; others become reviewers named after their login (`<login>@users.noreply.github.com`).
+- **State:** the resolved state of imported threads follows GitHub at every import. Edits made on GitHub after import are not applied.
+
 ## Plan changes
 
 - A1 is part of M2 (model, states, API) and M3 (selection UI).

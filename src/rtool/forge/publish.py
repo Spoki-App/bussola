@@ -121,7 +121,7 @@ def _plan_new_thread(context: ReviewContext, view: ThreadView, comments: list[Co
 
 
 def _plan_existing_thread(context: ReviewContext, view: ThreadView, comments: list[Comment], published: dict[str, PublishedComment], plan: PublishPlan) -> None:
-    thread_remote = next((published[comment.id].remote_id for comment in comments if comment.id in published and published[comment.id].remote_id), None)
+    thread_remote = next((record.remote_id for comment in comments if (record := published.get(comment.id)) and is_comment_id(record.remote_id)), None)
     for comment in comments:
         if comment.id in published:
             continue
@@ -133,12 +133,12 @@ def _plan_existing_thread(context: ReviewContext, view: ThreadView, comments: li
     groups: dict[str, list[Comment]] = {}
     for comment in comments:
         record = published.get(comment.id)
-        if record is not None and record.remote_id is not None:
+        if record is not None and record.remote_id is not None and is_comment_id(record.remote_id):
             groups.setdefault(record.remote_id, []).append(comment)
     for remote_id, members in groups.items():
         if any(_is_edited(context, member, published[member.id]) for member in members):
             plan.updates.append((members, remote_id, GROUP_SEPARATOR.join(render_comment(context, member) for member in members)))
-    edited_in_body = [comment for comment in comments if comment.id in published and published[comment.id].remote_id is None]
+    edited_in_body = [comment for comment in comments if comment.id in published and not is_comment_id(published[comment.id].remote_id)]
     edited_in_body = [comment for comment in edited_in_body if _is_edited(context, comment, published[comment.id])]
     if edited_in_body and view.thread.scope == ThreadScope.REVIEW:
         detail = "Edits to comments sent in a review body cannot be updated on GitHub"
@@ -167,7 +167,7 @@ class _Publisher:
             self.record(comments, remote)
             self.outcomes.append(Outcome(_ids(comments), PublishStatus.PUBLISHED, "Review comment", remote.url))
         for comments, _ in plan.body_parts:
-            self.record(comments, RemoteComment(None, submitted.url))
+            self.record(comments, RemoteComment(submitted.remote_id, submitted.url))
             self.outcomes.append(Outcome(_ids(comments), PublishStatus.PUBLISHED, "Part of the review body", submitted.url))
         return submitted.url
 
@@ -195,6 +195,14 @@ class _Publisher:
         for comment in comments:
             record = PublishedComment(comment.id, self.adapter.provider, remote.remote_id, remote.url, _body_hash(self.context, comment))
             self.context.store.forge.save_published(record)
+
+
+def is_comment_id(remote_id: str | None) -> bool:
+    return remote_id is not None and remote_id.isdigit()
+
+
+def body_hash(context: ReviewContext, comment: Comment) -> str:
+    return _body_hash(context, comment)
 
 
 def _is_edited(context: ReviewContext, comment: Comment, record: PublishedComment) -> bool:

@@ -1046,3 +1046,7 @@ button.danger {
 .review-actions {
   align-items: flex-start;
 }
+
+.github-link {
+  font-size: 12px;
+}
