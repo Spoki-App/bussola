@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -114,3 +115,50 @@ def test_repository_without_github_remote_lists_nothing(api: ApiClient, git_repo
     listing = api.call("GET", f"/repos/{repo}/pulls")
 
     assert (listing["repository"], listing["pulls"]) == (None, [])
+
+
+def open_link(api: ApiClient, url: str, expected: int = 201) -> Any:
+    return api.call("POST", "/pulls/open", expected, {"url": url})
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://github.com/acme/widgets/pull/7",
+        "github.com/Acme/Widgets/pull/7/files",
+        "https://github.com/acme/widgets/pull/7#discussion_r1",
+    ],
+)
+def test_a_pull_request_link_opens_its_review_in_the_matching_repository(api: ApiClient, github: GitHubSandbox, url: str) -> None:
+    head = github.open_pull_request({"app.py": FIRST})
+    repo = register(api)
+
+    review = open_link(api, url)
+
+    assert (review["repo_id"], review["pull_request"]["number"], review["latest_revision"]["head_sha"]) == (repo, 7, head)
+    assert open_link(api, url)["id"] == review["id"]
+
+
+def test_a_pull_request_link_finds_and_adds_a_clone_under_home(api: ApiClient, github: GitHubSandbox, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    github.open_pull_request({"app.py": FIRST})
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    review = open_link(api, "https://github.com/acme/widgets/pull/7")
+
+    assert [repo["path"] for repo in api.call("GET", "/repos")] == [str(api.git.root.resolve())]
+    assert review["pull_request"]["number"] == 7
+
+
+def test_a_pull_request_link_without_a_local_clone_is_reported(api: ApiClient, github: GitHubSandbox, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    github.open_pull_request({"app.py": FIRST})
+    monkeypatch.setenv("HOME", str(tmp_path / "data"))
+
+    error = open_link(api, "https://github.com/acme/gadgets/pull/7", 404)
+
+    assert "github.com/acme/gadgets" in error["detail"]
+
+
+def test_a_link_that_is_not_a_pull_request_is_rejected(api: ApiClient) -> None:
+    error = open_link(api, "https://github.com/acme/widgets/issues/7", 400)
+
+    assert "Not a GitHub pull request link" in error["detail"]

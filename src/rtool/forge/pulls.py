@@ -1,18 +1,23 @@
+import re
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from pathlib import Path
 
-from rtool.errors import ConflictError, InvalidRequestError
+from rtool.errors import ConflictError, InvalidRequestError, NotFoundError
 from rtool.forge.base import ForgeAdapter, ForgeError, ForgeStatus, PullRequest
 from rtool.forge.conversation import import_conversation
-from rtool.git import GitRepo
+from rtool.git import GitError, GitRepo
 from rtool.git.repo import DEFAULT_REMOTE
 from rtool.review.context import ReviewContext
 from rtool.review.hooks import REVISION_HOOKS
+from rtool.review.repos import open_repo, register_repo
 from rtool.review.revisions import RefreshResult, refresh_review
 from rtool.storage.models import ForgeLink, Repo, Review, Reviewer, utcnow
 from rtool.storage.repositories import Store
 
 PULL_REF_PREFIX = "refs/rtool/pull/"
 OPEN_STATE = "OPEN"
+PULL_URL = re.compile(r"^(?:https?://)?(?:www\.)?github\.com/(?P<repository>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(?P<number>\d+)(?:[/?#].*)?$")
 
 
 @dataclass(frozen=True)
@@ -48,18 +53,49 @@ class ConversationSync:
     state: str
 
 
+@dataclass(frozen=True)
+class PullRequestAddress:
+    repository: str
+    number: int
+
+
+def parse_pull_request_url(url: str) -> PullRequestAddress:
+    match = PULL_URL.match(url.strip())
+    if match is None:
+        raise InvalidRequestError("Not a GitHub pull request link. Expected https://github.com/<owner>/<repository>/pull/<number>.")
+    return PullRequestAddress(match["repository"], int(match["number"]))
+
+
+def find_repo_for(store: Store, adapter: ForgeAdapter, repository: str, candidates: Callable[[], Iterable[Path]]) -> Repo:
+    for repo in store.reviews.list_repos():
+        if Path(repo.path).is_dir() and _has_remote(adapter, open_repo(repo), repository):
+            return repo
+    for path in candidates():
+        try:
+            matches = _has_remote(adapter, GitRepo(path), repository)
+        except GitError:
+            continue
+        if matches:
+            return register_repo(store, path)
+    raise NotFoundError(f"No local clone of github.com/{repository} was found. Add its folder as a repository first.")
+
+
+def _has_remote(adapter: ForgeAdapter, git_repo: GitRepo, repository: str) -> bool:
+    return github_remote(adapter, git_repo, repository) is not None
+
+
 def pull_ref(number: int) -> str:
     return f"{PULL_REF_PREFIX}{number}"
 
 
-def github_remote(adapter: ForgeAdapter, git_repo: GitRepo) -> GitHubRemote | None:
+def github_remote(adapter: ForgeAdapter, git_repo: GitRepo, repository: str | None = None) -> GitHubRemote | None:
     remotes = git_repo.remotes()
     ordered = sorted(remotes, key=lambda name: name != DEFAULT_REMOTE)
     for remote in ordered:
         url = git_repo.remote_url(remote)
-        repository = adapter.repository_for(url) if url else None
-        if repository is not None:
-            return GitHubRemote(remote, repository)
+        found = adapter.repository_for(url) if url else None
+        if found is not None and (repository is None or found.lower() == repository.lower()):
+            return GitHubRemote(remote, found)
     return None
 
 
@@ -81,9 +117,9 @@ class ForgeSession:
     reviewer: Reviewer
 
 
-def review_pull_request(session: ForgeSession, repo: Repo, number: int) -> Review:
+def review_pull_request(session: ForgeSession, repo: Repo, number: int, repository: str | None = None) -> Review:
     store, adapter, git_repo = session.store, session.adapter, session.git_repo
-    remote = _require_remote(adapter, git_repo)
+    remote = _require_remote(adapter, git_repo, repository)
     pull = adapter.pull_request(remote.repository, number)
     head_ref, base_ref = fetch_pull_request(git_repo, remote, pull)
     review = _review_for(store, repo, remote.repository, pull) or store.reviews.find_review(repo.id, head_ref, base_ref)
@@ -116,7 +152,7 @@ def sync_pull_requests(session: ForgeSession, repo: Repo) -> SyncResult:
 
 def sync_review(session: ForgeSession, review: Review, link: ForgeLink) -> RefreshResult | None:
     store, adapter, git_repo = session.store, session.adapter, session.git_repo
-    remote = _require_remote(adapter, git_repo)
+    remote = _require_remote(adapter, git_repo, link.repository)
     pull = adapter.pull_request(link.repository, link.pr_number)
     _save_link(store, review, adapter.provider, link.repository, pull)
     if pull.state != OPEN_STATE:
@@ -146,10 +182,10 @@ def fetch_pull_request(git_repo: GitRepo, remote: GitHubRemote, pull: PullReques
     return head_ref, base_ref
 
 
-def _require_remote(adapter: ForgeAdapter, git_repo: GitRepo) -> GitHubRemote:
-    remote = github_remote(adapter, git_repo)
+def _require_remote(adapter: ForgeAdapter, git_repo: GitRepo, repository: str | None = None) -> GitHubRemote:
+    remote = github_remote(adapter, git_repo, repository)
     if remote is None:
-        raise ConflictError("This repository has no GitHub remote")
+        raise ConflictError(f"This repository has no GitHub remote for {repository}" if repository else "This repository has no GitHub remote")
     return remote
 
 

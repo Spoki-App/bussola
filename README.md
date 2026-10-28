@@ -72,6 +72,7 @@ Click a line number to start a thread on that line. To comment on several lines,
 
 For a repository with a GitHub remote, **Pull requests** on its card lists the open pull requests (read with the GitHub CLI, see below), each with its number of comments and how many review threads are still unresolved on GitHub. The list of reviews shows the same for rtool's own threads.
 
+- **Open pull request** on the home page takes a GitHub pull request link (`https://github.com/<owner>/<repository>/pull/<number>`, with or without `/files` or an anchor). rtool looks for a repository you added whose remote points to that GitHub repository; if there is none, it scans your home folder as **Browse** does, adds the first clone it finds and uses it. Then it opens the pull request review as **Review** below does. You can also open `http://127.0.0.1:<port>/github.com/<owner>/<repository>/pull/<number>` directly: replace `https://` in a GitHub link with the rtool address.
 - **Review** downloads the pull request's code with `git fetch` into `refs/rtool/pull/<number>`, so your branches are not touched. It then starts a review against the pull request's base branch, already linked to the pull request.
 - **Sync reviews** fetches the latest commits of every pull request you are reviewing in that repository and records new revisions. Pull requests that were closed or merged are marked as such.
 - On a pull request review, **Sync** does the same for that one pull request.

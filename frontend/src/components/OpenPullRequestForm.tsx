@@ -1,0 +1,32 @@
+import { useState, type SubmitEvent } from 'react'
+
+import { describeError } from '../api/client'
+import { useOpenPullRequestLink } from '../api/pulls'
+import { navigate } from '../navigation'
+import { isPullRequestUrl } from '../review/pullRequestLink'
+import { ErrorNote } from './Badges'
+
+export function OpenPullRequestForm() {
+  const [url, setUrl] = useState('')
+  const open = useOpenPullRequestLink()
+  const submit = (event: SubmitEvent) => {
+    event.preventDefault()
+    open.mutate(url.trim(), { onSuccess: (review) => { navigate(`/reviews/${String(review.id)}`) } })
+  }
+  return (
+    <form className="inline-form" onSubmit={submit}>
+      <label htmlFor="pull-request-url">Open pull request</label>
+      <input
+        id="pull-request-url"
+        value={url}
+        onChange={(event) => { setUrl(event.target.value) }}
+        placeholder="https://github.com/owner/repository/pull/123"
+        title="Paste a GitHub pull request link. rtool finds your local clone of that repository (adding it if it is under your home folder) and opens the pull request review."
+      />
+      <button type="submit" className="primary" disabled={!isPullRequestUrl(url) || open.isPending}>
+        {open.isPending ? 'Opening...' : 'Open'}
+      </button>
+      {open.error && <ErrorNote message={describeError(open.error)} />}
+    </form>
+  )
+}

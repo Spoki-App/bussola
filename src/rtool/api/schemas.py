@@ -358,6 +358,10 @@ class ConversationSyncOut(BaseModel):
     state: str
 
 
+class PullRequestLinkIn(BaseModel):
+    url: str = Field(max_length=2048)
+
+
 class PullSyncOut(BaseModel):
     updated: int
     closed: int

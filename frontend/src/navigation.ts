@@ -15,7 +15,11 @@ export function usePathname(): string {
   return useSyncExternalStore(subscribe, () => window.location.pathname)
 }
 
-export function navigate(to: string) {
-  window.history.pushState(null, '', to)
+export function navigate(to: string, { replace = false }: { replace?: boolean } = {}) {
+  if (replace) {
+    window.history.replaceState(null, '', to)
+  } else {
+    window.history.pushState(null, '', to)
+  }
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }

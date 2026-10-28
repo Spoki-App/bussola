@@ -165,3 +165,13 @@ POST   /reviews/{review_id}/sync               refresh with fetch, then publish 
 - **Errors:** a failed fetch is a warning, as before. A failed publish (head mismatch, `gh` error) does not undo the refresh; its reason is returned in `publish_error`.
 - **Label:** `GET /reviews/{review_id}` returns `unsent_comments`, and the button reads "Sync · N to send" on a linked review with unsent comments.
 - **Linking:** when an unlinked review still has unsent comments after a sync, the page offers the matching open pull requests (or a number); choosing one links the review and syncs again.
+
+## A8. Opening a pull request from its link
+
+```
+POST   /pulls/open                             {url} -> the pull request review (as POST /repos/{repo_id}/pulls/{number}/review)
+```
+
+- **Link:** `https://github.com/<owner>/<repository>/pull/<number>`, scheme optional, any suffix (`/files`, `#discussion_r...`) ignored. Anything else is rejected with 400.
+- **Repository:** the registered repositories are checked first, then the repositories found by the home scan of A3; a repository matches when any of its remotes points to `<owner>/<repository>` (case-insensitive). The first match from the scan is registered. No match gives 404. The pull request is fetched from the matching remote, not necessarily `origin`.
+- **UI:** an "Open pull request" field on the home page, and the client route `/github.com/<owner>/<repository>/pull/<number>`, which opens the review and replaces itself in the browser history.

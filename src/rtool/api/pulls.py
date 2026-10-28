@@ -1,12 +1,14 @@
 from dataclasses import asdict
+from pathlib import Path
 
 from fastapi import APIRouter, Request, status
 
 from rtool.api.deps import RepoDep, ReviewerDep, StoreDep
-from rtool.api.schemas import ForgeStatusOut, PullRequestListOut, PullRequestOut, PullRequestRowOut, PullSyncOut, ReviewDetailOut
+from rtool.api.schemas import ForgeStatusOut, PullRequestLinkIn, PullRequestListOut, PullRequestOut, PullRequestRowOut, PullSyncOut, ReviewDetailOut
 from rtool.api.state import app_state
 from rtool.api.views import review_detail_out
-from rtool.forge.pulls import ForgeSession, list_pull_requests, review_pull_request, sync_pull_requests
+from rtool.directories import find_repositories
+from rtool.forge.pulls import ForgeSession, find_repo_for, list_pull_requests, parse_pull_request_url, review_pull_request, sync_pull_requests
 from rtool.review.context import ReviewContext
 from rtool.review.repos import open_repo
 
@@ -32,3 +34,17 @@ def sync_pulls(repo: RepoDep, store: StoreDep, reviewer: ReviewerDep, request: R
     result = sync_pull_requests(ForgeSession(store, app_state(request).forge, open_repo(repo), reviewer), repo)
     store.commit()
     return PullSyncOut(updated=result.updated, closed=result.closed, failed=result.failed)
+
+
+@router.post("/pulls/open", status_code=status.HTTP_201_CREATED)
+def open_pull_request_link(body: PullRequestLinkIn, store: StoreDep, reviewer: ReviewerDep, request: Request) -> ReviewDetailOut:
+    address = parse_pull_request_url(body.url)
+    adapter = app_state(request).forge
+    repo = find_repo_for(store, adapter, address.repository, _repositories_under_home)
+    review = review_pull_request(ForgeSession(store, adapter, open_repo(repo), reviewer), repo, address.number, address.repository)
+    store.commit()
+    return review_detail_out(ReviewContext(store, review, reviewer), repo)
+
+
+def _repositories_under_home() -> list[Path]:
+    return [Path(found.path) for found in find_repositories().repositories]

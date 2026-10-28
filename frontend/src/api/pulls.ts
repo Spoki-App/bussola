@@ -25,3 +25,11 @@ export function useSyncPullRequests(repoId: number) {
     onSuccess: () => Promise.all([client.invalidateQueries({ queryKey: keys.reviews(repoId) }), client.invalidateQueries({ queryKey: pullsKey(repoId) })]),
   })
 }
+
+export function useOpenPullRequestLink() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (url: string) => postJson<ReviewDetail>('/pulls/open', { url }),
+    onSuccess: (review) => Promise.all([client.invalidateQueries({ queryKey: keys.repos }), client.invalidateQueries({ queryKey: keys.reviews(review.repo_id) })]),
+  })
+}

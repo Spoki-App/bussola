@@ -6,6 +6,7 @@ import type { Repo } from '../api/types'
 import { ErrorNote, ProgressBar } from '../components/Badges'
 import { CommentCount } from '../components/CommentCount'
 import { DirectoryPicker } from '../components/DirectoryPicker'
+import { OpenPullRequestForm } from '../components/OpenPullRequestForm'
 import { PullRequestsPanel } from '../components/PullRequestsPanel'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { Link } from '../Link'
@@ -19,6 +20,7 @@ export function HomePage() {
   return (
     <div className="page">
       <h1>Repositories</h1>
+      <OpenPullRequestForm />
       <AddRepoForm />
       {repos.error && <ErrorNote message={describeError(repos.error)} />}
       {repos.data?.length === 0 && <p className="muted">No repositories yet. Add one with Browse, or run `rtool serve` inside a repository.</p>}
