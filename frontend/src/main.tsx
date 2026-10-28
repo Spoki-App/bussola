@@ -4,6 +4,9 @@ import { createRoot } from 'react-dom/client'
 
 import App from './App'
 import './index.css'
+import { applyCodeFont, loadCodeFont } from './settings/codeFont'
+
+applyCodeFont(loadCodeFont())
 
 const queryClient = new QueryClient()
 const rootElement = document.getElementById('root')
