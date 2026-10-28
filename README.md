@@ -42,11 +42,10 @@ rtool refresh feature/x --fetch
 
 ### Reviewing
 
-The review header has three actions:
+The review header has two actions:
 
-- **Check for new commits** first fetches the branch from its remote (on a pull request review: the pull request's latest commits and comments from GitHub), then records any new commits as a new revision. Approvals of units that did not change are kept. If the remote or GitHub cannot be reached, it checks the local branch and says so.
+- **Sync** (shortcut `r`) first fetches the branch from its remote (on a pull request review: the pull request's latest commits and comments from GitHub), then records any new commits as a new revision. Approvals of units that did not change are kept. If the remote or GitHub cannot be reached, it checks the local branch and says so. When the review is linked to a pull request, it then sends your unsent comments to GitHub (see below); the button shows how many are waiting, as in "Sync · 3 to send".
 - **Mark as reviewed** remembers where you are. It approves and closes nothing; the **Since my last review** filter then shows only what changes after this point.
-- **GitHub comments** links the review to a pull request and sends your comments there (see below).
 
 | State | Meaning |
 |---|---|
@@ -75,24 +74,23 @@ For a repository with a GitHub remote, **Pull requests** on its card lists the o
 
 - **Review** downloads the pull request's code with `git fetch` into `refs/rtool/pull/<number>`, so your branches are not touched. It then starts a review against the pull request's base branch, already linked to the pull request.
 - **Sync reviews** fetches the latest commits of every pull request you are reviewing in that repository and records new revisions. Pull requests that were closed or merged are marked as such.
-- On a pull request review, **Check for new commits** does the same for that one pull request.
+- On a pull request review, **Sync** does the same for that one pull request.
 - The pull request's description is shown under the review header (collapsible, long ones are cut short until you click **Show all**) and is updated at every sync.
 - Comments already on GitHub are brought into the review each time: line comments become threads on the same lines (or on the file when the line is outdated or outside the changed units), conversation comments and review summaries become review comments, and resolved threads stay resolved. Your own GitHub comments show as yours, and replying in rtool to an imported thread sends the reply to GitHub. Comments that came from GitHub link back to it.
-- While a pull request review is open, rtool syncs its comments with GitHub every 3 minutes, and again when you come back to the page. New comments and replies are added, comments edited on GitHub are updated (unless you edited them in rtool and have not sent the edit yet), and threads resolved or reopened on GitHub follow. The header says when the last sync happened, and tells you when new commits were pushed so you can **Check for new commits**. Comments deleted on GitHub stay in rtool.
+- While a pull request review is open, rtool syncs its comments with GitHub every 3 minutes, and again when you come back to the page. New comments and replies are added, comments edited on GitHub are updated (unless you edited them in rtool and have not sent the edit yet), and threads resolved or reopened on GitHub follow. The header says when the last sync happened, and tells you when new commits were pushed so you can **Sync**. Comments deleted on GitHub stay in rtool.
 - Resolving or reopening a thread that is also on GitHub does the same on GitHub. If GitHub refuses (for example, you lack write access), the thread stays as it was and the error is shown.
 
 rtool contacts GitHub only when you press one of these buttons, or for the automatic sync while a pull request review is open.
 
 ### Sending comments to GitHub
 
-The "GitHub" button links the review to a pull request and sends the comments you have not sent yet as one pull request review. It uses the [GitHub CLI](https://cli.github.com), so run `gh auth login` once; rtool never stores a token.
+**Sync** sends the comments you have not sent yet as one pull request review. A pull request review is already linked; for a branch review with unsent comments, Sync offers the open pull requests of that branch (or a PR number) and sends once you pick one. It uses the [GitHub CLI](https://cli.github.com), so run `gh auth login` once; rtool never stores a token.
 
 - Lines inside the pull request diff become review comments on that line.
 - Other lines, outdated threads and file threads become file comments that quote the line.
 - Review threads go into the review body.
 - Later replies and edits are sent as replies and edits of the published comments. Deleting a thread locally does not change GitHub; resolving or reopening one that is on GitHub does.
 - Sending is blocked while the pull request head differs from the reviewed commit, because line numbers would not match.
-- "Keep as draft" leaves the review pending on GitHub. File comments are still posted immediately, because GitHub cannot keep them in a draft.
 
 Approvals stay local.
 

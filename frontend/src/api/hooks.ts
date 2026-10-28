@@ -6,7 +6,6 @@ import type {
   DirectoryListing,
   RepositoryScan,
   DiffMode,
-  RefreshResult,
   Refs,
   Repo,
   Review,
@@ -131,10 +130,6 @@ export function useRevokeSelections(reviewId: number) {
   return useReviewMutation(reviewId, (selectionIds: string[]) =>
     Promise.all(selectionIds.map((id) => deleteJson<unknown>(`/reviews/${String(reviewId)}/row-approvals/${id}`))),
   )
-}
-
-export function useRefresh(reviewId: number) {
-  return useReviewMutation(reviewId, (fetchRemote: boolean) => postJson<RefreshResult>(`/reviews/${String(reviewId)}/refresh`, { fetch: fetchRemote }))
 }
 
 export function useFinishReview(reviewId: number) {

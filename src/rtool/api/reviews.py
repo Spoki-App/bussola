@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Request, status
 
 from rtool.api.deps import ContextDep, ReviewerDep, repo_of, resolve_revision
-from rtool.api.schemas import RefreshIn, RefreshOut, ReviewDetailOut, ReviewerOut, SessionOut
+from rtool.api.schemas import PublishOut, RefreshIn, RefreshOut, ReviewDetailOut, ReviewerOut, SessionOut, SyncOut
 from rtool.api.state import app_state
-from rtool.api.views import review_detail_out, revision_out
+from rtool.api.views import publish_out, review_detail_out, revision_out
 from rtool.errors import ConflictError, InvalidRequestError
 from rtool.forge.base import ForgeAdapter, ForgeError
 from rtool.forge.conversation import import_conversation
+from rtool.forge.publish import pending_comment_count, publish_comments
 from rtool.forge.pulls import PULL_REF_PREFIX, ForgeSession, sync_review
 from rtool.git import GitError, GitRepo, InvalidRefError
 from rtool.review.context import ReviewContext
@@ -32,10 +33,30 @@ def get_review(context: ContextDep) -> ReviewDetailOut:
 
 @router.post("/reviews/{review_id}/refresh")
 def refresh(body: RefreshIn, context: ContextDep, request: Request) -> RefreshOut:
+    return _refresh(context, request, fetch=body.fetch)
+
+
+@router.post("/reviews/{review_id}/sync")
+def sync(context: ContextDep, request: Request) -> SyncOut:
+    refreshed = _refresh(context, request, fetch=True)
+    revision = resolve_revision(context, None)
+    published: PublishOut | None = None
+    publish_error = None
+    if context.store.forge.link(context.review.id) is not None and pending_comment_count(context, revision) > 0:
+        try:
+            published = publish_out(publish_comments(context, app_state(request).forge, revision, draft=False))
+            context.store.commit()
+        except (ForgeError, ConflictError) as error:
+            context.store.session.rollback()
+            publish_error = str(error)
+    return SyncOut(refresh=refreshed, published=published, publish_error=publish_error, unsent_comments=pending_comment_count(context, revision))
+
+
+def _refresh(context: ReviewContext, request: Request, *, fetch: bool) -> RefreshOut:
     git_repo = open_repo(repo_of(context))
     fetched: RefreshResult | None = None
     warning = None
-    if body.fetch:
+    if fetch:
         try:
             fetched = _fetch_and_refresh(context, app_state(request).forge, git_repo)
         except FETCH_ERRORS as error:

@@ -14,7 +14,7 @@ export function GitHubSyncStatus({ reviewId, headSha }: { reviewId: number; head
         {!sync.isFetching && sync.isError && `Could not sync comments with GitHub: ${describeError(sync.error)}`}
         {!sync.isFetching && !sync.isError && syncedAt && `Comments synced with GitHub at ${syncedAt}`}
       </p>
-      {sync.data?.new_commits && <p className="notice">New commits were pushed to this pull request. Use Check for new commits to review them.</p>}
+      {sync.data?.new_commits && <p className="notice">New commits were pushed to this pull request. Use Sync to review them.</p>}
     </>
   )
 }

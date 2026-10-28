@@ -152,3 +152,16 @@ POST   /reviews/{review_id}/forge/sync         import the pull request conversat
 - A1 is part of M2 (model, states, API) and M3 (selection UI).
 - A2 is a new milestone **M4b** after M4 (2-3 days): `ForgeAdapter`, `GitHubAdapter` via `gh`, linking, publish and its tests. Tests run against a fake `gh` executable placed first on `PATH`, which records its arguments and returns canned JSON; no real network call is made.
 - Section 1 "out of scope": GitHub integration is replaced by "anything on GitHub beyond publishing comments".
+
+## A7. One Sync action
+
+"Check for new commits" and "GitHub comments" are merged into one **Sync** button (shortcut `r`).
+
+```
+POST   /reviews/{review_id}/sync               refresh with fetch, then publish unsent comments when linked -> {refresh, published, publish_error, unsent_comments}
+```
+
+- **Order:** the refresh runs first (A4 for pull request reviews, `git fetch` otherwise), then, if the review is linked and has unsent comments, they are published as in A2 with event `COMMENT`. Sending as a draft is no longer offered in the UI; `POST /reviews/{review_id}/forge/publish` keeps its `draft` flag.
+- **Errors:** a failed fetch is a warning, as before. A failed publish (head mismatch, `gh` error) does not undo the refresh; its reason is returned in `publish_error`.
+- **Label:** `GET /reviews/{review_id}` returns `unsent_comments`, and the button reads "Sync · N to send" on a linked review with unsent comments.
+- **Linking:** when an unlinked review still has unsent comments after a sync, the page offers the matching open pull requests (or a number); choosing one links the review and syncs again.

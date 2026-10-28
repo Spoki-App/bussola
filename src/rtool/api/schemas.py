@@ -83,6 +83,7 @@ class ReviewOut(BaseModel):
 
 class ReviewDetailOut(ReviewOut):
     revisions: list[RevisionOut]
+    unsent_comments: int = 0
 
 
 class RefreshIn(BaseModel):
@@ -304,6 +305,13 @@ class PublishOutcomeOut(BaseModel):
 class PublishOut(BaseModel):
     review_url: str | None
     outcomes: list[PublishOutcomeOut]
+
+
+class SyncOut(BaseModel):
+    refresh: RefreshOut
+    published: PublishOut | None
+    publish_error: str | None
+    unsent_comments: int
 
 
 class DirectoryEntryOut(BaseModel):

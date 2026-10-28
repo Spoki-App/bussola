@@ -52,6 +52,7 @@ export interface Review {
 
 export interface ReviewDetail extends Review {
   revisions: Revision[]
+  unsent_comments: number
 }
 
 export interface Unit {
@@ -225,6 +226,13 @@ export interface PublishOutcome {
   status: 'published' | 'updated' | 'skipped' | 'failed'
   detail: string
   url: string | null
+}
+
+export interface SyncResult {
+  refresh: RefreshResult
+  published: PublishResult | null
+  publish_error: string | null
+  unsent_comments: number
 }
 
 export interface ConversationSync {

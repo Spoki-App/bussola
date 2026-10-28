@@ -7,7 +7,6 @@ import type { DiffRow, Thread, Unit, UnitDiff } from './api/types'
 import { ErrorNote } from './components/Badges'
 import { Composer } from './components/Composer'
 import { FileCommentButton } from './components/FileCommentButton'
-import { GitHubButton } from './components/GitHubButton'
 import { ThreadPanel } from './components/ThreadPanel'
 import { ThreadView } from './components/ThreadView'
 import { ReviewPage } from './pages/ReviewPage'
@@ -61,7 +60,6 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
         highlightRows: (unit, diff) => (draft?.unitId === unit.id && draft.mode === diff.mode ? draftRowKeys(draft, diff.rows) : undefined),
         renderWidgets,
         fileActions: (path) => <FileCommentButton reviewId={reviewId} path={path} />,
-        headerActions: <GitHubButton reviewId={reviewId} />,
         sidePanel: {
           label: `conversation (${String(openCount)})`,
           content: threads.error ? <ErrorNote message={describeError(threads.error)} /> : <ThreadPanel reviewId={reviewId} threads={threads.data ?? []} />,

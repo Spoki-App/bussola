@@ -1,14 +1,17 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
-import { useApprove, useFinishReview, useRefresh, useReview, useUnits } from '../api/hooks'
-import type { DiffRow, ReviewDetail, Unit, UnitDiff, UnitFilter } from '../api/types'
+import { useSync } from '../api/forge'
+import { useApprove, useFinishReview, useReview, useUnits } from '../api/hooks'
+import type { DiffRow, ReviewDetail, SyncResult, Unit, UnitDiff, UnitFilter } from '../api/types'
 import { ErrorNote, ProgressBar } from '../components/Badges'
 import { ExternalLink } from '../components/ExternalLink'
 import { FileTree } from '../components/FileTree'
 import { GitHubSyncStatus } from '../components/GitHubSyncStatus'
+import { LinkPullRequest } from '../components/LinkPullRequest'
 import { PullRequestDescription } from '../components/PullRequestDescription'
 import { ReviewTitle } from '../components/ReviewTitle'
+import { SyncSummary } from '../components/SyncSummary'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
 import { UnitTree } from '../components/UnitTree'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
@@ -24,7 +27,6 @@ export interface ReviewExtensions {
   unitFooter?: (unit: Unit) => ReactNode
   fileActions?: (path: string) => ReactNode
   sidePanel?: { label: string; content: ReactNode }
-  headerActions?: ReactNode
 }
 
 interface Props {
@@ -38,25 +40,32 @@ function scrollToElement(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-const CHECK_TITLE = 'Fetch the branch from its remote, then record any new commits as a new revision of this review.'
-const PULL_CHECK_TITLE = 'Download the latest commits and comments of the pull request from GitHub, then record any new commits as a new revision.'
+const SYNC_TITLE =
+  'Fetch the branch from its remote and record any new commits as a new revision. If the review is linked to a GitHub pull request, also bring in its comments and send your unsent comments as one review.'
+const PULL_SYNC_TITLE = 'Download the latest commits and comments of the pull request from GitHub, record any new commits as a new revision, then send your unsent comments as one review.'
 const MARK_TITLE = 'Remember this point. The "Since my last review" filter will then show only what changes after now. Nothing is approved or closed.'
 
-function ReviewHeader({ review, extra }: { review: ReviewDetail; extra?: ReactNode }) {
+function syncLabel(review: ReviewDetail, pending: boolean): string {
+  if (pending) {
+    return 'Syncing...'
+  }
+  return review.pull_request && review.unsent_comments > 0 ? `Sync \u00b7 ${String(review.unsent_comments)} to send` : 'Sync'
+}
+
+function ReviewHeader({ review }: { review: ReviewDetail }) {
   const isPullRequest = review.pull_request !== null
   const [message, setMessage] = useState<string | null>(null)
-  const refresh = useRefresh(review.id)
+  const [synced, setSynced] = useState<SyncResult | null>(null)
+  const sync = useSync(review.id)
   const finish = useFinishReview(review.id)
   const revision = review.latest_revision
 
-  const runRefresh = () => {
-    refresh.mutate(true, {
-      onSuccess: (result) => {
-        const outcome = result.created ? `New commits found: revision ${String(result.revision.number)} recorded.` : 'No new commits.'
-        setMessage(result.warning ? `${outcome} ${result.warning}` : outcome)
-      },
-    })
+  const runSync = () => {
+    setMessage(null)
+    sync.mutate(undefined, { onSuccess: setSynced })
   }
+  useKeyboardShortcuts({ r: runSync })
+  const needsLink = synced !== null && !isPullRequest && synced.unsent_comments > 0
 
   return (
     <header className="review-header">
@@ -84,8 +93,8 @@ function ReviewHeader({ review, extra }: { review: ReviewDetail; extra?: ReactNo
         )}
       </div>
       <div className="review-actions">
-        <button type="button" onClick={runRefresh} disabled={refresh.isPending} title={`${isPullRequest ? PULL_CHECK_TITLE : CHECK_TITLE} Shortcut: r`}>
-          {refresh.isPending ? 'Checking...' : 'Check for new commits'}
+        <button type="button" onClick={runSync} disabled={sync.isPending} title={`${isPullRequest ? PULL_SYNC_TITLE : SYNC_TITLE} Shortcut: r`}>
+          {syncLabel(review, sync.isPending)}
         </button>
         <button
           type="button"
@@ -93,15 +102,21 @@ function ReviewHeader({ review, extra }: { review: ReviewDetail; extra?: ReactNo
           title={MARK_TITLE}
           disabled={finish.isPending}
           onClick={() => {
-            finish.mutate(undefined, { onSuccess: () => { setMessage('Marked as reviewed. "Since my last review" now shows only what changes after this point.') } })
+            finish.mutate(undefined, {
+              onSuccess: () => {
+                setSynced(null)
+                setMessage('Marked as reviewed. "Since my last review" now shows only what changes after this point.')
+              },
+            })
           }}
         >
           Mark as reviewed
         </button>
-        {extra}
       </div>
       {message && <p className="notice">{message}</p>}
-      {(refresh.error ?? finish.error) && <ErrorNote message={describeError(refresh.error ?? finish.error)} />}
+      {synced && <SyncSummary result={synced} />}
+      {needsLink && <LinkPullRequest reviewId={review.id} unsent={synced.unsent_comments} onLinked={runSync} />}
+      {(sync.error ?? finish.error) && <ErrorNote message={describeError(sync.error ?? finish.error)} />}
     </header>
   )
 }
@@ -115,7 +130,6 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const groups = groupByFile(unitList)
   const [focusedIndex, setFocusedIndex] = useState(0)
   const actions = useRef(new Map<number, UnitActions>())
-  const refresh = useRefresh(reviewId)
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= WIDE_LAYOUT_PX)
 
   const register = useCallback((unitId: number, unitActions: UnitActions | null) => {
@@ -147,7 +161,6 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     },
     a: () => { if (focusedUnit) actions.current.get(focusedUnit.id)?.toggleApproval() },
     c: () => { if (focusedUnit) actions.current.get(focusedUnit.id)?.comment() },
-    r: () => { refresh.mutate(true) },
   })
 
   if (review.isPending) {
@@ -161,7 +174,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
 
   return (
     <div className="review-page">
-      <ReviewHeader review={data} extra={extensions.headerActions} />
+      <ReviewHeader review={data} />
       {data.pull_request && <PullRequestDescription pull={data.pull_request} />}
       <section className="review-summary">
         <ProgressBar percent={percent} />
@@ -180,7 +193,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           ))}
         </div>
         <div className="summary-row">
-          <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r check for new commits. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>
+          <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>
           {extensions.sidePanel && (
             <button type="button" aria-pressed={panelOpen} onClick={() => { setPanelOpen(!panelOpen) }}>
               {panelOpen ? `Hide ${extensions.sidePanel.label}` : `Show ${extensions.sidePanel.label}`}

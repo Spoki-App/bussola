@@ -215,3 +215,52 @@ def test_range_leaving_the_pull_request_diff_names_its_lines(api: ApiClient, git
     body = fake_gh.api_posts("/pulls/7/comments")[0]["input"]["body"]
     assert body.startswith("On `total`, lines 2-4:")
     assert "    count = len(items)\n    result = sum(items)\n    return result" in body
+
+
+def sync(api: ApiClient, review: int) -> Json:
+    return api.call("POST", f"/reviews/{review}/sync")
+
+
+def test_sync_checks_for_commits_then_sends_unsent_comments(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
+    review = setup_review(api, git_repo, fake_gh)
+    link(api, review)
+    comment_on(api, review, "app.py::total", 2, "Rename `result`?")
+    assert api.call("GET", f"/reviews/{review}")["unsent_comments"] == 1
+
+    result = sync(api, review)
+
+    assert result["refresh"]["revision"]["number"] == 1
+    assert [outcome["status"] for outcome in result["published"]["outcomes"]] == ["published"]
+    assert fake_gh.api_posts("/reviews")[0]["input"]["event"] == "COMMENT"
+    assert (result["publish_error"], result["unsent_comments"]) == (None, 0)
+    assert api.call("GET", f"/reviews/{review}")["unsent_comments"] == 0
+
+
+def test_sync_without_unsent_comments_sends_nothing(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
+    review = setup_review(api, git_repo, fake_gh)
+    link(api, review)
+
+    assert sync(api, review)["published"] is None
+    assert fake_gh.api_posts("/reviews") == []
+
+
+def test_sync_of_an_unlinked_review_keeps_comments_unsent(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
+    review = setup_review(api, git_repo, fake_gh)
+    comment_on(api, review, "app.py::total", 2, "Rename `result`?")
+
+    result = sync(api, review)
+
+    assert (result["published"], result["unsent_comments"]) == (None, 1)
+
+
+def test_sync_reports_why_comments_were_not_sent(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
+    review = setup_review(api, git_repo, fake_gh)
+    link(api, review)
+    comment_on(api, review, "app.py::total", 2, "Rename `result`?")
+    git_repo.commit({"app.py": HEAD + "\n\ndef extra():\n    return 1\n"})
+
+    result = sync(api, review)
+
+    assert result["refresh"]["created"] is True
+    assert "differs from the reviewed head" in result["publish_error"]
+    assert result["unsent_comments"] == 1

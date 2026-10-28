@@ -30,7 +30,7 @@ describe('GitHubSyncStatus', () => {
     expect(screen.queryByText(/New commits/)).not.toBeInTheDocument()
   })
 
-  it('points to Check for new commits when the pull request moved on', async () => {
+  it('points to Sync when the pull request moved on', async () => {
     renderStatus({ changes: 1, new_commits: true, state: 'OPEN' })
 
     expect(await screen.findByText(/New commits were pushed/)).toBeInTheDocument()

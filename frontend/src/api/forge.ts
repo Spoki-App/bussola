@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getJson, postJson, putJson } from './client'
 import { keys } from './hooks'
 import { threadsKey } from './threads'
-import type { ConversationSync, ForgeOverview, PublishResult } from './types'
+import type { ConversationSync, ForgeOverview, SyncResult } from './types'
 
 const forgeKey = (reviewId: number) => ['forge', reviewId] as const
 
@@ -24,11 +24,14 @@ export function useLinkPullRequest(reviewId: number) {
   })
 }
 
-export function usePublish(reviewId: number) {
+export function useSync(reviewId: number) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (draft: boolean) => postJson<PublishResult>(`/reviews/${String(reviewId)}/forge/publish`, { draft }),
-    onSettled: () => client.invalidateQueries({ queryKey: forgeKey(reviewId) }),
+    mutationFn: () => postJson<SyncResult>(`/reviews/${String(reviewId)}/sync`),
+    onSuccess: () =>
+      Promise.all(
+        [keys.units(reviewId), keys.diffs(reviewId), keys.review(reviewId), threadsKey(reviewId), forgeKey(reviewId)].map((queryKey) => client.invalidateQueries({ queryKey })),
+      ),
   })
 }
 

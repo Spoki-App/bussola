@@ -1,6 +1,18 @@
 from pathlib import Path
 
-from rtool.api.schemas import ApprovalOut, RepoOut, ReviewDetailOut, ReviewOut, ReviewPullOut, RevisionOut, RowApprovalOut, UnitOut
+from rtool.api.schemas import (
+    ApprovalOut,
+    PublishOut,
+    PublishOutcomeOut,
+    RepoOut,
+    ReviewDetailOut,
+    ReviewOut,
+    ReviewPullOut,
+    RevisionOut,
+    RowApprovalOut,
+    UnitOut,
+)
+from rtool.forge.publish import PublishResult, pending_comment_count
 from rtool.review.context import ReviewContext
 from rtool.review.diffs import DiffMode
 from rtool.review.overview import UnitView, count_states, unit_views
@@ -59,7 +71,14 @@ def _pull_out(context: ReviewContext) -> ReviewPullOut | None:
 def review_detail_out(context: ReviewContext, repo: Repo) -> ReviewDetailOut:
     summary = review_out(context, repo)
     revisions = [revision_out(revision) for revision in context.store.reviews.list_revisions(context.review.id)]
-    return ReviewDetailOut(**summary.model_dump(), revisions=revisions)
+    latest = context.store.reviews.latest_revision(context.review.id)
+    unsent = pending_comment_count(context, latest) if latest else 0
+    return ReviewDetailOut(**summary.model_dump(), revisions=revisions, unsent_comments=unsent)
+
+
+def publish_out(result: PublishResult) -> PublishOut:
+    outcomes = [PublishOutcomeOut(comment_ids=list(item.comment_ids), status=item.status.value, detail=item.detail, url=item.url) for item in result.outcomes]
+    return PublishOut(review_url=result.review_url, outcomes=outcomes)
 
 
 def unit_out(view: UnitView, open_threads: int) -> UnitOut:
