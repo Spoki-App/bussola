@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { memo, useEffect, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/hooks'
@@ -28,7 +28,7 @@ interface Props {
   reviewId: number
   unit: Unit
   focused: boolean
-  onFocus: () => void
+  onFocus: (unitId: number) => void
   register: (unitId: number, actions: UnitActions | null) => void
   onComment?: (target: CommentTarget) => void
   onCommentSelectEnd?: () => void
@@ -41,7 +41,7 @@ const APPROVE_LABELS = { approve: 'Approve', approve_under_name: 'Approve under 
 
 const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', base: 'Base → head' }
 
-export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, nested = false }: Props) {
+export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, nested = false }: Props) {
   const todo = unit.todo
   const [expanded, setExpanded] = useState(todo)
   const [wasTodo, setWasTodo] = useState(todo)
@@ -126,7 +126,7 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
   const canSwitchMode = diff.data?.available_modes.includes('approved') ?? false
 
   return (
-    <article id={`unit-${String(unit.id)}`} className={`unit-card${focused ? ' focused' : ''}`} onClick={onFocus}>
+    <article id={`unit-${String(unit.id)}`} className={`unit-card${focused ? ' focused' : ''}`} onClick={() => { onFocus(unit.id) }}>
       <header className="unit-header">
         <button type="button" className="disclosure" aria-expanded={expanded} aria-label={expanded ? 'Collapse unit' : 'Expand unit'} onClick={() => { setExpanded(!expanded) }}>
           {expanded ? '▾' : '▸'}
@@ -196,4 +196,4 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
       )}
     </article>
   )
-}
+})

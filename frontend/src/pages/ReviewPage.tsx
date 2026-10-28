@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useSync } from '../api/forge'
@@ -126,11 +126,18 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const [filter, setFilter] = useState<UnitFilter>('all')
   const revisionId = review.data?.latest_revision?.id
   const units = useUnits(reviewId, revisionId, filter)
-  const unitList = units.data ?? []
-  const groups = groupByFile(unitList)
+  const unitList = useMemo(() => units.data ?? [], [units.data])
+  const groups = useMemo(() => groupByFile(unitList).map((group) => ({ ...group, tree: buildUnitTree(group.units) })), [unitList])
   const [focusedIndex, setFocusedIndex] = useState(0)
   const actions = useRef(new Map<number, UnitActions>())
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= WIDE_LAYOUT_PX)
+
+  const focusUnit = useCallback(
+    (unitId: number) => {
+      setFocusedIndex(unitList.findIndex((unit) => unit.id === unitId))
+    },
+    [unitList],
+  )
 
   const register = useCallback((unitId: number, unitActions: UnitActions | null) => {
     if (unitActions) {
@@ -206,7 +213,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
             <section key={group.path} id={`file-${group.path}`} className="file-section">
               <FileHeader reviewId={reviewId} path={group.path} oldPath={group.oldPath} complete={group.complete} actions={extensions.fileActions?.(group.path)} />
               <UnitTree
-                nodes={buildUnitTree(group.units)}
+                nodes={group.tree}
                 renderUnit={(unit, nested) => (
                   <UnitCard
                     key={unit.id}
@@ -214,7 +221,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                     unit={unit}
                     nested={nested}
                     focused={focusedUnit?.id === unit.id}
-                    onFocus={() => { setFocusedIndex(unitList.indexOf(unit)) }}
+                    onFocus={focusUnit}
                     register={register}
                     onComment={extensions.onComment}
                     onCommentSelectEnd={extensions.onCommentSelectEnd}
