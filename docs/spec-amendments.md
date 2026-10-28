@@ -92,6 +92,18 @@ PUT    /reviews/{review_id}/forge              {pr_number}
 POST   /reviews/{review_id}/forge/publish      {draft: bool} -> result for each comment (published, updated, failed with reason)
 ```
 
+## A3. Choosing a repository folder from the UI
+
+Browsers do not reveal the absolute path of a folder chosen with their native picker, so the home page has a folder browser served by rtool itself:
+
+```
+GET    /directories?path=                      folders inside path (default: the home directory), marking git repositories
+```
+
+- It returns only the names and paths of non-hidden subdirectories, whether each contains `.git`, and the parent path. It never returns file names or file contents.
+- It sits behind the same token and Host checks as the rest of the API.
+- This is the one exception to section 11's rule about not reading the filesystem with paths from the input: only directory metadata is read.
+
 ## Plan changes
 
 - A1 is part of M2 (model, states, API) and M3 (selection UI).

@@ -189,3 +189,18 @@ export interface PublishResult {
   review_url: string | null
   outcomes: PublishOutcome[]
 }
+
+export interface DirectoryEntry {
+  name: string
+  path: string
+  is_repo: boolean
+}
+
+export interface DirectoryListing {
+  path: string
+  parent: string | null
+  home: string
+  is_repo: boolean
+  entries: DirectoryEntry[]
+  truncated: boolean
+}

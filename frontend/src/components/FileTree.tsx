@@ -22,7 +22,9 @@ export function FileTree({ groups, onSelect }: Props) {
           return (
             <li key={group.path} className={group.complete ? 'complete' : ''}>
               <button type="button" onClick={() => { onSelect(group.path) }} title={group.path}>
-                <span className="file-dir">{directory}</span>
+                <span className="file-dir">
+                  <bdi dir="ltr">{directory}</bdi>
+                </span>
                 <span className="file-name">{name}</span>
                 {group.complete ? <span className="check" aria-label="All approved">{'✓'}</span> : <span className="count">{group.todo}</span>}
               </button>

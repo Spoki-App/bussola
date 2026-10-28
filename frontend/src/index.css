@@ -745,3 +745,100 @@ button.link {
 .outcome-updated strong {
   color: var(--success);
 }
+
+.picker {
+  width: min(560px, calc(100vw - 32px));
+  height: min(600px, calc(100vh - 64px));
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.picker[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.picker::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.picker-header,
+.picker-path,
+.picker-current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.picker-header {
+  justify-content: space-between;
+}
+
+.picker-path code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.picker-current {
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--success-bg);
+}
+
+.picker-list {
+  flex: 1;
+  min-height: 160px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.picker-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px 2px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.picker-list li:last-child {
+  border-bottom: none;
+}
+
+.picker-list li.muted {
+  padding: 12px;
+}
+
+.picker-entry {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  text-align: left;
+}
+
+.picker-entry:hover {
+  background: var(--bg-subtle);
+}
+
+.picker-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

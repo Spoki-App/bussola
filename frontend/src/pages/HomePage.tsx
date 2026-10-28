@@ -4,6 +4,7 @@ import { describeError } from '../api/client'
 import { useAddRepo, useCreateReview, useRefs, useRepos, useReviews } from '../api/hooks'
 import type { Refs, Repo } from '../api/types'
 import { ErrorNote, ProgressBar } from '../components/Badges'
+import { DirectoryPicker } from '../components/DirectoryPicker'
 import { Link } from '../Link'
 import { navigate } from '../navigation'
 import { progressPercent } from '../review/logic'
@@ -17,7 +18,7 @@ export function HomePage() {
       <h1>Repositories</h1>
       <AddRepoForm />
       {repos.error && <ErrorNote message={describeError(repos.error)} />}
-      {repos.data?.length === 0 && <p className="muted">No repositories yet. Add one by path, or run `rtool serve` inside a repository.</p>}
+      {repos.data?.length === 0 && <p className="muted">No repositories yet. Add one with Browse, or run `rtool serve` inside a repository.</p>}
       {repos.data?.map((repo) => <RepoSection key={repo.id} repo={repo} />)}
     </div>
   )
@@ -25,10 +26,18 @@ export function HomePage() {
 
 function AddRepoForm() {
   const [path, setPath] = useState('')
+  const [browsing, setBrowsing] = useState(false)
   const addRepo = useAddRepo()
+  const add = (target: string, done: () => void) => {
+    addRepo.mutate(target.trim(), { onSuccess: done })
+  }
   const submit = (event: SubmitEvent) => {
     event.preventDefault()
-    addRepo.mutate(path.trim(), { onSuccess: () => { setPath('') } })
+    add(path, () => { setPath('') })
+  }
+  const openPicker = () => {
+    addRepo.reset()
+    setBrowsing(true)
   }
   return (
     <form className="inline-form" onSubmit={submit}>
@@ -37,7 +46,18 @@ function AddRepoForm() {
       <button type="submit" disabled={!path.trim() || addRepo.isPending}>
         Add
       </button>
-      {addRepo.error && <ErrorNote message={describeError(addRepo.error)} />}
+      <button type="button" className="primary" onClick={openPicker}>
+        Browse...
+      </button>
+      {!browsing && addRepo.error && <ErrorNote message={describeError(addRepo.error)} />}
+      {browsing && (
+        <DirectoryPicker
+          busy={addRepo.isPending}
+          error={addRepo.error}
+          onSelect={(target) => { add(target, () => { setBrowsing(false) }) }}
+          onClose={() => { setBrowsing(false) }}
+        />
+      )}
     </form>
   )
 }

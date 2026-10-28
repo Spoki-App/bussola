@@ -272,3 +272,18 @@ class PublishOutcomeOut(BaseModel):
 class PublishOut(BaseModel):
     review_url: str | None
     outcomes: list[PublishOutcomeOut]
+
+
+class DirectoryEntryOut(BaseModel):
+    name: str
+    path: str
+    is_repo: bool
+
+
+class DirectoryListingOut(BaseModel):
+    path: str
+    parent: str | None
+    home: str
+    is_repo: bool
+    entries: list[DirectoryEntryOut]
+    truncated: bool

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { deleteJson, getJson, postJson } from './client'
 import type {
   ApprovalRequest,
+  DirectoryListing,
   DiffMode,
   RefreshResult,
   Refs,
@@ -39,6 +40,15 @@ export function useAddRepo() {
   return useMutation({
     mutationFn: (path: string) => postJson<Repo>('/repos', { path }),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.repos }),
+  })
+}
+
+export function useDirectories(path: string | undefined) {
+  return useQuery({
+    queryKey: ['directories', path ?? ''],
+    queryFn: () => getJson<DirectoryListing>(path === undefined ? '/directories' : `/directories?path=${encodeURIComponent(path)}`),
+    placeholderData: (previous) => previous,
+    retry: false,
   })
 }
 
