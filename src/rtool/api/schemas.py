@@ -344,6 +344,12 @@ class PullRequestListOut(BaseModel):
     pulls: list[PullRequestRowOut]
 
 
+class ConversationSyncOut(BaseModel):
+    changes: int
+    new_commits: bool
+    state: str
+
+
 class PullSyncOut(BaseModel):
     updated: int
     closed: int

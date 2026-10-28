@@ -4,7 +4,7 @@ import { deleteJson, getJson, patchJson, postJson } from './client'
 import { keys } from './hooks'
 import type { Comment, NewThreadRequest, Thread, ThreadStatus } from './types'
 
-const threadsKey = (reviewId: number) => ['threads', reviewId] as const
+export const threadsKey = (reviewId: number) => ['threads', reviewId] as const
 
 export function useThreads(reviewId: number, revisionId: number | undefined) {
   return useQuery({

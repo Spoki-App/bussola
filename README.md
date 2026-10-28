@@ -77,9 +77,11 @@ For a repository with a GitHub remote, **Pull requests** on its card lists the o
 - **Sync reviews** fetches the latest commits of every pull request you are reviewing in that repository and records new revisions. Pull requests that were closed or merged are marked as such.
 - On a pull request review, **Check for new commits** does the same for that one pull request.
 - The pull request's description is shown under the review header (collapsible, long ones are cut short until you click **Show all**) and is updated at every sync.
-- Comments already on GitHub are brought into the review each time: line comments become threads on the same lines (or on the file when the line is outdated or outside the changed units), conversation comments and review summaries become review comments, and resolved threads stay resolved. Your own GitHub comments show as yours, and replying in rtool to an imported thread sends the reply to GitHub. Comments that came from GitHub link back to it. Edits made on GitHub to comments already imported are not picked up.
+- Comments already on GitHub are brought into the review each time: line comments become threads on the same lines (or on the file when the line is outdated or outside the changed units), conversation comments and review summaries become review comments, and resolved threads stay resolved. Your own GitHub comments show as yours, and replying in rtool to an imported thread sends the reply to GitHub. Comments that came from GitHub link back to it.
+- While a pull request review is open, rtool syncs its comments with GitHub every 3 minutes, and again when you come back to the page. New comments and replies are added, comments edited on GitHub are updated (unless you edited them in rtool and have not sent the edit yet), and threads resolved or reopened on GitHub follow. The header says when the last sync happened, and tells you when new commits were pushed so you can **Check for new commits**. Comments deleted on GitHub stay in rtool.
+- Resolving or reopening a thread that is also on GitHub does the same on GitHub. If GitHub refuses (for example, you lack write access), the thread stays as it was and the error is shown.
 
-rtool only contacts GitHub when you press one of these buttons.
+rtool contacts GitHub only when you press one of these buttons, or for the automatic sync while a pull request review is open.
 
 ### Sending comments to GitHub
 
@@ -88,7 +90,7 @@ The "GitHub" button links the review to a pull request and sends the comments yo
 - Lines inside the pull request diff become review comments on that line.
 - Other lines, outdated threads and file threads become file comments that quote the line.
 - Review threads go into the review body.
-- Later replies and edits are sent as replies and edits of the published comments. Deleting or resolving a thread locally does not change GitHub.
+- Later replies and edits are sent as replies and edits of the published comments. Deleting a thread locally does not change GitHub; resolving or reopening one that is on GitHub does.
 - Sending is blocked while the pull request head differs from the reviewed commit, because line numbers would not match.
 - "Keep as draft" leaves the review pending on GitHub. File comments are still posted immediately, because GitHub cannot keep them in a draft.
 
@@ -123,7 +125,7 @@ The server is meant for one person on one machine.
 - **Host check:** requests whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` are rejected, which blocks DNS rebinding.
 - **Git refs and files:** refs are validated with `git rev-parse --verify --end-of-options` before use. File contents are read only from the git object database.
 - **Opening links:** GitHub links are opened by the server in your default browser, as a new tab, so they work even when the rtool page runs in an app-style window. The server only opens `https://github.com` addresses.
-- **Outbound traffic:** the only network access is `git fetch` when you ask for it and `gh` when you use the GitHub panel.
+- **Outbound traffic:** the only network access is `git fetch` when you ask for it and `gh` when you use the GitHub panel or have a pull request review open.
 
 ## Development
 

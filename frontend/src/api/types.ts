@@ -227,6 +227,12 @@ export interface PublishOutcome {
   url: string | null
 }
 
+export interface ConversationSync {
+  changes: number
+  new_commits: boolean
+  state: string
+}
+
 export interface PublishResult {
   review_url: string | null
   outcomes: PublishOutcome[]

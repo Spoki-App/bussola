@@ -57,12 +57,22 @@ query($owner: String!, $name: String!, $number: Int!) {
       reviews(first: 100) { nodes { databaseId author { login } body submittedAt url } }
       reviewThreads(first: 100) {
         nodes {
-          isResolved path line startLine diffSide
+          id isResolved path line startLine diffSide
           comments(first: 100) { nodes { databaseId author { login } body createdAt url } }
         }
       }
     }
   }
+}
+"""
+RESOLVE_THREAD_MUTATION = """
+mutation($threadId: ID!) {
+  resolveReviewThread(input: {threadId: $threadId}) { thread { isResolved } }
+}
+"""
+UNRESOLVE_THREAD_MUTATION = """
+mutation($threadId: ID!) {
+  unresolveReviewThread(input: {threadId: $threadId}) { thread { isResolved } }
 }
 """
 ISSUE_COMMENT_PREFIX = "issue-"
@@ -151,6 +161,10 @@ class GitHubAdapter:
         viewer: JsonObject = data.get("viewer") or {}
         return Conversation(str(viewer.get("login", "")), str(pull.get("headRefOid", "")), sorted(notes, key=lambda note: note.created_at), threads)
 
+    def set_thread_resolved(self, thread_id: str, resolved: bool) -> None:
+        mutation = RESOLVE_THREAD_MUTATION if resolved else UNRESOLVE_THREAD_MUTATION
+        self._json(["api", "graphql", "-f", f"query={mutation}", "-f", f"threadId={thread_id}"])
+
     def _json(self, args: list[str], payload: JsonObject | None = None) -> Any:
         result = self._run(args, payload=payload)
         try:
@@ -212,6 +226,7 @@ def _remote_thread(item: JsonObject) -> RemoteThread:
         side=DiffSide.LEFT if item.get("diffSide") == DiffSide.LEFT else DiffSide.RIGHT,
         resolved=bool(item.get("isResolved", False)),
         comments=[_note(comment, "", "createdAt") for comment in _nodes(item.get("comments"))],
+        remote_id=str(item.get("id") or ""),
     )
 
 

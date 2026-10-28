@@ -6,6 +6,7 @@ import type { DiffRow, ReviewDetail, Unit, UnitDiff, UnitFilter } from '../api/t
 import { ErrorNote, ProgressBar } from '../components/Badges'
 import { ExternalLink } from '../components/ExternalLink'
 import { FileTree } from '../components/FileTree'
+import { GitHubSyncStatus } from '../components/GitHubSyncStatus'
 import { PullRequestDescription } from '../components/PullRequestDescription'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
@@ -74,6 +75,7 @@ function ReviewHeader({ review, extra }: { review: ReviewDetail; extra?: ReactNo
             {review.pull_request.author && ` \u00b7 by ${review.pull_request.author}`}
           </p>
         )}
+        {isPullRequest && <GitHubSyncStatus reviewId={review.id} headSha={revision?.head_sha} />}
         {revision && (
           <p className="muted">
             {`Revision ${String(revision.number)} \u00b7 ${shortSha(revision.head_sha)} \u00b7 checked ${new Date(revision.created_at).toLocaleString()}`}

@@ -1,10 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 
 from rtool.api.deps import ReviewerDep, StoreDep, resolve_revision, snapshot_of
 from rtool.api.schemas import CommentIn, CommentOut, ReviewerOut, ThreadAnchorOut, ThreadDeletedOut, ThreadIn, ThreadOut, ThreadPatch
+from rtool.api.state import app_state
 from rtool.errors import NotFoundError
+from rtool.forge.conversation import push_resolution
 from rtool.review.anchoring import line_count
 from rtool.review.context import ReviewContext
 from rtool.review.rows import Side
@@ -80,8 +82,10 @@ def post_comment(thread_id: str, body: CommentIn, context: ThreadContextDep) -> 
 
 
 @router.patch("/threads/{thread_id}")
-def patch_thread(thread_id: str, body: ThreadPatch, context: ThreadContextDep) -> ThreadOut:
+def patch_thread(thread_id: str, body: ThreadPatch, context: ThreadContextDep, request: Request) -> ThreadOut:
     thread = get_thread(context, thread_id)
+    if thread.status != body.status.value:
+        push_resolution(context, app_state(request).forge, thread, body.status == ThreadStatus.RESOLVED)
     thread.status = body.status.value
     context.store.commit()
     return _single_view(context, thread.id, None)

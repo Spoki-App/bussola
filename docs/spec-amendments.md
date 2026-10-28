@@ -82,7 +82,7 @@ Sending review comments to a GitHub pull request is now in scope for v1. It is o
 - The review is sent with event `COMMENT`, or left `PENDING` (draft) if the user ticks "keep as draft on GitHub".
 - If the PR head SHA differs from the head SHA of the current revision, sending is blocked with a message asking to push or refresh, because line numbers would not match.
 - Table `published_comments`: `comment_id`, `provider`, `remote_id`, `remote_url`, `published_at`, `published_body_hash`. A comment edited after publishing is updated on GitHub at the next send; a comment deleted locally is not deleted on GitHub.
-- Resolving a thread is not propagated.
+- Resolving a thread is not propagated (changed by A6).
 
 ### API
 
@@ -131,7 +131,21 @@ This amends A2, where publishing was one-way: rtool now also reads the comments 
 - **Mapping:** a review thread becomes a unit thread on the same lines when the pull request head equals the reviewed head and the lines fall inside a changed unit; otherwise it becomes a file thread. Conversation comments and non-empty review summaries become review threads.
 - **Identity:** every imported comment is recorded in `published_comments` with its GitHub id (`issue-<id>` and `review-<id>` for comments that cannot be replied to), so nothing is imported twice and nothing imported is sent back. A review sent from rtool is recorded as `review-<id>` for the same reason.
 - **Authors:** the GitHub user running `gh` maps to the current reviewer; others become reviewers named after their login (`<login>@users.noreply.github.com`).
-- **State:** the resolved state of imported threads follows GitHub at every import. Edits made on GitHub after import are not applied.
+- **State:** the resolved state of imported threads follows GitHub at every import. Edits made on GitHub after import are not applied (changed by A6).
+
+## A6. Automatic comment sync and resolution on GitHub
+
+This amends A2 and A5.
+
+```
+POST   /reviews/{review_id}/forge/sync         import the pull request conversation into the latest revision -> {changes, new_commits, state}
+```
+
+- **Automatic sync:** while a pull request review is open and visible, the page calls the sync endpoint every 3 minutes and when the page regains focus (at most once a minute). It reads the pull request and its conversation with `gh` (two calls) and never fetches commits; `new_commits` tells the page that the pull request head differs from the reviewed head, and the page suggests **Check for new commits**.
+- **Edits:** `published_comments.remote_body_hash` records the GitHub body last seen. When GitHub's body changes and the local comment was not edited since it was last sent or imported, the local comment takes GitHub's body and is marked edited. A GitHub comment that stands for several rtool comments (one review body) is never applied back. Rows written by a publish start without a hash, so the next sync only records it.
+- **Deletions** on GitHub are not applied.
+- **Resolution:** changing the status of a thread with a comment on GitHub resolves or unresolves the GitHub review thread (`resolveReviewThread` / `unresolveReviewThread` mutations through `gh api graphql`). If the mutation fails, the local status is not changed and the error is returned (502).
+- **Network:** this replaces "GitHub is only contacted on an explicit user action" in A4 for the duration of an open pull request review.
 
 ## Plan changes
 

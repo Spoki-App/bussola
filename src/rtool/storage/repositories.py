@@ -67,7 +67,7 @@ class ForgeRepository(Protocol):
     def links_for_repo(self, repo_id: int) -> list[ForgeLink]: ...
     def save_link(self, link: ForgeLink) -> ForgeLink: ...
     def published(self, comment_ids: list[str]) -> dict[str, PublishedComment]: ...
-    def published_by_remote(self, provider: str, remote_ids: list[str]) -> dict[str, PublishedComment]: ...
+    def published_by_remote(self, provider: str, remote_ids: list[str]) -> list[PublishedComment]: ...
     def save_published(self, published: PublishedComment) -> PublishedComment: ...
 
 
@@ -251,9 +251,9 @@ class SqlForgeRepository:
         rows = self._session.scalars(select(PublishedComment).where(PublishedComment.comment_id.in_(comment_ids)))
         return {row.comment_id: row for row in rows}
 
-    def published_by_remote(self, provider: str, remote_ids: list[str]) -> dict[str, PublishedComment]:
+    def published_by_remote(self, provider: str, remote_ids: list[str]) -> list[PublishedComment]:
         query = select(PublishedComment).where(PublishedComment.provider == provider, PublishedComment.remote_id.in_(remote_ids))
-        return {row.remote_id: row for row in self._session.scalars(query) if row.remote_id is not None}
+        return list(self._session.scalars(query))
 
     def save_published(self, published: PublishedComment) -> PublishedComment:
         merged = self._session.merge(published)

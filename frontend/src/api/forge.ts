@@ -1,9 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { getJson, postJson, putJson } from './client'
-import type { ForgeOverview, PublishResult } from './types'
+import { keys } from './hooks'
+import { threadsKey } from './threads'
+import type { ConversationSync, ForgeOverview, PublishResult } from './types'
 
 const forgeKey = (reviewId: number) => ['forge', reviewId] as const
+
+export const GITHUB_SYNC_INTERVAL_MS = 3 * 60 * 1000
+const GITHUB_SYNC_STALE_MS = 60 * 1000
 
 export function useForge(reviewId: number, enabled: boolean) {
   return useQuery({ queryKey: forgeKey(reviewId), queryFn: () => getJson<ForgeOverview>(`/reviews/${String(reviewId)}/forge`), enabled, retry: false })
@@ -24,5 +29,22 @@ export function usePublish(reviewId: number) {
   return useMutation({
     mutationFn: (draft: boolean) => postJson<PublishResult>(`/reviews/${String(reviewId)}/forge/publish`, { draft }),
     onSettled: () => client.invalidateQueries({ queryKey: forgeKey(reviewId) }),
+  })
+}
+
+export function useGitHubSync(reviewId: number, headSha: string | undefined) {
+  const client = useQueryClient()
+  return useQuery({
+    queryKey: ['github-sync', reviewId, headSha],
+    queryFn: async () => {
+      const result = await postJson<ConversationSync>(`/reviews/${String(reviewId)}/forge/sync`)
+      const stale = result.changes > 0 ? [keys.review(reviewId), keys.units(reviewId), threadsKey(reviewId), forgeKey(reviewId)] : [keys.review(reviewId)]
+      await Promise.all(stale.map((queryKey) => client.invalidateQueries({ queryKey })))
+      return result
+    },
+    enabled: headSha !== undefined,
+    refetchInterval: GITHUB_SYNC_INTERVAL_MS,
+    staleTime: GITHUB_SYNC_STALE_MS,
+    retry: false,
   })
 }

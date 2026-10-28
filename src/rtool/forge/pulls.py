@@ -41,6 +41,13 @@ class SyncResult:
     failed: list[str]
 
 
+@dataclass(frozen=True)
+class ConversationSync:
+    changes: int
+    new_commits: bool
+    state: str
+
+
 def pull_ref(number: int) -> str:
     return f"{PULL_REF_PREFIX}{number}"
 
@@ -118,6 +125,16 @@ def sync_review(session: ForgeSession, review: Review, link: ForgeLink) -> Refre
     result = refresh_review(store, review, git_repo, hooks=REVISION_HOOKS)
     import_conversation(ReviewContext(store, review, session.reviewer), adapter, link, result.revision)
     return result
+
+
+def sync_conversation(context: ReviewContext, adapter: ForgeAdapter, link: ForgeLink) -> ConversationSync:
+    revision = context.store.reviews.latest_revision(context.review.id)
+    if revision is None:
+        raise ConflictError("This review has no revision yet")
+    pull = adapter.pull_request(link.repository, link.pr_number)
+    _save_link(context.store, context.review, adapter.provider, link.repository, pull)
+    changes = import_conversation(context, adapter, link, revision)
+    return ConversationSync(changes, pull.head_sha != revision.head_sha, pull.state)
 
 
 def fetch_pull_request(git_repo: GitRepo, remote: GitHubRemote, pull: PullRequest) -> tuple[str, str]:

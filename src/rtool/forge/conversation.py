@@ -1,8 +1,10 @@
+import hashlib
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 
 from rtool.forge.base import Conversation, DiffSide, ForgeAdapter, RemoteNote, RemoteThread
-from rtool.forge.publish import body_hash
+from rtool.forge.publish import body_hash, is_comment_id
 from rtool.review.context import ReviewContext
 from rtool.review.rows import Side, unit_lines
 from rtool.review.threads import ThreadScope, ThreadStatus, anchor_to_unit
@@ -27,7 +29,21 @@ def import_conversation(context: ReviewContext, adapter: ForgeAdapter, link: For
         importer.import_note(note)
     for remote in conversation.threads:
         importer.import_thread(remote)
-    return importer.added
+    return importer.changes
+
+
+def push_resolution(context: ReviewContext, adapter: ForgeAdapter, thread: Thread, resolved: bool) -> None:
+    link = context.store.forge.link(context.review.id)
+    if link is None:
+        return
+    comment_ids = [comment.id for comment in context.store.threads.comments([thread.id])]
+    remote_ids = {record.remote_id for record in context.store.forge.published(comment_ids).values() if is_comment_id(record.remote_id)}
+    if not remote_ids:
+        return
+    conversation = adapter.pull_request_conversation(link.repository, link.pr_number)
+    remote = next((item for item in conversation.threads if any(note.remote_id in remote_ids for note in item.comments)), None)
+    if remote is not None and remote.remote_id and remote.resolved != resolved:
+        adapter.set_thread_resolved(remote.remote_id, resolved)
 
 
 def find_unit_target(snapshots: list[UnitSnapshot], remote: RemoteThread) -> UnitTarget | None:
@@ -53,16 +69,21 @@ class _Importer:
     provider: str
     conversation: Conversation
     revision: Revision
-    added: int = 0
-    _known: dict[str, PublishedComment] = field(default_factory=dict)
+    changes: int = 0
+    _known: dict[str, list[PublishedComment]] = field(default_factory=dict)
     _snapshots: list[UnitSnapshot] | None = None
 
     def __post_init__(self) -> None:
         notes = self.conversation.notes + [note for thread in self.conversation.threads for note in thread.comments]
-        self._known = self.context.store.forge.published_by_remote(self.provider, [note.remote_id for note in notes])
+        known: defaultdict[str, list[PublishedComment]] = defaultdict(list)
+        for record in self.context.store.forge.published_by_remote(self.provider, [note.remote_id for note in notes]):
+            if record.remote_id is not None:
+                known[record.remote_id].append(record)
+        self._known = dict(known)
 
     def import_note(self, note: RemoteNote) -> None:
         if note.remote_id in self._known:
+            self._follow_edit(note)
             return
         thread = self._add_thread(self._thread(note, ThreadScope.REVIEW, None))
         self._add_comment(thread, note)
@@ -70,14 +91,34 @@ class _Importer:
     def import_thread(self, remote: RemoteThread) -> None:
         if not remote.comments:
             return
-        known = next((self._known[note.remote_id] for note in remote.comments if note.remote_id in self._known), None)
+        known = next((self._known[note.remote_id][0] for note in remote.comments if note.remote_id in self._known), None)
         thread = self._existing_thread(known) if known else self._new_thread(remote)
         if thread is None:
             return
-        thread.status = (ThreadStatus.RESOLVED if remote.resolved else ThreadStatus.OPEN).value
+        status = (ThreadStatus.RESOLVED if remote.resolved else ThreadStatus.OPEN).value
+        if thread.status != status:
+            thread.status = status
+            self.changes += 1
         for note in remote.comments:
-            if note.remote_id not in self._known:
+            if note.remote_id in self._known:
+                self._follow_edit(note)
+            else:
                 self._add_comment(thread, note)
+
+    def _follow_edit(self, note: RemoteNote) -> None:
+        records = self._known[note.remote_id]
+        if len(records) != 1:
+            return
+        record, remote_hash = records[0], _text_hash(note.body)
+        previous, record.remote_body_hash = record.remote_body_hash, remote_hash
+        if previous is None or previous == remote_hash:
+            return
+        comment = self.context.store.threads.get_comment(record.comment_id)
+        if comment is None or comment.deleted_at is not None or record.published_body_hash != body_hash(self.context, comment):
+            return
+        comment.body, comment.edited_at = note.body, utcnow()
+        record.published_body_hash = body_hash(self.context, comment)
+        self.changes += 1
 
     def _existing_thread(self, record: PublishedComment) -> Thread | None:
         comment = self.context.store.threads.get_comment(record.comment_id)
@@ -113,8 +154,9 @@ class _Importer:
             Comment(thread_id=thread.id, author_id=self._author_id(note.author), body=note.body, created_at=_parse_time(note.created_at))
         )
         record = PublishedComment(comment.id, self.provider, note.remote_id, note.url or None, body_hash(self.context, comment))
-        self._known[note.remote_id] = self.context.store.forge.save_published(record)
-        self.added += 1
+        record.remote_body_hash = _text_hash(note.body)
+        self._known[note.remote_id] = [self.context.store.forge.save_published(record)]
+        self.changes += 1
 
     def _author_id(self, login: str) -> int:
         if login and login == self.conversation.viewer:
@@ -126,6 +168,10 @@ class _Importer:
         if self._snapshots is None:
             self._snapshots = self.context.store.reviews.snapshots(self.revision.id)
         return self._snapshots
+
+
+def _text_hash(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
 
 
 def _parse_time(value: str) -> datetime:

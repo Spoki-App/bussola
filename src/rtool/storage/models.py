@@ -224,3 +224,4 @@ class PublishedComment(Base):
     remote_url: Mapped[str | None] = mapped_column()
     published_body_hash: Mapped[str] = mapped_column()
     published_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+    remote_body_hash: Mapped[str | None] = mapped_column(default=None)

@@ -67,6 +67,17 @@ def main():
         log.write(json.dumps({"args": args, "input": payload}) + "\n")
     if args[:2] == ["auth", "status"]:
         sys.exit(0 if state.get("authenticated", True) else 1)
+    if args[:2] == ["api", "graphql"] and any("ReviewThread(input" in arg for arg in args):
+        if state.get("fail_resolve"):
+            fail("GraphQL: Resource not accessible by integration")
+        thread_id = next(arg.split("=", 1)[1] for arg in args if arg.startswith("threadId="))
+        resolved = not any("unresolveReviewThread" in arg for arg in args)
+        for thread in state.get("conversation", {}).get("reviewThreads", []):
+            if thread.get("id") == thread_id:
+                thread["isResolved"] = resolved
+        STATE.write_text(json.dumps(state))
+        print(json.dumps({"data": {"thread": {"isResolved": resolved}}}))
+        return
     if args[:2] == ["api", "graphql"] and any("pullRequest(number" in arg for arg in args):
         conversation = state.get("conversation", {})
         pull = {"headRefOid": conversation.get("headRefOid", ""), **{key: {"nodes": conversation.get(key, [])} for key in ("comments", "reviews", "reviewThreads")}}

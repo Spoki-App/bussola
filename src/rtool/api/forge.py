@@ -3,11 +3,22 @@ from dataclasses import asdict
 from fastapi import APIRouter, Request
 
 from rtool.api.deps import ContextDep, repo_of, resolve_revision
-from rtool.api.schemas import ForgeLinkIn, ForgeLinkOut, ForgeOut, ForgeStatusOut, PublishIn, PublishOut, PublishOutcomeOut, PullRequestOut
+from rtool.api.schemas import (
+    ConversationSyncOut,
+    ForgeLinkIn,
+    ForgeLinkOut,
+    ForgeOut,
+    ForgeStatusOut,
+    PublishIn,
+    PublishOut,
+    PublishOutcomeOut,
+    PullRequestOut,
+)
 from rtool.api.state import app_state
 from rtool.forge.base import PullRequest
 from rtool.forge.links import ForgeOverview, forge_overview, link_pull_request
-from rtool.forge.publish import publish_comments
+from rtool.forge.publish import publish_comments, require_link
+from rtool.forge.pulls import sync_conversation
 from rtool.review.context import ReviewContext
 from rtool.review.repos import open_repo
 
@@ -32,6 +43,13 @@ def publish(body: PublishIn, context: ContextDep, request: Request) -> PublishOu
     context.store.commit()
     outcomes = [PublishOutcomeOut(comment_ids=list(item.comment_ids), status=item.status.value, detail=item.detail, url=item.url) for item in result.outcomes]
     return PublishOut(review_url=result.review_url, outcomes=outcomes)
+
+
+@router.post("/reviews/{review_id}/forge/sync")
+def sync(context: ContextDep, request: Request) -> ConversationSyncOut:
+    result = sync_conversation(context, app_state(request).forge, require_link(context))
+    context.store.commit()
+    return ConversationSyncOut(changes=result.changes, new_commits=result.new_commits, state=result.state)
 
 
 def _overview(context: ReviewContext, request: Request) -> ForgeOut:
