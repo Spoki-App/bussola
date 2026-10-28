@@ -20,7 +20,7 @@ describe('CodeFontSettings', () => {
     fireEvent.change(screen.getByLabelText('Font'), { target: { value: 'JetBrains Mono' } })
 
     expect(document.documentElement.style.getPropertyValue('--mono')).toMatch(/^"JetBrains Mono"/)
-    expect(JSON.parse(window.localStorage.getItem('rtool.codeFont') ?? '{}')).toEqual({ family: 'JetBrains Mono', size: 12 })
+    expect(JSON.parse(window.localStorage.getItem('rtool.codeFont') ?? '{}')).toEqual({ family: 'JetBrains Mono', size: 12, ligatures: true, features: '' })
   })
 
   it('applies a size only once it is valid', () => {

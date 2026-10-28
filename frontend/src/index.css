@@ -79,6 +79,19 @@ code {
   font-size: 0.92em;
 }
 
+code,
+pre,
+.diff-line,
+.diff-decoration-content {
+  font-variant-ligatures: var(--code-ligatures, normal);
+  font-feature-settings: var(--code-features, normal);
+}
+
+.diff .diff-code {
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
 h1 {
   font-size: 1.5rem;
   margin: 0 0 12px;
@@ -568,6 +581,8 @@ textarea {
 }
 
 .diff {
+  --diff-font-family: var(--mono);
+
   font-family: var(--mono);
   font-size: var(--code-size);
 }

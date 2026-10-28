@@ -7,16 +7,18 @@ import {
   applyCodeFont,
   canListSystemFonts,
   clampSize,
+  featureSettings,
   fontStack,
   installedCommonFonts,
   isInstalled,
+  ligatureVariant,
   loadCodeFont,
   saveCodeFont,
   systemMonospaceFonts,
   type CodeFont,
 } from '../settings/codeFont'
 
-const PREVIEW = 'def total(items: list[int]) -> int:\n    return sum(i for i in items if i != 0)  # 0O1lI'
+const PREVIEW = 'def total(items: list[int]) -> int:\n    return sum(i for i in items if i != 0 and i >= -1)  # => === 0O1lI'
 
 export function CodeFontSettings() {
   const [open, setOpen] = useState(false)
@@ -104,7 +106,22 @@ function CodeFontPanel() {
         onChange={(event) => { changeSize(event.target.value) }}
         onBlur={() => { setSizeText(String(font.size)) }}
       />
-      <pre className="code-font-preview" style={{ fontFamily: fontStack(font), fontSize: `${String(font.size)}px` }}>
+      <label className="checkbox">
+        <input type="checkbox" checked={font.ligatures} onChange={(event) => { update({ ...font, ligatures: event.target.checked }) }} />
+        Ligatures (for fonts that have them, like Fira Code or JetBrains Mono)
+      </label>
+      <label htmlFor="code-font-features">Font features</label>
+      <input
+        id="code-font-features"
+        value={font.features}
+        placeholder="e.g. ss01 ss02 zero"
+        title="OpenType features to turn on, separated by spaces. Some fonts keep ligatures or alternate glyphs in stylistic sets (Monaspace: ss01 to ss08) or in dlig."
+        onChange={(event) => { update({ ...font, features: event.target.value }) }}
+      />
+      <pre
+        className="code-font-preview"
+        style={{ fontFamily: fontStack(font), fontSize: `${String(font.size)}px`, fontVariantLigatures: ligatureVariant(font), fontFeatureSettings: featureSettings(font) }}
+      >
         {PREVIEW}
       </pre>
       <button type="button" onClick={reset}>

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { DEFAULT_CODE_FONT, applyCodeFont, clampSize, fontStack, isInstalled, loadCodeFont, saveCodeFont } from './codeFont'
+import { DEFAULT_CODE_FONT, applyCodeFont, clampSize, featureSettings, fontStack, isInstalled, loadCodeFont, saveCodeFont } from './codeFont'
 
 function fakeContext(installed: string) {
   const context = {
@@ -17,7 +17,7 @@ describe('code font settings', () => {
   })
 
   it('puts the chosen family before the default stack and strips characters that would break CSS', () => {
-    expect(fontStack({ family: 'Fira "Code"; }', size: 12 })).toMatch(/^"Fira Code", ui-monospace/)
+    expect(fontStack({ ...DEFAULT_CODE_FONT, family: 'Fira "Code"; }' })).toMatch(/^"Fira Code", ui-monospace/)
     expect(fontStack(DEFAULT_CODE_FONT)).toMatch(/^ui-monospace/)
   })
 
@@ -26,18 +26,28 @@ describe('code font settings', () => {
   })
 
   it('remembers the choice and ignores unreadable storage', () => {
-    saveCodeFont({ family: 'JetBrains Mono', size: 14 })
-    expect(loadCodeFont()).toEqual({ family: 'JetBrains Mono', size: 14 })
+    saveCodeFont({ family: 'JetBrains Mono', size: 14, ligatures: false, features: 'ss01' })
+    expect(loadCodeFont()).toEqual({ family: 'JetBrains Mono', size: 14, ligatures: false, features: 'ss01' })
+
+    window.localStorage.setItem('rtool.codeFont', JSON.stringify({ family: 'Menlo', size: 13 }))
+    expect(loadCodeFont()).toEqual({ ...DEFAULT_CODE_FONT, family: 'Menlo', size: 13 })
 
     window.localStorage.setItem('rtool.codeFont', '{not json')
     expect(loadCodeFont()).toEqual(DEFAULT_CODE_FONT)
   })
 
   it('applies the font to the page', () => {
-    applyCodeFont({ family: 'Menlo', size: 15 })
+    applyCodeFont({ family: 'Menlo', size: 15, ligatures: false, features: '' })
 
     expect(document.documentElement.style.getPropertyValue('--mono')).toMatch(/^"Menlo"/)
     expect(document.documentElement.style.getPropertyValue('--code-size')).toBe('15px')
+    expect(document.documentElement.style.getPropertyValue('--code-ligatures')).toBe('none')
+  })
+
+  it('turns valid OpenType tags into feature settings and ligatures off explicitly', () => {
+    expect(featureSettings({ ...DEFAULT_CODE_FONT, features: 'ss01, ss02 bad! zero ss01' })).toBe('"ss01" 1, "ss02" 1, "zero" 1')
+    expect(featureSettings(DEFAULT_CODE_FONT)).toBe('normal')
+    expect(featureSettings({ ...DEFAULT_CODE_FONT, ligatures: false })).toBe('"liga" 0, "calt" 0, "dlig" 0')
   })
 
   it('detects installed fonts by how they change text width', () => {
