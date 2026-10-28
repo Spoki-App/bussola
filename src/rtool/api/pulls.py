@@ -7,7 +7,8 @@ from rtool.api.schemas import PullRequestLinkIn, PullRequestListOut, PullRequest
 from rtool.api.state import app_state
 from rtool.api.views import forge_status_out, pull_request_out, review_detail_out
 from rtool.directories import find_repositories
-from rtool.forge.pulls import ForgeSession, find_repo_for, list_pull_requests, parse_pull_request_url, review_pull_request, sync_pull_requests
+from rtool.forge.pulls import ForgeSession, find_repo_for, list_pull_requests, parse_pull_request_url, review_pull_request
+from rtool.forge.review_sync import sync_pull_requests
 from rtool.review.context import ReviewContext
 from rtool.review.repos import open_repo
 

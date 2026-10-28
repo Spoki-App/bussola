@@ -93,7 +93,7 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
         )}
       </div>
       <div className="review-actions">
-        <button type="button" onClick={runSync} disabled={sync.isPending} title={`${isPullRequest ? PULL_SYNC_TITLE : SYNC_TITLE} Shortcut: r`}>
+        <button type="button" onClick={runSync} disabled={sync.isPending} title={`${review.pull_request_review ? PULL_SYNC_TITLE : SYNC_TITLE} Shortcut: r`}>
           {syncLabel(review, sync.isPending)}
         </button>
         <button

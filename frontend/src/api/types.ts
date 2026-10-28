@@ -48,6 +48,7 @@ export interface Review {
   total_threads: number
   last_session_at: string | null
   pull_request: ReviewPullRequest | null
+  pull_request_review: boolean
 }
 
 export interface ReviewDetail extends Review {

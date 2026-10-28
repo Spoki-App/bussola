@@ -79,6 +79,7 @@ class ReviewOut(BaseModel):
     total_threads: int
     last_session_at: datetime | None
     pull_request: ReviewPullOut | None = None
+    pull_request_review: bool = False
 
 
 class ReviewDetailOut(ReviewOut):

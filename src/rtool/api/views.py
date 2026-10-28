@@ -17,6 +17,7 @@ from rtool.api.schemas import (
 )
 from rtool.forge.base import ForgeStatus, PullRequest
 from rtool.forge.publish import PublishResult, pending_comment_count
+from rtool.forge.pulls import is_pull_request_review
 from rtool.review.context import ReviewContext
 from rtool.review.images import image_type
 from rtool.review.overview import UnitView, count_states, unit_views
@@ -66,6 +67,7 @@ def _review_out(context: ReviewContext, repo: Repo, latest: Revision | None) -> 
         total_threads=len(threads),
         last_session_at=last_session.completed_at if last_session else None,
         pull_request=_pull_out(context),
+        pull_request_review=is_pull_request_review(context.review),
     )
 
 

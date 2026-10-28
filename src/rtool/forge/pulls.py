@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from rtool.errors import ConflictError, InvalidRequestError, NotFoundError
-from rtool.forge.base import ForgeAdapter, ForgeError, ForgeStatus, PullRequest
+from rtool.forge.base import ForgeAdapter, ForgeStatus, PullRequest
 from rtool.forge.conversation import import_conversation
 from rtool.git import GitError, GitRepo
 from rtool.git.repo import DEFAULT_REMOTE
@@ -36,13 +36,6 @@ class PullRequestList:
     status: ForgeStatus
     repository: str | None
     pulls: list[PullRequestRow] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class SyncResult:
-    updated: int
-    closed: int
-    failed: list[str]
 
 
 @dataclass(frozen=True)
@@ -118,7 +111,7 @@ class ForgeSession:
 
 def review_pull_request(session: ForgeSession, repo: Repo, number: int, repository: str | None = None) -> Review:
     store, adapter, git_repo = session.store, session.adapter, session.git_repo
-    remote = _require_remote(adapter, git_repo, repository)
+    remote = require_remote(adapter, git_repo, repository)
     pull = adapter.pull_request(remote.repository, number)
     head_ref, base_ref = fetch_pull_request(git_repo, remote, pull)
     review = _review_for(store, repo, remote.repository, pull) or store.reviews.find_or_add_review(repo.id, head_ref, base_ref)
@@ -129,27 +122,9 @@ def review_pull_request(session: ForgeSession, repo: Repo, number: int, reposito
     return review
 
 
-def sync_pull_requests(session: ForgeSession, repo: Repo) -> SyncResult:
-    remote = _require_remote(session.adapter, session.git_repo)
-    updated, closed = 0, 0
-    failed: list[str] = []
-    for link in session.store.forge.links_for_repo(repo.id):
-        review = session.store.reviews.get_review(link.review_id)
-        if review is None or link.repository != remote.repository:
-            continue
-        try:
-            if sync_review(session, review, link) is None:
-                closed += 1
-            else:
-                updated += 1
-        except (ForgeError, InvalidRequestError) as error:
-            failed.append(f"#{link.pr_number}: {error}")
-    return SyncResult(updated, closed, failed)
-
-
 def sync_review(session: ForgeSession, review: Review, link: ForgeLink) -> RefreshResult | None:
     store, adapter, git_repo = session.store, session.adapter, session.git_repo
-    remote = _require_remote(adapter, git_repo, link.repository)
+    remote = require_remote(adapter, git_repo, link.repository)
     pull = adapter.pull_request(link.repository, link.pr_number)
     _save_link(store, review, adapter.provider, link.repository, pull)
     if pull.state != OPEN_STATE:
@@ -179,7 +154,7 @@ def fetch_pull_request(git_repo: GitRepo, remote: GitHubRemote, pull: PullReques
     return head_ref, base_ref
 
 
-def _require_remote(adapter: ForgeAdapter, git_repo: GitRepo, repository: str | None = None) -> GitHubRemote:
+def require_remote(adapter: ForgeAdapter, git_repo: GitRepo, repository: str | None = None) -> GitHubRemote:
     remote = github_remote(adapter, git_repo, repository)
     if remote is None:
         raise ConflictError(f"This repository has no GitHub remote for {repository}" if repository else "This repository has no GitHub remote")

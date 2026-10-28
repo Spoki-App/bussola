@@ -162,3 +162,18 @@ def test_a_link_that_is_not_a_pull_request_is_rejected(api: ApiClient) -> None:
     error = open_link(api, "https://github.com/acme/widgets/issues/7", 400)
 
     assert "Not a GitHub pull request link" in error["detail"]
+
+
+def test_syncing_pull_requests_keeps_a_linked_branch_review_on_its_branch(api: ApiClient, github: GitHubSandbox) -> None:
+    github.open_pull_request({"app.py": FIRST})
+    github.local.branch("feature")
+    github.local.commit({"app.py": SECOND})
+    review = api.start_review()
+    api.call("PUT", f"/reviews/{review}/forge", body={"pr_number": 7})
+    repo = api.call("GET", "/repos")[0]["id"]
+
+    result = api.call("POST", f"/repos/{repo}/pulls/sync")
+
+    detail = api.call("GET", f"/reviews/{review}")
+    assert (result["updated"], result["failed"]) == (1, [])
+    assert (detail["head_ref"], detail["pull_request_review"], detail["pull_request"]["number"]) == ("feature", False, 7)

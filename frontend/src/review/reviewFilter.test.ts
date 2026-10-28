@@ -18,6 +18,7 @@ function review(state: string | null, linked = true): Review {
     total_threads: 0,
     last_session_at: null,
     pull_request: linked ? { number: 7, title: 'Sum', url: null, author: null, state, description: null } : null,
+    pull_request_review: linked,
   }
 }
 
