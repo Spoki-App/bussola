@@ -98,10 +98,13 @@ Browsers do not reveal the absolute path of a folder chosen with their native pi
 
 ```
 GET    /directories?path=                      folders inside path (default: the home directory), marking git repositories
+GET    /directories/repositories               git repositories found under the home directory, marking those already added
 ```
 
-- It returns only the names and paths of non-hidden subdirectories, whether each contains `.git`, and the parent path. It never returns file names or file contents.
-- It sits behind the same token and Host checks as the rest of the API.
+- The repository scan walks the home directory breadth first, up to four levels deep. It skips hidden folders, dependency and build folders (`node_modules`, `vendor`, `dist`, `build`, `target` and similar) and macOS media and `Library` folders. It does not follow symlinks or descend into a repository it found, and it stops after five seconds or 500 results, reporting that the list is incomplete.
+
+- Both return only folder names and paths and whether a folder contains `.git`; they never return file names or file contents.
+- Both sit behind the same token and Host checks as the rest of the API.
 - This is the one exception to section 11's rule about not reading the filesystem with paths from the input: only directory metadata is read.
 
 ## Plan changes

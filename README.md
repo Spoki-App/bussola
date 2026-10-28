@@ -29,7 +29,7 @@ The UI build goes to `src/rtool/static/` and is packaged with the Python wheel, 
 rtool serve
 ```
 
-Run inside a repository to register it and open the browser. To add other repositories, use **Browse...** on the home page to pick a folder (git repositories are marked), or paste a path. Options: `--repo PATH`, `--host 127.0.0.1`, `--port 8765`, `--no-open`.
+Run inside a repository to register it and open the browser. To add other repositories, use **Browse...** on the home page: it lists the git repositories found in your home folder (up to four levels deep, skipping hidden folders, `node_modules`, `Library` and similar), and its **Browse folders** tab lets you pick any other folder. You can also paste a path. Options: `--repo PATH`, `--host 127.0.0.1`, `--port 8765`, `--no-open`.
 
 The printed link contains a one-time session token. Opening it stores the token in a cookie for that browser; if you open rtool another way and see "Not authorized", use the printed link again.
 

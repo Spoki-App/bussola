@@ -4,6 +4,7 @@ import { deleteJson, getJson, postJson } from './client'
 import type {
   ApprovalRequest,
   DirectoryListing,
+  RepositoryScan,
   DiffMode,
   RefreshResult,
   Refs,
@@ -39,7 +40,8 @@ export function useAddRepo() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (path: string) => postJson<Repo>('/repos', { path }),
-    onSuccess: () => client.invalidateQueries({ queryKey: keys.repos }),
+    onSuccess: () =>
+      Promise.all([client.invalidateQueries({ queryKey: keys.repos }), client.invalidateQueries({ queryKey: ['repository-scan'] })]),
   })
 }
 
@@ -48,6 +50,17 @@ export function useDirectories(path: string | undefined) {
     queryKey: ['directories', path ?? ''],
     queryFn: () => getJson<DirectoryListing>(path === undefined ? '/directories' : `/directories?path=${encodeURIComponent(path)}`),
     placeholderData: (previous) => previous,
+    retry: false,
+  })
+}
+
+const SCAN_STALE_MS = 5 * 60 * 1000
+
+export function useRepositoryScan() {
+  return useQuery({
+    queryKey: ['repository-scan'],
+    queryFn: () => getJson<RepositoryScan>('/directories/repositories'),
+    staleTime: SCAN_STALE_MS,
     retry: false,
   })
 }

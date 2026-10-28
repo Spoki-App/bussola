@@ -854,3 +854,33 @@ button.link {
   margin: 0;
   color: var(--muted);
 }
+
+.picker-filter {
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-entry.static {
+  cursor: default;
+}
+
+.picker-entry.static:hover {
+  background: none;
+}
+
+.picker-name strong {
+  display: block;
+}
+
+.picker-detail {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.picker-added {
+  padding: 0 12px;
+  font-size: 12px;
+}

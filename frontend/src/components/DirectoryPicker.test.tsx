@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import type { DirectoryListing } from '../api/types'
+import type { DirectoryListing, RepositoryScan } from '../api/types'
 import { DirectoryPicker } from './DirectoryPicker'
 
 const LISTINGS: Record<string, DirectoryListing> = {
@@ -20,9 +20,21 @@ const LISTINGS: Record<string, DirectoryListing> = {
   '/home/me/code': { path: '/home/me/code', parent: '/home/me', home: '/home/me', is_repo: false, entries: [], truncated: false },
 }
 
+const SCAN: RepositoryScan = {
+  root: '/home/me',
+  repositories: [
+    { name: 'shop', path: '/home/me/shop', registered: false },
+    { name: 'api', path: '/home/me/work/api', registered: true },
+  ],
+  truncated: false,
+}
+
 function stubApi() {
   const fetchMock = vi.fn((input: string) => {
     const url = new URL(input, 'http://localhost')
+    if (url.pathname.endsWith('/repositories')) {
+      return Promise.resolve(Response.json(SCAN))
+    }
     const listing = LISTINGS[url.searchParams.get('path') ?? '/home/me']
     return Promise.resolve(Response.json(listing))
   })
@@ -54,19 +66,32 @@ describe('DirectoryPicker', () => {
     vi.unstubAllGlobals()
   })
 
-  it('starts at home and offers repositories for selection', async () => {
+  it('lists repositories found in the home folder and adds the chosen one', async () => {
     stubApi()
     const onSelect = renderPicker()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Add shop' }))
 
     expect(onSelect).toHaveBeenCalledWith('/home/me/shop')
-    expect(screen.queryByRole('button', { name: 'Add code' })).toBeNull()
+    expect(screen.getByText('Added')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add api' })).toBeNull()
   })
 
-  it('opens a folder when clicked', async () => {
+  it('filters found repositories', async () => {
+    stubApi()
+    renderPicker()
+    await screen.findByRole('button', { name: 'Add shop' })
+
+    fireEvent.change(screen.getByLabelText('Filter repositories'), { target: { value: 'work' } })
+
+    expect(screen.queryByRole('button', { name: 'Add shop' })).toBeNull()
+    expect(screen.getByText('api')).toBeInTheDocument()
+  })
+
+  it('browses folders and opens one when clicked', async () => {
     const fetchMock = stubApi()
     renderPicker()
+    fireEvent.click(screen.getByRole('tab', { name: 'Browse folders' }))
 
     fireEvent.click(await screen.findByText('code'))
 

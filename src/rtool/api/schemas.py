@@ -287,3 +287,15 @@ class DirectoryListingOut(BaseModel):
     is_repo: bool
     entries: list[DirectoryEntryOut]
     truncated: bool
+
+
+class FoundRepositoryOut(BaseModel):
+    name: str
+    path: str
+    registered: bool
+
+
+class RepositoryScanOut(BaseModel):
+    root: str
+    repositories: list[FoundRepositoryOut]
+    truncated: bool

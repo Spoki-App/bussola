@@ -204,3 +204,15 @@ export interface DirectoryListing {
   entries: DirectoryEntry[]
   truncated: boolean
 }
+
+export interface FoundRepository {
+  name: string
+  path: string
+  registered: boolean
+}
+
+export interface RepositoryScan {
+  root: string
+  repositories: FoundRepository[]
+  truncated: boolean
+}
