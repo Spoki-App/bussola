@@ -79,7 +79,6 @@ class GitHubSandbox:
             "author": {"login": "bob"},
             "state": state,
             "isDraft": False,
-            "updatedAt": "2026-10-28T10:00:00Z",
             "body": "Sums the items instead of returning zero.\n\n- [x] tested",
             "comments": {"totalCount": 2},
             "reviewThreads": {"nodes": [{"isResolved": False, "comments": {"totalCount": 3}}, {"isResolved": True, "comments": {"totalCount": 1}}]},

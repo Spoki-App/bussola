@@ -30,7 +30,7 @@ from rtool.units.model import UnitKind
 
 
 def repo_out(repo: Repo) -> RepoOut:
-    return RepoOut(id=repo.id, path=repo.path, name=Path(repo.path).name, root_commit=repo.root_commit, missing=not Path(repo.path).is_dir())
+    return RepoOut(id=repo.id, path=repo.path, name=Path(repo.path).name, missing=not Path(repo.path).is_dir())
 
 
 def revision_out(revision: Revision) -> RevisionOut:
@@ -81,9 +81,8 @@ def _pull_out(context: ReviewContext) -> ReviewPullOut | None:
 def review_detail_out(context: ReviewContext, repo: Repo) -> ReviewDetailOut:
     latest = context.store.reviews.latest_revision(context.review.id)
     summary = _review_out(context, repo, latest)
-    revisions = [revision_out(revision) for revision in context.store.reviews.list_revisions(context.review.id)]
     unsent = pending_comment_count(context, latest) if latest else 0
-    return ReviewDetailOut(**summary.model_dump(), revisions=revisions, unsent_comments=unsent)
+    return ReviewDetailOut(**summary.model_dump(), unsent_comments=unsent)
 
 
 def publish_out(result: PublishResult) -> PublishOut:
@@ -109,10 +108,6 @@ def unit_out(view: UnitView, open_threads: int) -> UnitOut:
         row_approvable=kind in ROW_APPROVABLE_KINDS and not binary,
         rows_total=status.rows_total,
         rows_approved=len(status.approved_row_hashes),
-        base_start=snapshot.base_start,
-        base_end=snapshot.base_end,
-        head_start=snapshot.head_start,
-        head_end=snapshot.head_end,
         binary=binary,
         image=image_type(snapshot.path) is not None,
         open_threads=open_threads,

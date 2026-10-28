@@ -15,7 +15,6 @@ export interface Repo {
   id: number
   path: string
   name: string
-  root_commit: string
   missing: boolean
 }
 
@@ -52,7 +51,6 @@ export interface Review {
 }
 
 export interface ReviewDetail extends Review {
-  revisions: Revision[]
   unsent_comments: number
 }
 
@@ -70,10 +68,6 @@ export interface Unit {
   row_approvable: boolean
   rows_total: number
   rows_approved: number
-  base_start: number | null
-  base_end: number | null
-  head_start: number | null
-  head_end: number | null
   binary: boolean
   image: boolean
   open_threads: number
@@ -179,7 +173,6 @@ export interface PullRequest {
   author: string
   state: string
   is_draft: boolean
-  updated_at: string
   comment_count: number
   unresolved_threads: number
   body: string

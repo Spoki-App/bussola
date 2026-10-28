@@ -65,9 +65,6 @@ class SqlReviewRepository(_SqlRepository):
     def latest_revision(self, review_id: int) -> Revision | None:
         return self._session.scalar(select(Revision).where(Revision.review_id == review_id).order_by(Revision.number.desc()).limit(1))
 
-    def list_revisions(self, review_id: int) -> list[Revision]:
-        return list(self._session.scalars(select(Revision).where(Revision.review_id == review_id).order_by(Revision.number)))
-
     def get_revision(self, revision_id: int) -> Revision | None:
         return self._session.get(Revision, revision_id)
 

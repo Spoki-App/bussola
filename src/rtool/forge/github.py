@@ -28,14 +28,14 @@ GH = "gh"
 PROVIDER = "github"
 GH_TIMEOUT_SECONDS = 60
 GH_ENV = {"GH_PROMPT_DISABLED": "1", "NO_COLOR": "1", "GH_NO_UPDATE_NOTIFIER": "1"}
-PR_FIELDS = "number,title,url,headRefOid,headRefName,baseRefName,author,state,isDraft,updatedAt,body"
+PR_FIELDS = "number,title,url,headRefOid,headRefName,baseRefName,author,state,isDraft,body"
 PR_LIST_LIMIT = 100
 OPEN_PULLS_QUERY = """
 query($owner: String!, $name: String!, $limit: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequests(states: OPEN, first: $limit, orderBy: {field: CREATED_AT, direction: DESC}) {
       nodes {
-        number title url headRefOid headRefName baseRefName state isDraft updatedAt
+        number title url headRefOid headRefName baseRefName state isDraft
         author { login }
         comments { totalCount }
         reviewThreads(first: 100) { nodes { isResolved comments { totalCount } } }
@@ -295,7 +295,6 @@ def _pull_request(item: JsonObject) -> PullRequest:
         author=_login(item.get("author")),
         state=item.get("state", "OPEN"),
         is_draft=bool(item.get("isDraft", False)),
-        updated_at=item.get("updatedAt", ""),
         comment_count=_comment_count(item),
         unresolved_threads=sum(1 for thread in _nodes(item.get("reviewThreads")) if not thread.get("isResolved", False)),
         body=str(item.get("body") or ""),

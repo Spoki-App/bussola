@@ -150,7 +150,7 @@ def test_sync_reports_new_commits_without_fetching_them(api: ApiClient, github: 
     github.open_pull_request({"app.py": SECOND})
 
     assert sync(api, review)["new_commits"] is True
-    assert len(api.call("GET", f"/reviews/{review}")["revisions"]) == 1
+    assert api.call("GET", f"/reviews/{review}")["latest_revision"]["number"] == 1
 
 
 def test_sync_follows_comments_edited_on_github(api: ApiClient, github: GitHubSandbox) -> None:

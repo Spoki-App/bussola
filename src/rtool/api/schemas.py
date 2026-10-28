@@ -32,7 +32,6 @@ class RepoOut(BaseModel):
     id: int
     path: str
     name: str
-    root_commit: str
     missing: bool
 
 
@@ -83,7 +82,6 @@ class ReviewOut(BaseModel):
 
 
 class ReviewDetailOut(ReviewOut):
-    revisions: list[RevisionOut]
     unsent_comments: int = 0
 
 
@@ -111,10 +109,6 @@ class UnitOut(BaseModel):
     row_approvable: bool
     rows_total: int
     rows_approved: int
-    base_start: int | None
-    base_end: int | None
-    head_start: int | None
-    head_end: int | None
     binary: bool
     image: bool
     open_threads: int
@@ -265,7 +259,6 @@ class PullRequestOut(BaseModel):
     author: str
     state: str
     is_draft: bool
-    updated_at: str
     comment_count: int
     unresolved_threads: int
     body: str

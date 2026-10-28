@@ -30,7 +30,6 @@ class PullRequest:
     author: str = ""
     state: str = "OPEN"
     is_draft: bool = False
-    updated_at: str = ""
     comment_count: int = 0
     unresolved_threads: int = 0
     body: str = ""
