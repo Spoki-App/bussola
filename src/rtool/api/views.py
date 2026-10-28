@@ -53,7 +53,7 @@ def _pull_out(context: ReviewContext) -> ReviewPullOut | None:
     link = context.store.forge.link(context.review.id)
     if link is None:
         return None
-    return ReviewPullOut(number=link.pr_number, title=link.title, url=link.url, author=link.author, state=link.state)
+    return ReviewPullOut(number=link.pr_number, title=link.title, url=link.url, author=link.author, state=link.state, description=link.description)
 
 
 def review_detail_out(context: ReviewContext, repo: Repo) -> ReviewDetailOut:

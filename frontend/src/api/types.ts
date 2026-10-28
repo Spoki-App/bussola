@@ -180,6 +180,7 @@ export interface PullRequest {
   updated_at: string
   comment_count: number
   unresolved_threads: number
+  body: string
 }
 
 export interface PullRequestRow {
@@ -205,6 +206,7 @@ export interface ReviewPullRequest {
   url: string | null
   author: string | null
   state: string | null
+  description: string | null
 }
 
 export interface ForgeOverview {

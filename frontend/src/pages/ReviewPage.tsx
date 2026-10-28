@@ -6,6 +6,7 @@ import type { DiffRow, ReviewDetail, Unit, UnitDiff, UnitFilter } from '../api/t
 import { ErrorNote, ProgressBar } from '../components/Badges'
 import { ExternalLink } from '../components/ExternalLink'
 import { FileTree } from '../components/FileTree'
+import { PullRequestDescription } from '../components/PullRequestDescription'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
 import { UnitTree } from '../components/UnitTree'
@@ -159,6 +160,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   return (
     <div className="review-page">
       <ReviewHeader review={data} extra={extensions.headerActions} />
+      {data.pull_request && <PullRequestDescription pull={data.pull_request} />}
       <section className="review-summary">
         <ProgressBar percent={percent} />
         <p>

@@ -33,6 +33,7 @@ class PullRequest:
     updated_at: str = ""
     comment_count: int = 0
     unresolved_threads: int = 0
+    body: str = ""
 
 
 @dataclass(frozen=True)

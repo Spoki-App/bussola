@@ -62,6 +62,7 @@ class ReviewPullOut(BaseModel):
     url: str | None
     author: str | None
     state: str | None
+    description: str | None = None
 
 
 class ReviewOut(BaseModel):
@@ -265,6 +266,7 @@ class PullRequestOut(BaseModel):
     updated_at: str
     comment_count: int
     unresolved_threads: int
+    body: str
 
 
 class ForgeLinkOut(BaseModel):

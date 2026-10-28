@@ -151,6 +151,7 @@ def _save_link(store: Store, review: Review, provider: str, repository: str, pul
         author=pull.author,
         url=pull.url,
         state=pull.state,
+        description=pull.body,
         synced_at=utcnow(),
     )
     return store.forge.save_link(link)

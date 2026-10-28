@@ -243,6 +243,7 @@ class SqlForgeRepository:
         existing.provider, existing.repository, existing.pr_number = link.provider, link.repository, link.pr_number
         if link.synced_at is not None:
             existing.title, existing.author, existing.url, existing.state = link.title, link.author, link.url, link.state
+            existing.description = link.description
             existing.synced_at = link.synced_at
         return existing
 

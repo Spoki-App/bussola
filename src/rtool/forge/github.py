@@ -24,7 +24,7 @@ GH = "gh"
 PROVIDER = "github"
 GH_TIMEOUT_SECONDS = 60
 GH_ENV = {"GH_PROMPT_DISABLED": "1", "NO_COLOR": "1", "GH_NO_UPDATE_NOTIFIER": "1"}
-PR_FIELDS = "number,title,url,headRefOid,headRefName,baseRefName,author,state,isDraft,updatedAt"
+PR_FIELDS = "number,title,url,headRefOid,headRefName,baseRefName,author,state,isDraft,updatedAt,body"
 PR_LIST_LIMIT = 100
 OPEN_PULLS_QUERY = """
 query($owner: String!, $name: String!, $limit: Int!) {
@@ -249,6 +249,7 @@ def _pull_request(item: JsonObject) -> PullRequest:
         updated_at=item.get("updatedAt", ""),
         comment_count=_comment_count(item),
         unresolved_threads=sum(1 for thread in _threads(item) if not thread.get("isResolved", False)),
+        body=str(item.get("body") or ""),
     )
 
 

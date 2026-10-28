@@ -34,7 +34,14 @@ def test_reviewing_a_pull_request_fetches_its_code_and_links_it(api: ApiClient, 
 
     assert (review["head_ref"], review["base_ref"]) == ("refs/rtool/pull/7", "origin/main")
     assert review["latest_revision"]["head_sha"] == head
-    assert review["pull_request"] == {"number": 7, "title": "Sum the items", "url": "https://github.com/acme/widgets/pull/7", "author": "bob", "state": "OPEN"}
+    assert review["pull_request"] == {
+        "number": 7,
+        "title": "Sum the items",
+        "url": "https://github.com/acme/widgets/pull/7",
+        "author": "bob",
+        "state": "OPEN",
+        "description": "Sums the items instead of returning zero.\n\n- [x] tested",
+    }
     assert api.states(review["id"]) == {"app.py::total": "new"}
     assert api.call("GET", f"/repos/{repo}/pulls")["pulls"][0]["review_id"] == review["id"]
     assert api.call("GET", f"/reviews/{review['id']}/forge")["link"]["pr_number"] == 7
