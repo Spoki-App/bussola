@@ -967,27 +967,6 @@ button.link {
   font-weight: 700;
 }
 
-.popover-anchor {
-  position: relative;
-}
-
-.popover {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: 10;
-  width: min(420px, calc(100vw - 32px));
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-}
-
-.popover p {
-  margin: 0;
-}
-
 .stack {
   display: grid;
   gap: 8px;
@@ -1354,7 +1333,7 @@ button.danger {
 }
 
 
-.code-font-panel input {
+.code-font-panel input:not([type='checkbox']) {
   width: 100%;
 }
 
@@ -1364,4 +1343,29 @@ button.danger {
   overflow-x: auto;
   border-radius: 6px;
   background: var(--bg-subtle);
+}
+
+.app-menu {
+  width: min(640px, calc(100vw - 32px));
+  height: auto;
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+}
+
+.app-menu section + section {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.app-menu h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.app-menu .inline-form {
+  margin: 4px 0;
+}
+
+.app-menu .inline-form input {
+  min-width: 200px;
 }

@@ -1,12 +1,10 @@
 import { useState, type SubmitEvent } from 'react'
 
 import { describeError } from '../api/client'
-import { useAddRepo, useCreateReview, useRefs, useRepos, useReviews } from '../api/hooks'
+import { useCreateReview, useRefs, useRepos, useReviews } from '../api/hooks'
 import type { Repo } from '../api/types'
 import { ErrorNote, ProgressBar } from '../components/Badges'
 import { CommentCount } from '../components/CommentCount'
-import { DirectoryPicker } from '../components/DirectoryPicker'
-import { OpenPullRequestForm } from '../components/OpenPullRequestForm'
 import { PullRequestsPanel } from '../components/PullRequestsPanel'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { Link } from '../Link'
@@ -20,50 +18,10 @@ export function HomePage() {
   return (
     <div className="page">
       <h1>Repositories</h1>
-      <OpenPullRequestForm />
-      <AddRepoForm />
       {repos.error && <ErrorNote message={describeError(repos.error)} />}
-      {repos.data?.length === 0 && <p className="muted">No repositories yet. Add one with Browse, or run `rtool serve` inside a repository.</p>}
+      {repos.data?.length === 0 && <p className="muted">No repositories yet. Add one from Menu (top right), or run `rtool serve` inside a repository.</p>}
       {repos.data?.map((repo) => <RepoSection key={repo.id} repo={repo} />)}
     </div>
-  )
-}
-
-function AddRepoForm() {
-  const [path, setPath] = useState('')
-  const [browsing, setBrowsing] = useState(false)
-  const addRepo = useAddRepo()
-  const add = (target: string, done: () => void) => {
-    addRepo.mutate(target.trim(), { onSuccess: done })
-  }
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault()
-    add(path, () => { setPath('') })
-  }
-  const openPicker = () => {
-    addRepo.reset()
-    setBrowsing(true)
-  }
-  return (
-    <form className="inline-form" onSubmit={submit}>
-      <label htmlFor="repo-path">Add repository</label>
-      <input id="repo-path" value={path} onChange={(event) => { setPath(event.target.value) }} placeholder="/path/to/repository" />
-      <button type="submit" disabled={!path.trim() || addRepo.isPending}>
-        Add
-      </button>
-      <button type="button" className="primary" onClick={openPicker}>
-        Browse...
-      </button>
-      {!browsing && addRepo.error && <ErrorNote message={describeError(addRepo.error)} />}
-      {browsing && (
-        <DirectoryPicker
-          busy={addRepo.isPending}
-          error={addRepo.error}
-          onSelect={(target) => { add(target, () => { setBrowsing(false) }) }}
-          onClose={() => { setBrowsing(false) }}
-        />
-      )}
-    </form>
   )
 }
 

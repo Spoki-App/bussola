@@ -6,16 +6,21 @@ import { navigate } from '../navigation'
 import { isPullRequestUrl } from '../review/pullRequestLink'
 import { ErrorNote } from './Badges'
 
-export function OpenPullRequestForm() {
+export function OpenPullRequestForm({ onOpened }: { onOpened: () => void }) {
   const [url, setUrl] = useState('')
   const open = useOpenPullRequestLink()
   const submit = (event: SubmitEvent) => {
     event.preventDefault()
-    open.mutate(url.trim(), { onSuccess: (review) => { navigate(`/reviews/${String(review.id)}`) } })
+    open.mutate(url.trim(), {
+      onSuccess: (review) => {
+        onOpened()
+        navigate(`/reviews/${String(review.id)}`)
+      },
+    })
   }
   return (
     <form className="inline-form" onSubmit={submit}>
-      <label htmlFor="pull-request-url">Open pull request</label>
+      <label htmlFor="pull-request-url">GitHub link</label>
       <input
         id="pull-request-url"
         value={url}

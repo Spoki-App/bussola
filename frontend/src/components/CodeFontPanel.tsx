@@ -20,23 +20,7 @@ import {
 
 const PREVIEW = 'def total(items: list[int]) -> int:\n    return sum(i for i in items if i != 0 and i >= -1)  # => === 0O1lI'
 
-export function CodeFontSettings() {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="popover-anchor">
-      <button type="button" aria-expanded={open} title="Choose the font used to show code" onClick={() => { setOpen(!open) }}>
-        Code font
-      </button>
-      {open && (
-        <div className="popover" role="dialog" aria-label="Code font">
-          <CodeFontPanel />
-        </div>
-      )}
-    </div>
-  )
-}
-
-function CodeFontPanel() {
+export function CodeFontPanel() {
   const [font, setFont] = useState<CodeFont>(loadCodeFont)
   const [sizeText, setSizeText] = useState(() => String(font.size))
   const [families, setFamilies] = useState<string[]>(installedCommonFonts)

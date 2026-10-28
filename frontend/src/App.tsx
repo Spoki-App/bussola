@@ -1,7 +1,7 @@
 import { useMe } from './api/hooks'
 import { OpenPullRequestRoute } from './OpenPullRequestRoute'
 import { ReviewRoute } from './ReviewRoute'
-import { CodeFontSettings } from './components/CodeFontSettings'
+import { AppMenu } from './components/AppMenu'
 import { HomePage } from './pages/HomePage'
 import { Link } from './Link'
 import { usePathname } from './navigation'
@@ -23,8 +23,8 @@ export default function App() {
           rtool
         </Link>
         <span className="spacer" />
-        <CodeFontSettings />
         {me.data && <span className="muted">{`${me.data.name} <${me.data.email}>`}</span>}
+        <AppMenu />
       </header>
       {reviewMatch ? (
         <ReviewRoute key={reviewMatch[1]} reviewId={Number(reviewMatch[1])} />

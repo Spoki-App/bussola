@@ -1,14 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { CodeFontSettings } from './CodeFontSettings'
+import { CodeFontPanel } from './CodeFontPanel'
 
 function open() {
-  render(<CodeFontSettings />)
-  fireEvent.click(screen.getByRole('button', { name: 'Code font' }))
+  render(<CodeFontPanel />)
 }
 
-describe('CodeFontSettings', () => {
+describe('CodeFontPanel', () => {
   afterEach(() => {
     window.localStorage.clear()
     document.documentElement.removeAttribute('style')
