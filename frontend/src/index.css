@@ -825,6 +825,28 @@ textarea {
   color: #59636e;
 }
 
+.hljs-name,
+.hljs-tag,
+.hljs-selector-class,
+.hljs-selector-id {
+  color: #116329;
+}
+
+.hljs-symbol,
+.hljs-property,
+.hljs-attribute,
+.hljs-params {
+  color: #953800;
+}
+
+.hljs-addition {
+  color: #116329;
+}
+
+.hljs-deletion {
+  color: #82071e;
+}
+
 @media (prefers-color-scheme: dark) {
   .hljs-keyword,
   .hljs-built_in,
@@ -855,6 +877,28 @@ textarea {
   .hljs-comment,
   .hljs-quote {
     color: #9198a1;
+  }
+
+  .hljs-name,
+  .hljs-tag,
+  .hljs-selector-class,
+  .hljs-selector-id {
+    color: #7ee787;
+  }
+
+  .hljs-symbol,
+  .hljs-property,
+  .hljs-attribute,
+  .hljs-params {
+    color: #ffa657;
+  }
+
+  .hljs-addition {
+    color: #aff5b4;
+  }
+
+  .hljs-deletion {
+    color: #ffdcd7;
   }
 
   .markdown-alert-important {

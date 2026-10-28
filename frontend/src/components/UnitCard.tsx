@@ -177,6 +177,7 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
           {diff.data && (
             <UnitDiffView
               diff={diff.data}
+              path={unit.path}
               selectable={unit.row_approvable}
               selected={selected}
               onRowClick={onRowClick}

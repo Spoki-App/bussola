@@ -4,6 +4,7 @@ import 'react-diff-view/style/index.css'
 
 import type { DiffRow, UnitDiff } from '../api/types'
 import { collapsedUnified, segmentRows, type Segment } from '../review/collapse'
+import { highlightTokens, languageFor } from '../review/highlight'
 import { isSelectable, rowKey } from '../review/selection'
 
 const PLACEHOLDER_GUTTER = '⋯'
@@ -13,6 +14,7 @@ export type GutterSide = 'old' | 'new'
 
 interface Props {
   diff: UnitDiff
+  path: string
   selectable: boolean
   selected: ReadonlySet<string>
   onRowClick: (row: DiffRow, extend: boolean) => void
@@ -101,7 +103,7 @@ function renderSegments(segments: Segment[], hunks: HunkData[], expand: (id: str
   })
 }
 
-export function UnitDiffView({ diff, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted }: Props) {
+export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted }: Props) {
   const dragging = useRef(false)
   const endSelection = useRef(onLineSelectEnd)
 
@@ -131,10 +133,12 @@ export function UnitDiffView({ diff, selectable, selected, onRowClick, onLineNum
     const pinned = new Set(diff.rows.flatMap((row, position) => (keys.has(index.changeKeyOf(row) ?? '') ? [position] : [])))
     return segmentRows(diff.rows, expanded, pinned)
   }, [diff.rows, expanded, index, pinnedKeys])
-  const file = useMemo(() => {
-    const header = diff.unified.split('\n').slice(0, FILE_HEADER_LINES).join('\n')
-    return parseDiff(collapsedUnified(header, diff.rows, segments))[0]
-  }, [diff.unified, diff.rows, segments])
+  const header = diff.unified.split('\n').slice(0, FILE_HEADER_LINES).join('\n')
+  const file = useMemo(() => parseDiff(collapsedUnified(header, diff.rows, segments))[0], [header, diff.rows, segments])
+  const tokens = useMemo(() => {
+    const whole: Segment[] = diff.rows.length > 0 ? [{ kind: 'rows', start: 0, end: diff.rows.length - 1 }] : []
+    return highlightTokens(parseDiff(collapsedUnified(header, diff.rows, whole))[0]?.hunks ?? [], languageFor(path))
+  }, [header, diff.rows, path])
 
   if (diff.binary) {
     return <p className="diff-note">Binary file, no diff available.</p>
@@ -156,6 +160,7 @@ export function UnitDiffView({ diff, selectable, selected, onRowClick, onLineNum
       viewType="unified"
       diffType={file.type}
       hunks={file.hunks}
+      tokens={tokens}
       selectedChanges={selectedChanges}
       widgets={widgetMap}
       className={selectable ? 'diff selectable' : 'diff'}
