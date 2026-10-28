@@ -4,12 +4,13 @@ from fastapi import APIRouter, status
 
 from rtool.api.deps import RepoDep, ReviewerDep, StoreDep
 from rtool.api.schemas import RefsOut, RepoIn, RepoOut, ReviewDetailOut, ReviewIn, ReviewOut
-from rtool.api.views import repo_out, review_detail_out, review_out
+from rtool.api.views import repo_out, review_detail_out, review_summary_out
 from rtool.config import load_repo_config
 from rtool.review.context import ReviewContext
 from rtool.review.refs import NoBaseBranchError, default_base_ref
 from rtool.review.repos import open_repo, register_repo
 from rtool.review.revisions import refresh_review
+from rtool.review.summaries import load_review_data
 
 router = APIRouter(tags=["repos"])
 
@@ -39,7 +40,7 @@ def list_refs(repo: RepoDep) -> RefsOut:
 
 @router.get("/repos/{repo_id}/reviews")
 def list_reviews(repo: RepoDep, store: StoreDep, reviewer: ReviewerDep) -> list[ReviewOut]:
-    return [review_out(ReviewContext(store, review, reviewer), repo) for review in store.reviews.list_reviews(repo.id)]
+    return [review_summary_out(data, repo) for data in load_review_data(store, store.reviews.list_reviews(repo.id), reviewer)]
 
 
 @router.post("/repos/{repo_id}/reviews", status_code=status.HTTP_201_CREATED)

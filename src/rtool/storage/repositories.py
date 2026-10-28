@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, defer
 
 from rtool.storage.models import (
@@ -65,6 +65,16 @@ class SqlReviewRepository(_SqlRepository):
     def latest_revision(self, review_id: int) -> Revision | None:
         return self._session.scalar(select(Revision).where(Revision.review_id == review_id).order_by(Revision.number.desc()).limit(1))
 
+    def latest_revisions(self, review_ids: list[int]) -> dict[int, Revision]:
+        latest = (
+            select(Revision.review_id, func.max(Revision.number).label("number"))
+            .where(Revision.review_id.in_(review_ids))
+            .group_by(Revision.review_id)
+            .subquery()
+        )
+        query = select(Revision).join(latest, (Revision.review_id == latest.c.review_id) & (Revision.number == latest.c.number))
+        return {revision.review_id: revision for revision in self._session.scalars(query)}
+
     def get_revision(self, revision_id: int) -> Revision | None:
         return self._session.get(Revision, revision_id)
 
@@ -77,7 +87,10 @@ class SqlReviewRepository(_SqlRepository):
         return revision
 
     def snapshots(self, revision_id: int, *, texts: bool = True) -> list[UnitSnapshot]:
-        query = select(UnitSnapshot).where(UnitSnapshot.revision_id == revision_id).order_by(UnitSnapshot.path, UnitSnapshot.id)
+        return self.snapshots_of([revision_id], texts=texts)
+
+    def snapshots_of(self, revision_ids: list[int], *, texts: bool = True) -> list[UnitSnapshot]:
+        query = select(UnitSnapshot).where(UnitSnapshot.revision_id.in_(revision_ids)).order_by(UnitSnapshot.path, UnitSnapshot.id)
         if not texts:
             query = query.options(*(defer(column) for column in SNAPSHOT_TEXT_COLUMNS))
         return list(self._session.scalars(query))
@@ -100,18 +113,21 @@ class SqlReviewRepository(_SqlRepository):
         return self._add(review_session)
 
     def last_session(self, review_id: int, reviewer_id: int) -> ReviewSession | None:
+        return self.last_sessions([review_id], reviewer_id).get(review_id)
+
+    def last_sessions(self, review_ids: list[int], reviewer_id: int) -> dict[int, ReviewSession]:
         query = (
-            select(ReviewSession)
-            .where(ReviewSession.review_id == review_id, ReviewSession.reviewer_id == reviewer_id)
-            .order_by(ReviewSession.completed_at.desc())
-            .limit(1)
+            select(ReviewSession).where(ReviewSession.review_id.in_(review_ids), ReviewSession.reviewer_id == reviewer_id).order_by(ReviewSession.completed_at)
         )
-        return self._session.scalar(query)
+        return {review_session.review_id: review_session for review_session in self._session.scalars(query)}
 
 
 class SqlApprovalRepository(_SqlRepository):
     def approvals(self, review_id: int, reviewer_id: int) -> list[Approval]:
-        query = select(Approval).where(Approval.review_id == review_id, Approval.reviewer_id == reviewer_id).order_by(Approval.created_at)
+        return self.approvals_of([review_id], reviewer_id)
+
+    def approvals_of(self, review_ids: list[int], reviewer_id: int) -> list[Approval]:
+        query = select(Approval).where(Approval.review_id.in_(review_ids), Approval.reviewer_id == reviewer_id).order_by(Approval.created_at)
         return list(self._session.scalars(query))
 
     def get_approval(self, approval_id: str) -> Approval | None:
@@ -123,7 +139,10 @@ class SqlApprovalRepository(_SqlRepository):
         return approvals
 
     def row_approvals(self, review_id: int, reviewer_id: int) -> list[RowApproval]:
-        query = select(RowApproval).where(RowApproval.review_id == review_id, RowApproval.reviewer_id == reviewer_id).order_by(RowApproval.created_at)
+        return self.row_approvals_of([review_id], reviewer_id)
+
+    def row_approvals_of(self, review_ids: list[int], reviewer_id: int) -> list[RowApproval]:
+        query = select(RowApproval).where(RowApproval.review_id.in_(review_ids), RowApproval.reviewer_id == reviewer_id).order_by(RowApproval.created_at)
         return list(self._session.scalars(query))
 
     def add_row_approvals(self, rows: list[RowApproval]) -> list[RowApproval]:
@@ -137,7 +156,10 @@ class SqlApprovalRepository(_SqlRepository):
 
 class SqlThreadRepository(_SqlRepository):
     def threads(self, review_id: int) -> list[Thread]:
-        query = select(Thread).where(Thread.review_id == review_id, Thread.deleted_at.is_(None)).order_by(Thread.created_at)
+        return self.threads_of([review_id])
+
+    def threads_of(self, review_ids: list[int]) -> list[Thread]:
+        query = select(Thread).where(Thread.review_id.in_(review_ids), Thread.deleted_at.is_(None)).order_by(Thread.created_at)
         return list(self._session.scalars(query))
 
     def get_thread(self, thread_id: str) -> Thread | None:
@@ -166,7 +188,10 @@ class SqlThreadRepository(_SqlRepository):
 
 class SqlForgeRepository(_SqlRepository):
     def link(self, review_id: int) -> ForgeLink | None:
-        return self._session.scalar(select(ForgeLink).where(ForgeLink.review_id == review_id))
+        return self.links_of([review_id]).get(review_id)
+
+    def links_of(self, review_ids: list[int]) -> dict[int, ForgeLink]:
+        return {link.review_id: link for link in self._session.scalars(select(ForgeLink).where(ForgeLink.review_id.in_(review_ids)))}
 
     def links_for_repo(self, repo_id: int) -> list[ForgeLink]:
         query = select(ForgeLink).join(Review, Review.id == ForgeLink.review_id).where(Review.repo_id == repo_id).order_by(ForgeLink.pr_number)

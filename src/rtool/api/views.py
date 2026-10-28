@@ -1,3 +1,4 @@
+from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
 
@@ -20,12 +21,13 @@ from rtool.forge.publish import PublishResult, pending_comment_count
 from rtool.forge.pulls import is_pull_request_review
 from rtool.review.context import ReviewContext
 from rtool.review.images import image_type
-from rtool.review.overview import UnitView, count_states, unit_views
+from rtool.review.overview import UnitView
 from rtool.review.rows import ROW_APPROVABLE_KINDS, is_binary
 from rtool.review.scope import ChangeType
-from rtool.review.states import DONE_STATES
+from rtool.review.states import DONE_STATES, UnitState
+from rtool.review.summaries import ReviewData, load_review_data
 from rtool.review.threads_count import open_thread_counts
-from rtool.storage.models import Approval, Repo, Revision, RowApproval
+from rtool.storage.models import Approval, ForgeLink, Repo, Revision, RowApproval
 from rtool.units.model import UnitKind
 
 
@@ -45,44 +47,39 @@ def revision_out(revision: Revision) -> RevisionOut:
 
 
 def review_out(context: ReviewContext, repo: Repo) -> ReviewOut:
-    return _review_out(context, repo, context.store.reviews.latest_revision(context.review.id))
+    return review_summary_out(load_review_data(context.store, [context.review], context.reviewer)[0], repo)
 
 
-def _review_out(context: ReviewContext, repo: Repo, latest: Revision | None) -> ReviewOut:
-    views = unit_views(context, latest, texts=False) if latest else []
-    counts = count_states(views)
-    threads = context.store.threads.threads(context.review.id)
-    last_session = context.store.reviews.last_session(context.review.id, context.reviewer.id)
+def review_summary_out(data: ReviewData, repo: Repo) -> ReviewOut:
+    states = Counter(status.state for status in data.statuses)
+    counts = {state: states.get(state, 0) for state in UnitState}
+    review, link = data.review, data.link
     return ReviewOut(
-        id=context.review.id,
+        id=review.id,
         repo_id=repo.id,
         repo_path=repo.path,
-        head_ref=context.review.head_ref,
-        base_ref=context.review.base_ref,
-        latest_revision=revision_out(latest) if latest else None,
+        head_ref=review.head_ref,
+        base_ref=review.base_ref,
+        latest_revision=revision_out(data.latest) if data.latest else None,
         counts=counts,
-        total=len(views),
+        total=len(data.statuses),
         approved=sum(counts[state] for state in DONE_STATES),
-        open_threads=sum(open_thread_counts(threads).values()),
-        total_threads=len(threads),
-        last_session_at=last_session.completed_at if last_session else None,
-        pull_request=_pull_out(context),
-        pull_request_review=is_pull_request_review(context.review),
+        open_threads=sum(open_thread_counts(data.threads).values()),
+        total_threads=len(data.threads),
+        last_session_at=data.last_session.completed_at if data.last_session else None,
+        pull_request=_pull_out(link) if link else None,
+        pull_request_review=is_pull_request_review(review),
     )
 
 
-def _pull_out(context: ReviewContext) -> ReviewPullOut | None:
-    link = context.store.forge.link(context.review.id)
-    if link is None:
-        return None
+def _pull_out(link: ForgeLink) -> ReviewPullOut:
     return ReviewPullOut(number=link.pr_number, title=link.title, url=link.url, author=link.author, state=link.state, description=link.description)
 
 
 def review_detail_out(context: ReviewContext, repo: Repo) -> ReviewDetailOut:
-    latest = context.store.reviews.latest_revision(context.review.id)
-    summary = _review_out(context, repo, latest)
-    unsent = pending_comment_count(context, latest) if latest else 0
-    return ReviewDetailOut(**summary.model_dump(), unsent_comments=unsent)
+    data = load_review_data(context.store, [context.review], context.reviewer)[0]
+    unsent = pending_comment_count(context, data.latest) if data.latest else 0
+    return ReviewDetailOut(**review_summary_out(data, repo).model_dump(), unsent_comments=unsent)
 
 
 def publish_out(result: PublishResult) -> PublishOut:
