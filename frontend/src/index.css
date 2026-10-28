@@ -796,14 +796,12 @@ textarea {
 
 .hljs-keyword,
 .hljs-built_in,
-.hljs-literal,
 .hljs-selector-tag {
   color: #cf222e;
 }
 
 .hljs-string,
-.hljs-regexp,
-.hljs-attr {
+.hljs-regexp {
   color: #0a3069;
 }
 
@@ -814,6 +812,7 @@ textarea {
 }
 
 .hljs-number,
+.hljs-literal,
 .hljs-variable,
 .hljs-type,
 .hljs-meta {
@@ -825,8 +824,13 @@ textarea {
   color: #59636e;
 }
 
+.hljs-literal .hljs-keyword {
+  color: inherit;
+}
+
 .hljs-name,
 .hljs-tag,
+.hljs-attr,
 .hljs-selector-class,
 .hljs-selector-id {
   color: #116329;
@@ -850,14 +854,12 @@ textarea {
 @media (prefers-color-scheme: dark) {
   .hljs-keyword,
   .hljs-built_in,
-  .hljs-literal,
   .hljs-selector-tag {
     color: #ff7b72;
   }
 
   .hljs-string,
-  .hljs-regexp,
-  .hljs-attr {
+  .hljs-regexp {
     color: #a5d6ff;
   }
 
@@ -868,6 +870,7 @@ textarea {
   }
 
   .hljs-number,
+  .hljs-literal,
   .hljs-variable,
   .hljs-type,
   .hljs-meta {
@@ -881,6 +884,7 @@ textarea {
 
   .hljs-name,
   .hljs-tag,
+  .hljs-attr,
   .hljs-selector-class,
   .hljs-selector-id {
     color: #7ee787;

@@ -27,6 +27,16 @@ describe('highlightTokens', () => {
     expect(JSON.stringify(tokens?.old[1])).toContain('hljs-string')
   })
 
+  it('marks JSON keys apart from string values', () => {
+    const json = ['--- a/en.json', '+++ b/en.json', '@@ -1,1 +1,1 @@', '-{"title": "Old", "count": 1, "on": true}', '+{"title": "New", "count": 2, "on": false}', ''].join('\n')
+
+    const line = JSON.stringify(highlightTokens(parseDiff(json)[0].hunks, languageFor('src/App/locale/en.json'))?.new[0])
+    expect(line).toContain('hljs-attr')
+    expect(line).toContain('hljs-string')
+    expect(line).toContain('hljs-number')
+    expect(line).toContain('hljs-literal')
+  })
+
   it('leaves plain text when the language is unknown', () => {
     expect(highlightTokens(parseDiff(UNIFIED)[0].hunks, null)).toBeUndefined()
   })
