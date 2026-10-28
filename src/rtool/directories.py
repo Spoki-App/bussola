@@ -106,7 +106,7 @@ def find_repositories(root: Path | None = None, limits: ScanLimits | None = None
         for child in _scannable_children(directory):
             if _is_repo(child):
                 found.append(FoundRepository(child.name, str(child)))
-            elif depth + 1 < limits.max_depth:
+            if depth + 1 < limits.max_depth:
                 pending.append((child, depth + 1))
     return RepositoryScan(str(start), sorted(found, key=lambda repo: repo.path.lower()), truncated)
 

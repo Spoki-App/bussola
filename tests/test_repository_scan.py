@@ -20,17 +20,21 @@ def home(tmp_path: Path) -> Path:
     return root
 
 
-def test_finds_repositories_without_entering_them(home: Path) -> None:
+def test_finds_repositories_including_ones_nested_inside_other_repositories(home: Path) -> None:
     scan = find_repositories(home)
 
-    assert [repo.path for repo in scan.repositories] == [str(home / "Projects" / "shop"), str(home / "work" / "clients" / "acme" / "api")]
+    assert [repo.path for repo in scan.repositories] == [
+        str(home / "Projects" / "shop"),
+        str(home / "Projects" / "shop" / "plugins" / "nested"),
+        str(home / "work" / "clients" / "acme" / "api"),
+    ]
     assert scan.truncated is False
 
 
 def test_skips_hidden_and_dependency_folders_and_respects_depth(home: Path) -> None:
     names = {repo.name for repo in find_repositories(home).repositories}
 
-    assert names.isdisjoint({"hidden-repo", "left-pad", "too-deep", "nested"})
+    assert names.isdisjoint({"hidden-repo", "left-pad", "too-deep"})
     assert "too-deep" in {repo.name for repo in find_repositories(home, ScanLimits(max_depth=6)).repositories}
 
 

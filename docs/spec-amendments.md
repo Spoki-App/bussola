@@ -101,7 +101,7 @@ GET    /directories?path=                      folders inside path (default: the
 GET    /directories/repositories               git repositories found under the home directory, marking those already added
 ```
 
-- The repository scan walks the home directory breadth first, up to four levels deep. It skips hidden folders, dependency and build folders (`node_modules`, `vendor`, `dist`, `build`, `target` and similar) and macOS media and `Library` folders. It does not follow symlinks or descend into a repository it found, and it stops after five seconds or 500 results, reporting that the list is incomplete.
+- The repository scan walks the home directory breadth first, up to four levels deep. It skips hidden folders, dependency and build folders (`node_modules`, `vendor`, `dist`, `build`, `target` and similar) and macOS media and `Library` folders. It also looks inside repositories it found, since a repository can contain other independent repositories, but it does not follow symlinks, and it stops after five seconds or 500 results, reporting that the list is incomplete.
 
 - Both return only folder names and paths and whether a folder contains `.git`; they never return file names or file contents.
 - Both sit behind the same token and Host checks as the rest of the API.
