@@ -46,7 +46,7 @@ class PublishPlan:
     skipped: list[Outcome] = field(default_factory=list)
 
 
-def publish_comments(context: ReviewContext, adapter: ForgeAdapter, revision: Revision, *, draft: bool) -> PublishResult:
+def publish_comments(context: ReviewContext, adapter: ForgeAdapter, revision: Revision) -> PublishResult:
     link = require_link(context)
     pull = adapter.pull_request(link.repository, link.pr_number)
     if pull.head_sha != revision.head_sha:
@@ -54,7 +54,7 @@ def publish_comments(context: ReviewContext, adapter: ForgeAdapter, revision: Re
         raise ConflictError(f"The pull request head ({pr_head}) differs from the reviewed head ({reviewed}). Push the branch or refresh the review first.")
     plan = build_plan(context, revision, adapter.diff_ranges(link.repository, link.pr_number))
     publisher = _Publisher(context, adapter, link, revision.head_sha, list(plan.skipped))
-    review_url = publisher.submit_review(plan, draft=draft)
+    review_url = publisher.submit_review(plan)
     for comments, path, body in plan.files:
         publisher.attempt(comments, lambda path=path, body=body: adapter.create_file_comment(link.repository, link.pr_number, revision.head_sha, path, body))
     for comment, remote_id, body in plan.replies:
@@ -154,11 +154,11 @@ class _Publisher:
     commit_id: str
     outcomes: list[Outcome]
 
-    def submit_review(self, plan: PublishPlan, *, draft: bool) -> str | None:
+    def submit_review(self, plan: PublishPlan) -> str | None:
         if not plan.inline and not plan.body_parts:
             return None
         body = GROUP_SEPARATOR.join(text for _, text in plan.body_parts)
-        submission = ReviewSubmission(self.commit_id, body, [item for _, item in plan.inline], draft)
+        submission = ReviewSubmission(self.commit_id, body, [item for _, item in plan.inline])
         try:
             submitted = self.adapter.submit_review(self.link.repository, self.link.pr_number, submission)
         except ForgeError as error:

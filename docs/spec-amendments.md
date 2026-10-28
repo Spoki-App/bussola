@@ -79,7 +79,7 @@ Sending review comments to a GitHub pull request is now in scope for v1. It is o
 | Review thread | Part of the review body |
 | Reply in a thread already on GitHub | Reply to that review comment |
 
-- The review is sent with event `COMMENT`, or left `PENDING` (draft) if the user ticks "keep as draft on GitHub".
+- The review is sent with event `COMMENT` (sending as a pending draft was dropped in A7).
 - If the PR head SHA differs from the head SHA of the current revision, sending is blocked with a message asking to push or refresh, because line numbers would not match.
 - Table `published_comments`: `comment_id`, `provider`, `remote_id`, `remote_url`, `published_at`, `published_body_hash`. A comment edited after publishing is updated on GitHub at the next send; a comment deleted locally is not deleted on GitHub.
 - Resolving a thread is not propagated (changed by A6).
@@ -89,7 +89,6 @@ Sending review comments to a GitHub pull request is now in scope for v1. It is o
 ```
 GET    /reviews/{review_id}/forge              link status, detected PR candidates, gh availability
 PUT    /reviews/{review_id}/forge              {pr_number}
-POST   /reviews/{review_id}/forge/publish      {draft: bool} -> result for each comment (published, updated, failed with reason)
 ```
 
 ## A3. Choosing a repository folder from the UI
@@ -161,7 +160,7 @@ POST   /reviews/{review_id}/forge/sync         import the pull request conversat
 POST   /reviews/{review_id}/sync               refresh with fetch, then publish unsent comments when linked -> {refresh, published, publish_error, unsent_comments}
 ```
 
-- **Order:** the refresh runs first (A4 for pull request reviews, `git fetch` otherwise), then, if the review is linked and has unsent comments, they are published as in A2 with event `COMMENT`. Sending as a draft is no longer offered in the UI; `POST /reviews/{review_id}/forge/publish` keeps its `draft` flag.
+- **Order:** the refresh runs first (A4 for pull request reviews, `git fetch` otherwise), then, if the review is linked and has unsent comments, they are published as in A2 with event `COMMENT`. `/sync` is the only way to publish: the separate publish endpoint and the draft option were removed.
 - **Errors:** a failed fetch is a warning, as before. A failed publish (head mismatch, `gh` error) does not undo the refresh; its reason is returned in `publish_error`.
 - **Label:** `GET /reviews/{review_id}` returns `unsent_comments`, and the button reads "Sync · N to send" on a linked review with unsent comments.
 - **Linking:** when an unlinked review still has unsent comments after a sync, the page offers the matching open pull requests (or a number); choosing one links the review and syncs again.

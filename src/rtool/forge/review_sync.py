@@ -55,7 +55,7 @@ def sync_and_publish(context: ReviewContext, adapter: ForgeAdapter, git_repo: Gi
     publish_error = None
     if context.store.forge.link(context.review.id) is not None and pending_comment_count(context, revision) > 0:
         try:
-            published = publish_comments(context, adapter, revision, draft=False)
+            published = publish_comments(context, adapter, revision)
             context.store.commit()
         except PUBLISH_ERRORS as error:
             context.store.session.rollback()

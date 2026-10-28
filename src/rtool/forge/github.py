@@ -131,9 +131,8 @@ class GitHubAdapter:
             "commit_id": submission.commit_id,
             "body": submission.body,
             "comments": [_inline_payload(item) for item in submission.comments],
+            "event": "COMMENT",
         }
-        if not submission.draft:
-            payload["event"] = "COMMENT"
         review = self._json(["api", "--method", "POST", f"repos/{_repo(repository)}/pulls/{number}/reviews", "--input", "-"], payload)
         review_id = f"{REVIEW_PREFIX}{review['id']}" if "id" in review else None
         if not submission.comments:

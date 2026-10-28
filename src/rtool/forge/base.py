@@ -61,7 +61,6 @@ class ReviewSubmission:
     commit_id: str
     body: str
     comments: list[InlineComment] = field(default_factory=list)
-    draft: bool = False
 
 
 @dataclass(frozen=True)

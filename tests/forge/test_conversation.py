@@ -99,7 +99,7 @@ def test_reply_in_rtool_to_an_imported_thread_is_sent_as_a_github_reply(api: Api
     github.fake_gh.configure(files=[{"filename": "app.py", "patch": "@@ -1,2 +1,2 @@\n def total(items):\n-    return 0\n+    return sum(items)\n"}])
     github.fake_gh.clear_log()
 
-    api.call("POST", f"/reviews/{review}/forge/publish", body={"draft": False})
+    api.call("POST", f"/reviews/{review}/sync")
 
     reply = github.fake_gh.api_posts("/replies")[0]
     assert reply["args"][3].endswith("/comments/501/replies")

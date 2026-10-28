@@ -9,14 +9,12 @@ from rtool.api.schemas import (
     ForgeLinkIn,
     ForgeLinkOut,
     ForgeOut,
-    PublishIn,
-    PublishOut,
 )
 from rtool.api.state import app_state
-from rtool.api.views import forge_status_out, publish_out, pull_request_out
+from rtool.api.views import forge_status_out, pull_request_out
 from rtool.forge.base import Asset
 from rtool.forge.links import ForgeOverview, forge_overview, link_pull_request
-from rtool.forge.publish import publish_comments, require_link
+from rtool.forge.publish import require_link
 from rtool.forge.pulls import sync_conversation
 from rtool.review.context import ReviewContext
 from rtool.review.repos import open_repo
@@ -47,13 +45,6 @@ def put_forge(body: ForgeLinkIn, context: ContextDep, request: Request) -> Forge
     link_pull_request(context, app_state(request).forge, open_repo(repo_of(context)), body.pr_number)
     context.store.commit()
     return _overview(context, request)
-
-
-@router.post("/reviews/{review_id}/forge/publish")
-def publish(body: PublishIn, context: ContextDep, request: Request) -> PublishOut:
-    result = publish_comments(context, app_state(request).forge, resolve_revision(context, None), draft=body.draft)
-    context.store.commit()
-    return publish_out(result)
 
 
 @router.post("/reviews/{review_id}/forge/sync")

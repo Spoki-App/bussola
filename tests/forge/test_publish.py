@@ -32,8 +32,8 @@ def link(api: ApiClient, review: int) -> None:
     api.call("PUT", f"/reviews/{review}/forge", body={"pr_number": 7})
 
 
-def publish(api: ApiClient, review: int, *, draft: bool = False, expected: int = 200) -> Json:
-    return api.call("POST", f"/reviews/{review}/forge/publish", expected, {"draft": draft})
+def publish(api: ApiClient, review: int) -> Json:
+    return api.call("POST", f"/reviews/{review}/sync")["published"] or {"outcomes": []}
 
 
 def test_overview_detects_repository_and_candidate_pull_requests(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
@@ -121,16 +121,6 @@ def test_line_outside_the_pull_request_diff_becomes_a_file_comment(api: ApiClien
     assert fake_gh.api_posts("/reviews") == []
 
 
-def test_draft_review_is_left_pending(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
-    review = setup_review(api, git_repo, fake_gh)
-    link(api, review)
-    comment_on(api, review, "app.py::total", 2)
-
-    publish(api, review, draft=True)
-
-    assert "event" not in fake_gh.api_posts("/reviews")[0]["input"]
-
-
 def test_publish_is_blocked_when_the_pull_request_head_differs(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
     review = setup_review(api, git_repo, fake_gh)
     link(api, review)
@@ -138,9 +128,9 @@ def test_publish_is_blocked_when_the_pull_request_head_differs(api: ApiClient, g
     git_repo.commit({"app.py": HEAD + "\n"})
     api.refresh(review)
 
-    error = publish(api, review, expected=409)
+    result = api.call("POST", f"/reviews/{review}/sync")
 
-    assert "Push the branch or refresh" in str(error["detail"])
+    assert "Push the branch or refresh" in result["publish_error"]
     assert fake_gh.api_posts("/reviews") == []
 
 

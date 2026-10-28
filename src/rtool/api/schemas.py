@@ -291,10 +291,6 @@ class ForgeLinkIn(BaseModel):
     pr_number: int = Field(gt=0)
 
 
-class PublishIn(BaseModel):
-    draft: bool = False
-
-
 class PublishOutcomeOut(BaseModel):
     comment_ids: list[str]
     status: str
