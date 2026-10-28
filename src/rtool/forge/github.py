@@ -13,6 +13,20 @@ GH_TIMEOUT_SECONDS = 60
 GH_ENV = {"GH_PROMPT_DISABLED": "1", "NO_COLOR": "1", "GH_NO_UPDATE_NOTIFIER": "1"}
 PR_FIELDS = "number,title,url,headRefOid,headRefName,baseRefName,author,state,isDraft,updatedAt"
 PR_LIST_LIMIT = 100
+OPEN_PULLS_QUERY = """
+query($owner: String!, $name: String!, $limit: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(states: OPEN, first: $limit, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes {
+        number title url headRefOid headRefName baseRefName state isDraft updatedAt
+        author { login }
+        comments { totalCount }
+        reviewThreads(first: 100) { nodes { isResolved comments { totalCount } } }
+      }
+    }
+  }
+}
+"""
 REPOSITORY_NAME = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 REMOTE_PATTERNS = (
     re.compile(r"^git@github\.com:(?P<repo>[^/]+/[^/]+?)(?:\.git)?/?$"),
@@ -46,8 +60,14 @@ class GitHubAdapter:
         return [_pull_request(item) for item in self._json(args)]
 
     def open_pull_requests(self, repository: str) -> list[PullRequest]:
-        args = ["pr", "list", "--repo", _repo(repository), "--state", "open", "--limit", str(PR_LIST_LIMIT), "--json", PR_FIELDS]
-        return [_pull_request(item) for item in self._json(args)]
+        owner, name = _repo(repository).split("/")
+        args = ["api", "graphql", "-f", f"query={OPEN_PULLS_QUERY}", "-f", f"owner={owner}", "-f", f"name={name}", "-F", f"limit={PR_LIST_LIMIT}"]
+        response = self._json(args)
+        try:
+            nodes = response["data"]["repository"]["pullRequests"]["nodes"]
+        except (KeyError, TypeError) as error:
+            raise ForgeError(f"GitHub did not return the pull requests of {repository}") from error
+        return [_pull_request(node) for node in nodes]
 
     def pull_request(self, repository: str, number: int) -> PullRequest:
         return _pull_request(self._json(["pr", "view", str(number), "--repo", _repo(repository), "--json", PR_FIELDS]))
@@ -143,7 +163,22 @@ def _pull_request(item: JsonObject) -> PullRequest:
         state=item.get("state", "OPEN"),
         is_draft=bool(item.get("isDraft", False)),
         updated_at=item.get("updatedAt", ""),
+        comment_count=_comment_count(item),
+        unresolved_threads=sum(1 for thread in _threads(item) if not thread.get("isResolved", False)),
     )
+
+
+def _threads(item: JsonObject) -> list[JsonObject]:
+    threads: JsonObject = item.get("reviewThreads") or {}
+    return list(threads.get("nodes") or [])
+
+
+def _total(connection: JsonObject | None) -> int:
+    return int(connection.get("totalCount", 0)) if connection else 0
+
+
+def _comment_count(item: JsonObject) -> int:
+    return _total(item.get("comments")) + sum(_total(thread.get("comments")) for thread in _threads(item))
 
 
 def _login(author: JsonObject | None) -> str:

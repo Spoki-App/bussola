@@ -45,6 +45,7 @@ export interface Review {
   total: number
   approved: number
   open_threads: number
+  total_threads: number
   last_session_at: string | null
   pull_request: ReviewPullRequest | null
 }
@@ -170,6 +171,8 @@ export interface PullRequest {
   state: string
   is_draft: boolean
   updated_at: string
+  comment_count: number
+  unresolved_threads: number
 }
 
 export interface PullRequestRow {

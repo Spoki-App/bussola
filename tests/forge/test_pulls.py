@@ -33,6 +33,8 @@ class GitHubSandbox:
             "state": state,
             "isDraft": False,
             "updatedAt": "2026-10-28T10:00:00Z",
+            "comments": {"totalCount": 2},
+            "reviewThreads": {"nodes": [{"isResolved": False, "comments": {"totalCount": 3}}, {"isResolved": True, "comments": {"totalCount": 1}}]},
         }
         self.fake_gh.configure(prs=[pull], files=[])
         return head
@@ -70,6 +72,7 @@ def test_lists_open_pull_requests_of_the_github_remote(api: ApiClient, github: G
 
     assert listing["repository"] == "acme/widgets"
     assert [(row["pull"]["number"], row["pull"]["author"], row["review_id"]) for row in listing["pulls"]] == [(7, "bob", None)]
+    assert (listing["pulls"][0]["pull"]["comment_count"], listing["pulls"][0]["pull"]["unresolved_threads"]) == (6, 1)
 
 
 def test_reviewing_a_pull_request_fetches_its_code_and_links_it(api: ApiClient, github: GitHubSandbox) -> None:

@@ -73,6 +73,7 @@ class ReviewOut(BaseModel):
     total: int
     approved: int
     open_threads: int
+    total_threads: int
     last_session_at: datetime | None
     pull_request: ReviewPullOut | None = None
 
@@ -248,6 +249,8 @@ class PullRequestOut(BaseModel):
     state: str
     is_draft: bool
     updated_at: str
+    comment_count: int
+    unresolved_threads: int
 
 
 class ForgeLinkOut(BaseModel):

@@ -112,11 +112,12 @@ GET    /directories/repositories               git repositories found under the 
 For a repository whose remote (preferably `origin`) points to GitHub, rtool lists the open pull requests and turns any of them into a review.
 
 ```
-GET    /repos/{repo_id}/pulls                  open pull requests (number, title, author, branches, draft) and the review already linked to each
+GET    /repos/{repo_id}/pulls                  open pull requests (number, title, author, branches, draft, comments, unresolved threads) and the review already linked to each
 POST   /repos/{repo_id}/pulls/{number}/review  fetch the pull request and start (or reuse) its review
 POST   /repos/{repo_id}/pulls/sync             fetch every linked open pull request and refresh its review; mark closed or merged ones
 ```
 
+- **Listing:** one GitHub GraphQL query through `gh api graphql` returns the open pull requests with their comment count (conversation comments plus review comments) and the number of review threads not resolved, which `gh pr list` cannot report.
 - **Fetching:** `git fetch --no-tags <remote> +refs/pull/<n>/head:refs/rtool/pull/<n> +refs/heads/<base>:refs/remotes/<remote>/<base>`. The review compares `refs/rtool/pull/<n>` with `<remote>/<base>`, so the user's branches are never modified. The base branch name from GitHub is checked with `git check-ref-format --branch` before use.
 - **Linking:** the review is linked to the pull request through `forge_links`, which also keeps its title, author, URL, state and last sync time. Publishing comments (A2) then needs no separate linking step.
 - **Refresh:** on a pull request review, a refresh with `fetch` syncs that pull request instead of fetching the remote's default refspecs.

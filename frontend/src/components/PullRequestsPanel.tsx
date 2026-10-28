@@ -4,6 +4,7 @@ import type { PullSyncResult } from '../api/types'
 import { Link } from '../Link'
 import { navigate } from '../navigation'
 import { ErrorNote } from './Badges'
+import { CommentCount } from './CommentCount'
 
 function syncSummary(result: PullSyncResult): string {
   const parts = [`${String(result.updated)} updated`, `${String(result.closed)} closed or merged`]
@@ -59,6 +60,7 @@ export function PullRequestsPanel({ repoId }: { repoId: number }) {
               </span>
             </div>
             {pull.is_draft && <span className="badge kind">draft</span>}
+            <CommentCount total={pull.comment_count} unresolved={pull.unresolved_threads} totalLabel="comment" />
             {reviewId === null ? (
               <button
                 type="button"

@@ -216,7 +216,7 @@ textarea {
 
 .review-list li {
   display: grid;
-  grid-template-columns: minmax(200px, 1fr) 160px auto auto auto;
+  grid-template-columns: minmax(200px, 1fr) 160px auto auto minmax(150px, auto);
   align-items: center;
   gap: 16px;
   padding: 8px 0;
@@ -949,4 +949,27 @@ button.link {
 
 .repo-header button + button {
   margin-left: 0;
+}
+
+.comment-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 150px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.comment-count.empty {
+  visibility: hidden;
+}
+
+.comment-count .unresolved {
+  margin-left: 4px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 20px;
+  background: var(--warning-bg);
+  color: var(--warning);
 }

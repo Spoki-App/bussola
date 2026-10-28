@@ -87,7 +87,7 @@ def test_review_and_file_threads_and_replies(api: ApiClient, git_repo: GitFixtur
     threads = {thread["id"]: thread for thread in api.call("GET", f"/reviews/{review}/threads")}
     assert [comment["body"] for comment in threads[general["id"]]["comments"]] == ["Looks good overall", "Agreed"]
     assert threads[on_file["id"]]["status"] == "resolved"
-    assert summary["open_threads"] == 1
+    assert (summary["open_threads"], summary["total_threads"]) == (1, 2)
 
 
 def test_only_the_author_can_edit_or_delete_a_comment(api: ApiClient, git_repo: GitFixture) -> None:

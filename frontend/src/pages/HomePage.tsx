@@ -4,6 +4,7 @@ import { describeError } from '../api/client'
 import { useAddRepo, useCreateReview, useRefs, useRepos, useReviews } from '../api/hooks'
 import type { Repo } from '../api/types'
 import { ErrorNote, ProgressBar } from '../components/Badges'
+import { CommentCount } from '../components/CommentCount'
 import { DirectoryPicker } from '../components/DirectoryPicker'
 import { PullRequestsPanel } from '../components/PullRequestsPanel'
 import { ReviewTitle } from '../components/ReviewTitle'
@@ -98,7 +99,7 @@ function RepoSection({ repo }: { repo: Repo }) {
             <ProgressBar percent={progressPercent(review)} label={`Progress of ${review.head_ref}`} />
             <span className="muted">{`${String(review.approved)}/${String(review.total)} approved`}</span>
             <span className="muted">{`${String(review.total - review.approved)} to review`}</span>
-            {review.open_threads > 0 && <span className="muted">{`${String(review.open_threads)} open thread${review.open_threads === 1 ? '' : 's'}`}</span>}
+            <CommentCount total={review.total_threads} unresolved={review.open_threads} totalLabel="thread" />
           </li>
         ))}
       </ul>

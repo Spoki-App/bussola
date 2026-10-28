@@ -67,6 +67,10 @@ def main():
         log.write(json.dumps({"args": args, "input": payload}) + "\n")
     if args[:2] == ["auth", "status"]:
         sys.exit(0 if state.get("authenticated", True) else 1)
+    if args[:2] == ["api", "graphql"]:
+        open_pulls = [pr for pr in state["prs"] if pr.get("state", "OPEN") == "OPEN"]
+        print(json.dumps({"data": {"repository": {"pullRequests": {"nodes": open_pulls}}}}))
+        return
     result = pull_requests(args, state) if args[0] == "pr" else api(args, state, payload)
     STATE.write_text(json.dumps(state))
     print(json.dumps(result))

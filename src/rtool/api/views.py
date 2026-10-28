@@ -43,6 +43,7 @@ def review_out(context: ReviewContext, repo: Repo) -> ReviewOut:
         total=len(views),
         approved=sum(counts[state] for state in DONE_STATES),
         open_threads=sum(open_thread_counts(context.store, context.review.id).values()),
+        total_threads=len(context.store.threads.threads(context.review.id)),
         last_session_at=last_session.completed_at if last_session else None,
         pull_request=_pull_out(context),
     )
