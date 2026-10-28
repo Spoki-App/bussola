@@ -1010,3 +1010,7 @@ button.link {
   margin: 0 0 4px;
   font-size: 12px;
 }
+
+.diff .diff-gutter {
+  -webkit-user-select: none;
+}

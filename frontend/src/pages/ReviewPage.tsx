@@ -13,6 +13,7 @@ import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, groupByFile, next
 
 export interface ReviewExtensions {
   onComment?: (target: CommentTarget) => void
+  onCommentSelectEnd?: () => void
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
   unitFooter?: (unit: Unit) => ReactNode
@@ -170,7 +171,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           ))}
         </div>
         <div className="summary-row">
-          <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r refresh. Click a line number to comment, shift-click another to comment on the lines between.</p>
+          <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r refresh. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>
           {extensions.sidePanel && (
             <button type="button" aria-pressed={panelOpen} onClick={() => { setPanelOpen(!panelOpen) }}>
               {panelOpen ? `Hide ${extensions.sidePanel.label}` : `Show ${extensions.sidePanel.label}`}
@@ -197,6 +198,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                   onFocus={() => { setFocusedIndex(unitList.indexOf(unit)) }}
                   register={register}
                   onComment={extensions.onComment}
+                  onCommentSelectEnd={extensions.onCommentSelectEnd}
                   renderWidgets={extensions.renderWidgets}
                   highlightRows={extensions.highlightRows}
                   footer={extensions.unitFooter?.(unit)}

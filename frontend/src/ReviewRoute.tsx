@@ -11,7 +11,7 @@ import { GitHubButton } from './components/GitHubButton'
 import { ThreadPanel } from './components/ThreadPanel'
 import { ThreadView } from './components/ThreadView'
 import { ReviewPage } from './pages/ReviewPage'
-import { draftEndRow, draftRequest, draftRowKeys, isInline, nextDraft, threadRow, type Draft } from './review/threadPlacement'
+import { draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, nextDraft, threadRow, type Draft } from './review/threadPlacement'
 
 export function ReviewRoute({ reviewId }: { reviewId: number }) {
   const review = useReview(reviewId)
@@ -32,7 +32,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
     for (const thread of inline.filter((candidate: Thread) => candidate.anchor?.unit_id === unit.id)) {
       place(threadRow(thread, diff), <ThreadView key={thread.id} reviewId={reviewId} thread={thread} />)
     }
-    if (draft?.unitId === unit.id && draft.mode === diff.mode) {
+    if (draft?.unitId === unit.id && draft.mode === diff.mode && !draft.selecting) {
       const request = draftRequest(draft)
       place(
         draftEndRow(draft, diff.rows),
@@ -56,7 +56,8 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
     <ReviewPage
       reviewId={reviewId}
       extensions={{
-        onComment: (target) => { setDraft(nextDraft(draft, target, target.extend)) },
+        onComment: (target) => { setDraft((current) => nextDraft(current, target, target.extend)) },
+        onCommentSelectEnd: () => { setDraft(finishSelection) },
         highlightRows: (unit, diff) => (draft?.unitId === unit.id && draft.mode === diff.mode ? draftRowKeys(draft, diff.rows) : undefined),
         renderWidgets,
         fileActions: (path) => <FileCommentButton reviewId={reviewId} path={path} />,

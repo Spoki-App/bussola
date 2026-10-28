@@ -59,7 +59,7 @@ Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve
 
 ### Comments
 
-Click a line number to start a thread on that line, and shift-click another line number to extend it to the lines in between (sent to GitHub as a multi-line comment). Use "Comment on file" in a file header, or the conversation panel for comments on the whole review. Comments are Markdown. When the code changes, a thread moves with its line. It follows a renamed unit, and becomes outdated, showing the original snippet, when its line is gone.
+Click a line number to start a thread on that line. To comment on several lines, drag over their line numbers or shift-click another line number; the thread is sent to GitHub as a multi-line comment. Use "Comment on file" in a file header, or the conversation panel for comments on the whole review. Comments are Markdown. When the code changes, a thread moves with its line. It follows a renamed unit, and becomes outdated, showing the original snippet, when its line is gone.
 
 ### Reviewing GitHub pull requests
 

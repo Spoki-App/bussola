@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { DiffRow, Thread, Unit, UnitDiff } from '../api/types'
 import type { CommentTarget } from '../components/UnitCard'
 import { rowKey } from './selection'
-import { draftAnchor, draftEndRow, draftRequest, draftRowKeys, isInline, nextDraft, threadRow } from './threadPlacement'
+import { draftAnchor, draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, nextDraft, threadRow } from './threadPlacement'
 
 function row(change: DiffRow['change'], oldIndex: number | null, newIndex: number | null, text: string): DiffRow {
   return {
@@ -25,7 +25,7 @@ const unit = { id: 1 } as Unit
 
 function target(index: number, extend = false, mode: CommentTarget['mode'] = 'base'): CommentTarget {
   const picked = rows[index]
-  return { unit, row: picked, side: picked.change === 'removed' ? 'old' : 'new', mode, extend }
+  return { unit, row: picked, side: picked.change === 'removed' ? 'old' : 'new', mode, extend, selecting: false }
 }
 
 function diff(mode: UnitDiff['mode']): UnitDiff {
@@ -82,6 +82,15 @@ describe('nextDraft', () => {
     const first = nextDraft(null, target(2), false)
 
     expect(nextDraft(first, target(1, true), true)).toEqual(first)
+  })
+
+  it('keeps the draft in selecting mode while dragging until the selection ends', () => {
+    const pressed = nextDraft(null, { ...target(2), selecting: true }, false)
+    const dragged = nextDraft(pressed, { ...target(4, true), selecting: true }, true) ?? fail()
+
+    expect(dragged.selecting).toBe(true)
+    expect(draftRequest(dragged)).toEqual({ side: 'head', line_offset: 1, line_count: 3 })
+    expect(finishSelection(dragged)?.selecting).toBe(false)
   })
 
   it('starts over when shift-clicking in another unit', () => {

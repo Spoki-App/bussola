@@ -14,6 +14,7 @@ export interface Draft {
   anchor: number
   start: number
   end: number
+  selecting: boolean
 }
 
 export function draftAnchor(target: CommentTarget): DraftAnchor | null {
@@ -30,14 +31,15 @@ export function draftAnchor(target: CommentTarget): DraftAnchor | null {
 export function nextDraft(current: Draft | null, target: CommentTarget, extend: boolean): Draft | null {
   if (extend && current?.unitId === target.unit.id && current.mode === target.mode) {
     const offset = sideIndex(target.row, current.side, current.mode)
-    return offset === null ? current : { ...current, start: Math.min(current.anchor, offset), end: Math.max(current.anchor, offset) }
+    const selecting = target.selecting
+    return offset === null ? { ...current, selecting } : { ...current, selecting, start: Math.min(current.anchor, offset), end: Math.max(current.anchor, offset) }
   }
   const anchor = draftAnchor(target)
   if (!anchor) {
     return null
   }
   const offset = anchor.line_offset
-  return { unitId: target.unit.id, mode: target.mode, side: anchor.side, anchor: offset, start: offset, end: offset }
+  return { unitId: target.unit.id, mode: target.mode, side: anchor.side, anchor: offset, start: offset, end: offset, selecting: target.selecting }
 }
 
 export function draftRequest(draft: Draft): { side: Side; line_offset: number; line_count: number } {
@@ -78,4 +80,8 @@ function sideIndex(row: DiffRow, side: Side, mode: DiffMode): number | null {
     return mode === 'base' && row.change !== 'added' ? row.old_index : null
   }
   return row.new_index
+}
+
+export function finishSelection(draft: Draft | null): Draft | null {
+  return draft?.selecting ? { ...draft, selecting: false } : draft
 }
