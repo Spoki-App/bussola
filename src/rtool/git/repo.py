@@ -100,7 +100,19 @@ class GitRepo:
     def remote_url(self, remote: str) -> str | None:
         if remote not in self.remotes():
             return None
-        return self.run("remote", "get-url", "--", remote).decode().strip() or None
+        return self.config_value(f"remote.{remote}.url")
+
+    def fetch_refspecs(self, remote: str, refspecs: list[str]) -> None:
+        if remote not in self.remotes():
+            raise InvalidRefError(remote)
+        self.run("fetch", "--quiet", "--no-tags", "--end-of-options", remote, *refspecs)
+
+    def is_valid_branch_name(self, name: str) -> bool:
+        try:
+            self.run("check-ref-format", "--branch", name)
+        except GitError:
+            return False
+        return not name.startswith("-")
 
     def fetch(self, remote: str) -> None:
         if remote not in self.remotes():

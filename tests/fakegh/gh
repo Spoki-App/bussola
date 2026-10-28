@@ -54,6 +54,8 @@ def pull_requests(args, state):
     if args[1] == "view":
         found = [pr for pr in state["prs"] if str(pr["number"]) == args[2]]
         return found[0] if found else fail("no pull requests found")
+    if "--head" not in args:
+        return [pr for pr in state["prs"] if pr.get("state", "OPEN") == "OPEN"]
     return [pr for pr in state["prs"] if pr["headRefName"] == option(args, "--head") and pr["baseRefName"] == option(args, "--base")]
 
 

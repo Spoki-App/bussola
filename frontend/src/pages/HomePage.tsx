@@ -5,6 +5,8 @@ import { useAddRepo, useCreateReview, useRefs, useRepos, useReviews } from '../a
 import type { Repo } from '../api/types'
 import { ErrorNote, ProgressBar } from '../components/Badges'
 import { DirectoryPicker } from '../components/DirectoryPicker'
+import { PullRequestsPanel } from '../components/PullRequestsPanel'
+import { ReviewTitle } from '../components/ReviewTitle'
 import { Link } from '../Link'
 import { navigate } from '../navigation'
 import { progressPercent } from '../review/logic'
@@ -65,6 +67,7 @@ function AddRepoForm() {
 function RepoSection({ repo }: { repo: Repo }) {
   const reviews = useReviews(repo.id)
   const [creating, setCreating] = useState(false)
+  const [showPulls, setShowPulls] = useState(false)
   return (
     <section className="repo">
       <div className="repo-header">
@@ -72,19 +75,25 @@ function RepoSection({ repo }: { repo: Repo }) {
         <span className="muted">{repo.path}</span>
         <span className="spacer" />
         {!repo.missing && (
-          <button type="button" onClick={() => { setCreating(!creating) }}>
-            New review
-          </button>
+          <>
+            <button type="button" aria-expanded={showPulls} onClick={() => { setShowPulls(!showPulls) }}>
+              Pull requests
+            </button>
+            <button type="button" aria-expanded={creating} onClick={() => { setCreating(!creating) }}>
+              New review
+            </button>
+          </>
         )}
       </div>
       {repo.missing && <ErrorNote message="This repository is no longer at this path. Add it again from its new location; its reviews will follow it." />}
+      {showPulls && <PullRequestsPanel repoId={repo.id} />}
       {creating && <NewReviewForm repoId={repo.id} />}
       {reviews.error && <ErrorNote message={describeError(reviews.error)} />}
       <ul className="review-list">
         {reviews.data?.map((review) => (
           <li key={review.id}>
             <Link to={`/reviews/${String(review.id)}`} className="review-link">
-              <code>{review.head_ref}</code> <span className="muted">into</span> <code>{review.base_ref}</code>
+              <ReviewTitle review={review} />
             </Link>
             <ProgressBar percent={progressPercent(review)} label={`Progress of ${review.head_ref}`} />
             <span className="muted">{`${String(review.approved)}/${String(review.total)} approved`}</span>

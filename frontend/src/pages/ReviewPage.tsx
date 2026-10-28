@@ -5,6 +5,7 @@ import { useApprove, useFinishReview, useRefresh, useReview, useUnits } from '..
 import type { DiffRow, ReviewDetail, Unit, UnitDiff, UnitFilter } from '../api/types'
 import { ErrorNote, ProgressBar } from '../components/Badges'
 import { FileTree } from '../components/FileTree'
+import { ReviewTitle } from '../components/ReviewTitle'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
@@ -52,8 +53,17 @@ function ReviewHeader({ review, extra }: { review: ReviewDetail; extra?: ReactNo
           {review.repo_path.split('/').at(-1)}
         </Link>
         <h1>
-          <code>{review.head_ref}</code> <span className="muted">into</span> <code>{review.base_ref}</code>
+          <ReviewTitle review={review} />
         </h1>
+        {review.pull_request?.url && (
+          <p className="muted">
+            <a href={review.pull_request.url} target="_blank" rel="noreferrer">
+              View on GitHub
+            </a>
+            {review.pull_request.author && ` · by ${review.pull_request.author}`}
+            {' · Refresh with fetch pulls the latest commits of the pull request'}
+          </p>
+        )}
         {revision && (
           <p className="muted">
             {`Revision ${String(revision.number)} · ${shortSha(revision.head_sha)} · refreshed ${new Date(revision.created_at).toLocaleString()}`}

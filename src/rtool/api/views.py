@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from rtool.api.schemas import ApprovalOut, RepoOut, ReviewDetailOut, ReviewOut, RevisionOut, RowApprovalOut, UnitOut
+from rtool.api.schemas import ApprovalOut, RepoOut, ReviewDetailOut, ReviewOut, ReviewPullOut, RevisionOut, RowApprovalOut, UnitOut
 from rtool.review.context import ReviewContext
 from rtool.review.diffs import DiffMode
 from rtool.review.overview import UnitView, count_states, unit_views
@@ -44,7 +44,15 @@ def review_out(context: ReviewContext, repo: Repo) -> ReviewOut:
         approved=sum(counts[state] for state in DONE_STATES),
         open_threads=sum(open_thread_counts(context.store, context.review.id).values()),
         last_session_at=last_session.completed_at if last_session else None,
+        pull_request=_pull_out(context),
     )
+
+
+def _pull_out(context: ReviewContext) -> ReviewPullOut | None:
+    link = context.store.forge.link(context.review.id)
+    if link is None:
+        return None
+    return ReviewPullOut(number=link.pr_number, title=link.title, url=link.url, author=link.author, state=link.state)
 
 
 def review_detail_out(context: ReviewContext, repo: Repo) -> ReviewDetailOut:

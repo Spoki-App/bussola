@@ -1,8 +1,10 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 
 from rtool.api.deps import ContextDep, ReviewerDep, repo_of, resolve_revision
 from rtool.api.schemas import RefreshIn, RefreshOut, ReviewDetailOut, ReviewerOut, SessionOut
+from rtool.api.state import app_state
 from rtool.api.views import review_detail_out, revision_out
+from rtool.forge.pulls import PULL_REF_PREFIX, sync_review
 from rtool.review.hooks import REVISION_HOOKS
 from rtool.review.repos import open_repo
 from rtool.review.revisions import refresh_review
@@ -22,8 +24,12 @@ def get_review(context: ContextDep) -> ReviewDetailOut:
 
 
 @router.post("/reviews/{review_id}/refresh")
-def refresh(body: RefreshIn, context: ContextDep) -> RefreshOut:
-    result = refresh_review(context.store, context.review, open_repo(repo_of(context)), fetch=body.fetch, hooks=REVISION_HOOKS)
+def refresh(body: RefreshIn, context: ContextDep, request: Request) -> RefreshOut:
+    git_repo = open_repo(repo_of(context))
+    link = context.store.forge.link(context.review.id)
+    pull_review = body.fetch and link is not None and context.review.head_ref.startswith(PULL_REF_PREFIX)
+    synced = sync_review(context.store, app_state(request).forge, git_repo, context.review, link) if pull_review and link is not None else None
+    result = synced or refresh_review(context.store, context.review, git_repo, fetch=body.fetch and not pull_review, hooks=REVISION_HOOKS)
     context.store.commit()
     return RefreshOut(revision=revision_out(result.revision), created=result.created)
 

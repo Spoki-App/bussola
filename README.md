@@ -61,6 +61,16 @@ Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve
 
 Click a line number to start a thread on that line. Use "Comment on file" in a file header, or the conversation panel for comments on the whole review. Comments are Markdown. When the code changes, a thread moves with its line. It follows a renamed unit, and becomes outdated, showing the original snippet, when its line is gone.
 
+### Reviewing GitHub pull requests
+
+For a repository with a GitHub remote, **Pull requests** on its card lists the open pull requests (read with the GitHub CLI, see below).
+
+- **Review** downloads the pull request's code with `git fetch` into `refs/rtool/pull/<number>`, so your branches are not touched. It then starts a review against the pull request's base branch, already linked to the pull request.
+- **Sync reviews** fetches the latest commits of every pull request you are reviewing in that repository and records new revisions. Pull requests that were closed or merged are marked as such.
+- On a pull request review, **Refresh** with **fetch** does the same for that one pull request.
+
+rtool only contacts GitHub when you press one of these buttons.
+
 ### Sending comments to GitHub
 
 The "GitHub" button links the review to a pull request and sends the comments you have not sent yet as one pull request review. It uses the [GitHub CLI](https://cli.github.com), so run `gh auth login` once; rtool never stores a token.

@@ -204,6 +204,11 @@ class ForgeLink(Base):
     provider: Mapped[str] = mapped_column()
     repository: Mapped[str] = mapped_column()
     pr_number: Mapped[int] = mapped_column()
+    title: Mapped[str | None] = mapped_column(default=None)
+    author: Mapped[str | None] = mapped_column(default=None)
+    url: Mapped[str | None] = mapped_column(default=None)
+    state: Mapped[str | None] = mapped_column(default=None)
+    synced_at: Mapped[datetime | None] = mapped_column(default=None)
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
 

@@ -107,6 +107,21 @@ GET    /directories/repositories               git repositories found under the 
 - Both sit behind the same token and Host checks as the rest of the API.
 - This is the one exception to section 11's rule about not reading the filesystem with paths from the input: only directory metadata is read.
 
+## A4. Reviewing GitHub pull requests
+
+For a repository whose remote (preferably `origin`) points to GitHub, rtool lists the open pull requests and turns any of them into a review.
+
+```
+GET    /repos/{repo_id}/pulls                  open pull requests (number, title, author, branches, draft) and the review already linked to each
+POST   /repos/{repo_id}/pulls/{number}/review  fetch the pull request and start (or reuse) its review
+POST   /repos/{repo_id}/pulls/sync             fetch every linked open pull request and refresh its review; mark closed or merged ones
+```
+
+- **Fetching:** `git fetch --no-tags <remote> +refs/pull/<n>/head:refs/rtool/pull/<n> +refs/heads/<base>:refs/remotes/<remote>/<base>`. The review compares `refs/rtool/pull/<n>` with `<remote>/<base>`, so the user's branches are never modified. The base branch name from GitHub is checked with `git check-ref-format --branch` before use.
+- **Linking:** the review is linked to the pull request through `forge_links`, which also keeps its title, author, URL, state and last sync time. Publishing comments (A2) then needs no separate linking step.
+- **Refresh:** on a pull request review, a refresh with `fetch` syncs that pull request instead of fetching the remote's default refspecs.
+- **Network:** as in A2, GitHub is only contacted on an explicit user action.
+
 ## Plan changes
 
 - A1 is part of M2 (model, states, API) and M3 (selection UI).

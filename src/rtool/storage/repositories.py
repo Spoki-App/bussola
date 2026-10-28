@@ -64,6 +64,7 @@ class ThreadRepository(Protocol):
 
 class ForgeRepository(Protocol):
     def link(self, review_id: int) -> ForgeLink | None: ...
+    def links_for_repo(self, repo_id: int) -> list[ForgeLink]: ...
     def save_link(self, link: ForgeLink) -> ForgeLink: ...
     def published(self, comment_ids: list[str]) -> dict[str, PublishedComment]: ...
     def save_published(self, published: PublishedComment) -> PublishedComment: ...
@@ -226,6 +227,10 @@ class SqlForgeRepository:
     def link(self, review_id: int) -> ForgeLink | None:
         return self._session.scalar(select(ForgeLink).where(ForgeLink.review_id == review_id))
 
+    def links_for_repo(self, repo_id: int) -> list[ForgeLink]:
+        query = select(ForgeLink).join(Review, Review.id == ForgeLink.review_id).where(Review.repo_id == repo_id).order_by(ForgeLink.pr_number)
+        return list(self._session.scalars(query))
+
     def save_link(self, link: ForgeLink) -> ForgeLink:
         existing = self.link(link.review_id)
         if existing is None:
@@ -233,6 +238,9 @@ class SqlForgeRepository:
             self._session.flush()
             return link
         existing.provider, existing.repository, existing.pr_number = link.provider, link.repository, link.pr_number
+        if link.synced_at is not None:
+            existing.title, existing.author, existing.url, existing.state = link.title, link.author, link.url, link.state
+            existing.synced_at = link.synced_at
         return existing
 
     def published(self, comment_ids: list[str]) -> dict[str, PublishedComment]:

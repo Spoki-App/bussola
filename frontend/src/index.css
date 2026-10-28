@@ -884,3 +884,69 @@ button.link {
   padding: 0 12px;
   font-size: 12px;
 }
+
+.pulls {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+}
+
+.pulls-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pull-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pull-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.pull-info {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.pull-info a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pull-info .muted {
+  font-size: 12px;
+}
+
+.pr-number {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.pr-state {
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.button-link {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.repo-header button + button {
+  margin-left: 0;
+}

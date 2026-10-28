@@ -46,6 +46,7 @@ export interface Review {
   approved: number
   open_threads: number
   last_session_at: string | null
+  pull_request: ReviewPullRequest | null
 }
 
 export interface ReviewDetail extends Review {
@@ -165,6 +166,35 @@ export interface PullRequest {
   head_sha: string
   head_ref: string
   base_ref: string
+  author: string
+  state: string
+  is_draft: boolean
+  updated_at: string
+}
+
+export interface PullRequestRow {
+  pull: PullRequest
+  review_id: number | null
+}
+
+export interface PullRequestList {
+  status: { available: boolean; authenticated: boolean; message: string }
+  repository: string | null
+  pulls: PullRequestRow[]
+}
+
+export interface PullSyncResult {
+  updated: number
+  closed: number
+  failed: string[]
+}
+
+export interface ReviewPullRequest {
+  number: number
+  title: string | null
+  url: string | null
+  author: string | null
+  state: string | null
 }
 
 export interface ForgeOverview {

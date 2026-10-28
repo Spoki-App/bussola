@@ -11,7 +11,8 @@ GH = "gh"
 PROVIDER = "github"
 GH_TIMEOUT_SECONDS = 60
 GH_ENV = {"GH_PROMPT_DISABLED": "1", "NO_COLOR": "1", "GH_NO_UPDATE_NOTIFIER": "1"}
-PR_FIELDS = "number,title,url,headRefOid,headRefName,baseRefName"
+PR_FIELDS = "number,title,url,headRefOid,headRefName,baseRefName,author,state,isDraft,updatedAt"
+PR_LIST_LIMIT = 100
 REPOSITORY_NAME = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 REMOTE_PATTERNS = (
     re.compile(r"^git@github\.com:(?P<repo>[^/]+/[^/]+?)(?:\.git)?/?$"),
@@ -42,6 +43,10 @@ class GitHubAdapter:
 
     def find_pull_requests(self, repository: str, head_branch: str, base_branch: str) -> list[PullRequest]:
         args = ["pr", "list", "--repo", _repo(repository), "--state", "open", "--head", head_branch, "--base", base_branch, "--json", PR_FIELDS]
+        return [_pull_request(item) for item in self._json(args)]
+
+    def open_pull_requests(self, repository: str) -> list[PullRequest]:
+        args = ["pr", "list", "--repo", _repo(repository), "--state", "open", "--limit", str(PR_LIST_LIMIT), "--json", PR_FIELDS]
         return [_pull_request(item) for item in self._json(args)]
 
     def pull_request(self, repository: str, number: int) -> PullRequest:
@@ -127,7 +132,22 @@ def _match_comments(submission: ReviewSubmission, remote: list[JsonObject]) -> l
 
 
 def _pull_request(item: JsonObject) -> PullRequest:
-    return PullRequest(item["number"], item.get("title", ""), item.get("url", ""), item["headRefOid"], item.get("headRefName", ""), item.get("baseRefName", ""))
+    return PullRequest(
+        number=item["number"],
+        title=item.get("title", ""),
+        url=item.get("url", ""),
+        head_sha=item["headRefOid"],
+        head_ref=item.get("headRefName", ""),
+        base_ref=item.get("baseRefName", ""),
+        author=_login(item.get("author")),
+        state=item.get("state", "OPEN"),
+        is_draft=bool(item.get("isDraft", False)),
+        updated_at=item.get("updatedAt", ""),
+    )
+
+
+def _login(author: JsonObject | None) -> str:
+    return str(author.get("login", "")) if author else ""
 
 
 def _remote(item: JsonObject) -> RemoteComment:

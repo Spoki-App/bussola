@@ -54,6 +54,14 @@ class RevisionOut(BaseModel):
     created_at: datetime
 
 
+class ReviewPullOut(BaseModel):
+    number: int
+    title: str | None
+    url: str | None
+    author: str | None
+    state: str | None
+
+
 class ReviewOut(BaseModel):
     id: int
     repo_id: int
@@ -66,6 +74,7 @@ class ReviewOut(BaseModel):
     approved: int
     open_threads: int
     last_session_at: datetime | None
+    pull_request: ReviewPullOut | None = None
 
 
 class ReviewDetailOut(ReviewOut):
@@ -235,6 +244,10 @@ class PullRequestOut(BaseModel):
     head_sha: str
     head_ref: str
     base_ref: str
+    author: str
+    state: str
+    is_draft: bool
+    updated_at: str
 
 
 class ForgeLinkOut(BaseModel):
@@ -299,3 +312,20 @@ class RepositoryScanOut(BaseModel):
     root: str
     repositories: list[FoundRepositoryOut]
     truncated: bool
+
+
+class PullRequestRowOut(BaseModel):
+    pull: PullRequestOut
+    review_id: int | None
+
+
+class PullRequestListOut(BaseModel):
+    status: ForgeStatusOut
+    repository: str | None
+    pulls: list[PullRequestRowOut]
+
+
+class PullSyncOut(BaseModel):
+    updated: int
+    closed: int
+    failed: list[str]
