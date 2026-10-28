@@ -1,4 +1,4 @@
-from tree_sitter import Language, Node, Parser
+from tree_sitter import Language, Node, Parser, Tree
 
 from rtool.units.extractors.base import NameLocation, Span
 from rtool.units.model import UnitKind
@@ -6,9 +6,9 @@ from rtool.units.model import UnitKind
 COMMENT = "comment"
 
 
-def parse(language: Language, source: bytes) -> Node | None:
-    root = Parser(language).parse(source).root_node
-    return None if root.has_error else root
+def parse(language: Language, source: bytes) -> Tree | None:
+    tree = Parser(language).parse(source)
+    return None if tree.root_node.has_error else tree
 
 
 def node_text(node: Node | None) -> str:

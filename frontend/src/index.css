@@ -842,3 +842,15 @@ button.link {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.inline-form input.ref-input {
+  flex: 0 1 220px;
+  min-width: 140px;
+  font-family: var(--mono);
+}
+
+.form-hint {
+  width: 100%;
+  margin: 0;
+  color: var(--muted);
+}

@@ -2,14 +2,14 @@ import { useState, type SubmitEvent } from 'react'
 
 import { describeError } from '../api/client'
 import { useAddRepo, useCreateReview, useRefs, useRepos, useReviews } from '../api/hooks'
-import type { Refs, Repo } from '../api/types'
+import type { Repo } from '../api/types'
 import { ErrorNote, ProgressBar } from '../components/Badges'
 import { DirectoryPicker } from '../components/DirectoryPicker'
 import { Link } from '../Link'
 import { navigate } from '../navigation'
 import { progressPercent } from '../review/logic'
+import { defaultReviewRefs, reviewFormProblem } from '../review/newReview'
 
-const BASE_FALLBACKS = ['develop', 'main', 'master']
 
 export function HomePage() {
   const repos = useRepos()
@@ -97,10 +97,6 @@ function RepoSection({ repo }: { repo: Repo }) {
   )
 }
 
-function defaultBase(refs: Refs): string {
-  return refs.default_base ?? BASE_FALLBACKS.find((name) => refs.local.includes(name)) ?? refs.local.at(0) ?? ''
-}
-
 function NewReviewForm({ repoId }: { repoId: number }) {
   const refs = useRefs(repoId, true)
   const create = useCreateReview(repoId)
@@ -112,41 +108,54 @@ function NewReviewForm({ repoId }: { repoId: number }) {
   if (refs.error) {
     return <ErrorNote message={describeError(refs.error)} />
   }
-  const options = [...refs.data.local, ...refs.data.remote]
-  const chosenBase = base ?? defaultBase(refs.data)
-  const chosenHead = head ?? refs.data.local.find((name) => name !== chosenBase) ?? ''
+  const defaults = defaultReviewRefs(refs.data)
+  const choice = { head: head ?? defaults.head, base: base ?? defaults.base }
+  const problem = reviewFormProblem(refs.data, choice)
+  const suggestions = `refs-${String(repoId)}`
   const submit = (event: SubmitEvent) => {
     event.preventDefault()
-    create.mutate({ head_ref: chosenHead, base_ref: chosenBase }, { onSuccess: (review) => { navigate(`/reviews/${String(review.id)}`) } })
+    create.mutate({ head_ref: choice.head.trim(), base_ref: choice.base.trim() }, { onSuccess: (review) => { navigate(`/reviews/${String(review.id)}`) } })
   }
   return (
     <form className="inline-form" onSubmit={submit}>
-      <BranchSelect id={`head-${String(repoId)}`} label="Branch" value={chosenHead} refs={refs.data} onChange={setHead} />
-      <BranchSelect id={`base-${String(repoId)}`} label="against" value={chosenBase} refs={refs.data} onChange={setBase} />
-      <button type="submit" className="primary" disabled={!chosenHead || !chosenBase || create.isPending || !options.includes(chosenHead)}>
+      <datalist id={suggestions}>
+        {[...refs.data.local, ...refs.data.remote].map((name) => (
+          <option key={name} value={name} />
+        ))}
+      </datalist>
+      <RefInput id={`head-${String(repoId)}`} label="Branch" value={choice.head} suggestions={suggestions} onChange={setHead} />
+      <RefInput id={`base-${String(repoId)}`} label="against" value={choice.base} suggestions={suggestions} onChange={setBase} />
+      <button type="submit" className="primary" disabled={problem !== null || create.isPending}>
         {create.isPending ? 'Creating...' : 'Start review'}
       </button>
+      {problem && <p className="form-hint">{problem}</p>}
       {create.error && <ErrorNote message={describeError(create.error)} />}
     </form>
   )
 }
 
-function BranchSelect({ id, label, value, refs, onChange }: { id: string; label: string; value: string; refs: Refs; onChange: (value: string) => void }) {
+interface RefInputProps {
+  id: string
+  label: string
+  value: string
+  suggestions: string
+  onChange: (value: string) => void
+}
+
+function RefInput({ id, label, value, suggestions, onChange }: RefInputProps) {
   return (
     <>
       <label htmlFor={id}>{label}</label>
-      <select id={id} value={value} onChange={(event) => { onChange(event.target.value) }}>
-        <optgroup label="Local">
-          {refs.local.map((name) => (
-            <option key={name}>{name}</option>
-          ))}
-        </optgroup>
-        <optgroup label="Remote">
-          {refs.remote.map((name) => (
-            <option key={name}>{name}</option>
-          ))}
-        </optgroup>
-      </select>
+      <input
+        id={id}
+        className="ref-input"
+        list={suggestions}
+        value={value}
+        spellCheck={false}
+        autoComplete="off"
+        placeholder="branch or commit"
+        onChange={(event) => { onChange(event.target.value) }}
+      />
     </>
   )
 }

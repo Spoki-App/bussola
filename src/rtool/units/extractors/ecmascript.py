@@ -25,10 +25,10 @@ class EcmaScriptExtractor:
         self._language = language
 
     def extract(self, source: bytes) -> list[Unit] | None:
-        root = parse(self._language, source)
-        if root is None:
+        tree = parse(self._language, source)
+        if tree is None:
             return None
-        siblings = root.named_children
+        siblings = tree.root_node.named_children
         spans = [span for index in range(len(siblings)) if (span := _top_level_span(siblings, index)) is not None]
         return build_units(SourceLines.from_bytes(source), spans)
 

@@ -16,10 +16,10 @@ class PythonExtractor:
     version: int = 1
 
     def extract(self, source: bytes) -> list[Unit] | None:
-        root = parse(PYTHON, source)
-        if root is None:
+        tree = parse(PYTHON, source)
+        if tree is None:
             return None
-        return build_units(SourceLines.from_bytes(source), _collect(root.named_children, "", in_class=False))
+        return build_units(SourceLines.from_bytes(source), _collect(tree.root_node.named_children, "", in_class=False))
 
 
 def _collect(siblings: list[Node], prefix: str, *, in_class: bool) -> list[Span]:
