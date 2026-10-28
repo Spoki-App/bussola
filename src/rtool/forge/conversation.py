@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from rtool.forge.base import Conversation, DiffSide, ForgeAdapter, RemoteNote, RemoteThread
-from rtool.forge.publish import body_hash, is_comment_id
+from rtool.forge.publish import body_hash
 from rtool.review.anchoring import anchor_for
 from rtool.review.context import ReviewContext
 from rtool.review.rows import Side, side_lines
@@ -39,7 +39,7 @@ def push_resolution(context: ReviewContext, adapter: ForgeAdapter, thread: Threa
     if link is None:
         return
     comment_ids = [comment.id for comment in context.store.threads.comments([thread.id])]
-    remote_ids = {record.remote_id for record in context.store.forge.published(comment_ids).values() if is_comment_id(record.remote_id)}
+    remote_ids = {record.remote_id for record in context.store.forge.published(comment_ids).values() if adapter.can_reply(record.remote_id)}
     if not remote_ids:
         return
     conversation = adapter.pull_request_conversation(link.repository, link.pr_number)

@@ -169,6 +169,9 @@ class GitHubAdapter:
         mutation = RESOLVE_THREAD_MUTATION if resolved else UNRESOLVE_THREAD_MUTATION
         self._graphql(mutation, threadId=thread_id)
 
+    def can_reply(self, remote_id: str | None) -> bool:
+        return remote_id is not None and remote_id.isdigit()
+
     def download_asset(self, url: str) -> Asset:
         if not ASSET_URL.fullmatch(url):
             raise InvalidRequestError("Only GitHub attachment links can be downloaded")

@@ -52,7 +52,7 @@ def publish_comments(context: ReviewContext, adapter: ForgeAdapter, revision: Re
     if pull.head_sha != revision.head_sha:
         pr_head, reviewed = pull.head_sha[:SHORT_SHA], revision.head_sha[:SHORT_SHA]
         raise ConflictError(f"The pull request head ({pr_head}) differs from the reviewed head ({reviewed}). Push the branch or refresh the review first.")
-    plan = build_plan(context, revision, adapter.diff_ranges(link.repository, link.pr_number))
+    plan = build_plan(context, adapter, revision, adapter.diff_ranges(link.repository, link.pr_number))
     publisher = _Publisher(context, adapter, link, revision.head_sha, list(plan.skipped))
     review_url = publisher.submit_review(plan)
     for comments, path, body in plan.files:
@@ -71,19 +71,19 @@ def require_link(context: ReviewContext) -> ForgeLink:
     return link
 
 
-def build_plan(context: ReviewContext, revision: Revision, ranges: dict[str, LineRanges]) -> PublishPlan:
+def build_plan(context: ReviewContext, adapter: ForgeAdapter, revision: Revision, ranges: dict[str, LineRanges]) -> PublishPlan:
     plan = PublishPlan()
     views = thread_views(context, revision)
     published = context.store.forge.published([comment.id for view in views for comment in view.comments])
     for view in views:
-        comments = [comment for comment in view.comments if comment.deleted_at is None]
+        comments = _live_comments(view)
         records = [published[comment.id] for comment in comments if comment.id in published]
         if not comments:
             continue
         if not records:
             _plan_new_thread(context, view, comments, ranges, plan)
             continue
-        _plan_existing_thread(context, view, comments, published, plan)
+        _plan_existing_thread(context, adapter, view, published, plan)
     return plan
 
 
@@ -121,8 +121,9 @@ def _plan_new_thread(context: ReviewContext, view: ThreadView, comments: list[Co
         plan.body_parts.append((comments, f"On `{path}`:\n\n{body}"))
 
 
-def _plan_existing_thread(context: ReviewContext, view: ThreadView, comments: list[Comment], published: dict[str, PublishedComment], plan: PublishPlan) -> None:
-    thread_remote = next((record.remote_id for comment in comments if (record := published.get(comment.id)) and is_comment_id(record.remote_id)), None)
+def _plan_existing_thread(context: ReviewContext, adapter: ForgeAdapter, view: ThreadView, published: dict[str, PublishedComment], plan: PublishPlan) -> None:
+    comments = _live_comments(view)
+    thread_remote = next((record.remote_id for comment in comments if (record := published.get(comment.id)) and adapter.can_reply(record.remote_id)), None)
     for comment in comments:
         if comment.id in published:
             continue
@@ -134,12 +135,12 @@ def _plan_existing_thread(context: ReviewContext, view: ThreadView, comments: li
     groups: dict[str, list[Comment]] = {}
     for comment in comments:
         record = published.get(comment.id)
-        if record is not None and record.remote_id is not None and is_comment_id(record.remote_id):
+        if record is not None and record.remote_id is not None and adapter.can_reply(record.remote_id):
             groups.setdefault(record.remote_id, []).append(comment)
     for remote_id, members in groups.items():
         if any(_is_edited(context, member, published[member.id]) for member in members):
             plan.updates.append((members, remote_id, GROUP_SEPARATOR.join(render_comment(context, member) for member in members)))
-    edited_in_body = [comment for comment in comments if comment.id in published and not is_comment_id(published[comment.id].remote_id)]
+    edited_in_body = [comment for comment in comments if comment.id in published and not adapter.can_reply(published[comment.id].remote_id)]
     edited_in_body = [comment for comment in edited_in_body if _is_edited(context, comment, published[comment.id])]
     if edited_in_body and view.thread.scope == ThreadScope.REVIEW:
         detail = "Edits to comments sent in a review body cannot be updated on GitHub"
@@ -198,10 +199,6 @@ class _Publisher:
             self.context.store.forge.save_published(record)
 
 
-def is_comment_id(remote_id: str | None) -> bool:
-    return remote_id is not None and remote_id.isdigit()
-
-
 def _is_edited(context: ReviewContext, comment: Comment, record: PublishedComment) -> bool:
     return record.published_body_hash != body_hash(context, comment)
 
@@ -218,6 +215,10 @@ def _unit_location(view: ThreadView) -> str:
     where = f"Outdated comment on {name}" if view.outdated or view.file_line is None else f"On {name}, {lines}"
     snippet = f"\n\n```\n{thread.line_text}\n```" if thread.line_text else ""
     return f"{where}:{snippet}\n\n"
+
+
+def _live_comments(view: ThreadView) -> list[Comment]:
+    return [comment for comment in view.comments if comment.deleted_at is None]
 
 
 def _ids(comments: list[Comment]) -> tuple[str, ...]:
