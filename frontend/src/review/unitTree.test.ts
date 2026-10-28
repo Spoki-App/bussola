@@ -20,6 +20,8 @@ function unit(id: number, kind: string, qualifiedName: string): Unit {
     rows_approved: 0,
     binary: false,
     image: false,
+    todo: true,
+    action: 'approve',
     open_threads: 0,
   }
 }

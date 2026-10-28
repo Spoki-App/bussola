@@ -110,6 +110,8 @@ def unit_out(view: UnitView, open_threads: int) -> UnitOut:
         rows_approved=len(status.approved_row_hashes),
         binary=binary,
         image=image_type(snapshot.path) is not None,
+        todo=status.is_todo,
+        action=status.action(removed=snapshot.head_hash is None),
         open_threads=open_threads,
     )
 

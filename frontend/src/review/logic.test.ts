@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Unit, UnitState } from '../api/types'
-import { groupByFile, isTodo, nextTodoIndex, progressPercent, unitTitle } from './logic'
+import { groupByFile, nextTodoIndex, progressPercent, unitTitle } from './logic'
 
 function unit(id: number, path: string, state: UnitState, qualifiedName = `f${String(id)}`): Unit {
   return {
@@ -20,17 +20,11 @@ function unit(id: number, path: string, state: UnitState, qualifiedName = `f${St
     rows_approved: 0,
     binary: false,
     image: false,
+    todo: !state.startsWith('approved'),
+    action: state.startsWith('approved') ? 'revoke' : 'approve',
     open_threads: 0,
   }
 }
-
-describe('unit states', () => {
-  it('treats new, changed, partial and removed as to review', () => {
-    const todo = (['new', 'changed', 'partial', 'removed', 'approved', 'approved_moved'] as UnitState[]).filter(isTodo)
-
-    expect(todo).toEqual(['new', 'changed', 'partial', 'removed'])
-  })
-})
 
 describe('groupByFile', () => {
   it('groups units by path and marks files without pending units as complete', () => {

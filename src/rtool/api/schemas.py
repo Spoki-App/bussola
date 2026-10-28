@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 from rtool.review.diffs import DiffMode
 from rtool.review.rows import LineChange, Side
 from rtool.review.scope import ChangeType
-from rtool.review.states import UnitState
+from rtool.review.states import ApprovalAction, UnitState
 from rtool.review.thread_types import ThreadScope, ThreadStatus
 
 MAX_THREAD_LINES = 500
@@ -111,6 +111,8 @@ class UnitOut(BaseModel):
     rows_approved: int
     binary: bool
     image: bool
+    todo: bool
+    action: ApprovalAction
     open_threads: int
 
 

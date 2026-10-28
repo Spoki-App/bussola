@@ -1,7 +1,5 @@
 import type { Review, Unit, UnitFilter, UnitState } from '../api/types'
 
-export const TODO_STATES: ReadonlySet<UnitState> = new Set<UnitState>(['new', 'changed', 'partial', 'removed'])
-
 export const STATE_LABELS: Record<UnitState, string> = {
   approved: 'Approved',
   approved_moved: 'Approved (moved)',
@@ -27,16 +25,12 @@ export interface FileGroup {
   complete: boolean
 }
 
-export function isTodo(state: UnitState): boolean {
-  return TODO_STATES.has(state)
-}
-
 export function groupByFile(units: Unit[]): FileGroup[] {
   const groups = new Map<string, FileGroup>()
   for (const unit of units) {
     const group = groups.get(unit.path) ?? { path: unit.path, oldPath: unit.old_path, units: [], todo: 0, complete: true }
     group.units.push(unit)
-    if (isTodo(unit.state)) {
+    if (unit.todo) {
       group.todo += 1
       group.complete = false
     }
@@ -52,7 +46,7 @@ export function progressPercent(review: Pick<Review, 'approved' | 'total'>): num
 export function nextTodoIndex(units: Unit[], fromIndex: number): number {
   for (let step = 1; step <= units.length; step += 1) {
     const index = (fromIndex + step + units.length) % units.length
-    if (isTodo(units[index].state)) {
+    if (units[index].todo) {
       return index
     }
   }

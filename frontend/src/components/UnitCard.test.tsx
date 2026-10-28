@@ -22,6 +22,8 @@ function unit(state: UnitState): Unit {
     rows_approved: 0,
     binary: false,
     image: false,
+    todo: !state.startsWith('approved'),
+    action: state.startsWith('approved') ? 'revoke' : 'approve',
     open_threads: 0,
   }
 }

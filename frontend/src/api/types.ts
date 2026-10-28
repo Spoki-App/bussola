@@ -54,6 +54,8 @@ export interface ReviewDetail extends Review {
   unsent_comments: number
 }
 
+export type ApprovalAction = 'approve' | 'approve_under_name' | 'confirm_removal' | 'revoke' | 'revoke_lines' | 'none'
+
 export interface Unit {
   id: number
   revision_id: number
@@ -70,6 +72,8 @@ export interface Unit {
   rows_approved: number
   binary: boolean
   image: boolean
+  todo: boolean
+  action: ApprovalAction
   open_threads: number
 }
 

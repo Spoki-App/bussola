@@ -23,6 +23,15 @@ TODO_STATES = frozenset({UnitState.NEW, UnitState.CHANGED, UnitState.PARTIAL, Un
 DONE_STATES = frozenset({UnitState.APPROVED, UnitState.APPROVED_MOVED})
 
 
+class ApprovalAction(StrEnum):
+    APPROVE = "approve"
+    APPROVE_UNDER_NAME = "approve_under_name"
+    CONFIRM_REMOVAL = "confirm_removal"
+    REVOKE = "revoke"
+    REVOKE_LINES = "revoke_lines"
+    NONE = "none"
+
+
 @dataclass(frozen=True)
 class UnitStatus:
     state: UnitState
@@ -34,6 +43,13 @@ class UnitStatus:
     @property
     def is_todo(self) -> bool:
         return self.state in TODO_STATES
+
+    def action(self, removed: bool) -> ApprovalAction:
+        if self.state == UnitState.APPROVED:
+            return ApprovalAction.REVOKE_LINES if self.approved_row_hashes else ApprovalAction.REVOKE
+        if self.state == UnitState.APPROVED_MOVED:
+            return ApprovalAction.NONE if removed else ApprovalAction.APPROVE_UNDER_NAME
+        return ApprovalAction.CONFIRM_REMOVAL if self.state == UnitState.REMOVED else ApprovalAction.APPROVE
 
 
 @dataclass(frozen=True)

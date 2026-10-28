@@ -72,3 +72,21 @@ def test_functions_cannot_be_approved_by_selection(api: ApiClient, git_repo: Git
     unit_id = api.unit(review, "app.py::f")["id"]
 
     api.call("POST", f"/reviews/{review}/approvals", 400, {"unit_id": unit_id, "head_range": [2, 2]})
+
+
+def test_units_say_which_approval_action_applies(api: ApiClient, git_repo: GitFixture) -> None:
+    git_repo.commit({"settings.ini": BASE_CONFIG, "app.py": "def gone():\n    return 0\n\n\ndef total():\n    return 0\n"})
+    git_repo.branch("feature")
+    git_repo.commit({"settings.ini": HEAD_CONFIG, "app.py": "def total():\n    return 1\n"})
+    review = api.start_review()
+
+    def action(name: str) -> tuple[bool, str]:
+        unit = api.unit(review, name)
+        return unit["todo"], unit["action"]
+
+    assert action("app.py::total") == (True, "approve")
+    assert action("app.py::gone") == (True, "confirm_removal")
+    api.approve(review, "app.py::total")
+    assert action("app.py::total") == (False, "revoke")
+    api.approve_rows(review, "settings.ini", head_range=(1, 4), base_range=(1, 3))
+    assert action("settings.ini") == (False, "revoke_lines")

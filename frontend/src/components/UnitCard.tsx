@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { describeError } from '../api/client'
 import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/hooks'
 import type { DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
-import { isTodo, unitTitle } from '../review/logic'
+import { unitTitle } from '../review/logic'
 import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
 import { lastSegment } from '../review/unitTree'
 import { ErrorNote, KindBadge, StateBadge } from './Badges'
@@ -37,10 +37,12 @@ interface Props {
   nested?: boolean
 }
 
+const APPROVE_LABELS = { approve: 'Approve', approve_under_name: 'Approve under this name', confirm_removal: 'Confirm removal' } as const
+
 const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', base: 'Base → head' }
 
 export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, nested = false }: Props) {
-  const todo = isTodo(unit.state)
+  const todo = unit.todo
   const [expanded, setExpanded] = useState(todo)
   const [wasTodo, setWasTodo] = useState(todo)
   if (todo !== wasTodo) {
@@ -57,7 +59,6 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
   const rows = diff.data?.rows ?? []
   const busy = approve.isPending || revoke.isPending || revokeSelections.isPending
   const failure = approve.error ?? revoke.error ?? revokeSelections.error
-  const wholeApproval = unit.state === 'approved' && unit.rows_approved === 0 ? unit.approval_id : null
 
   const clearSelection = () => {
     setSelected(new Set())
@@ -69,6 +70,11 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
   const approveSelection = () => {
     approve.mutate({ unit_id: unit.id, ...selectionRanges(rows, selected) }, { onSuccess: clearSelection })
   }
+  const revokeUnit = () => {
+    if (unit.approval_id) {
+      revoke.mutate(unit.approval_id)
+    }
+  }
   const revokeRows = () => {
     revokeSelections.mutate(approvedSelections(rows))
   }
@@ -78,11 +84,11 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
     }
     if (selected.size > 0) {
       approveSelection()
-    } else if (wholeApproval) {
-      revoke.mutate(wholeApproval)
-    } else if (unit.state === 'approved' && unit.rows_approved > 0) {
+    } else if (unit.action === 'revoke') {
+      revokeUnit()
+    } else if (unit.action === 'revoke_lines') {
       revokeRows()
-    } else {
+    } else if (unit.action !== 'none') {
       approveUnit()
     }
   }
@@ -133,7 +139,7 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
         {unit.change_type !== 'modified' && <span className="label">{unit.change_type}</span>}
         {unit.base_changed && <span className="label" title="The base changed since you approved this unit">base changed</span>}
         {unit.rows_total > 0 && <span className="label">{`${String(unit.rows_approved)}/${String(unit.rows_total)} lines approved`}</span>}
-        {unit.open_threads > 0 && <span className={`label threads${isTodo(unit.state) ? '' : ' warn'}`}>{`${String(unit.open_threads)} open thread${unit.open_threads > 1 ? 's' : ''}`}</span>}
+        {unit.open_threads > 0 && <span className={`label threads${unit.todo ? '' : ' warn'}`}>{`${String(unit.open_threads)} open thread${unit.open_threads > 1 ? 's' : ''}`}</span>}
         <span className="spacer" />
         {canSwitchMode && (
           <div className="segmented" role="group" aria-label="Diff mode">
@@ -154,24 +160,22 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
             Revoke lines
           </button>
         )}
-        {wholeApproval ? (
-          <button type="button" disabled={busy} onClick={() => { revoke.mutate(wholeApproval) }}>
+        {unit.action === 'revoke' && (
+          <button type="button" disabled={busy} onClick={revokeUnit}>
             Revoke
           </button>
-        ) : (
-          unit.state !== 'approved' &&
-          !(unit.state === 'approved_moved' && unit.change_type === 'removed') && (
-            <button type="button" className={selected.size > 0 ? '' : 'primary'} disabled={busy} onClick={approveUnit}>
-              {unit.state === 'approved_moved' ? 'Approve under this name' : unit.state === 'removed' ? 'Confirm removal' : 'Approve'}
-            </button>
-          )
+        )}
+        {unit.action in APPROVE_LABELS && (
+          <button type="button" className={selected.size > 0 ? '' : 'primary'} disabled={busy} onClick={approveUnit}>
+            {APPROVE_LABELS[unit.action as keyof typeof APPROVE_LABELS]}
+          </button>
         )}
       </header>
       {failure && <ErrorNote message={describeError(failure)} />}
       {expanded && (
         <div className="unit-body">
           {diff.data?.approved_text_unavailable && <p className="diff-note">The approved version is too large to keep, so only the base diff is available.</p>}
-          {unit.row_approvable && isTodo(unit.state) && <p className="hint">Click changed lines to select them, shift-click to extend, then approve the selection.</p>}
+          {unit.row_approvable && unit.todo && <p className="hint">Click changed lines to select them, shift-click to extend, then approve the selection.</p>}
           {diff.isPending && <p className="diff-note">Loading diff...</p>}
           {diff.error && <ErrorNote message={describeError(diff.error)} />}
           {unit.image && <ImagePreview reviewId={reviewId} unit={unit} />}
