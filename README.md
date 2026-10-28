@@ -47,6 +47,8 @@ The review header has two actions:
 - **Sync** (shortcut `r`) first fetches the branch from its remote (on a pull request review: the pull request's latest commits and comments from GitHub), then records any new commits as a new revision. Approvals of units that did not change are kept. If the remote or GitHub cannot be reached, it checks the local branch and says so. When the review is linked to a pull request, it then sends your unsent comments to GitHub (see below); the button shows how many are waiting, as in "Sync · 3 to send".
 - **Mark as reviewed** remembers where you are. It approves and closes nothing; the **Since my last review** filter then shows only what changes after this point.
 
+Units that still need review start open and the others closed. Approving a unit closes its card, and a card opens again when its unit needs review again (approval revoked, or new changes).
+
 | State | Meaning |
 |---|---|
 | New | Not approved yet |

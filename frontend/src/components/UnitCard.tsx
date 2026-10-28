@@ -40,7 +40,13 @@ interface Props {
 const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', base: 'Base → head' }
 
 export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, footer, nested = false }: Props) {
-  const [expanded, setExpanded] = useState(isTodo(unit.state))
+  const todo = isTodo(unit.state)
+  const [expanded, setExpanded] = useState(todo)
+  const [wasTodo, setWasTodo] = useState(todo)
+  if (todo !== wasTodo) {
+    setWasTodo(todo)
+    setExpanded(todo)
+  }
   const [mode, setMode] = useState<DiffMode | undefined>(undefined)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [anchor, setAnchor] = useState<string | null>(null)
