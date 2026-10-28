@@ -15,6 +15,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <Link to="/" className="brand">
+          <img src="/favicon.svg" alt="" width="22" height="22" />
           rtool
         </Link>
         <span className="spacer" />

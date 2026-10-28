@@ -103,6 +103,7 @@ export interface UnitDiff {
 export interface RefreshResult {
   revision: Revision
   created: boolean
+  warning: string | null
 }
 
 export interface ApprovalRequest {

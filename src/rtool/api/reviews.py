@@ -4,14 +4,20 @@ from rtool.api.deps import ContextDep, ReviewerDep, repo_of, resolve_revision
 from rtool.api.schemas import RefreshIn, RefreshOut, ReviewDetailOut, ReviewerOut, SessionOut
 from rtool.api.state import app_state
 from rtool.api.views import review_detail_out, revision_out
+from rtool.errors import ConflictError, InvalidRequestError
+from rtool.forge.base import ForgeAdapter, ForgeError
 from rtool.forge.conversation import import_conversation
 from rtool.forge.pulls import PULL_REF_PREFIX, ForgeSession, sync_review
+from rtool.git import GitError, GitRepo, InvalidRefError
+from rtool.review.context import ReviewContext
 from rtool.review.hooks import REVISION_HOOKS
 from rtool.review.repos import open_repo
-from rtool.review.revisions import refresh_review
+from rtool.review.revisions import RefreshResult, fetch_review_remotes, refresh_review
 from rtool.storage.models import ReviewSession
 
 router = APIRouter(tags=["reviews"])
+
+FETCH_ERRORS = (ForgeError, GitError, InvalidRefError, InvalidRequestError, ConflictError)
 
 
 @router.get("/me")
@@ -27,16 +33,28 @@ def get_review(context: ContextDep) -> ReviewDetailOut:
 @router.post("/reviews/{review_id}/refresh")
 def refresh(body: RefreshIn, context: ContextDep, request: Request) -> RefreshOut:
     git_repo = open_repo(repo_of(context))
-    link = context.store.forge.link(context.review.id)
-    pull_review = body.fetch and link is not None and context.review.head_ref.startswith(PULL_REF_PREFIX)
-    adapter = app_state(request).forge
-    session = ForgeSession(context.store, adapter, git_repo, context.reviewer)
-    synced = sync_review(session, context.review, link) if pull_review and link is not None else None
-    result = synced or refresh_review(context.store, context.review, git_repo, fetch=body.fetch and not pull_review, hooks=REVISION_HOOKS)
-    if body.fetch and link is not None and not pull_review:
-        import_conversation(context, adapter, link, result.revision)
+    fetched: RefreshResult | None = None
+    warning = None
+    if body.fetch:
+        try:
+            fetched = _fetch_and_refresh(context, app_state(request).forge, git_repo)
+        except FETCH_ERRORS as error:
+            context.store.session.rollback()
+            warning = f"Could not fetch ({error}). Checked the local branch instead."
+    result = fetched or refresh_review(context.store, context.review, git_repo, hooks=REVISION_HOOKS)
     context.store.commit()
-    return RefreshOut(revision=revision_out(result.revision), created=result.created)
+    return RefreshOut(revision=revision_out(result.revision), created=result.created, warning=warning)
+
+
+def _fetch_and_refresh(context: ReviewContext, adapter: ForgeAdapter, git_repo: GitRepo) -> RefreshResult | None:
+    link = context.store.forge.link(context.review.id)
+    if link is not None and context.review.head_ref.startswith(PULL_REF_PREFIX):
+        return sync_review(ForgeSession(context.store, adapter, git_repo, context.reviewer), context.review, link)
+    fetch_review_remotes(git_repo, context.review)
+    result = refresh_review(context.store, context.review, git_repo, hooks=REVISION_HOOKS)
+    if link is not None:
+        import_conversation(context, adapter, link, result.revision)
+    return result
 
 
 @router.post("/reviews/{review_id}/sessions", status_code=status.HTTP_201_CREATED)

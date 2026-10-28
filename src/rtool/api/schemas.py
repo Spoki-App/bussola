@@ -91,6 +91,7 @@ class RefreshIn(BaseModel):
 class RefreshOut(BaseModel):
     revision: RevisionOut
     created: bool
+    warning: str | None = None
 
 
 class UnitOut(BaseModel):

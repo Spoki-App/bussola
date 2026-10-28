@@ -161,8 +161,15 @@ textarea {
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 700;
   color: var(--text);
+}
+
+.brand:hover {
+  text-decoration: none;
 }
 
 .inline-form {
@@ -1032,21 +1039,28 @@ button.danger {
   color: var(--accent-text);
 }
 
-.action-group {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-}
-
-.action-group .checkbox {
-  font-size: 12px;
-}
-
 .review-actions {
   align-items: flex-start;
 }
 
 .github-link {
   font-size: 12px;
+}
+
+.class-group > .unit-card {
+  margin-bottom: 8px;
+}
+
+.unit-children {
+  margin: 0 0 12px 20px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
+}
+
+.unit-children:empty {
+  display: none;
+}
+
+.class-stand-in .unit-header {
+  background: none;
 }

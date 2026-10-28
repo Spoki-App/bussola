@@ -5,6 +5,7 @@ import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/
 import type { DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
 import { isTodo, unitTitle } from '../review/logic'
 import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
+import { lastSegment } from '../review/unitTree'
 import { ErrorNote, KindBadge, StateBadge } from './Badges'
 import { UnitDiffView, type GutterSide } from './UnitDiffView'
 
@@ -33,11 +34,12 @@ interface Props {
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
   footer?: ReactNode
+  nested?: boolean
 }
 
 const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', base: 'Base → head' }
 
-export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, footer }: Props) {
+export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, footer, nested = false }: Props) {
   const [expanded, setExpanded] = useState(isTodo(unit.state))
   const [mode, setMode] = useState<DiffMode | undefined>(undefined)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
@@ -118,7 +120,9 @@ export function UnitCard({ reviewId, unit, focused, onFocus, register, onComment
           {expanded ? '▾' : '▸'}
         </button>
         <KindBadge kind={unit.kind} />
-        <span className="unit-name">{unitTitle(unit)}</span>
+        <span className="unit-name" title={unit.qualified_name || undefined}>
+          {nested && unit.qualified_name ? lastSegment(unit.qualified_name) : unitTitle(unit)}
+        </span>
         <StateBadge state={unit.state} />
         {unit.change_type !== 'modified' && <span className="label">{unit.change_type}</span>}
         {unit.base_changed && <span className="label" title="The base changed since you approved this unit">base changed</span>}

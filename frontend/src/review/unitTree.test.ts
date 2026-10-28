@@ -1,0 +1,68 @@
+import { describe, expect, it } from 'vitest'
+
+import type { Unit } from '../api/types'
+import { buildUnitTree, lastSegment, parentName, type UnitNode } from './unitTree'
+
+function unit(id: number, kind: string, qualifiedName: string): Unit {
+  return {
+    id,
+    revision_id: 1,
+    path: 'a.py',
+    old_path: null,
+    kind,
+    qualified_name: qualifiedName,
+    state: 'new',
+    change_type: 'modified',
+    base_changed: false,
+    approval_id: null,
+    row_approvable: kind === 'module',
+    rows_total: 0,
+    rows_approved: 0,
+    base_start: 1,
+    base_end: 2,
+    head_start: 1,
+    head_end: 2,
+    binary: false,
+    open_threads: 0,
+    default_diff_mode: 'base',
+  }
+}
+
+function shape(nodes: UnitNode[]): unknown[] {
+  return nodes.map((node) => (node.kind === 'unit' ? node.unit.qualified_name || node.unit.kind : { class: node.name, own: node.unit !== null, children: shape(node.children) }))
+}
+
+describe('parentName', () => {
+  it('drops the last segment', () => {
+    expect(parentName('Service.run')).toBe('Service')
+    expect(parentName('Outer.Inner.load')).toBe('Outer.Inner')
+    expect(parentName('helper')).toBeNull()
+  })
+
+  it('ignores dots inside computed names and accessor labels', () => {
+    expect(parentName('Client.[Symbol.iterator]')).toBe('Client')
+    expect(parentName("Client.['a.b']")).toBe('Client')
+    expect(parentName('Client.get token')).toBe('Client')
+    expect(lastSegment('Client.[Symbol.iterator]')).toBe('[Symbol.iterator]')
+  })
+})
+
+describe('buildUnitTree', () => {
+  it('nests methods under their class card', () => {
+    const tree = buildUnitTree([unit(1, 'module', ''), unit(2, 'class', 'Service'), unit(3, 'method', 'Service.run'), unit(4, 'function', 'helper')])
+
+    expect(shape(tree)).toEqual(['module', { class: 'Service', own: true, children: ['Service.run'] }, 'helper'])
+  })
+
+  it('adds a class card when only its methods changed', () => {
+    const tree = buildUnitTree([unit(1, 'method', 'Service.run'), unit(2, 'method', 'Service.stop')])
+
+    expect(shape(tree)).toEqual([{ class: 'Service', own: false, children: ['Service.run', 'Service.stop'] }])
+  })
+
+  it('nests inner classes and their methods', () => {
+    const tree = buildUnitTree([unit(1, 'method', 'Outer.Inner.load'), unit(2, 'class', 'Outer')])
+
+    expect(shape(tree)).toEqual([{ class: 'Outer', own: true, children: [{ class: 'Outer.Inner', own: false, children: ['Outer.Inner.load'] }] }])
+  })
+})

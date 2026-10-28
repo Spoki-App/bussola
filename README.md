@@ -44,7 +44,7 @@ rtool refresh feature/x --fetch
 
 The review header has three actions:
 
-- **Check for new commits** looks at the branch for commits made since the last check and records them as a new revision. Approvals of units that did not change are kept. Tick **also fetch from remote** to run `git fetch` first; on a pull request review the option reads **fetch the pull request first** and downloads its latest commits.
+- **Check for new commits** first fetches the branch from its remote (on a pull request review: the pull request's latest commits and comments from GitHub), then records any new commits as a new revision. Approvals of units that did not change are kept. If the remote or GitHub cannot be reached, it checks the local branch and says so.
 - **Mark as reviewed** remembers where you are. It approves and closes nothing; the **Since my last review** filter then shows only what changes after this point.
 - **GitHub comments** links the review to a pull request and sends your comments there (see below).
 
@@ -56,6 +56,8 @@ The review header has three actions:
 | Changed since approval | You approved an earlier version; the diff shows approved to current by default |
 | Partly approved | Some of the changed lines of a module or file are approved |
 | Removed | The unit was deleted; approving it confirms the deletion |
+
+Methods are shown inside their class's card. When only methods of a class changed, the class still gets a card, marked "no changes outside its methods", with nothing to approve.
 
 A unit's own name does not count towards its content, so renaming a function with an unchanged body keeps the approval.
 
@@ -73,7 +75,7 @@ For a repository with a GitHub remote, **Pull requests** on its card lists the o
 
 - **Review** downloads the pull request's code with `git fetch` into `refs/rtool/pull/<number>`, so your branches are not touched. It then starts a review against the pull request's base branch, already linked to the pull request.
 - **Sync reviews** fetches the latest commits of every pull request you are reviewing in that repository and records new revisions. Pull requests that were closed or merged are marked as such.
-- On a pull request review, **Check for new commits** with **fetch commits and comments from GitHub** (ticked by default) does the same for that one pull request.
+- On a pull request review, **Check for new commits** does the same for that one pull request.
 - Comments already on GitHub are brought into the review each time: line comments become threads on the same lines (or on the file when the line is outdated or outside the changed units), conversation comments and review summaries become review comments, and resolved threads stay resolved. Your own GitHub comments show as yours, and replying in rtool to an imported thread sends the reply to GitHub. Comments that came from GitHub link back to it. Edits made on GitHub to comments already imported are not picked up.
 
 rtool only contacts GitHub when you press one of these buttons.

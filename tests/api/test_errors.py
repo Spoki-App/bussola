@@ -50,3 +50,17 @@ def test_path_that_is_not_a_repository_is_rejected(api: ApiClient, tmp_path: Pat
     error = api.call("POST", "/repos", 400, {"path": str(tmp_path)})
 
     assert "not a git repository" in error["detail"]
+
+
+def test_unreachable_remote_falls_back_to_the_local_branch_with_a_warning(api: ApiClient, git_repo: GitFixture, tmp_path: Path) -> None:
+    git_repo.commit({"a.txt": "a\n"})
+    git_repo.git("remote", "add", "origin", str(tmp_path / "missing.git"))
+    git_repo.branch("feature")
+    git_repo.commit({"a.txt": "b\n"})
+    review = api.start_review()
+    git_repo.commit({"a.txt": "c\n"})
+
+    result = api.call("POST", f"/reviews/{review}/refresh", body={"fetch": True})
+
+    assert result["created"] is True
+    assert result["warning"].startswith("Could not fetch")

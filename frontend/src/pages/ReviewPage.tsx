@@ -7,8 +7,10 @@ import { ErrorNote, ProgressBar } from '../components/Badges'
 import { FileTree } from '../components/FileTree'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
+import { UnitTree } from '../components/UnitTree'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
+import { buildUnitTree } from '../review/unitTree'
 import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, groupByFile, nextTodoIndex, progressPercent, shortSha } from '../review/logic'
 
 export interface ReviewExtensions {
@@ -33,23 +35,22 @@ function scrollToElement(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-const CHECK_TITLE = 'Look at the branch for commits made since the last check and record them as a new revision of this review.'
-const FETCH_TITLE = 'Run git fetch before checking, to get commits that exist only on the remote.'
-const PULL_FETCH_TITLE = 'Download the latest commits and comments of the pull request from GitHub before checking.'
+const CHECK_TITLE = 'Fetch the branch from its remote, then record any new commits as a new revision of this review.'
+const PULL_CHECK_TITLE = 'Download the latest commits and comments of the pull request from GitHub, then record any new commits as a new revision.'
 const MARK_TITLE = 'Remember this point. The "Since my last review" filter will then show only what changes after now. Nothing is approved or closed.'
 
 function ReviewHeader({ review, extra }: { review: ReviewDetail; extra?: ReactNode }) {
   const isPullRequest = review.pull_request !== null
-  const [fetchRemote, setFetchRemote] = useState(isPullRequest)
   const [message, setMessage] = useState<string | null>(null)
   const refresh = useRefresh(review.id)
   const finish = useFinishReview(review.id)
   const revision = review.latest_revision
 
   const runRefresh = () => {
-    refresh.mutate(fetchRemote, {
+    refresh.mutate(true, {
       onSuccess: (result) => {
-        setMessage(result.created ? `New commits found: revision ${String(result.revision.number)} recorded.` : 'No new commits.')
+        const outcome = result.created ? `New commits found: revision ${String(result.revision.number)} recorded.` : 'No new commits.'
+        setMessage(result.warning ? `${outcome} ${result.warning}` : outcome)
       },
     })
   }
@@ -79,15 +80,9 @@ function ReviewHeader({ review, extra }: { review: ReviewDetail; extra?: ReactNo
         )}
       </div>
       <div className="review-actions">
-        <div className="action-group">
-          <button type="button" onClick={runRefresh} disabled={refresh.isPending} title={`${CHECK_TITLE} Shortcut: r`}>
-            {refresh.isPending ? 'Checking...' : 'Check for new commits'}
-          </button>
-          <label className="checkbox" title={isPullRequest ? PULL_FETCH_TITLE : FETCH_TITLE}>
-            <input type="checkbox" checked={fetchRemote} onChange={(event) => { setFetchRemote(event.target.checked) }} />
-            {isPullRequest ? 'fetch commits and comments from GitHub' : 'also fetch from remote'}
-          </label>
-        </div>
+        <button type="button" onClick={runRefresh} disabled={refresh.isPending} title={`${isPullRequest ? PULL_CHECK_TITLE : CHECK_TITLE} Shortcut: r`}>
+          {refresh.isPending ? 'Checking...' : 'Check for new commits'}
+        </button>
         <button
           type="button"
           className="primary"
@@ -148,7 +143,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     },
     a: () => { if (focusedUnit) actions.current.get(focusedUnit.id)?.toggleApproval() },
     c: () => { if (focusedUnit) actions.current.get(focusedUnit.id)?.comment() },
-    r: () => { refresh.mutate(false) },
+    r: () => { refresh.mutate(true) },
   })
 
   if (review.isPending) {
@@ -198,21 +193,25 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           {groups.map((group) => (
             <section key={group.path} id={`file-${group.path}`} className="file-section">
               <FileHeader reviewId={reviewId} path={group.path} oldPath={group.oldPath} complete={group.complete} actions={extensions.fileActions?.(group.path)} />
-              {group.units.map((unit) => (
-                <UnitCard
-                  key={unit.id}
-                  reviewId={reviewId}
-                  unit={unit}
-                  focused={focusedUnit?.id === unit.id}
-                  onFocus={() => { setFocusedIndex(unitList.indexOf(unit)) }}
-                  register={register}
-                  onComment={extensions.onComment}
-                  onCommentSelectEnd={extensions.onCommentSelectEnd}
-                  renderWidgets={extensions.renderWidgets}
-                  highlightRows={extensions.highlightRows}
-                  footer={extensions.unitFooter?.(unit)}
-                />
-              ))}
+              <UnitTree
+                nodes={buildUnitTree(group.units)}
+                renderUnit={(unit, nested) => (
+                  <UnitCard
+                    key={unit.id}
+                    reviewId={reviewId}
+                    unit={unit}
+                    nested={nested}
+                    focused={focusedUnit?.id === unit.id}
+                    onFocus={() => { setFocusedIndex(unitList.indexOf(unit)) }}
+                    register={register}
+                    onComment={extensions.onComment}
+                    onCommentSelectEnd={extensions.onCommentSelectEnd}
+                    renderWidgets={extensions.renderWidgets}
+                    highlightRows={extensions.highlightRows}
+                    footer={extensions.unitFooter?.(unit)}
+                  />
+                )}
+              />
             </section>
           ))}
         </main>
