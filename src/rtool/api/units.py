@@ -42,6 +42,7 @@ def get_diff(context: ContextDep, unit_id: int, mode: DiffMode | None = None) ->
             row_hash=row.row_hash,
             approved=row.row_hash is not None and row.row_hash in status.approved_row_hashes,
             selection_id=selections.get(row.row_hash) if row.row_hash else None,
+            placeholder=row.placeholder,
         )
         for row in diff.rows
     ]

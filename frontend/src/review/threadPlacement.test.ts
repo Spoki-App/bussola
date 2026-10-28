@@ -5,9 +5,9 @@ import { draftAnchor, isInline, threadRow } from './threadPlacement'
 import type { CommentTarget } from '../components/UnitCard'
 
 const rows: DiffRow[] = [
-  { change: 'context', old_index: 0, new_index: 0, old_line: 1, new_line: 1, text: 'a', row_hash: null, approved: false, selection_id: null },
-  { change: 'removed', old_index: 1, new_index: null, old_line: 2, new_line: null, text: 'b', row_hash: 'x', approved: false, selection_id: null },
-  { change: 'added', old_index: null, new_index: 1, old_line: null, new_line: 2, text: 'c', row_hash: 'y', approved: false, selection_id: null },
+  { change: 'context', old_index: 0, new_index: 0, old_line: 1, new_line: 1, text: 'a', row_hash: null, approved: false, selection_id: null, placeholder: false },
+  { change: 'removed', old_index: 1, new_index: null, old_line: 2, new_line: null, text: 'b', row_hash: 'x', approved: false, selection_id: null, placeholder: false },
+  { change: 'added', old_index: null, new_index: 1, old_line: null, new_line: 2, text: 'c', row_hash: 'y', approved: false, selection_id: null, placeholder: false },
 ]
 
 function diff(mode: UnitDiff['mode']): UnitDiff {

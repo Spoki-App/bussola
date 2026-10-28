@@ -124,6 +124,7 @@ class DiffRowOut(BaseModel):
     row_hash: str | None
     approved: bool
     selection_id: str | None
+    placeholder: bool
 
 
 class DiffOut(BaseModel):

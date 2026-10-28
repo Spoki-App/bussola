@@ -87,6 +87,7 @@ export interface DiffRow {
   row_hash: string | null
   approved: boolean
   selection_id: string | null
+  placeholder: boolean
 }
 
 export interface UnitDiff {

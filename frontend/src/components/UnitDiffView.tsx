@@ -1,11 +1,13 @@
-import { useMemo, type MouseEvent, type ReactNode } from 'react'
-import { Diff, Hunk, getChangeKey, isDelete, isInsert, parseDiff, type ChangeData } from 'react-diff-view'
+import { useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { Decoration, Diff, Hunk, getChangeKey, isDelete, isInsert, parseDiff, type ChangeData, type HunkData } from 'react-diff-view'
 import 'react-diff-view/style/index.css'
 
 import type { DiffRow, UnitDiff } from '../api/types'
+import { collapsedUnified, segmentRows, type Segment } from '../review/collapse'
 import { isSelectable, rowKey } from '../review/selection'
 
 const PLACEHOLDER_GUTTER = '⋯'
+const FILE_HEADER_LINES = 3
 
 export type GutterSide = 'old' | 'new'
 
@@ -70,9 +72,43 @@ function gutterNumber(row: DiffRow | undefined, side: GutterSide): string {
   return line === null ? PLACEHOLDER_GUTTER : String(line)
 }
 
+function hiddenLabel(segment: Segment): string {
+  const count = segment.end - segment.start + 1
+  return `Show ${String(count)} hidden line${count === 1 ? '' : 's'}`
+}
+
+function renderSegments(segments: Segment[], hunks: HunkData[], expand: (id: string) => void) {
+  let hunkIndex = 0
+  return segments.map((segment) => {
+    if (segment.kind === 'rows') {
+      const hunk = hunks[hunkIndex]
+      hunkIndex += 1
+      return <Hunk key={`rows-${String(segment.start)}`} hunk={hunk} />
+    }
+    return (
+      <Decoration key={`gap-${segment.id}`} className="diff-gap">
+        <button type="button" className="gap-button" onClick={() => { expand(segment.id) }}>
+          {hiddenLabel(segment)}
+        </button>
+      </Decoration>
+    )
+  })
+}
+
 export function UnitDiffView({ diff, selectable, selected, onRowClick, onLineNumberClick, widgets }: Props) {
-  const file = useMemo(() => parseDiff(diff.unified)[0], [diff.unified])
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const index = useMemo(() => buildIndex(diff.rows), [diff.rows])
+  const widgetMap = widgets ? widgets(index.changeKeyOf) : undefined
+  const pinnedKeys = Object.keys(widgetMap ?? {}).join(',')
+  const segments = useMemo(() => {
+    const keys = new Set(pinnedKeys.split(','))
+    const pinned = new Set(diff.rows.flatMap((row, position) => (keys.has(index.changeKeyOf(row) ?? '') ? [position] : [])))
+    return segmentRows(diff.rows, expanded, pinned)
+  }, [diff.rows, expanded, index, pinnedKeys])
+  const file = useMemo(() => {
+    const header = diff.unified.split('\n').slice(0, FILE_HEADER_LINES).join('\n')
+    return parseDiff(collapsedUnified(header, diff.rows, segments))[0]
+  }, [diff.unified, diff.rows, segments])
 
   if (diff.binary) {
     return <p className="diff-note">Binary file, no diff available.</p>
@@ -95,11 +131,18 @@ export function UnitDiffView({ diff, selectable, selected, onRowClick, onLineNum
       diffType={file.type}
       hunks={file.hunks}
       selectedChanges={selectedChanges}
-      widgets={widgets ? widgets(index.changeKeyOf) : undefined}
+      widgets={widgetMap}
       className={selectable ? 'diff selectable' : 'diff'}
       generateLineClassName={({ changes, defaultGenerate }) => {
-        const approved = changes.some((change) => index.rowOf(change)?.approved)
-        return approved ? `${defaultGenerate()} row-approved` : defaultGenerate()
+        const rows = changes.map((change) => index.rowOf(change))
+        const classes = [defaultGenerate()]
+        if (rows.some((row) => row?.approved)) {
+          classes.push('row-approved')
+        }
+        if (rows.some((row) => row?.placeholder)) {
+          classes.push('row-placeholder')
+        }
+        return classes.join(' ')
       }}
       renderGutter={({ change, side }) => gutterNumber(index.rowOf(change), side)}
       gutterEvents={{
@@ -119,7 +162,7 @@ export function UnitDiffView({ diff, selectable, selected, onRowClick, onLineNum
         },
       }}
     >
-      {(hunks) => hunks.map((hunk) => <Hunk key={hunk.content} hunk={hunk} />)}
+      {(hunks) => renderSegments(segments, hunks, (id) => { setExpanded(new Set([...expanded, id])) })}
     </Diff>
   )
 }

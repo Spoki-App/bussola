@@ -973,3 +973,30 @@ button.link {
   background: var(--warning-bg);
   color: var(--warning);
 }
+
+.diff .diff-gap td {
+  padding: 0;
+  background: var(--info-bg);
+}
+
+.gap-button {
+  width: 100%;
+  padding: 4px 12px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--accent);
+  font-family: var(--sans);
+  font-size: 12px;
+  text-align: left;
+}
+
+.gap-button:hover {
+  text-decoration: underline;
+}
+
+.diff .row-placeholder td {
+  color: var(--muted);
+  font-style: italic;
+  font-family: var(--sans);
+}

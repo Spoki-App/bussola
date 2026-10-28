@@ -14,6 +14,7 @@ function row(change: DiffRow['change'], oldIndex: number | null, newIndex: numbe
     row_hash: change === 'context' ? null : `h${String(oldIndex)}${String(newIndex)}`,
     approved: false,
     selection_id: null,
+    placeholder: false,
     ...extra,
   }
 }

@@ -160,3 +160,15 @@ def test_since_last_review_shows_only_units_touched_afterwards(api: ApiClient, g
 
     assert api.states(review, "todo") == {"app.py::second": "new", "app.py::third": "new"}
     assert api.states(review, "since_last") == {"app.py::third": "new"}
+
+
+def test_hidden_child_units_are_shown_as_a_readable_placeholder(api: ApiClient, git_repo: GitFixture) -> None:
+    feature_with(git_repo, {"app.py": "import os\n\n\n" + TWO_FUNCTIONS}, {"app.py": "import sys\n\n\n" + TWO_FUNCTIONS})
+    review = api.start_review()
+
+    rows = api.diff(review, "app.py")["rows"]
+
+    placeholders = [row for row in rows if row["placeholder"]]
+    assert [row["text"] for row in placeholders] == ["\u22ef functions and classes, reviewed in their own cards"]
+    assert placeholders[0]["old_line"] is None
+    assert placeholders[0]["new_line"] is None
