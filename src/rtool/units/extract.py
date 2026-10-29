@@ -1,3 +1,5 @@
+import hashlib
+import json
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -7,7 +9,7 @@ from rtool.globs import matches_any
 from rtool.units.extractors.base import Extractor
 from rtool.units.extractors.fallback import binary_unit, file_unit, submodule_unit
 from rtool.units.model import Unit
-from rtool.units.registry import extractor_for
+from rtool.units.registry import EXTRACTORS_BY_SUFFIX, extractor_for
 
 BINARY_SNIFF_BYTES = 8000
 FALLBACK_EXTRACTOR = "file"
@@ -42,6 +44,11 @@ class FileUnitExtractor:
     def __init__(self, config: RepoConfig, cache: UnitCache | None = None) -> None:
         self.config = config
         self._cache: UnitCache = cache if cache is not None else InMemoryUnitCache()
+
+    def signature(self) -> str:
+        extractors = sorted((suffix, extractor.name, extractor.version) for suffix, extractor in EXTRACTORS_BY_SUFFIX.items())
+        rules = [FALLBACK_EXTRACTOR, FALLBACK_VERSION, extractors, self.config.file_level]
+        return hashlib.sha256(json.dumps(rules).encode()).hexdigest()
 
     def units_for(self, blob: BlobRef, reader: BlobReader) -> list[Unit]:
         if blob.is_submodule:

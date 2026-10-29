@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 
 from rtool.config import load_repo_config
@@ -22,18 +23,25 @@ def refresh_review(store: Store, review: Review, repo: GitRepo, *, fetch: bool =
         fetch_review_remotes(repo, review)
     commits = resolve_review_commits(repo, review.head_ref, review.base_ref)
     previous = store.reviews.latest_revision(review.id)
-    if previous is not None and (previous.head_sha, previous.base_sha, previous.merge_base_sha) == (commits.head_sha, commits.base_sha, commits.merge_base_sha):
-        return RefreshResult(previous, created=False)
     extractor = FileUnitExtractor(load_repo_config(repo.root), SqlUnitCache(store.session))
-    changes = compute_scope(repo, commits.merge_base_sha, commits.head_sha, extractor)
+    signature = extractor.signature()
+    commit_shas = (commits.head_sha, commits.base_sha, commits.merge_base_sha)
+    same_commits = previous is not None and (previous.head_sha, previous.base_sha, previous.merge_base_sha) == commit_shas
+    if previous is not None and same_commits and previous.units_signature == signature:
+        return RefreshResult(previous, created=False)
+    snapshots = [snapshot_from(change) for change in compute_scope(repo, commits.merge_base_sha, commits.head_sha, extractor)]
+    if previous is not None and same_commits and _same_units(store.reviews.snapshots(previous.id, texts=False), snapshots):
+        previous.units_signature = signature
+        return RefreshResult(previous, created=False)
     revision = Revision(
         review_id=review.id,
         number=previous.number + 1 if previous else 1,
         head_sha=commits.head_sha,
         base_sha=commits.base_sha,
         merge_base_sha=commits.merge_base_sha,
+        units_signature=signature,
     )
-    store.reviews.add_revision(revision, [snapshot_from(change) for change in changes])
+    store.reviews.add_revision(revision, snapshots)
     reanchor_threads(store, review, revision)
     return RefreshResult(revision, created=True)
 
@@ -42,6 +50,22 @@ def fetch_review_remotes(repo: GitRepo, review: Review) -> None:
     remotes = {remote for ref in (review.head_ref, review.base_ref) if (remote := repo.upstream_remote(ref)) is not None}
     for remote in sorted(remotes):
         repo.fetch(remote)
+
+
+def _same_units(stored: list[UnitSnapshot], computed: list[UnitSnapshot]) -> bool:
+    return sorted(map(_unit_identity, stored)) == sorted(map(_unit_identity, computed))
+
+
+def _unit_identity(snapshot: UnitSnapshot) -> tuple[str, str, str, str, str, str, str]:
+    return (
+        snapshot.path,
+        snapshot.old_path or "",
+        snapshot.kind,
+        snapshot.qualified_name,
+        snapshot.base_hash or "",
+        snapshot.head_hash or "",
+        json.dumps([snapshot.base_lines, snapshot.head_lines]),
+    )
 
 
 def snapshot_from(change: UnitChange) -> UnitSnapshot:

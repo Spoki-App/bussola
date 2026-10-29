@@ -200,3 +200,5 @@ GET    /forge/asset?url=                       an image attached on GitHub, down
 - Everything else (package clause, imports, variables, constants) is module-level code.
 
 Methods are declared outside their type in Go, so the UI groups them: a method card is shown under the card of its type when the type is in the same file, or under a stand-in card ("only its methods changed here") otherwise. This only changes the layout; unit keys stay `(path, kind, qualified_name)`.
+
+Each revision stores a signature of the unit rules it was built with (extractors with their versions, and the `file_level` globs). When a refresh finds the same commits but a different signature, for example after an upgrade that adds a language, it recomputes the units: a new revision is recorded only if they differ, otherwise the stored signature is updated.

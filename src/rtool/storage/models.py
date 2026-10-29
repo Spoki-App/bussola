@@ -70,6 +70,7 @@ class Revision(Base):
     merge_base_sha: Mapped[str] = mapped_column()
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+    units_signature: Mapped[str | None] = mapped_column(default=None)
 
 
 class UnitSnapshot(Base):
