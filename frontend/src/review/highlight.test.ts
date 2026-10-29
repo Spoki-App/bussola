@@ -7,7 +7,7 @@ const UNIFIED = ['--- a/app.py', '+++ b/app.py', '@@ -1,3 +1,3 @@', ' def total(
 
 describe('languageFor', () => {
   it('picks the language from the file extension or name', () => {
-    expect(['src/app.py', 'web/App.tsx', 'conf/settings.yml', 'Makefile', 'ui/Page.vue'].map(languageFor)).toEqual(['py', 'tsx', 'yml', 'makefile', 'xml'])
+    expect(['src/app.py', 'web/App.tsx', 'cmd/main.go', 'conf/settings.yml', 'Makefile', 'ui/Page.vue'].map(languageFor)).toEqual(['py', 'tsx', 'go', 'yml', 'makefile', 'xml'])
   })
 
   it('returns null for unknown files', () => {

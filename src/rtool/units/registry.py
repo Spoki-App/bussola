@@ -1,6 +1,7 @@
 from pathlib import PurePosixPath
 
 from rtool.units.extractors.base import Extractor
+from rtool.units.extractors.go import GoExtractor
 from rtool.units.extractors.javascript import JAVASCRIPT
 from rtool.units.extractors.python import PythonExtractor
 from rtool.units.extractors.typescript import TSX, TYPESCRIPT
@@ -16,6 +17,7 @@ EXTRACTORS_BY_SUFFIX: dict[str, Extractor] = {
     ".jsx": JAVASCRIPT,
     ".mjs": JAVASCRIPT,
     ".cjs": JAVASCRIPT,
+    ".go": GoExtractor(),
 }
 
 

@@ -2,14 +2,16 @@
 
 Local, per-function code review for git branches. `rtool serve` opens a review UI on `localhost` that works directly on your repository, without needing a hosting service.
 
-- Changes between a branch and its base (the same three-dot diff a pull request shows) are split into **reviewable units**: functions, methods, class bodies, TypeScript types, module-level code, and whole files for languages that are not parsed.
+- Changes between a branch and its base (the same three-dot diff a pull request shows) are split into **reviewable units**: functions, methods, class bodies, TypeScript and Go types, module-level code, and whole files for languages that are not parsed.
 - An approval is tied to the **content** of a unit, not to a commit. After new commits, a rebase or a force-push, a unit with the same content stays approved.
 - When an approved unit changes, you see the diff between the version you approved and the current one.
 - Module-level code and whole files can also be approved **one selection of lines at a time**.
 - "Since my last review" shows only what appeared or changed after you last clicked "Mark as reviewed".
 - Comment threads are anchored to lines and follow them when the code moves. They can be sent to the GitHub pull request.
 
-Python (`.py`, `.pyi`), TypeScript (`.ts`), TSX and JavaScript (`.js`, `.jsx`, `.mjs`, `.cjs`) are parsed with tree-sitter. Everything else is reviewed as whole files.
+Python (`.py`, `.pyi`), TypeScript (`.ts`), TSX, JavaScript (`.js`, `.jsx`, `.mjs`, `.cjs`) and Go (`.go`) are parsed with tree-sitter. Everything else is reviewed as whole files.
+
+In Go, each function, method and type is its own unit. A method is named after its receiver type (`Service.Run`, also for `*Service` and `Stack[T]`), and its card is shown under the card of that type when both are in the same file. Each type in a grouped `type ( ... )` block is a separate unit.
 
 ## Install
 

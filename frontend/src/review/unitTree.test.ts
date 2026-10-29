@@ -58,6 +58,25 @@ describe('buildUnitTree', () => {
     expect(shape(tree)).toEqual([{ class: 'Service', own: false, children: ['Service.run', 'Service.stop'] }])
   })
 
+  it('nests Go methods under the card of their type', () => {
+    const tree = buildUnitTree([unit(1, 'type', 'Service'), unit(2, 'type', 'Reader'), unit(3, 'method', 'Service.Run'), unit(4, 'function', 'New')])
+
+    expect(shape(tree)).toEqual([{ class: 'Service', own: true, children: ['Service.Run'] }, 'Reader', 'New'])
+  })
+
+  it('marks the stand-in of a Go type as a type', () => {
+    const method = { ...unit(1, 'method', 'Service.Run'), path: 'service.go' }
+
+    expect(buildUnitTree([method]).map((node) => node.kind === 'class' && node.standIn)).toEqual(['type'])
+    expect(buildUnitTree([unit(2, 'method', 'Service.run')]).map((node) => node.kind === 'class' && node.standIn)).toEqual(['class'])
+  })
+
+  it('keeps a type next to a class of the same name', () => {
+    const tree = buildUnitTree([unit(1, 'type', 'Service'), unit(2, 'class', 'Service'), unit(3, 'method', 'Service.run')])
+
+    expect(shape(tree)).toEqual(['Service', { class: 'Service', own: true, children: ['Service.run'] }])
+  })
+
   it('nests inner classes and their methods', () => {
     const tree = buildUnitTree([unit(1, 'method', 'Outer.Inner.load'), unit(2, 'class', 'Outer')])
 

@@ -189,3 +189,14 @@ GET    /forge/asset?url=                       an image attached on GitHub, down
 
 - Only `https://github.com/user-attachments/assets/<uuid>` and `https://github.com/<owner>/<repository>/assets/<id>/<uuid>` are accepted (400 otherwise). The token comes from `gh auth token` at each download, is sent only to `github.com` (not on the redirect to the storage host) and is never stored. Only images up to 25 MB are returned (502 otherwise), with `Content-Security-Policy: sandbox` and `nosniff`; up to 64 images are kept in memory.
 - This adds image downloads from GitHub to the outbound traffic of section 15.
+
+## A10. Go units
+
+`.go` files are parsed with tree-sitter (`tree-sitter-go`), in addition to the languages of the original spec. Go has no classes, so units map as follows:
+
+- `func Name` is a `function` unit named `Name`; repeated names such as `init` get the usual `#2` suffix.
+- `func (r *T) Name` is a `method` unit named `T.Name`: pointers, parentheses and type parameters of the receiver are dropped, so `*Stack[T]` gives `Stack`.
+- Each type (struct, interface, alias or named type) is a `type` unit. In a grouped `type ( ... )` block each type is its own unit, and the `type (` and `)` lines stay in the module unit.
+- Everything else (package clause, imports, variables, constants) is module-level code.
+
+Methods are declared outside their type in Go, so the UI groups them: a method card is shown under the card of its type when the type is in the same file, or under a stand-in card ("only its methods changed here") otherwise. This only changes the layout; unit keys stay `(path, kind, qualified_name)`.
