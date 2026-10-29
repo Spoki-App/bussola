@@ -91,6 +91,22 @@ def test_lines_are_not_anchored_when_github_has_another_head(api: ApiClient, git
     assert {thread["scope"] for thread in threads(api, review)} == {"file", "review"}
 
 
+def test_a_comment_imported_before_its_commit_is_placed_on_its_line_once_the_commit_arrives(api: ApiClient, github: GitHubSandbox) -> None:
+    github.open_pull_request({"app.py": FIRST})
+    set_conversation(github, [])
+    review = start_review(api)
+    github.open_pull_request({"app.py": SECOND})
+    set_conversation(github, [review_thread(2, note(601, "bob", "Why zero?"))])
+    sync(api, review)
+    assert {thread["scope"] for thread in threads(api, review)} == {"file", "review"}
+
+    api.call("POST", f"/reviews/{review}/refresh", body={"fetch": True})
+
+    inline = inline_thread(api, review)
+    assert (inline["qualified_name"], inline["anchor"]["file_line"], inline["comments"][0]["body"]) == ("total", 2, "Why zero?")
+    assert len(threads(api, review)) == 2
+
+
 def test_reply_in_rtool_to_an_imported_thread_is_sent_as_a_github_reply(api: ApiClient, github: GitHubSandbox) -> None:
     github.open_pull_request({"app.py": FIRST})
     set_conversation(github, [review_thread(2, note(501, "bob", "Why sum?"))])

@@ -97,6 +97,8 @@ class _Importer:
         thread = self._existing_thread(known) if known else self._new_thread(remote)
         if thread is None:
             return
+        if thread.scope == ThreadScope.FILE and self._place(thread, remote):
+            self.changes += 1
         status = (ThreadStatus.RESOLVED if remote.resolved else ThreadStatus.OPEN).value
         if thread.status != status:
             thread.status = status
@@ -127,15 +129,20 @@ class _Importer:
         return self.context.store.threads.get_thread(comment.thread_id) if comment else None
 
     def _new_thread(self, remote: RemoteThread) -> Thread:
-        thread = self._thread(remote.comments[0], ThreadScope.FILE, remote.path)
-        target = find_unit_target(self._unit_snapshots(), remote) if self.conversation.pull.head_sha == self.revision.head_sha else None
-        if target is not None:
-            thread.scope = ThreadScope.UNIT.value
-            anchor_to_unit(thread, target.snapshot, target.side, target.line_offset, target.count)
-        self.context.store.threads.add_thread(thread)
-        if target is not None:
-            self.context.store.threads.add_anchor(anchor_for(thread, self.revision.id))
+        thread = self.context.store.threads.add_thread(self._thread(remote.comments[0], ThreadScope.FILE, remote.path))
+        self._place(thread, remote)
         return thread
+
+    def _place(self, thread: Thread, remote: RemoteThread) -> bool:
+        if remote.line is None or self.conversation.pull.head_sha != self.revision.head_sha:
+            return False
+        target = find_unit_target(self._unit_snapshots(), remote)
+        if target is None:
+            return False
+        thread.scope = ThreadScope.UNIT.value
+        anchor_to_unit(thread, target.snapshot, target.side, target.line_offset, target.count)
+        self.context.store.threads.add_anchor(anchor_for(thread, self.revision.id))
+        return True
 
     def _thread(self, first: RemoteNote, scope: ThreadScope, path: str | None) -> Thread:
         return Thread(
