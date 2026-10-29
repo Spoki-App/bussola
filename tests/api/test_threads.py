@@ -35,6 +35,18 @@ def test_thread_follows_its_line_when_lines_move_inside_the_unit(api: ApiClient,
     assert (anchor["line_offset"], anchor["outdated"], anchor["file_line"]) == (3, False, 4)
 
 
+def test_resolved_thread_follows_its_line_to_new_revisions(api: ApiClient, git_repo: GitFixture) -> None:
+    review = start(git_repo, api)
+    thread = comment_on(api, review, "app.py::total", 2)
+    api.call("PATCH", f"/threads/{thread['id']}", body={"status": "resolved"})
+
+    git_repo.commit({"app.py": BODY.replace("    count = len(items)\n", "    items = list(items)\n    count = len(items)\n") + OTHER})
+    api.refresh(review)
+    listed = thread_anchor(api, review, thread["id"])
+
+    assert (listed["status"], listed["anchor"]["outdated"], listed["anchor"]["file_line"]) == ("resolved", False, 4)
+
+
 def test_thread_becomes_outdated_when_its_line_is_deleted(api: ApiClient, git_repo: GitFixture) -> None:
     review = start(git_repo, api)
     thread = comment_on(api, review, "app.py::total", 2)

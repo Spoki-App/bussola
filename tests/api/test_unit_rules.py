@@ -1,7 +1,7 @@
 import pytest
 
 from rtool.units.registry import EXTRACTORS_BY_SUFFIX
-from tests.apiclient import ApiClient
+from tests.apiclient import ApiClient, comment_on, thread_anchor
 from tests.gitrepo import GitFixture
 
 GO_BEFORE = "package billing\n\nfunc Total() int {\n\treturn 0\n}\n"
@@ -37,3 +37,18 @@ def test_rule_changes_that_do_not_touch_the_review_keep_its_revision(api: ApiCli
     refreshed = api.refresh(review)
 
     assert (refreshed["created"], refreshed["revision"]["number"]) == (False, 1)
+
+
+def test_threads_on_a_whole_file_move_to_the_unit_that_now_holds_their_line(api: ApiClient, git_repo: GitFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    git_repo.commit({"billing.go": GO_BEFORE})
+    git_repo.branch("feature")
+    git_repo.commit({"billing.go": GO_AFTER})
+    with monkeypatch.context() as patch:
+        patch.delitem(EXTRACTORS_BY_SUFFIX, ".go")
+        review = api.start_review()
+        thread = comment_on(api, review, "billing.go", 3)
+
+    api.refresh(review)
+    listed = thread_anchor(api, review, thread["id"])
+
+    assert (listed["qualified_name"], listed["anchor"]["outdated"], listed["anchor"]["file_line"]) == ("Total", False, 4)

@@ -28,11 +28,11 @@ def refresh_review(store: Store, review: Review, repo: GitRepo, *, fetch: bool =
     commit_shas = (commits.head_sha, commits.base_sha, commits.merge_base_sha)
     same_commits = previous is not None and (previous.head_sha, previous.base_sha, previous.merge_base_sha) == commit_shas
     if previous is not None and same_commits and previous.units_signature == signature:
-        return RefreshResult(previous, created=False)
+        return _refreshed(store, review, previous, created=False)
     snapshots = [snapshot_from(change) for change in compute_scope(repo, commits.merge_base_sha, commits.head_sha, extractor)]
     if previous is not None and same_commits and _same_units(store.reviews.snapshots(previous.id, texts=False), snapshots):
         previous.units_signature = signature
-        return RefreshResult(previous, created=False)
+        return _refreshed(store, review, previous, created=False)
     revision = Revision(
         review_id=review.id,
         number=previous.number + 1 if previous else 1,
@@ -42,8 +42,12 @@ def refresh_review(store: Store, review: Review, repo: GitRepo, *, fetch: bool =
         units_signature=signature,
     )
     store.reviews.add_revision(revision, snapshots)
+    return _refreshed(store, review, revision, created=True)
+
+
+def _refreshed(store: Store, review: Review, revision: Revision, *, created: bool) -> RefreshResult:
     reanchor_threads(store, review, revision)
-    return RefreshResult(revision, created=True)
+    return RefreshResult(revision, created)
 
 
 def fetch_review_remotes(repo: GitRepo, review: Review) -> None:

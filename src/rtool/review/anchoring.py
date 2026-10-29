@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from rtool.review.keys import key_of
 from rtool.review.rows import Side, side_lines
-from rtool.review.thread_types import ThreadScope, ThreadStatus
+from rtool.review.thread_types import ThreadScope
 from rtool.storage.models import Review, Revision, Thread, ThreadAnchor, UnitSnapshot
 from rtool.storage.repositories import Store
 
@@ -43,12 +43,13 @@ def anchor_for(thread: Thread, revision_id: int) -> ThreadAnchor:
 
 
 def reanchor_threads(store: Store, review: Review, revision: Revision) -> None:
-    threads = [thread for thread in store.threads.threads(review.id) if thread.scope == ThreadScope.UNIT and thread.status == ThreadStatus.OPEN]
-    if not threads:
+    threads = [thread for thread in store.threads.threads(review.id) if thread.scope == ThreadScope.UNIT]
+    latest = {anchor.thread_id: anchor for anchor in store.threads.anchors([thread.id for thread in threads])} if threads else {}
+    behind = [thread for thread in threads if thread.id not in latest or latest[thread.id].revision_id < revision.id]
+    if not behind:
         return
-    latest = {anchor.thread_id: anchor for anchor in store.threads.anchors([thread.id for thread in threads])}
     snapshots = store.reviews.snapshots(revision.id)
-    for thread in threads:
+    for thread in behind:
         target = locate(thread, latest.get(thread.id), snapshots)
         if target is not None:
             thread.path, thread.kind, thread.qualified_name = key_of(target.snapshot)
@@ -60,22 +61,31 @@ def locate(thread: Thread, last: ThreadAnchor | None, snapshots: list[UnitSnapsh
     key = (thread.path, thread.kind, thread.qualified_name)
     last_hash = last.unit_hash if last else thread.unit_hash
     last_offset = last.line_offset if last and last.line_offset is not None else thread.line_offset or 0
-    same_key = next((snapshot for snapshot in snapshots if key_of(snapshot) == key and side_hash(snapshot, side) is not None), None)
+    candidates = [snapshot for snapshot in snapshots if side_hash(snapshot, side) is not None]
+    same_key = next((snapshot for snapshot in candidates if key_of(snapshot) == key), None)
     if same_key is not None and side_hash(same_key, side) == last_hash and last is not None and not last.outdated:
         return AnchorTarget(same_key, last_offset)
     if same_key is not None:
-        offset = find_line(thread, side_text(same_key, side), last_offset)
-        return None if offset is None else AnchorTarget(same_key, offset)
-    moved = next((snapshot for snapshot in snapshots if last_hash is not None and side_hash(snapshot, side) == last_hash), None)
-    return None if moved is None else AnchorTarget(moved, last_offset)
+        return find_line(thread, [same_key], side, last_offset)
+    moved = next((snapshot for snapshot in candidates if last_hash is not None and side_hash(snapshot, side) == last_hash), None)
+    if moved is not None:
+        return AnchorTarget(moved, last_offset)
+    return find_line(thread, [snapshot for snapshot in candidates if snapshot.path == thread.path], side, last_offset)
 
 
-def find_line(thread: Thread, lines: Sequence[str], previous_offset: int) -> int | None:
+def find_line(thread: Thread, snapshots: list[UnitSnapshot], side: str, previous_offset: int) -> AnchorTarget | None:
     wanted = selected_lines(thread)[0].strip()
-    matches = [index for index, line in enumerate(lines) if line.strip() == wanted]
+    matches = [
+        (snapshot, lines, index)
+        for snapshot in snapshots
+        for lines in [side_text(snapshot, side)]
+        for index, line in enumerate(lines)
+        if line.strip() == wanted
+    ]
     if not matches:
         return None
-    return max(matches, key=lambda index: (_context_score(thread, lines, index), -abs(index - previous_offset)))
+    snapshot, _, offset = max(matches, key=lambda match: (_context_score(thread, match[1], match[2]), -abs(match[2] - previous_offset)))
+    return AnchorTarget(snapshot, offset)
 
 
 def _context_score(thread: Thread, lines: Sequence[str], index: int) -> int:
