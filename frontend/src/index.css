@@ -408,12 +408,20 @@ textarea {
 
 .review-layout {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
   align-items: start;
 }
 
 .review-layout.with-panel {
-  grid-template-columns: 240px minmax(0, 1fr) 340px;
+  grid-template-columns: 280px minmax(0, 1fr) 340px;
+}
+
+.review-layout.files-hidden {
+  grid-template-columns: 40px minmax(0, 1fr);
+}
+
+.review-layout.files-hidden.with-panel {
+  grid-template-columns: 40px minmax(0, 1fr) 340px;
 }
 
 .summary-row {
@@ -429,6 +437,11 @@ textarea {
     grid-template-columns: 180px minmax(0, 1fr);
   }
 
+  .review-layout.files-hidden,
+  .review-layout.files-hidden.with-panel {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+
   .review-layout.with-panel .side-panel {
     grid-column: 1 / -1;
     position: static;
@@ -441,7 +454,9 @@ textarea {
 
 @media (max-width: 700px) {
   .review-layout,
-  .review-layout.with-panel {
+  .review-layout.with-panel,
+  .review-layout.files-hidden,
+  .review-layout.files-hidden.with-panel {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -471,7 +486,37 @@ textarea {
   border-left: 1px solid var(--border);
 }
 
-.file-tree {
+.files-hidden .sidebar {
+  padding: 12px 4px;
+}
+
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 4px 6px;
+  border: none;
+  background: none;
+  font-weight: 600;
+}
+
+.sidebar-toggle:hover {
+  background: var(--bg-subtle);
+}
+
+.tree-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+.file-tree,
+.file-tree ul {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -479,11 +524,12 @@ textarea {
 
 .file-tree button {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   width: 100%;
-  gap: 4px;
-  padding: 4px 8px;
+  gap: 6px;
+  padding: 3px 8px 3px calc(8px + var(--depth, 0) * 16px);
   border: none;
+  border-radius: 6px;
   background: none;
   text-align: left;
   overflow: hidden;
@@ -493,16 +539,29 @@ textarea {
   background: var(--bg-subtle);
 }
 
-.file-dir {
+.file-tree .active > button {
+  background: var(--info-bg);
+}
+
+.tree-chevron {
+  flex: none;
+  width: 10px;
   color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  direction: rtl;
-  font-size: 12px;
+  font-size: 11px;
+}
+
+.file-tree li:not([aria-expanded]) > button {
+  padding-left: calc(24px + var(--depth, 0) * 16px);
+}
+
+.file-tree .tree-icon {
+  color: var(--muted);
 }
 
 .file-name {
-  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-tree .count {
@@ -518,8 +577,7 @@ textarea {
   color: var(--success);
 }
 
-.file-tree .complete .file-name {
-  font-weight: 400;
+.file-tree .complete > button .file-name {
   color: var(--muted);
 }
 

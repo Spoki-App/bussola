@@ -16,7 +16,9 @@ import { UnitCard, type CommentTarget, type UnitActions } from '../components/Un
 import { UnitTree } from '../components/UnitTree'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
+import { buildFileTree, filesInOrder } from '../review/fileTree'
 import { buildUnitTree } from '../review/unitTree'
+import { readStored, writeStored } from '../settings/storage'
 import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, groupByFile, nextTodoIndex, progressPercent, shortSha } from '../review/logic'
 import { Segmented } from '../components/Segmented'
 
@@ -35,6 +37,7 @@ interface Props {
 }
 
 const WIDE_LAYOUT_PX = 1400
+const FILES_HIDDEN_KEY = 'rtool.filesHidden'
 
 function scrollToElement(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -126,11 +129,17 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const [filter, setFilter] = useState<UnitFilter>('all')
   const revisionId = review.data?.latest_revision?.id
   const units = useUnits(reviewId, revisionId, filter)
-  const unitList = useMemo(() => units.data ?? [], [units.data])
-  const groups = useMemo(() => groupByFile(unitList).map((group) => ({ ...group, tree: buildUnitTree(group.units) })), [unitList])
+  const fileTree = useMemo(() => buildFileTree(groupByFile(units.data ?? [])), [units.data])
+  const groups = useMemo(() => filesInOrder(fileTree).map((group) => ({ ...group, tree: buildUnitTree(group.units) })), [fileTree])
+  const unitList = useMemo(() => groups.flatMap((group) => group.units), [groups])
   const [focusedIndex, setFocusedIndex] = useState(0)
   const actions = useRef(new Map<number, UnitActions>())
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= WIDE_LAYOUT_PX)
+  const [filesHidden, setFilesHidden] = useState(() => readStored(FILES_HIDDEN_KEY) === 'true')
+  const toggleFiles = () => {
+    setFilesHidden(!filesHidden)
+    writeStored(FILES_HIDDEN_KEY, String(!filesHidden))
+  }
 
   const focusUnit = useCallback(
     (unitId: number) => {
@@ -202,9 +211,17 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           )}
         </div>
       </section>
-      <div className={`review-layout${panelOpen && extensions.sidePanel ? ' with-panel' : ''}`}>
-        <aside className="sidebar">
-          <FileTree groups={groups} onSelect={(path) => { scrollToElement(`file-${path}`) }} />
+      <div className={`review-layout${panelOpen && extensions.sidePanel ? ' with-panel' : ''}${filesHidden ? ' files-hidden' : ''}`}>
+        <aside className="sidebar" aria-label="Files">
+          <button type="button" className="sidebar-toggle" aria-expanded={!filesHidden} aria-controls={filesHidden ? undefined : 'file-tree'} title={filesHidden ? 'Show files' : 'Hide files'} onClick={toggleFiles}>
+            <SidebarIcon />
+            {!filesHidden && <span>Files</span>}
+          </button>
+          {!filesHidden && (
+            <div id="file-tree">
+              <FileTree nodes={fileTree} activePath={focusedUnit?.path} onSelect={(path) => { scrollToElement(`file-${path}`) }} />
+            </div>
+          )}
         </aside>
         <main className="units">
           {units.error && <ErrorNote message={describeError(units.error)} />}
@@ -236,6 +253,15 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
         {panelOpen && extensions.sidePanel && <aside className="side-panel">{extensions.sidePanel.content}</aside>}
       </div>
     </div>
+  )
+}
+
+function SidebarIcon() {
+  return (
+    <svg className="tree-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+      <path d="M6 2.5v11" />
+    </svg>
   )
 }
 
