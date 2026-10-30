@@ -16,13 +16,13 @@ interface Props {
 }
 
 export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
-  const [collapsed, setCollapsed] = useState(thread.status === 'resolved')
+  const resolved = thread.resolvable && thread.status === 'resolved'
+  const [collapsed, setCollapsed] = useState(resolved)
   const reply = useReply(reviewId)
   const setStatus = useSetThreadStatus(reviewId)
   const remove = useDeleteThread(reviewId)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const failure = reply.error ?? setStatus.error ?? remove.error
-  const resolved = thread.status === 'resolved'
 
   return (
     <div className={`thread${resolved ? ' resolved' : ''}${thread.anchor?.outdated ? ' outdated' : ''}`} data-testid="thread">
@@ -43,9 +43,11 @@ export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
             Delete
           </button>
         )}
-        <button type="button" disabled={setStatus.isPending} onClick={() => { setStatus.mutate({ threadId: thread.id, status: resolved ? 'open' : 'resolved' }) }}>
-          {resolved ? 'Reopen' : 'Resolve'}
-        </button>
+        {thread.resolvable && (
+          <button type="button" disabled={setStatus.isPending} onClick={() => { setStatus.mutate({ threadId: thread.id, status: resolved ? 'open' : 'resolved' }) }}>
+            {resolved ? 'Reopen' : 'Resolve'}
+          </button>
+        )}
       </div>
       {confirmingDelete && (
         <div className="confirm" role="alertdialog" aria-label="Delete thread">

@@ -99,7 +99,19 @@ def test_review_and_file_threads_and_replies(api: ApiClient, git_repo: GitFixtur
     threads = {thread["id"]: thread for thread in api.call("GET", f"/reviews/{review}/threads")}
     assert [comment["body"] for comment in threads[general["id"]]["comments"]] == ["Looks good overall", "Agreed"]
     assert threads[on_file["id"]]["status"] == "resolved"
-    assert (summary["open_threads"], summary["total_threads"]) == (1, 2)
+    assert (threads[general["id"]]["resolvable"], threads[on_file["id"]]["resolvable"]) == (False, True)
+    assert (summary["open_threads"], summary["total_threads"]) == (0, 2)
+
+
+def test_comments_on_the_whole_review_cannot_be_resolved_and_are_not_counted_as_open(api: ApiClient, git_repo: GitFixture) -> None:
+    review = start(git_repo, api)
+    general = api.call("POST", f"/reviews/{review}/threads", 201, {"scope": "review", "body": "Looks good overall"})
+    api.call("POST", f"/reviews/{review}/threads", 201, {"scope": "file", "path": "app.py", "body": "Split this file?"})
+
+    refused = api.call("PATCH", f"/threads/{general['id']}", 400, {"status": "resolved"})
+
+    assert "cannot be resolved" in refused["detail"]
+    assert api.call("GET", f"/reviews/{review}")["open_threads"] == 1
 
 
 def test_only_the_author_can_edit_or_delete_a_comment(api: ApiClient, git_repo: GitFixture) -> None:

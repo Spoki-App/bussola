@@ -146,6 +146,7 @@ export interface Thread {
   qualified_name: string | null
   side: Side | null
   status: ThreadStatus
+  resolvable: boolean
   created_by: Reviewer
   created_at: string
   line_text: string | null

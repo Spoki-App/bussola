@@ -52,6 +52,8 @@ def test_github_comments_are_imported_when_reviewing_a_pull_request(api: ApiClie
     ]
     assert inline["comments"][0]["remote_url"] == "https://github.com/acme/widgets/pull/7#c501"
     assert sorted(comment["body"] for thread in imported if thread["scope"] == "review" for comment in thread["comments"]) == ["Looks good overall", "Nice PR"]
+    assert [(thread["scope"], thread["resolvable"]) for thread in imported if thread["scope"] == "review"] == [("review", False)] * 2
+    assert api.call("GET", f"/reviews/{review}")["open_threads"] == 1
     assert api.call("GET", f"/reviews/{review}")["unsent_comments"] == 0
 
 
@@ -220,7 +222,7 @@ def test_resolving_a_thread_that_is_not_on_github_stays_local(api: ApiClient, gi
     github.open_pull_request({"app.py": FIRST})
     set_conversation(github, [])
     review = start_review(api)
-    thread = api.call("POST", f"/reviews/{review}/threads", 201, {"scope": "review", "body": "Overall fine"})
+    thread = api.call("POST", f"/reviews/{review}/threads", 201, {"scope": "file", "path": "app.py", "body": "Split this file?"})
     github.fake_gh.clear_log()
 
     assert api.call("PATCH", f"/threads/{thread['id']}", body={"status": "resolved"})["status"] == "resolved"

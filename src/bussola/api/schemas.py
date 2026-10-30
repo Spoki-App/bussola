@@ -229,6 +229,7 @@ class ThreadOut(BaseModel):
     qualified_name: str | None
     side: Side | None
     status: ThreadStatus
+    resolvable: bool
     created_by: ReviewerOut
     created_at: datetime
     line_text: str | None

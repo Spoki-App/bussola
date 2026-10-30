@@ -11,7 +11,7 @@ import { FileCommentButton } from './components/FileCommentButton'
 import { ThreadPanel } from './components/ThreadPanel'
 import { ThreadView } from './components/ThreadView'
 import { ReviewPage } from './pages/ReviewPage'
-import { draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, nextDraft, threadRow, type Draft } from './review/threadPlacement'
+import { draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, isOpen, nextDraft, threadRow, type Draft } from './review/threadPlacement'
 
 export function ReviewRoute({ reviewId }: { reviewId: number }) {
   const review = useReview(reviewId)
@@ -28,7 +28,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
     }
     return grouped
   }, [threads.data])
-  const openCount = (threads.data ?? []).filter((thread) => thread.status === 'open').length
+  const openCount = (threads.data ?? []).filter(isOpen).length
 
   const renderWidgets = useCallback(
     (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => {

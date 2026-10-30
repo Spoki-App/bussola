@@ -10,3 +10,7 @@ class ThreadScope(StrEnum):
 class ThreadStatus(StrEnum):
     OPEN = "open"
     RESOLVED = "resolved"
+
+
+def is_resolvable(scope: str) -> bool:
+    return scope != ThreadScope.REVIEW

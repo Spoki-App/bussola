@@ -71,6 +71,10 @@ export function threadRow(thread: Thread, diff: UnitDiff): DiffRow | undefined {
   return diff.rows.findLast((row) => row.new_index !== null && row.new_index <= last)
 }
 
+export function isOpen(thread: Thread): boolean {
+  return thread.resolvable && thread.status === 'open'
+}
+
 export function isInline(thread: Thread): boolean {
   return thread.scope === 'unit' && thread.anchor !== null && !thread.anchor.outdated && thread.anchor.unit_id !== null
 }

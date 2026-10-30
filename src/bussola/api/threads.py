@@ -5,12 +5,12 @@ from fastapi import APIRouter, Depends, Request, status
 from bussola.api.deps import ContextDep, ReviewerDep, StoreDep, resolve_revision, review_context, snapshot_of
 from bussola.api.schemas import CommentIn, CommentOut, ReviewerOut, ThreadAnchorOut, ThreadDeletedOut, ThreadIn, ThreadOut, ThreadPatch
 from bussola.api.state import app_state
-from bussola.errors import NotFoundError
+from bussola.errors import InvalidRequestError, NotFoundError
 from bussola.forge.conversation import push_resolution
 from bussola.review.anchoring import line_count
 from bussola.review.context import ReviewContext
 from bussola.review.rows import Side
-from bussola.review.thread_types import ThreadScope, ThreadStatus
+from bussola.review.thread_types import ThreadScope, ThreadStatus, is_resolvable
 from bussola.review.threads import (
     NewThread,
     ThreadView,
@@ -74,6 +74,8 @@ def post_comment(thread_id: str, body: CommentIn, context: ThreadContextDep) -> 
 @router.patch("/threads/{thread_id}")
 def patch_thread(thread_id: str, body: ThreadPatch, context: ThreadContextDep, request: Request) -> ThreadOut:
     thread = get_thread(context, thread_id)
+    if not is_resolvable(thread.scope):
+        raise InvalidRequestError("Comments on the whole review are part of the conversation and cannot be resolved")
     if thread.status != body.status.value:
         push_resolution(context, app_state(request).forge, thread, body.status == ThreadStatus.RESOLVED)
     thread.status = body.status.value
@@ -114,6 +116,7 @@ def thread_out(context: ReviewContext, view: ThreadView, published: dict[str, Pu
         qualified_name=thread.qualified_name,
         side=Side(thread.side) if thread.side else None,
         status=ThreadStatus(thread.status),
+        resolvable=is_resolvable(thread.scope),
         created_by=_reviewer_out(context.store, thread.created_by),
         created_at=thread.created_at,
         line_text=thread.line_text,

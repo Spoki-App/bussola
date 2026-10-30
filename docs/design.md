@@ -67,7 +67,7 @@ DELETE /reviews/{review_id}/row-approvals/{selection_id}
 
 ## Threads
 
-A thread has a scope: `review` (the whole review), `file` or `unit`. A unit thread stores its unit key, side, first line offset inside the unit, the selected lines and three lines of context on each side.
+A thread has a scope: `review` (the whole review), `file` or `unit`. As on GitHub, only `file` and `unit` threads can be resolved and count as open: a `review` thread is part of the conversation, like a pull request comment or a review summary, and resolving it is refused. A unit thread stores its unit key, side, first line offset inside the unit, the selected lines and three lines of context on each side.
 
 At each refresh every unit thread, open or resolved, gets an anchor on the latest revision:
 

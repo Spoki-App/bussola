@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Thread } from '../api/types'
 import { ThreadView } from './ThreadView'
 
-function thread(canDelete: boolean): Thread {
+function thread(canDelete: boolean, resolvable: boolean): Thread {
   return {
     id: 't1',
     scope: 'review',
@@ -14,6 +14,7 @@ function thread(canDelete: boolean): Thread {
     qualified_name: null,
     side: null,
     status: 'open',
+    resolvable,
     created_by: { id: 1, email: 'a@b.c', name: 'Alice' },
     created_at: '2026-10-28T10:00:00Z',
     line_text: null,
@@ -26,11 +27,11 @@ function thread(canDelete: boolean): Thread {
   }
 }
 
-function renderThread(canDelete: boolean) {
+function renderThread(canDelete: boolean, resolvable = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
-      <ThreadView reviewId={1} thread={thread(canDelete)} />
+      <ThreadView reviewId={1} thread={thread(canDelete, resolvable)} />
     </QueryClientProvider>,
   )
 }
@@ -58,5 +59,19 @@ describe('ThreadView deletion', () => {
     renderThread(false)
 
     expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+  })
+})
+
+describe('ThreadView resolution', () => {
+  it('offers Resolve on a thread that can be resolved', () => {
+    renderThread(false, true)
+
+    expect(screen.getByRole('button', { name: 'Resolve' })).toBeTruthy()
+  })
+
+  it('hides Resolve on a comment on the whole review', () => {
+    renderThread(false, false)
+
+    expect(screen.queryByRole('button', { name: 'Resolve' })).toBeNull()
   })
 })

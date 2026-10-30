@@ -1,7 +1,7 @@
 import { describeError } from '../api/client'
 import { useCreateThread } from '../api/threads'
 import type { Thread } from '../api/types'
-import { isInline } from '../review/threadPlacement'
+import { isInline, isOpen } from '../review/threadPlacement'
 import { ErrorNote } from './Badges'
 import { Composer } from './Composer'
 import { ThreadView } from './ThreadView'
@@ -21,7 +21,7 @@ export function ThreadPanel({ reviewId, threads }: Props) {
   const general = threads.filter((thread) => thread.scope === 'review')
   const files = threads.filter((thread) => thread.scope === 'file')
   const elsewhere = threads.filter((thread) => thread.scope === 'unit' && !isInline(thread))
-  const open = threads.filter((thread) => thread.status === 'open').length
+  const open = threads.filter(isOpen).length
 
   return (
     <div className="thread-panel">
