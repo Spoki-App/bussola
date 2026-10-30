@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useDeferredValue, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useSync } from '../api/forge'
@@ -134,7 +134,8 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const revisionId = review.data?.latest_revision?.id
   const units = useUnits(reviewId, revisionId, filter)
   const [query, setQuery] = useState('')
-  const shownUnits = useMemo(() => (units.data ?? []).filter((unit) => matchesUnitQuery(unit, query)), [units.data, query])
+  const deferredQuery = useDeferredValue(query)
+  const shownUnits = useMemo(() => (units.data ?? []).filter((unit) => matchesUnitQuery(unit, deferredQuery)), [units.data, deferredQuery])
   const fileTree = useMemo(() => buildFileTree(groupByFile(shownUnits)), [shownUnits])
   const groups = useMemo(() => filesInOrder(fileTree).map((group) => ({ ...group, tree: buildUnitTree(group.units) })), [fileTree])
   const unitList = useMemo(() => groups.flatMap((group) => group.units), [groups])
@@ -254,6 +255,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
               <FileHeader reviewId={reviewId} path={group.path} oldPath={group.oldPath} complete={group.complete} actions={extensions.fileActions?.(group.path)} />
               <UnitTree
                 nodes={group.tree}
+                module={group.units.at(0)?.module ?? null}
                 renderUnit={(unit, nested) => (
                   <UnitCard
                     key={unit.id}

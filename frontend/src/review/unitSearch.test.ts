@@ -50,6 +50,11 @@ describe('matchesUnitQuery', () => {
     expect(matchesUnitQuery(findLine, 'anchoring.find_')).toBe(true)
   })
 
+  it('matches every word of the query, in any order', () => {
+    expect(matchesUnitQuery(findLine, 'find_line anchoring')).toBe(true)
+    expect(matchesUnitQuery(findLine, 'find_line forge')).toBe(false)
+  })
+
   it('matches the name and the file path', () => {
     expect(matchesUnitQuery(findLine, 'find_line')).toBe(true)
     expect(matchesUnitQuery(findLine, 'src/bussola/review')).toBe(true)

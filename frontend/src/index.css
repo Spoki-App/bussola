@@ -1027,6 +1027,10 @@ textarea {
   min-width: 0;
 }
 
+.unit-header > .qualified-name {
+  font-size: 13px;
+}
+
 .qualified-name {
   display: inline-flex;
   align-items: baseline;
@@ -1037,19 +1041,13 @@ textarea {
 
 .unit-module {
   flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
   font-family: var(--mono);
-  font-size: 13px;
-  color: var(--muted);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  direction: rtl;
 }
 
 .qualified-name > .unit-name {
   flex: 0 0 auto;
   max-width: 100%;
+  font-size: inherit;
 }
 
 .unit-name {
@@ -1298,11 +1296,6 @@ button.link:hover:not(:disabled) {
   font-family: var(--mono);
   font-size: 12px;
   overflow-wrap: anywhere;
-}
-
-.thread-location .unit-module,
-.thread-location .unit-name {
-  font-size: inherit;
 }
 
 .snippet {
@@ -1603,7 +1596,8 @@ button.danger {
   justify-content: space-between;
 }
 
-.picker-path code {
+.picker-path code,
+.unit-module {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

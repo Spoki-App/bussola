@@ -1,24 +1,27 @@
 from collections.abc import Callable
 from pathlib import PurePosixPath
 
-PYTHON_SUFFIXES = frozenset({".py", ".pyi"})
-SCRIPT_SUFFIXES = frozenset({".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"})
-GO_SUFFIX = ".go"
+from bussola.units.extractors.go import GoExtractor
+from bussola.units.extractors.javascript import JAVASCRIPT
+from bussola.units.extractors.typescript import TSX, TYPESCRIPT
+from bussola.units.registry import PYTHON, extractor_for
+
 GO_MOD = "go.mod"
 PYTHON_SOURCE_ROOT = "src"
 PYTHON_PACKAGE_FILE = "__init__"
+SCRIPT_EXTRACTORS = (TYPESCRIPT, TSX, JAVASCRIPT)
 
 GoModuleLookup = Callable[[str], str | None]
 
 
 def module_path(path: str, go_module: GoModuleLookup) -> str | None:
+    extractor = extractor_for(path)
     file = PurePosixPath(path)
-    suffix = file.suffix.lower()
-    if suffix in PYTHON_SUFFIXES:
+    if extractor is PYTHON:
         return _python_module(file)
-    if suffix in SCRIPT_SUFFIXES:
+    if extractor in SCRIPT_EXTRACTORS:
         return str(file.with_suffix(""))
-    if suffix == GO_SUFFIX:
+    if isinstance(extractor, GoExtractor):
         return _go_package(file.parent, go_module)
     return None
 
@@ -42,12 +45,7 @@ def _python_module(file: PurePosixPath) -> str | None:
 
 def _go_package(directory: PurePosixPath, go_module: GoModuleLookup) -> str | None:
     for root in (directory, *directory.parents):
-        name = go_module(_directory(root))
+        name = go_module("/".join(root.parts))
         if name is not None:
-            relative = directory.relative_to(root)
-            return name if relative == PurePosixPath() else f"{name}/{relative}"
-    return _directory(directory) or None
-
-
-def _directory(directory: PurePosixPath) -> str:
-    return "" if directory == PurePosixPath() else str(directory)
+            return "/".join((name, *directory.relative_to(root).parts))
+    return "/".join(directory.parts) or None

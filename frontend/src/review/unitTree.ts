@@ -83,13 +83,3 @@ export function lastSegment(qualifiedName: string): string {
   const parent = parentName(qualifiedName)
   return parent ? qualifiedName.slice(parent.length + 1) : qualifiedName
 }
-
-export function firstUnit(nodes: UnitNode[]): Unit | undefined {
-  for (const node of nodes) {
-    const unit = node.kind === 'unit' ? node.unit : (node.unit ?? firstUnit(node.children))
-    if (unit) {
-      return unit
-    }
-  }
-  return undefined
-}
