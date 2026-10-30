@@ -3,7 +3,9 @@ from pathlib import Path
 
 import pytest
 
+from bussola.units.model import UnitKind
 from bussola.units.registry import extractor_for
+from tests.units.helpers import extract
 
 PROJECT_ROOT = Path(__file__).parents[2]
 SOURCES = sorted(
@@ -25,3 +27,22 @@ def test_extracting_this_projects_sources_yields_units(path: Path) -> None:
     assert units is not None
     assert all(unit.text is not None for unit in units)
     assert [unit.qualified_name for unit in units] == [unit.qualified_name for unit in units if unit.content_hash]
+
+
+@pytest.mark.parametrize(
+    ("path", "header", "function"),
+    [
+        ("big.py", "", "def f{index}(a):\n    return a"),
+        ("big.ts", "", "export function f{index}(a: number) {{ return a }}"),
+        ("big.go", "package main\n\n", "func F{index}() int {{ return {index} }}"),
+    ],
+)
+def test_extracting_sources_with_rows_beyond_the_small_int_cache_is_stable(path: str, header: str, function: str) -> None:
+    source = header + "\n\n".join(function.format(index=index) for index in range(400))
+
+    for _ in range(3):
+        units = extract(path, source)
+        gc.collect()
+        functions = [unit for unit in units if unit.kind == UnitKind.FUNCTION]
+        assert len(functions) == 400
+        assert functions[-1].line_numbers[-1] == len(source.splitlines())

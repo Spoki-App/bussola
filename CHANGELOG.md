@@ -4,6 +4,10 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Changed
+
+- Allow tree-sitter 0.26. Syntax tree positions are read as plain tuples, because the `Point.row` and `Point.column` properties in tree-sitter 0.26.0 drop a reference on every read and crash the process on files longer than 256 lines.
+
 ### Fixed
 
 - Comments on the whole review, including pull request comments and review summaries imported from GitHub, no longer have a Resolve button and no longer count as open threads, as on GitHub.
