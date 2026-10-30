@@ -61,6 +61,7 @@ export interface Unit {
   revision_id: number
   path: string
   old_path: string | null
+  module: string | null
   kind: string
   qualified_name: string
   state: UnitState
@@ -142,6 +143,7 @@ export interface Thread {
   id: string
   scope: ThreadScope
   path: string | null
+  module: string | null
   kind: string | null
   qualified_name: string | null
   side: Side | null

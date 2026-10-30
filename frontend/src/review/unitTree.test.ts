@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Unit } from '../api/types'
-import { buildUnitTree, lastSegment, parentName, type UnitNode } from './unitTree'
+import { buildUnitTree, firstUnit, lastSegment, parentName, type UnitNode } from './unitTree'
 
 function unit(id: number, kind: string, qualifiedName: string): Unit {
   return {
@@ -9,6 +9,7 @@ function unit(id: number, kind: string, qualifiedName: string): Unit {
     revision_id: 1,
     path: 'a.py',
     old_path: null,
+    module: null,
     kind,
     qualified_name: qualifiedName,
     state: 'new',
@@ -81,5 +82,13 @@ describe('buildUnitTree', () => {
     const tree = buildUnitTree([unit(1, 'method', 'Outer.Inner.load'), unit(2, 'class', 'Outer')])
 
     expect(shape(tree)).toEqual([{ class: 'Outer', own: true, children: [{ class: 'Outer.Inner', own: false, children: ['Outer.Inner.load'] }] }])
+  })
+})
+
+describe('firstUnit', () => {
+  it('finds the first unit inside class cards', () => {
+    const tree = buildUnitTree([unit(1, 'method', 'Outer.Inner.load'), unit(2, 'function', 'helper')])
+    expect(firstUnit(tree)?.id).toBe(1)
+    expect(firstUnit([])).toBeUndefined()
   })
 })

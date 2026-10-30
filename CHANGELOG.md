@@ -7,6 +7,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 ### Added
 
 - Changed words inside a modified line are highlighted with a stronger background on both the removed and the added line, when the two lines are similar enough ([#25](https://github.com/Spoki-App/bussola/issues/25)).
+- Unit names in card headers and in the conversation panel start with their module (Python dotted module, TypeScript/JavaScript file path, Go package import path), muted and cut from the left when long, and a new box on the review page finds units by module, name or path ([#15](https://github.com/Spoki-App/bussola/issues/15)).
 
 ### Changed
 

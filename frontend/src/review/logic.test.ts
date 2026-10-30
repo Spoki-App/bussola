@@ -9,6 +9,7 @@ function unit(id: number, path: string, state: UnitState, qualifiedName = `f${St
     revision_id: 1,
     path,
     old_path: null,
+    module: null,
     kind: qualifiedName ? 'function' : 'module',
     qualified_name: qualifiedName,
     state,

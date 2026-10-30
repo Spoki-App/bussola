@@ -5,12 +5,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Unit, UnitState } from '../api/types'
 import { UnitCard } from './UnitCard'
 
-function unit(state: UnitState): Unit {
+function unit(state: UnitState, overrides: Partial<Unit> = {}): Unit {
   return {
     id: 1,
     revision_id: 1,
     path: 'app.py',
     old_path: null,
+    module: null,
     kind: 'function',
     qualified_name: 'total',
     state,
@@ -25,6 +26,7 @@ function unit(state: UnitState): Unit {
     todo: !state.startsWith('approved'),
     action: state.startsWith('approved') ? 'revoke' : 'approve',
     open_threads: 0,
+    ...overrides,
   }
 }
 
@@ -53,5 +55,26 @@ describe('UnitCard', () => {
 
     rerender(card('changed'))
     expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('shows the module before the name of a top-level unit only', () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
+    const client = new QueryClient()
+    const card = (nested: boolean, overrides: Partial<Unit>) => (
+      <QueryClientProvider client={client}>
+        <UnitCard reviewId={1} unit={unit('approved', overrides)} nested={nested} focused={false} onFocus={() => undefined} register={() => undefined} />
+      </QueryClientProvider>
+    )
+    const { container, rerender } = render(card(false, { module: 'shop.app', qualified_name: 'Cart.total' }))
+    expect(container.querySelector('.unit-header .qualified-name')).toHaveAttribute('title', 'shop.app.Cart.total')
+    expect(container.querySelector('.unit-module')?.textContent).toContain('shop.app.')
+
+    rerender(card(true, { module: 'shop.app', qualified_name: 'Cart.total' }))
+    expect(container.querySelector('.unit-module')).toBeNull()
+    expect(screen.getByText('total')).toHaveAttribute('title', 'Cart.total')
+
+    rerender(card(false, { module: 'shop.app', kind: 'module', qualified_name: '' }))
+    expect(container.querySelector('.unit-module')).toBeNull()
+    expect(screen.getByText('Module code')).toBeInTheDocument()
   })
 })

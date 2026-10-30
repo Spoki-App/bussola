@@ -641,8 +641,16 @@ textarea {
   margin: 0;
 }
 
-.review-summary > .segmented {
-  justify-self: start;
+.unit-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.unit-search {
+  flex: 0 1 320px;
+  min-width: 0;
 }
 
 .course-summary {
@@ -1013,9 +1021,35 @@ textarea {
   flex-shrink: 0;
 }
 
-.unit-header > .unit-name {
+.unit-header > .unit-name,
+.unit-header > .qualified-name {
   flex: 0 1 auto;
   min-width: 0;
+}
+
+.qualified-name {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: bottom;
+}
+
+.unit-module {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+}
+
+.qualified-name > .unit-name {
+  flex: 0 0 auto;
+  max-width: 100%;
 }
 
 .unit-name {
@@ -1264,6 +1298,11 @@ button.link:hover:not(:disabled) {
   font-family: var(--mono);
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+
+.thread-location .unit-module,
+.thread-location .unit-name {
+  font-size: inherit;
 }
 
 .snippet {

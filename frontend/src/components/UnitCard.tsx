@@ -8,6 +8,7 @@ import { approvedSelections, rowKey, selectRange, selectionRanges } from '../rev
 import { lastSegment } from '../review/unitTree'
 import { ErrorNote, KindBadge, StateBadge } from './Badges'
 import { ImagePreview } from './ImagePreview'
+import { QualifiedName } from './QualifiedName'
 import { UnitDiffView, type GutterSide } from './UnitDiffView'
 
 export interface UnitActions {
@@ -132,9 +133,13 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
           {expanded ? '▾' : '▸'}
         </button>
         <KindBadge kind={unit.kind} />
-        <span className="unit-name" title={unit.qualified_name || undefined}>
-          {nested && unit.qualified_name ? lastSegment(unit.qualified_name) : unitTitle(unit)}
-        </span>
+        {nested && unit.qualified_name ? (
+          <span className="unit-name" title={unit.qualified_name}>
+            {lastSegment(unit.qualified_name)}
+          </span>
+        ) : (
+          <QualifiedName module={unit.qualified_name ? unit.module : null} name={unitTitle(unit)} />
+        )}
         <StateBadge state={unit.state} />
         {unit.change_type !== 'modified' && <span className="label">{unit.change_type}</span>}
         {unit.base_changed && <span className="label" title="The base changed since you approved this unit">base changed</span>}

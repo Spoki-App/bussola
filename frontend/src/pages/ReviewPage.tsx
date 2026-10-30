@@ -18,6 +18,7 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
 import { buildUnitTree } from '../review/unitTree'
+import { matchesUnitQuery } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
 import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, groupByFile, nextTodoIndex, progressPercent, shortSha } from '../review/logic'
 import { plural } from '../review/text'
@@ -132,7 +133,9 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const [filter, setFilter] = useState<UnitFilter>('all')
   const revisionId = review.data?.latest_revision?.id
   const units = useUnits(reviewId, revisionId, filter)
-  const fileTree = useMemo(() => buildFileTree(groupByFile(units.data ?? [])), [units.data])
+  const [query, setQuery] = useState('')
+  const shownUnits = useMemo(() => (units.data ?? []).filter((unit) => matchesUnitQuery(unit, query)), [units.data, query])
+  const fileTree = useMemo(() => buildFileTree(groupByFile(shownUnits)), [shownUnits])
   const groups = useMemo(() => filesInOrder(fileTree).map((group) => ({ ...group, tree: buildUnitTree(group.units) })), [fileTree])
   const unitList = useMemo(() => groups.flatMap((group) => group.units), [groups])
   const [focusedIndex, setFocusedIndex] = useState(0)
@@ -210,7 +213,17 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
               {data.open_threads > 0 && <li className="legend-threads">{plural(data.open_threads, 'open thread')}</li>}
             </ul>
           </div>
-          <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
+          <div className="unit-filters">
+            <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
+            <input
+              type="search"
+              className="unit-search"
+              aria-label="Find units by module, name or path"
+              placeholder="Find by module, name or path"
+              value={query}
+              onChange={(event) => { setQuery(event.target.value) }}
+            />
+          </div>
           <div className="summary-row">
             <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>
             {extensions.sidePanel && (
@@ -235,7 +248,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
         </aside>
         <main className="units">
           {units.error && <ErrorNote message={describeError(units.error)} />}
-          {units.data && unitList.length === 0 && <p className="muted">{filter === 'all' ? 'No changes between the branches.' : 'Nothing to review here.'}</p>}
+          {units.data && unitList.length === 0 && <p className="muted">{emptyMessage(filter, query, units.data.length)}</p>}
           {groups.map((group) => (
             <section key={group.path} id={`file-${group.path}`} className="file-section">
               <FileHeader reviewId={reviewId} path={group.path} oldPath={group.oldPath} complete={group.complete} actions={extensions.fileActions?.(group.path)} />
@@ -264,6 +277,13 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
       </div>
     </div>
   )
+}
+
+function emptyMessage(filter: UnitFilter, query: string, total: number): string {
+  if (total > 0) {
+    return `No units match "${query.trim()}".`
+  }
+  return filter === 'all' ? 'No changes between the branches.' : 'Nothing to review here.'
 }
 
 function SidebarIcon() {

@@ -4,6 +4,7 @@ import type { Thread } from '../api/types'
 import { isInline, isOpen } from '../review/threadPlacement'
 import { ErrorNote } from './Badges'
 import { Composer } from './Composer'
+import { QualifiedName } from './QualifiedName'
 import { ThreadView } from './ThreadView'
 
 interface Props {
@@ -11,9 +12,16 @@ interface Props {
   threads: Thread[]
 }
 
-function location(thread: Thread): string {
-  const name = thread.qualified_name ? `::${thread.qualified_name}` : ''
-  return `${thread.path ?? ''}${name}`
+function Location({ thread }: { thread: Thread }) {
+  if (!thread.qualified_name) {
+    return <p className="thread-location">{thread.path}</p>
+  }
+  return (
+    <p className="thread-location">
+      <QualifiedName module={thread.module} name={thread.qualified_name} />
+      {thread.path && <span className="muted">{` in ${thread.path}`}</span>}
+    </p>
+  )
 }
 
 export function ThreadPanel({ reviewId, threads }: Props) {
@@ -55,7 +63,7 @@ export function ThreadPanel({ reviewId, threads }: Props) {
           <h3>Outdated or not shown</h3>
           {elsewhere.map((thread) => (
             <div key={thread.id}>
-              <p className="thread-location">{location(thread)}</p>
+              <Location thread={thread} />
               <ThreadView reviewId={reviewId} thread={thread} showSnippet />
             </div>
           ))}

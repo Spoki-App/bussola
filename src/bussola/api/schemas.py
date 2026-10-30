@@ -100,6 +100,7 @@ class UnitOut(BaseModel):
     revision_id: int
     path: str
     old_path: str | None
+    module: str | None
     kind: str
     qualified_name: str
     state: UnitState
@@ -225,6 +226,7 @@ class ThreadOut(BaseModel):
     id: str
     scope: ThreadScope
     path: str | None
+    module: str | None
     kind: str | None
     qualified_name: str | None
     side: Side | None

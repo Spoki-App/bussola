@@ -37,6 +37,7 @@ function thread(side: Thread['side'], offset: number | null, lineCount = 1, outd
     id: 't',
     scope: 'unit',
     path: 'a.py',
+    module: 'a',
     kind: 'function',
     qualified_name: 'f',
     side,
