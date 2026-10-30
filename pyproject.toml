@@ -2,8 +2,25 @@
 name = "rtool"
 version = "0.1.0"
 description = "Local, per-function code review on git branches"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "Davide Candita", email = "davide.candita@spoki.it" }
+]
+keywords = ["code review", "git", "github", "pull request", "tree-sitter"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Version Control :: Git",
 ]
 requires-python = ">=3.12"
 dependencies = [

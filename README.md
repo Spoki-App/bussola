@@ -15,7 +15,14 @@ In Go, each function, method and type is its own unit. A method is named after i
 
 ## Install
 
-Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/), git, and Node.js 22.12+ to build the UI (`frontend/.nvmrc` pins 24).
+Requirements:
+
+- Python 3.12+ and [uv](https://docs.astral.sh/uv/)
+- git
+- Node.js 22.12+ to build the UI (`frontend/.nvmrc` pins 24)
+- The [GitHub CLI](https://cli.github.com) (`gh`), only for the GitHub features
+
+rtool is developed on macOS and tested on macOS and Linux. Windows is not tested yet.
 
 ```bash
 npm --prefix frontend ci
@@ -138,33 +145,43 @@ The server is meant for one person on one machine.
 - **Outbound traffic:** the only network access is `git fetch` when you ask for it, `gh` when you sync or have a pull request review open, and downloads of images attached on GitHub shown in comments and descriptions.
 - **Rendered Markdown:** HTML in comments and descriptions is sanitized with GitHub's rules before it is shown. Attached images are served from `/api/forge/asset` only for `https://github.com/.../assets/...` links and only when they are images, with a sandboxing Content-Security-Policy.
 
-## Development
+## Status
 
-```bash
-uv sync
-npm --prefix frontend ci
-uv run rtool serve --no-open
-npm --prefix frontend run dev
-```
+rtool is used on real pull requests, but it is young. Until 1.0, commands, options and the UI may change between minor versions. Your data is kept across upgrades: the database is migrated automatically at startup, and a change to how files are split into units is applied to existing reviews at their next **Sync**, without losing approvals of units that did not change.
 
-The Vite dev server proxies `/api` to `127.0.0.1:8765`. To get the session cookie on the Vite origin, open `http://localhost:5173/api/health?token=<token>` once, using the token printed by `rtool serve` (set `RTOOL_TOKEN` to keep the same token across restarts).
+## FAQ
 
-Checks:
+<details><summary><b>Does my code leave my machine?</b></summary>
 
-```bash
-uv run ruff format --check . && uv run ruff check . && uv run basedpyright && uv run pytest
-npm --prefix frontend run lint && npm --prefix frontend run typecheck && npm --prefix frontend test
-npm --prefix frontend run build && npm --prefix frontend run e2e
-```
+No. rtool reads your local clone. It only talks to your git remote when you sync, and to GitHub through your own `gh` login when you use the pull request features.
+</details>
 
-The Playwright smoke test needs a browser once: `npx --prefix frontend playwright install chromium`. The GitHub tests use a fake `gh` from `tests/fakegh` and make no network calls.
+<details><summary><b>Do I need GitHub?</b></summary>
 
-Database migrations live in `src/rtool/storage/migrations` and run automatically at startup. After changing `src/rtool/storage/models.py`:
+No. Any two branches of a local repository can be reviewed. GitHub adds pull request listing, comment import and sending comments back.
+</details>
 
-```bash
-uv run alembic -c alembic.ini upgrade head
-uv run alembic -c alembic.ini revision --autogenerate -m "describe the change"
-rm dev.db
-```
+<details><summary><b>Is it a replacement for GitHub's review UI?</b></summary>
 
-Spec changes made after the original specification are recorded in [docs/spec-amendments.md](docs/spec-amendments.md).
+It is a place to do the reading. Approvals stay with you and follow the code across force-pushes and rebases; comments go back to the pull request so the discussion stays where your team has it.
+</details>
+
+<details><summary><b>Can several people review the same branch?</b></summary>
+
+Each person runs rtool on their own machine and keeps their own approvals. Comments are shared through the pull request.
+</details>
+
+<details><summary><b>What about other languages?</b></summary>
+
+Files that are not parsed are still reviewed, as whole files with line selections. Adding a language means adding a tree-sitter extractor in `src/rtool/units/extractors/`; see [CONTRIBUTING.md](CONTRIBUTING.md).
+</details>
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup and checks, and [docs/design.md](docs/design.md) for how units, revisions, approvals, threads and the GitHub integration work. Report security issues as described in [SECURITY.md](SECURITY.md).
+
+## License
+
+rtool is released under the [MIT License](LICENSE). It is not affiliated with GitHub; GitHub is a trademark of GitHub, Inc.
+
+The UI bundles third-party libraries; their licenses are listed in `THIRD_PARTY_LICENSES.md`, which the UI build writes next to the app and the package ships. Diagrams use [elkjs](https://github.com/kieler/elkjs) (EPL-2.0), whose source code is available from that repository.

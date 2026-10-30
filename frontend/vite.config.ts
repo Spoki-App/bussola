@@ -11,6 +11,7 @@ export default defineConfig({
   build: {
     outDir: '../src/rtool/static',
     emptyOutDir: true,
+    license: { fileName: 'THIRD_PARTY_LICENSES.md' },
   },
   test: {
     environment: 'jsdom',

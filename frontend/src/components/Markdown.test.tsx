@@ -53,10 +53,10 @@ describe('Markdown', () => {
   })
 
   it('keeps line breaks and links cross-repository references like GitHub', () => {
-    const container = renderMarkdown('**Overview**\nPairs with Spoki-App/spoki-ai#517.')
+    const container = renderMarkdown('**Overview**\nPairs with acme/widgets#517.')
 
     expect(container.querySelector('br')).not.toBeNull()
-    expect(screen.getByRole('link', { name: 'Spoki-App/spoki-ai#517' }).getAttribute('href')).toBe('https://github.com/Spoki-App/spoki-ai/issues/517')
+    expect(screen.getByRole('link', { name: 'acme/widgets#517' }).getAttribute('href')).toBe('https://github.com/acme/widgets/issues/517')
   })
 
   it('draws mermaid diagrams', async () => {
