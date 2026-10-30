@@ -17,9 +17,14 @@ def node_text(node: Node | None) -> str:
     return node.text.decode(errors="replace")
 
 
+def start_row(node: Node) -> int:
+    row, _ = node.start_point
+    return row
+
+
 def last_row(node: Node) -> int:
-    row = node.end_point.row
-    return row - 1 if node.end_point.column == 0 and row > node.start_point.row else row
+    row, column = node.end_point
+    return row - 1 if column == 0 and row > start_row(node) else row
 
 
 def span_for(siblings: list[Node], index: int, kind: UnitKind, qualified_name: str, children: tuple[Span, ...] = ()) -> Span:
@@ -27,21 +32,24 @@ def span_for(siblings: list[Node], index: int, kind: UnitKind, qualified_name: s
 
 
 def with_name(span: Span, name_node: Node | None) -> Span:
-    if name_node is None or name_node.start_point.row != name_node.end_point.row:
+    if name_node is None:
         return span
-    location = NameLocation(name_node.start_point.row, name_node.start_point.column, name_node.end_point.column)
+    (row, start_column), (end_row, end_column) = name_node.start_point, name_node.end_point
+    if row != end_row:
+        return span
+    location = NameLocation(row, start_column, end_column)
     return Span(span.kind, span.qualified_name, span.start_row, span.end_row, span.children, location)
 
 
 def _leading_comment_row(siblings: list[Node], index: int) -> int:
-    start = siblings[index].start_point.row
+    start = start_row(siblings[index])
     position = index - 1
     while position >= 0:
         candidate = siblings[position]
         if candidate.type != COMMENT or last_row(candidate) != start - 1:
             break
-        if position > 0 and last_row(siblings[position - 1]) == candidate.start_point.row:
+        if position > 0 and last_row(siblings[position - 1]) == start_row(candidate):
             break
-        start = candidate.start_point.row
+        start = start_row(candidate)
         position -= 1
     return start

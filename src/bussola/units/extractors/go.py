@@ -2,7 +2,7 @@ import tree_sitter_go
 from tree_sitter import Language, Node
 
 from bussola.units.extractors.base import SourceLines, Span, build_units
-from bussola.units.extractors.treesitter import node_text, parse, span_for, with_name
+from bussola.units.extractors.treesitter import node_text, parse, span_for, start_row, with_name
 from bussola.units.model import Unit, UnitKind
 
 GO = Language(tree_sitter_go.language())
@@ -43,7 +43,7 @@ def _collect(siblings: list[Node]) -> list[Span]:
 def _types(siblings: list[Node], index: int) -> list[Span]:
     declaration = siblings[index]
     specs = [child for child in declaration.named_children if child.type in TYPE_SPECS]
-    if len(specs) == 1 and declaration.start_point.row == specs[0].start_point.row:
+    if len(specs) == 1 and start_row(declaration) == start_row(specs[0]):
         name_node = specs[0].child_by_field_name("name")
         return [with_name(span_for(siblings, index, UnitKind.TYPE, node_text(name_node)), name_node)]
     members = declaration.named_children
