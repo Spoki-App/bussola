@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from rtool.units.registry import extractor_for
+from bussola.units.registry import extractor_for
 
 PROJECT_ROOT = Path(__file__).parents[2]
 SOURCES = sorted(

@@ -23,7 +23,7 @@ body:
     id: what
     attributes:
       label: What happened, and what did you expect?
-      description: Steps to reproduce, ideally on a small public repository, and the error shown in the page or printed by `rtool serve`.
+      description: Steps to reproduce, ideally on a small public repository, and the error shown in the page or printed by `bussola serve`.
     validations:
       required: true
   - type: input

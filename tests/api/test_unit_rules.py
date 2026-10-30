@@ -1,6 +1,6 @@
 import pytest
 
-from rtool.units.registry import EXTRACTORS_BY_SUFFIX
+from bussola.units.registry import EXTRACTORS_BY_SUFFIX
 from tests.apiclient import ApiClient, comment_on, thread_anchor
 from tests.gitrepo import GitFixture
 

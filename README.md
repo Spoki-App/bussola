@@ -1,6 +1,8 @@
-# rtool
+# bussola
 
-Local, per-function code review for git branches. `rtool serve` opens a review UI on `localhost` that works directly on your repository, without needing a hosting service.
+Local, per-function code review for git branches. `bussola serve` opens a review UI on `localhost` that works directly on your repository, without needing a hosting service.
+
+*Bussola* is Italian for compass: it helps you find your way through a large change, one function at a time.
 
 - Changes between a branch and its base (the same three-dot diff a pull request shows) are split into **reviewable units**: functions, methods, class bodies, TypeScript and Go types, module-level code, and whole files for languages that are not parsed.
 - An approval is tied to the **content** of a unit, not to a commit. After new commits, a rebase or a force-push, a unit with the same content stays approved.
@@ -22,7 +24,7 @@ Requirements:
 - Node.js 22.12+ to build the UI (`frontend/.nvmrc` pins 24)
 - The [GitHub CLI](https://cli.github.com) (`gh`), only for the GitHub features
 
-rtool is developed on macOS and tested on macOS and Linux. Windows is not tested yet.
+bussola is developed on macOS and tested on macOS and Linux. Windows is not tested yet.
 
 ```bash
 npm --prefix frontend ci
@@ -30,24 +32,24 @@ npm --prefix frontend run build
 uv tool install .
 ```
 
-The UI build goes to `src/rtool/static/` and is packaged with the Python wheel, so rebuild it before reinstalling.
+The UI build goes to `src/bussola/static/` and is packaged with the Python wheel, so rebuild it before reinstalling.
 
 ## Usage
 
 ```bash
-rtool serve
+bussola serve
 ```
 
 Run inside a repository to register it and open the browser. **Settings** (top right) opens a window with **Open pull request**, **Add repository** and **Code font**. To add other repositories, use **Browse...** under **Add repository**: it lists the git repositories found in your home folder (up to four levels deep, skipping hidden folders, `node_modules`, `Library` and similar), and its **Browse folders** tab lets you pick any other folder. You can also paste a path. Options: `--repo PATH`, `--host 127.0.0.1`, `--port 8765`, `--no-open`.
 
-The printed link contains a one-time session token. Opening it stores the token in a cookie for that browser; if you open rtool another way and see "Not authorized", use the printed link again.
+The printed link contains a one-time session token. Opening it stores the token in a cookie for that browser; if you open bussola another way and see "Not authorized", use the printed link again.
 
 ```bash
-rtool status feature/x --base develop
-rtool refresh feature/x --fetch
+bussola status feature/x --base develop
+bussola refresh feature/x --fetch
 ```
 
-`status` refreshes the review of a branch and prints the state of each changed unit. `refresh` records a new revision if any commit changed (`--fetch` runs `git fetch --prune` first). The base defaults to `base_branch` from `.rtool.toml`, then the first of `develop`, `main`, `master` that exists. An open review page picks up new revisions by itself.
+`status` refreshes the review of a branch and prints the state of each changed unit. `refresh` records a new revision if any commit changed (`--fetch` runs `git fetch --prune` first). The base defaults to `base_branch` from `.bussola.toml`, then the first of `develop`, `main`, `master` that exists. An open review page picks up new revisions by itself.
 
 ### Reviewing
 
@@ -83,27 +85,27 @@ Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve
 
 ### Comments
 
-Click a line number to start a thread on that line. To comment on several lines, drag over their line numbers or shift-click another line number; the thread is sent to GitHub as a multi-line comment. Use "Comment on file" in a file header, or the conversation panel for comments on the whole review. Comments and pull request descriptions are rendered like on GitHub: GitHub Flavored Markdown (tables, task lists, line breaks), `> [!NOTE]` style alerts, safe HTML, highlighted code, mermaid diagrams, `owner/repo#123` links, and images attached on GitHub (downloaded through rtool with your `gh` login, since GitHub only serves them to signed-in users). You can edit or delete your own comments, and delete a thread you started as long as nobody else replied to it (otherwise resolve it). Deleted threads disappear from rtool but stay on GitHub if they were already sent. When the code changes, a thread moves with its line. It follows a renamed unit, and becomes outdated, showing the original snippet, when its line is gone.
+Click a line number to start a thread on that line. To comment on several lines, drag over their line numbers or shift-click another line number; the thread is sent to GitHub as a multi-line comment. Use "Comment on file" in a file header, or the conversation panel for comments on the whole review. Comments and pull request descriptions are rendered like on GitHub: GitHub Flavored Markdown (tables, task lists, line breaks), `> [!NOTE]` style alerts, safe HTML, highlighted code, mermaid diagrams, `owner/repo#123` links, and images attached on GitHub (downloaded through bussola with your `gh` login, since GitHub only serves them to signed-in users). You can edit or delete your own comments, and delete a thread you started as long as nobody else replied to it (otherwise resolve it). Deleted threads disappear from bussola but stay on GitHub if they were already sent. When the code changes, a thread moves with its line. It follows a renamed unit, and becomes outdated, showing the original snippet, when its line is gone.
 
 ### Reviewing GitHub pull requests
 
-For a repository with a GitHub remote, **Pull requests** on its card lists the open pull requests (read with the GitHub CLI, see below), each with its number of comments and how many review threads are still unresolved on GitHub. The list of reviews shows the same for rtool's own threads.
+For a repository with a GitHub remote, **Pull requests** on its card lists the open pull requests (read with the GitHub CLI, see below), each with its number of comments and how many review threads are still unresolved on GitHub. The list of reviews shows the same for bussola's own threads.
 
-- **Open pull request** in **Settings** takes a GitHub pull request link (`https://github.com/<owner>/<repository>/pull/<number>`, with or without `/files` or an anchor). rtool looks for a repository you added whose remote points to that GitHub repository; if there is none, it scans your home folder as **Browse** does, adds the first clone it finds and uses it. Then it opens the pull request review as **Review** below does. You can also open `http://127.0.0.1:<port>/github.com/<owner>/<repository>/pull/<number>` directly: replace `https://` in a GitHub link with the rtool address.
-- **Review** downloads the pull request's code with `git fetch` into `refs/rtool/pull/<number>`, so your branches are not touched. It then starts a review against the pull request's base branch, already linked to the pull request.
+- **Open pull request** in **Settings** takes a GitHub pull request link (`https://github.com/<owner>/<repository>/pull/<number>`, with or without `/files` or an anchor). bussola looks for a repository you added whose remote points to that GitHub repository; if there is none, it scans your home folder as **Browse** does, adds the first clone it finds and uses it. Then it opens the pull request review as **Review** below does. You can also open `http://127.0.0.1:<port>/github.com/<owner>/<repository>/pull/<number>` directly: replace `https://` in a GitHub link with the bussola address.
+- **Review** downloads the pull request's code with `git fetch` into `refs/bussola/pull/<number>`, so your branches are not touched. It then starts a review against the pull request's base branch, already linked to the pull request.
 - **Sync reviews** fetches the latest commits of every pull request you are reviewing in that repository and records new revisions. Pull requests that were closed or merged are marked as such. A review of a branch that you linked to a pull request is refreshed the same way its own **Sync** does it: the branch is fetched and the pull request comments are imported.
 - The filter above the repositories (**Open**, **Merged**, **Closed**, **All**) shows open pull requests and branch reviews by default; reviews of merged or closed pull requests are hidden until you pick another filter. Each repository says how many reviews the filter hides, and the choice is kept in this browser.
 - On a pull request review, **Sync** does the same for that one pull request.
 - The pull request's description is shown under the review header (collapsible, long ones are cut short until you click **Show all**) and is updated at every sync.
-- Comments already on GitHub are brought into the review each time: line comments become threads on the same lines (or on the file when the line is outdated or outside the changed units), conversation comments and review summaries become review comments, and resolved threads stay resolved. Your own GitHub comments show as yours, and replying in rtool to an imported thread sends the reply to GitHub. Comments that came from GitHub link back to it.
-- While a pull request review is open, rtool syncs its comments with GitHub every 3 minutes, and again when you come back to the page. New comments and replies are added, comments edited on GitHub are updated (unless you edited them in rtool and have not sent the edit yet), and threads resolved or reopened on GitHub follow. The header says when the last sync happened, and tells you when new commits were pushed so you can **Sync**. Comments deleted on GitHub stay in rtool.
+- Comments already on GitHub are brought into the review each time: line comments become threads on the same lines (or on the file when the line is outdated or outside the changed units), conversation comments and review summaries become review comments, and resolved threads stay resolved. Your own GitHub comments show as yours, and replying in bussola to an imported thread sends the reply to GitHub. Comments that came from GitHub link back to it.
+- While a pull request review is open, bussola syncs its comments with GitHub every 3 minutes, and again when you come back to the page. New comments and replies are added, comments edited on GitHub are updated (unless you edited them in bussola and have not sent the edit yet), and threads resolved or reopened on GitHub follow. The header says when the last sync happened, and tells you when new commits were pushed so you can **Sync**. Comments deleted on GitHub stay in bussola.
 - Resolving or reopening a thread that is also on GitHub does the same on GitHub. If GitHub refuses (for example, you lack write access), the thread stays as it was and the error is shown.
 
-rtool contacts GitHub only when you press one of these buttons, or for the automatic sync while a pull request review is open.
+bussola contacts GitHub only when you press one of these buttons, or for the automatic sync while a pull request review is open.
 
 ### Sending comments to GitHub
 
-**Sync** sends the comments you have not sent yet as one pull request review. A pull request review is already linked; for a branch review with unsent comments, Sync offers the open pull requests of that branch (or a PR number) and sends once you pick one. It uses the [GitHub CLI](https://cli.github.com), so run `gh auth login` once; rtool never stores a token.
+**Sync** sends the comments you have not sent yet as one pull request review. A pull request review is already linked; for a branch review with unsent comments, Sync offers the open pull requests of that branch (or a PR number) and sends once you pick one. It uses the [GitHub CLI](https://cli.github.com), so run `gh auth login` once; bussola never stores a token.
 
 - Lines inside the pull request diff become review comments on that line.
 - Other lines, outdated threads and file threads become file comments that quote the line.
@@ -115,7 +117,7 @@ Approvals stay local.
 
 ## Configuration
 
-Optional `.rtool.toml` at the repository root:
+Optional `.bussola.toml` at the repository root:
 
 ```toml
 base_branch = "develop"
@@ -129,7 +131,7 @@ ignore = ["vendor/**", "docs/**"]
 
 ## Data
 
-Reviews, approvals and comments are stored in SQLite at `platformdirs.user_data_dir("rtool")/rtool.db` (on macOS `~/Library/Application Support/rtool`). Set `RTOOL_DATA_DIR` to use another directory.
+Reviews, approvals and comments are stored in SQLite at `platformdirs.user_data_dir("bussola")/bussola.db` (on macOS `~/Library/Application Support/bussola`). Set `BUSSOLA_DATA_DIR` to use another directory.
 
 A registered repository is remembered by its path and its first commit. If you move it, add it again from the new location and its reviews follow.
 
@@ -141,19 +143,19 @@ The server is meant for one person on one machine.
 - **Session token:** every API call needs the session token cookie (HttpOnly, SameSite=Strict).
 - **Host check:** requests whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` are rejected, which blocks DNS rebinding.
 - **Git refs and files:** refs are validated with `git rev-parse --verify --end-of-options` before use. File contents are read only from the git object database.
-- **Opening links:** GitHub links are opened by the server in your default browser, as a new tab, so they work even when the rtool page runs in an app-style window. The server only opens `https://github.com` addresses.
+- **Opening links:** GitHub links are opened by the server in your default browser, as a new tab, so they work even when the bussola page runs in an app-style window. The server only opens `https://github.com` addresses.
 - **Outbound traffic:** the only network access is `git fetch` when you ask for it, `gh` when you sync or have a pull request review open, and downloads of images attached on GitHub shown in comments and descriptions.
 - **Rendered Markdown:** HTML in comments and descriptions is sanitized with GitHub's rules before it is shown. Attached images are served from `/api/forge/asset` only for `https://github.com/.../assets/...` links and only when they are images, with a sandboxing Content-Security-Policy.
 
 ## Status
 
-rtool is used on real pull requests, but it is young. Until 1.0, commands, options and the UI may change between minor versions. Your data is kept across upgrades: the database is migrated automatically at startup, and a change to how files are split into units is applied to existing reviews at their next **Sync**, without losing approvals of units that did not change.
+bussola is used on real pull requests, but it is young. Until 1.0, commands, options and the UI may change between minor versions. Your data is kept across upgrades: the database is migrated automatically at startup, and a change to how files are split into units is applied to existing reviews at their next **Sync**, without losing approvals of units that did not change.
 
 ## FAQ
 
 <details><summary><b>Does my code leave my machine?</b></summary>
 
-No. rtool reads your local clone. It only talks to your git remote when you sync, and to GitHub through your own `gh` login when you use the pull request features.
+No. bussola reads your local clone. It only talks to your git remote when you sync, and to GitHub through your own `gh` login when you use the pull request features.
 </details>
 
 <details><summary><b>Do I need GitHub?</b></summary>
@@ -168,12 +170,12 @@ It is a place to do the reading. Approvals stay with you and follow the code acr
 
 <details><summary><b>Can several people review the same branch?</b></summary>
 
-Each person runs rtool on their own machine and keeps their own approvals. Comments are shared through the pull request.
+Each person runs bussola on their own machine and keeps their own approvals. Comments are shared through the pull request.
 </details>
 
 <details><summary><b>What about other languages?</b></summary>
 
-Files that are not parsed are still reviewed, as whole files with line selections. Adding a language means adding a tree-sitter extractor in `src/rtool/units/extractors/`; see [CONTRIBUTING.md](CONTRIBUTING.md).
+Files that are not parsed are still reviewed, as whole files with line selections. Adding a language means adding a tree-sitter extractor in `src/bussola/units/extractors/`; see [CONTRIBUTING.md](CONTRIBUTING.md).
 </details>
 
 ## Contributing
@@ -182,6 +184,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup and checks, and
 
 ## License
 
-rtool is released under the [MIT License](LICENSE). It is not affiliated with GitHub; GitHub is a trademark of GitHub, Inc.
+bussola is released under the [MIT License](LICENSE). It is not affiliated with GitHub; GitHub is a trademark of GitHub, Inc.
 
 The UI bundles third-party libraries; their licenses are listed in `THIRD_PARTY_LICENSES.md`, which the UI build writes next to the app and the package ships. Diagrams use [elkjs](https://github.com/kieler/elkjs) (EPL-2.0), whose source code is available from that repository.

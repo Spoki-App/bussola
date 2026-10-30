@@ -14,7 +14,7 @@ def git_repo(tmp_path: Path) -> GitFixture:
 @pytest.fixture
 def data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     path = tmp_path / "data"
-    monkeypatch.setenv("RTOOL_DATA_DIR", str(path))
+    monkeypatch.setenv("BUSSOLA_DATA_DIR", str(path))
     return path
 
 

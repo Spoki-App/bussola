@@ -45,7 +45,7 @@ export const deleteJson = <T>(path: string) => request<T>('DELETE', path)
 
 export function describeError(error: unknown): string {
   if (error instanceof ApiError && error.status === 403) {
-    return 'Not authorized. Open rtool with the link printed by `rtool serve`.'
+    return 'Not authorized. Open bussola with the link printed by `bussola serve`.'
   }
   return error instanceof Error ? error.message : 'Unexpected error'
 }

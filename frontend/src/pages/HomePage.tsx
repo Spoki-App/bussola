@@ -30,7 +30,7 @@ export function HomePage() {
         <Segmented label="Show reviews" labels={REVIEW_FILTER_LABELS} value={filter} onChange={choose} />
       </div>
       {repos.error && <ErrorNote message={describeError(repos.error)} />}
-      {repos.data?.length === 0 && <p className="muted">No repositories yet. Add one from Settings (top right), or run `rtool serve` inside a repository.</p>}
+      {repos.data?.length === 0 && <p className="muted">No repositories yet. Add one from Settings (top right), or run `bussola serve` inside a repository.</p>}
       {repos.data?.map((repo) => <RepoSection key={repo.id} repo={repo} filter={filter} />)}
     </div>
   )

@@ -1,4 +1,4 @@
-from rtool.units.normalize import content_hash, normalize
+from bussola.units.normalize import content_hash, normalize
 
 
 def test_normalize_strips_crlf_trailing_spaces_and_outer_blank_lines() -> None:

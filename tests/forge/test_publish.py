@@ -1,6 +1,6 @@
 import pytest
 
-from rtool.forge.github import GitHubAdapter, parse_patch_ranges
+from bussola.forge.github import GitHubAdapter, parse_patch_ranges
 from tests.apiclient import ApiClient, Json, comment_on
 from tests.forge.conftest import FakeGh
 from tests.gitrepo import GitFixture

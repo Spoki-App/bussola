@@ -9,7 +9,7 @@ export default defineConfig({
     proxy: { '/api': { target: BACKEND_URL, changeOrigin: true } },
   },
   build: {
-    outDir: '../src/rtool/static',
+    outDir: '../src/bussola/static',
     emptyOutDir: true,
     license: { fileName: 'THIRD_PARTY_LICENSES.md' },
   },

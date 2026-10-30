@@ -26,7 +26,7 @@ export function OpenPullRequestForm({ onOpened }: { onOpened: () => void }) {
         value={url}
         onChange={(event) => { setUrl(event.target.value) }}
         placeholder="https://github.com/owner/repository/pull/123"
-        title="Paste a GitHub pull request link. rtool finds your local clone of that repository (adding it if it is under your home folder) and opens the pull request review."
+        title="Paste a GitHub pull request link. bussola finds your local clone of that repository (adding it if it is under your home folder) and opens the pull request review."
       />
       <button type="submit" className="primary" disabled={!isPullRequestUrl(url) || open.isPending}>
         {open.isPending ? 'Opening...' : 'Open'}

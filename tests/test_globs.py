@@ -1,6 +1,6 @@
 import pytest
 
-from rtool.globs import matches_glob
+from bussola.globs import matches_glob
 
 
 @pytest.mark.parametrize(

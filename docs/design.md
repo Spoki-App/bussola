@@ -1,6 +1,6 @@
 # Design notes
 
-How rtool works under the hood. The [README](../README.md) describes what it does from the user's side; this file covers the rules behind it.
+How bussola works under the hood. The [README](../README.md) describes what it does from the user's side; this file covers the rules behind it.
 
 ## Units
 
@@ -79,7 +79,7 @@ At each refresh every unit thread, open or resolved, gets an anchor on the lates
 
 ## GitHub
 
-rtool talks to GitHub only through the `gh` CLI, run with an argument list. Authentication is whatever `gh auth login` set up, and rtool never stores a token. If `gh` is missing or not authenticated, the UI says how to fix it and the rest keeps working.
+bussola talks to GitHub only through the `gh` CLI, run with an argument list. Authentication is whatever `gh auth login` set up, and bussola never stores a token. If `gh` is missing or not authenticated, the UI says how to fix it and the rest keeps working.
 
 ### Pull request reviews
 
@@ -91,7 +91,7 @@ POST   /pulls/open                             {url} -> the pull request review
 ```
 
 - **Listing:** one GraphQL query returns the open pull requests with their comment count and the number of unresolved review threads, which `gh pr list` cannot report.
-- **Fetching:** `git fetch --no-tags <remote> +refs/pull/<n>/head:refs/rtool/pull/<n> +refs/heads/<base>:refs/remotes/<remote>/<base>`. The review compares `refs/rtool/pull/<n>` with `<remote>/<base>`, so the user's branches are never modified. The base branch name from GitHub is checked with `git check-ref-format --branch` before use.
+- **Fetching:** `git fetch --no-tags <remote> +refs/pull/<n>/head:refs/bussola/pull/<n> +refs/heads/<base>:refs/remotes/<remote>/<base>`. The review compares `refs/bussola/pull/<n>` with `<remote>/<base>`, so the user's branches are never modified. The base branch name from GitHub is checked with `git check-ref-format --branch` before use.
 - **Linking:** table `forge_links` ties a review to its pull request and keeps its title, author, URL, state, description and last sync time.
 - **Opening from a link:** `https://github.com/<owner>/<repository>/pull/<number>` (scheme optional, any suffix ignored). Registered repositories are checked first, then the repositories found by the home folder scan; a repository matches when any of its remotes points to `<owner>/<repository>`.
 
@@ -114,7 +114,7 @@ POST   /reviews/{review_id}/sync               refresh with fetch, then publish 
 
 **Sync** refreshes first, then sends the comments that were not published yet (or were edited after publishing) as one pull request review with event `COMMENT`, at the pull request head commit:
 
-| rtool thread | On GitHub |
+| bussola thread | On GitHub |
 |---|---|
 | Unit thread, line in the pull request diff | Review comment on that line (`RIGHT` for head, `LEFT` for base) |
 | Unit thread, line outside the diff, or outdated | File comment quoting the line number and the anchored snippet |
@@ -132,7 +132,7 @@ Images attached on GitHub need a signed-in user, so they are loaded through `GET
 
 ## Folder browser
 
-Browsers do not reveal the absolute path of a folder picked with their native dialog, so rtool serves its own:
+Browsers do not reveal the absolute path of a folder picked with their native dialog, so bussola serves its own:
 
 ```
 GET    /directories?path=                      folders inside path (default: the home directory), marking git repositories

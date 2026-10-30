@@ -1,5 +1,5 @@
-from rtool.units.model import Unit, UnitKind
-from rtool.units.registry import extractor_for
+from bussola.units.model import Unit, UnitKind
+from bussola.units.registry import extractor_for
 
 
 def extract(path: str, source: str) -> list[Unit]:

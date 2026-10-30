@@ -107,7 +107,7 @@ def test_a_comment_imported_before_its_commit_is_placed_on_its_line_once_the_com
     assert len(threads(api, review)) == 2
 
 
-def test_reply_in_rtool_to_an_imported_thread_is_sent_as_a_github_reply(api: ApiClient, github: GitHubSandbox) -> None:
+def test_reply_in_bussola_to_an_imported_thread_is_sent_as_a_github_reply(api: ApiClient, github: GitHubSandbox) -> None:
     github.open_pull_request({"app.py": FIRST})
     set_conversation(github, [review_thread(2, note(501, "bob", "Why sum?"))])
     review = start_review(api)

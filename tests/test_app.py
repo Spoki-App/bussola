@@ -2,8 +2,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from rtool.app import create_app
-from rtool.config import AppSettings
+from bussola.app import create_app
+from bussola.config import AppSettings
 
 
 def client_for(tmp_path: Path, static_dir: Path) -> TestClient:
@@ -18,16 +18,16 @@ def test_health_endpoint_reports_ok(tmp_path: Path) -> None:
 
 
 def test_frontend_routes_fall_back_to_index(tmp_path: Path) -> None:
-    (tmp_path / "index.html").write_text("<html>rtool</html>")
+    (tmp_path / "index.html").write_text("<html>bussola</html>")
 
     response = client_for(tmp_path, tmp_path).get("/reviews/1")
 
     assert response.status_code == 200
-    assert "rtool" in response.text
+    assert "bussola" in response.text
 
 
 def test_unknown_api_route_is_not_served_as_index(tmp_path: Path) -> None:
-    (tmp_path / "index.html").write_text("<html>rtool</html>")
+    (tmp_path / "index.html").write_text("<html>bussola</html>")
 
     response = client_for(tmp_path, tmp_path).get("/api/missing")
 
@@ -35,7 +35,7 @@ def test_unknown_api_route_is_not_served_as_index(tmp_path: Path) -> None:
 
 
 def test_root_level_static_files_are_served(tmp_path: Path) -> None:
-    (tmp_path / "index.html").write_text("<html>rtool</html>")
+    (tmp_path / "index.html").write_text("<html>bussola</html>")
     (tmp_path / "favicon.svg").write_text("<svg/>")
 
     response = client_for(tmp_path, tmp_path).get("/favicon.svg")

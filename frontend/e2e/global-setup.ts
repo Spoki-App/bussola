@@ -40,10 +40,10 @@ async function waitForServer(server: ChildProcess) {
   const deadline = Date.now() + STARTUP_TIMEOUT_MS
   while (Date.now() < deadline) {
     if (server.exitCode !== null) {
-      throw new Error(`rtool exited with code ${String(server.exitCode)}`)
+      throw new Error(`bussola exited with code ${String(server.exitCode)}`)
     }
     try {
-      const response = await fetch(`http://127.0.0.1:${String(E2E_PORT)}/api/health`, { headers: { cookie: `rtool_token=${E2E_TOKEN}` } })
+      const response = await fetch(`http://127.0.0.1:${String(E2E_PORT)}/api/health`, { headers: { cookie: `bussola_token=${E2E_TOKEN}` } })
       if (response.ok) {
         return
       }
@@ -51,7 +51,7 @@ async function waitForServer(server: ChildProcess) {
       await new Promise((done) => setTimeout(done, POLL_INTERVAL_MS))
     }
   }
-  throw new Error('rtool did not start in time')
+  throw new Error('bussola did not start in time')
 }
 
 async function assertPortFree() {
@@ -60,7 +60,7 @@ async function assertPortFree() {
   } catch {
     return
   }
-  throw new Error(`Port ${String(E2E_PORT)} is already in use. Stop the process using it or set RTOOL_E2E_PORT.`)
+  throw new Error(`Port ${String(E2E_PORT)} is already in use. Stop the process using it or set BUSSOLA_E2E_PORT.`)
 }
 
 function stop(server: ChildProcess) {
@@ -71,12 +71,12 @@ function stop(server: ChildProcess) {
 
 export default async function globalSetup() {
   await assertPortFree()
-  const root = mkdtempSync(join(tmpdir(), 'rtool-e2e-'))
+  const root = mkdtempSync(join(tmpdir(), 'bussola-e2e-'))
   const repo = createRepository(root)
   const logPath = join(root, 'server.log')
   const log = openSync(logPath, 'a')
-  const server = spawn('uv', ['run', '--project', PROJECT_ROOT, 'rtool', 'serve', '--no-open', '--port', String(E2E_PORT), '--repo', repo], {
-    env: { ...process.env, RTOOL_DATA_DIR: join(root, 'data'), RTOOL_TOKEN: E2E_TOKEN },
+  const server = spawn('uv', ['run', '--project', PROJECT_ROOT, 'bussola', 'serve', '--no-open', '--port', String(E2E_PORT), '--repo', repo], {
+    env: { ...process.env, BUSSOLA_DATA_DIR: join(root, 'data'), BUSSOLA_TOKEN: E2E_TOKEN },
     stdio: ['ignore', log, log],
     detached: true,
   })

@@ -33,7 +33,7 @@ def test_reviewing_a_pull_request_fetches_its_code_and_links_it(api: ApiClient, 
 
     review = api.call("POST", f"/repos/{repo}/pulls/7/review", 201)
 
-    assert (review["head_ref"], review["base_ref"]) == ("refs/rtool/pull/7", "origin/main")
+    assert (review["head_ref"], review["base_ref"]) == ("refs/bussola/pull/7", "origin/main")
     assert review["latest_revision"]["head_sha"] == head
     assert review["pull_request"] == {
         "number": 7,
@@ -46,7 +46,7 @@ def test_reviewing_a_pull_request_fetches_its_code_and_links_it(api: ApiClient, 
     assert api.states(review["id"]) == {"app.py::total": "new"}
     assert api.call("GET", f"/repos/{repo}/pulls")["pulls"][0]["review_id"] == review["id"]
     assert api.call("GET", f"/reviews/{review['id']}/forge")["link"]["pr_number"] == 7
-    assert "refs/rtool/pull/7" not in github.local.git("branch", "--all")
+    assert "refs/bussola/pull/7" not in github.local.git("branch", "--all")
 
 
 def test_reviewing_the_same_pull_request_again_reuses_the_review(api: ApiClient, github: GitHubSandbox) -> None:

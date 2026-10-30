@@ -5,7 +5,7 @@ from typing import Self
 
 import pytest
 
-from rtool.forge import github
+from bussola.forge import github
 from tests.apiclient import ApiClient
 
 ASSET = "https://github.com/user-attachments/assets/ad4619dd-3cdd-4568-a5e3-2fad4b1db525"

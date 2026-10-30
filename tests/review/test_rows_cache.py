@@ -2,8 +2,8 @@ from difflib import SequenceMatcher
 
 import pytest
 
-from rtool.review import rows
-from rtool.review.rows import LineChange, diff_lines
+from bussola.review import rows
+from bussola.review.rows import LineChange, diff_lines
 
 
 def test_line_diffs_are_computed_once_per_content(monkeypatch: pytest.MonkeyPatch) -> None:

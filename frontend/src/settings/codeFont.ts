@@ -11,7 +11,7 @@ export const DEFAULT_CODE_FONT: CodeFont = { family: '', size: 12, ligatures: tr
 export const MIN_CODE_SIZE = 9
 export const MAX_CODE_SIZE = 24
 
-const STORAGE_KEY = 'rtool.codeFont'
+const STORAGE_KEY = 'bussola.codeFont'
 const FALLBACK_STACK = "ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
 const PROBE_TEXT = 'mmmmmmmmmmlliWW@#0O'
 const PROBE_SIZE = '72px'

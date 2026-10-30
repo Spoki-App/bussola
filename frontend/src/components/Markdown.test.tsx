@@ -38,7 +38,7 @@ describe('Markdown', () => {
     expect(container.querySelector('script')).toBeNull()
   })
 
-  it('loads GitHub attachments through rtool', () => {
+  it('loads GitHub attachments through bussola', () => {
     renderMarkdown('![Where the marker sits](https://github.com/user-attachments/assets/ad4619dd-3cdd-4568-a5e3-2fad4b1db525)')
 
     expect(screen.getByAltText('Where the marker sits').getAttribute('src')).toBe(

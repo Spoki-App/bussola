@@ -24,7 +24,7 @@ export function LinkPullRequest({ reviewId, unsent, onLinked }: Props) {
     return <p>{`Your comments were not sent to GitHub. ${overview.status.message}`}</p>
   }
   if (overview.repository === null) {
-    return <p className="muted">This branch has no GitHub remote, so your comments stay in rtool.</p>
+    return <p className="muted">This branch has no GitHub remote, so your comments stay in bussola.</p>
   }
   return <LinkForm reviewId={reviewId} unsent={unsent} overview={overview} onLinked={onLinked} />
 }

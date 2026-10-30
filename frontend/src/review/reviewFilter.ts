@@ -6,7 +6,7 @@ export type ReviewFilter = 'open' | 'merged' | 'closed' | 'all'
 export const REVIEW_FILTER_LABELS: Record<ReviewFilter, string> = { open: 'Open', merged: 'Merged', closed: 'Closed', all: 'All' }
 export const DEFAULT_REVIEW_FILTER: ReviewFilter = 'open'
 
-const STORAGE_KEY = 'rtool.reviewFilter'
+const STORAGE_KEY = 'bussola.reviewFilter'
 
 function isReviewFilter(value: unknown): value is ReviewFilter {
   return typeof value === 'string' && value in REVIEW_FILTER_LABELS

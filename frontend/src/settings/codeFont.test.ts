@@ -29,10 +29,10 @@ describe('code font settings', () => {
     saveCodeFont({ family: 'JetBrains Mono', size: 14, ligatures: false, features: 'ss01' })
     expect(loadCodeFont()).toEqual({ family: 'JetBrains Mono', size: 14, ligatures: false, features: 'ss01' })
 
-    window.localStorage.setItem('rtool.codeFont', JSON.stringify({ family: 'Menlo', size: 13 }))
+    window.localStorage.setItem('bussola.codeFont', JSON.stringify({ family: 'Menlo', size: 13 }))
     expect(loadCodeFont()).toEqual({ ...DEFAULT_CODE_FONT, family: 'Menlo', size: 13 })
 
-    window.localStorage.setItem('rtool.codeFont', '{not json')
+    window.localStorage.setItem('bussola.codeFont', '{not json')
     expect(loadCodeFont()).toEqual(DEFAULT_CODE_FONT)
   })
 

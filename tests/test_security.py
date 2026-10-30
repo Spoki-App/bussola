@@ -3,9 +3,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from rtool.app import create_app
-from rtool.config import AppSettings
-from rtool.security import TOKEN_COOKIE, allowed_hosts_for
+from bussola.app import create_app
+from bussola.config import AppSettings
+from bussola.security import TOKEN_COOKIE, allowed_hosts_for
 from tests.gitrepo import GitFixture
 
 TOKEN = "secret-token"

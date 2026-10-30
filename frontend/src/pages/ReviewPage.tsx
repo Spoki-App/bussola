@@ -37,7 +37,7 @@ interface Props {
 }
 
 const WIDE_LAYOUT_PX = 1400
-const FILES_HIDDEN_KEY = 'rtool.filesHidden'
+const FILES_HIDDEN_KEY = 'bussola.filesHidden'
 
 function scrollToElement(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })

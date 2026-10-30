@@ -1,6 +1,6 @@
 import pytest
 
-from rtool.git import ChangeStatus, GitRepo, InvalidRefError
+from bussola.git import ChangeStatus, GitRepo, InvalidRefError
 from tests.gitrepo import GitFixture
 
 

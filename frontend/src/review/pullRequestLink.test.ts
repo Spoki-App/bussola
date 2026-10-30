@@ -16,7 +16,7 @@ describe('isPullRequestUrl', () => {
 })
 
 describe('pullRequestUrlFromPath', () => {
-  it('turns an rtool path that mirrors a GitHub link into that link', () => {
+  it('turns an bussola path that mirrors a GitHub link into that link', () => {
     expect(pullRequestUrlFromPath('/github.com/acme/widgets/pull/7/files')).toBe('https://github.com/acme/widgets/pull/7/files')
   })
 

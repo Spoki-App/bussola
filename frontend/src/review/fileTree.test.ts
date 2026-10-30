@@ -19,10 +19,10 @@ describe('buildFileTree', () => {
   })
 
   it('joins folders that only hold one folder', () => {
-    const tree = buildFileTree([group('src/rtool/api/views.py'), group('src/rtool/api/forge.py')])
+    const tree = buildFileTree([group('src/bussola/api/views.py'), group('src/bussola/api/forge.py')])
 
-    expect(shape(tree)).toEqual([{ 'src/rtool/api': ['forge.py', 'views.py'] }])
-    expect(directoryPaths(tree)).toEqual(['src/rtool/api'])
+    expect(shape(tree)).toEqual([{ 'src/bussola/api': ['forge.py', 'views.py'] }])
+    expect(directoryPaths(tree)).toEqual(['src/bussola/api'])
   })
 
   it('adds up what is left to review in each folder', () => {

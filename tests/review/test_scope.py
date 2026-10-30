@@ -1,7 +1,7 @@
-from rtool.config import RepoConfig
-from rtool.review.refs import resolve_review_commits
-from rtool.review.scope import ChangeType, UnitChange, compute_scope
-from rtool.units.extract import FileUnitExtractor
+from bussola.config import RepoConfig
+from bussola.review.refs import resolve_review_commits
+from bussola.review.scope import ChangeType, UnitChange, compute_scope
+from bussola.units.extract import FileUnitExtractor
 from tests.gitrepo import FileContent, GitFixture
 
 FUNCTIONS = "import os\n\n\ndef first():\n    return 1\n\n\ndef second():\n    return 2\n"

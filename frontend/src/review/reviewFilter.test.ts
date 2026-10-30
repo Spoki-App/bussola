@@ -39,7 +39,7 @@ describe('review filter', () => {
     expect(loadReviewFilter()).toBe('open')
     saveReviewFilter('merged')
     expect(loadReviewFilter()).toBe('merged')
-    window.localStorage.setItem('rtool.reviewFilter', 'bogus')
+    window.localStorage.setItem('bussola.reviewFilter', 'bogus')
     expect(loadReviewFilter()).toBe('open')
   })
 })

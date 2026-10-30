@@ -1,5 +1,5 @@
 [project]
-name = "rtool"
+name = "bussola"
 version = "0.1.0"
 description = "Local, per-function code review on git branches"
 readme = "README.md"
@@ -39,7 +39,7 @@ dependencies = [
 ]
 
 [project.scripts]
-rtool = "rtool.cli:main"
+bussola = "bussola.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.15,<0.13.0"]
@@ -56,7 +56,7 @@ dev = [
 [tool.ruff]
 line-length = 160
 target-version = "py312"
-extend-exclude = ["frontend", "src/rtool/static"]
+extend-exclude = ["frontend", "src/bussola/static"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "RET", "PTH", "PL", "RUF", "S", "T20"]
@@ -64,7 +64,7 @@ ignore = ["S105", "S603", "S607"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "PLR2004"]
-"src/rtool/forge/github.py" = ["S310"]
+"src/bussola/forge/github.py" = ["S310"]
 
 [tool.ruff.lint.pylint]
 max-args = 5
@@ -72,7 +72,7 @@ max-statements = 60
 
 [tool.basedpyright]
 include = ["src", "tests"]
-exclude = ["src/rtool/static", "frontend", "**/__pycache__"]
+exclude = ["src/bussola/static", "frontend", "**/__pycache__"]
 pythonVersion = "3.12"
 typeCheckingMode = "recommended"
 reportAny = false

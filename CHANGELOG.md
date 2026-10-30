@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to rtool are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org).
+All notable changes to bussola are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
@@ -8,7 +8,7 @@ First public release.
 
 ### Added
 
-- Local review UI (`rtool serve`) and the `rtool status` and `rtool refresh` commands.
+- Local review UI (`bussola serve`) and the `bussola status` and `bussola refresh` commands.
 - Changes split into functions, methods, classes, types, module-level code and whole files, with tree-sitter parsing for Python, TypeScript, TSX, JavaScript and Go.
 - Approvals tied to unit content, kept across new commits, rebases and renames, and approval of selected lines in module-level code and whole files.
 - "Since my last review" filter, revisions, and diffs from the approved version to the current one.

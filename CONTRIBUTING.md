@@ -1,10 +1,10 @@
 # Contributing
 
-Thanks for helping with rtool. Bug reports, ideas and pull requests are welcome. For a larger change, open an issue first so we can agree on the approach.
+Thanks for helping with bussola. Bug reports, ideas and pull requests are welcome. For a larger change, open an issue first so we can agree on the approach.
 
 ## Principles
 
-Every change should keep rtool:
+Every change should keep bussola:
 
 - **Local:** your code never leaves your machine. Network access is `git fetch` and `gh`, and only when the user asks for it or has a pull request review open.
 - **Content-based:** approvals and threads follow code by its content, not by commit or line number.
@@ -17,14 +17,14 @@ If a change trades one of these for something else, say so in the pull request.
 
 | Path | What |
 |---|---|
-| `src/rtool/cli.py`, `app.py` | Command line and the FastAPI app |
-| `src/rtool/units/` | Splitting files into units: tree-sitter extractors, normalization, hashing |
-| `src/rtool/review/` | Revisions, unit states, approvals, threads and their anchoring |
-| `src/rtool/forge/` | GitHub through `gh`: pull requests, importing and sending comments |
-| `src/rtool/git/` | Running `git` safely |
-| `src/rtool/storage/` | SQLAlchemy models, repositories and Alembic migrations |
-| `src/rtool/api/` | HTTP routes and schemas |
-| `frontend/` | React UI, built into `src/rtool/static/` |
+| `src/bussola/cli.py`, `app.py` | Command line and the FastAPI app |
+| `src/bussola/units/` | Splitting files into units: tree-sitter extractors, normalization, hashing |
+| `src/bussola/review/` | Revisions, unit states, approvals, threads and their anchoring |
+| `src/bussola/forge/` | GitHub through `gh`: pull requests, importing and sending comments |
+| `src/bussola/git/` | Running `git` safely |
+| `src/bussola/storage/` | SQLAlchemy models, repositories and Alembic migrations |
+| `src/bussola/api/` | HTTP routes and schemas |
+| `frontend/` | React UI, built into `src/bussola/static/` |
 | `tests/` | Backend tests; `tests/fakegh` is the fake `gh` used by the GitHub tests |
 | `docs/design.md` | The rules behind units, approvals, threads and GitHub sync |
 
@@ -35,11 +35,11 @@ You need Python 3.12+, [uv](https://docs.astral.sh/uv/), git and Node.js 22.12+ 
 ```bash
 uv sync
 npm --prefix frontend ci
-uv run rtool serve --no-open
+uv run bussola serve --no-open
 npm --prefix frontend run dev
 ```
 
-The Vite dev server proxies `/api` to `127.0.0.1:8765`. To get the session cookie on the Vite origin, open `http://localhost:5173/api/health?token=<token>` once, using the token printed by `rtool serve` (set `RTOOL_TOKEN` to keep the same token across restarts, and `RTOOL_DATA_DIR` to keep development data apart from your own reviews).
+The Vite dev server proxies `/api` to `127.0.0.1:8765`. To get the session cookie on the Vite origin, open `http://localhost:5173/api/health?token=<token>` once, using the token printed by `bussola serve` (set `BUSSOLA_TOKEN` to keep the same token across restarts, and `BUSSOLA_DATA_DIR` to keep development data apart from your own reviews).
 
 ## Checks
 
@@ -55,7 +55,7 @@ The Playwright smoke test needs a browser once: `npx --prefix frontend playwrigh
 
 ## Database migrations
 
-Migrations live in `src/rtool/storage/migrations` and run automatically at startup. After changing `src/rtool/storage/models.py`:
+Migrations live in `src/bussola/storage/migrations` and run automatically at startup. After changing `src/bussola/storage/models.py`:
 
 ```bash
 uv run alembic -c alembic.ini upgrade head

@@ -2,7 +2,7 @@ import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 
-from rtool.git import GitRepo
+from bussola.git import GitRepo
 
 type FileContent = str | bytes | None
 

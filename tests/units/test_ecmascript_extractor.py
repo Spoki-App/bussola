@@ -1,6 +1,6 @@
 import pytest
 
-from rtool.units.model import UnitKind
+from bussola.units.model import UnitKind
 from tests.units.helpers import extract, names
 
 TYPESCRIPT_SOURCE = """import { x } from './x'

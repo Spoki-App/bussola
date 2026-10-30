@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from rtool.directories import ScanLimits, find_repositories
+from bussola.directories import ScanLimits, find_repositories
 from tests.apiclient import ApiClient
 from tests.gitrepo import GitFixture
 

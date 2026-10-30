@@ -1,6 +1,6 @@
-from rtool.units.model import UnitKind
-from rtool.units.normalize import UNIT_PLACEHOLDER
-from rtool.units.registry import extractor_for
+from bussola.units.model import UnitKind
+from bussola.units.normalize import UNIT_PLACEHOLDER
+from bussola.units.registry import extractor_for
 from tests.units.helpers import extract, names, unit_named
 
 SOURCE = '''import os

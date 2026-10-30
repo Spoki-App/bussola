@@ -9,7 +9,7 @@ describe('ExternalLink', () => {
     vi.restoreAllMocks()
   })
 
-  it('asks the rtool server to open GitHub links in the default browser', async () => {
+  it('asks the bussola server to open GitHub links in the default browser', async () => {
     const fetchMock = vi.fn(() => Promise.resolve(Response.json({ opened: true })))
     vi.stubGlobal('fetch', fetchMock)
     const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)

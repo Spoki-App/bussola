@@ -3,8 +3,8 @@ from pathlib import Path
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 
-from rtool.storage.database import Database
-from rtool.storage.models import Base
+from bussola.storage.database import Database
+from bussola.storage.models import Base
 
 
 def test_migrations_produce_the_model_schema(tmp_path: Path) -> None:

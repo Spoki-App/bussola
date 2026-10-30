@@ -3,8 +3,8 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from rtool.app import create_app
-from rtool.config import AppSettings
+from bussola.app import create_app
+from bussola.config import AppSettings
 from tests.gitrepo import GitFixture
 
 type Json = Any

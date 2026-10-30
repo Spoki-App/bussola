@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="rtool-bg" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="bussola-bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#2f6fea"/>
       <stop offset="1" stop-color="#6d3fd8"/>
     </linearGradient>
   </defs>
-  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#rtool-bg)"/>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#bussola-bg)"/>
   <g fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
     <path d="M23 13c-5 0-6 3-6 8v3c0 4-2 7-5 8 3 1 5 4 5 8v3c0 5 1 8 6 8"/>
     <path d="M41 13c5 0 6 3 6 8v3c0 4 2 7 5 8-3 1-5 4-5 8v3c0 5-1 8-6 8"/>

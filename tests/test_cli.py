@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from rtool.cli import app
+from bussola.cli import app
 from tests.gitrepo import GitFixture
 
 runner = CliRunner()
@@ -18,12 +18,12 @@ def test_status_prints_unit_states(git_repo: GitFixture, data_dir: Path) -> None
 
     assert result.exit_code == 0, result.output
     assert result.output.split() == ["new", "function", "app.py::f"]
-    assert (data_dir / "rtool.db").is_file()
+    assert (data_dir / "bussola.db").is_file()
 
 
 @pytest.mark.usefixtures("data_dir")
-def test_status_uses_rtool_toml_base_branch(git_repo: GitFixture) -> None:
-    git_repo.commit({".rtool.toml": 'base_branch = "trunk"\n', "a.txt": "a\n"})
+def test_status_uses_bussola_toml_base_branch(git_repo: GitFixture) -> None:
+    git_repo.commit({".bussola.toml": 'base_branch = "trunk"\n', "a.txt": "a\n"})
     git_repo.branch("trunk")
     git_repo.branch("feature")
     git_repo.commit({"a.txt": "b\n"})
@@ -59,8 +59,8 @@ def test_status_rejects_option_like_refs(git_repo: GitFixture) -> None:
 
 
 @pytest.mark.usefixtures("data_dir")
-def test_rtool_toml_file_level_and_ignore_globs(git_repo: GitFixture) -> None:
-    git_repo.commit({".rtool.toml": 'file_level = ["generated/*.py"]\nignore = ["docs/**"]\n', "a.txt": "a\n"})
+def test_bussola_toml_file_level_and_ignore_globs(git_repo: GitFixture) -> None:
+    git_repo.commit({".bussola.toml": 'file_level = ["generated/*.py"]\nignore = ["docs/**"]\n', "a.txt": "a\n"})
     git_repo.branch("feature")
     git_repo.commit({"generated/models.py": "def f():\n    pass\n", "docs/guide.md": "hi\n", "app.py": "def g():\n    pass\n"})
 

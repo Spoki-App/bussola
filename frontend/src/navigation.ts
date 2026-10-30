@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 
-const NAVIGATE_EVENT = 'rtool:navigate'
+const NAVIGATE_EVENT = 'bussola:navigate'
 
 function subscribe(onChange: () => void) {
   window.addEventListener('popstate', onChange)

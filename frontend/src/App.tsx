@@ -18,7 +18,7 @@ export default function App() {
       <header className="topbar">
         <Link to="/" className="brand">
           <img src="/favicon.svg" alt="" width="22" height="22" />
-          rtool
+          bussola
         </Link>
         <span className="spacer" />
         {me.data && <span className="muted">{`${me.data.name} <${me.data.email}>`}</span>}
