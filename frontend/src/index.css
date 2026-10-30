@@ -641,8 +641,12 @@ textarea {
   margin: 0;
 }
 
-.review-summary > .segmented {
-  justify-self: start;
+.summary-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .course-summary {
@@ -1083,6 +1087,7 @@ textarea {
   --diff-code-delete-edit-background-color: rgba(229, 72, 77, 0.26);
   --diff-code-selected-background-color: rgba(41, 82, 204, 0.14);
   --diff-gutter-selected-background-color: rgba(41, 82, 204, 0.22);
+  --diff-omit-gutter-line-color: transparent;
 
   font-family: var(--mono);
   font-size: var(--code-size);
@@ -1109,9 +1114,16 @@ textarea {
   cursor: pointer;
 }
 
-.diff .row-approved td {
+.diff .row-approved td,
+.diff .row-approved-old :is(.diff-gutter-delete, .diff-code-delete),
+.diff .row-approved-new :is(.diff-gutter-insert, .diff-code-insert) {
   box-shadow: inset 3px 0 0 var(--success);
   background-color: var(--approved-row);
+}
+
+.diff .diff-gutter-omit,
+.diff .diff-code-omit {
+  background: var(--bg-subtle);
 }
 
 .diff .diff-gap td {
@@ -1137,13 +1149,17 @@ textarea {
   background: var(--info-bg);
 }
 
-.diff .row-placeholder td {
+.diff .row-placeholder td,
+.diff .row-placeholder-old :is(.diff-gutter-delete, .diff-code-delete),
+.diff .row-placeholder-new :is(.diff-gutter-insert, .diff-code-insert) {
   color: var(--muted);
   font-style: italic;
   font-family: var(--sans);
 }
 
-.diff .row-commented td {
+.diff .row-commented td,
+.diff .row-commented-old :is(.diff-gutter-delete, .diff-code-delete),
+.diff .row-commented-new :is(.diff-gutter-insert, .diff-code-insert) {
   background-color: var(--info-bg);
   box-shadow: inset 3px 0 0 var(--accent);
 }
