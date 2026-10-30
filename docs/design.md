@@ -129,9 +129,9 @@ Sending is blocked while the pull request head differs from the reviewed head, b
 After sending comments, **Sync** marks as viewed on GitHub every file whose units are all `approved` or `approved (moved)` for the current reviewer in the latest revision, so a file changed after approval does not count. Through the forge adapter:
 
 - `file_views` reads the pull request node id, its head and each file's `viewerViewedState` (GraphQL, paged by `gh api --paginate`).
-- `mark_files_viewed` marks the fully approved files that are not viewed yet with one GraphQL request of aliased `markFileAsViewed` mutations per 50 files. If a request fails, its files are retried one at a time, so only the files that fail are reported.
+- `set_files_viewed` marks the fully approved files that are not viewed yet with one GraphQL request of aliased `markFileAsViewed` mutations per 50 files. GitHub reports a refused file as an error on its alias, so only that file is reported as not marked. A request that fails as a whole (no permission, timeout) stops the marking and is reported once, without retrying file by file.
 
-Nothing is marked while the pull request head differs from the reviewed head. Files already viewed are left as they are, and nothing is ever unmarked. A file missing from the pull request, or a failed mutation, is reported in the sync result as not marked; it does not fail the sync. GitHub is not contacted when no file is fully approved.
+Nothing is marked while the pull request head differs from the reviewed head. `markFileAsViewed` takes no commit, so after marking, the head is read again; if it moved meanwhile, the files just marked are unmarked (they were not viewed before) and the sync asks to run again. A push after that point is handled by GitHub, which resets the viewed state of changed files. Files already viewed are left as they are, and files the user viewed by hand are never unmarked. Approved files that are not part of the pull request are skipped. When publishing comments already failed because the head moved, the viewed step is skipped. A failure never fails the sync, and GitHub is not contacted when no file is fully approved.
 
 ### Rendering
 

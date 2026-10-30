@@ -95,7 +95,7 @@ query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
   }
 }
 """
-MARK_FILE_VIEWED_FIELD = "f{index}: markFileAsViewed(input: {{pullRequestId: $pullRequestId, path: $p{index}}}) {{ clientMutationId }}"
+FILE_VIEWED_FIELD = "f{index}: {mutation}(input: {{pullRequestId: $pullRequestId, path: $p{index}}}) {{ clientMutationId }}"
 VIEWED_STATE = "VIEWED"
 ISSUE_COMMENT_PREFIX = "issue-"
 ASSET_URL = re.compile(r"https://github\.com/(?:user-attachments/assets/[0-9a-f-]{36}|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/assets/\d+/[0-9a-f-]{36})")
@@ -192,16 +192,25 @@ class GitHubAdapter:
         pages = self._graphql(FILE_VIEWS_QUERY, "--paginate", "--slurp", owner=owner, name=name, number=number)
         try:
             pulls = [page["data"]["repository"]["pullRequest"] for page in pages]
-            viewed = {str(item["path"]): item.get("viewerViewedState") == VIEWED_STATE for pull in pulls for item in _nodes(pull["files"])}
+            files = [pull["files"]["nodes"] for pull in pulls]
+            viewed = {str(item["path"]): item.get("viewerViewedState") == VIEWED_STATE for nodes in files for item in nodes}
             return FileViews(str(pulls[0]["id"]), str(pulls[0]["headRefOid"]), viewed)
         except (KeyError, TypeError, IndexError) as error:
             raise ForgeError(f"GitHub did not return the files of pull request #{number}") from error
 
-    def mark_files_viewed(self, pull_id: str, paths: Sequence[str]) -> None:
+    def set_files_viewed(self, pull_id: str, paths: Sequence[str], viewed: bool) -> dict[str, str]:
+        mutation_name = "markFileAsViewed" if viewed else "unmarkFileAsViewed"
         declarations = "".join(f", $p{index}: String!" for index in range(len(paths)))
-        fields = "\n  ".join(MARK_FILE_VIEWED_FIELD.format(index=index) for index in range(len(paths)))
+        fields = "\n  ".join(FILE_VIEWED_FIELD.format(index=index, mutation=mutation_name) for index in range(len(paths)))
         mutation = f"mutation($pullRequestId: ID!{declarations}) {{\n  {fields}\n}}"
-        self._graphql(mutation, pullRequestId=pull_id, **{f"p{index}": path for index, path in enumerate(paths)})
+        variables: dict[str, str | int] = {"pullRequestId": pull_id, **{f"p{index}": path for index, path in enumerate(paths)}}
+        result = self._run(_graphql_args(mutation, (), variables), check=False)
+        if result.returncode == 0:
+            return {}
+        failed = _failed_fields(result.stdout, paths)
+        if not failed:
+            raise ForgeError(result.stderr.decode(errors="replace").strip() or "gh api graphql failed")
+        return failed
 
     def can_reply(self, remote_id: str | None) -> bool:
         return remote_id is not None and remote_id.isdigit()
@@ -223,10 +232,7 @@ class GitHubAdapter:
         return Asset(content_type, data)
 
     def _graphql(self, query: str, *flags: str, **variables: str | int) -> Any:
-        args = ["api", "graphql", *flags, "-f", f"query={query}"]
-        for name, value in variables.items():
-            args += ["-F" if isinstance(value, int) else "-f", f"{name}={value}"]
-        return self._json(args)
+        return self._json(_graphql_args(query, flags, variables))
 
     def _paginated(self, endpoint: str) -> list[JsonObject]:
         pages: list[list[JsonObject]] = self._json(["api", "--paginate", "--slurp", endpoint])
@@ -271,6 +277,28 @@ def parse_patch_ranges(patch: str) -> LineRanges:
         if old_count:
             left.append((old_start, old_start + old_count - 1))
     return LineRanges(tuple(right), tuple(left))
+
+
+def _graphql_args(query: str, flags: Sequence[str], variables: dict[str, str | int]) -> list[str]:
+    args = ["api", "graphql", *flags, "-f", f"query={query}"]
+    for name, value in variables.items():
+        args += ["-F" if isinstance(value, int) else "-f", f"{name}={value}"]
+    return args
+
+
+def _failed_fields(output: bytes, paths: Sequence[str]) -> dict[str, str]:
+    try:
+        errors: list[JsonObject] = json.loads(output or b"null")["errors"]
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return {}
+    fields = {f"f{index}": path for index, path in enumerate(paths)}
+    failed: dict[str, str] = {}
+    for error in errors:
+        location: list[str] = error.get("path") or []
+        if not location or location[0] not in fields:
+            return {}
+        failed[fields[location[0]]] = str(error.get("message") or "GitHub refused the change")
+    return failed
 
 
 def _nodes(connection: JsonObject | None) -> list[JsonObject]:

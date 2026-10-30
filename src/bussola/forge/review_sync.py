@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from bussola.errors import ConflictError, InvalidRequestError
 from bussola.forge.base import ForgeAdapter, ForgeError
 from bussola.forge.conversation import import_conversation
+from bussola.forge.heads import HeadMismatchError
 from bussola.forge.publish import PublishResult, pending_comment_count, publish_comments
 from bussola.forge.pulls import ForgeSession, is_pull_request_review, require_remote, sync_review
 from bussola.forge.viewed import ViewedResult, mark_approved_files_viewed
@@ -55,18 +56,18 @@ def sync_and_publish(context: ReviewContext, adapter: ForgeAdapter, git_repo: Gi
     revision = refreshed.result.revision
     published: PublishResult | None = None
     publish_error = None
+    head_moved = False
     link = context.store.forge.link(context.review.id)
-    pending = pending_comment_count(context, revision)
-    if link is not None and pending > 0:
+    if link is not None and pending_comment_count(context, revision) > 0:
         try:
             published = publish_comments(context, adapter, revision)
             context.store.commit()
         except PUBLISH_ERRORS as error:
             context.store.session.rollback()
             publish_error = str(error)
-    viewed = mark_approved_files_viewed(context, adapter, link, revision) if link is not None else ViewedResult([], {})
-    unsent = pending_comment_count(context, revision) if published else pending
-    return SyncOutcome(refreshed, published, publish_error, unsent, viewed)
+            head_moved = isinstance(error, HeadMismatchError)
+    viewed = mark_approved_files_viewed(context, adapter, link, revision) if link is not None and not head_moved else ViewedResult()
+    return SyncOutcome(refreshed, published, publish_error, pending_comment_count(context, revision), viewed)
 
 
 def sync_pull_requests(session: ForgeSession, repo: Repo) -> SyncResult:

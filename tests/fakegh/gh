@@ -67,17 +67,27 @@ def file_views(args, state):
     pull = next(pr for pr in state["prs"] if pr["number"] == int(variable(args, "number")))
     viewed = state.get("viewed", [])
     nodes = [{"path": item["filename"], "viewerViewedState": "VIEWED" if item["filename"] in viewed else "UNVIEWED"} for item in state["files"]]
-    files = {"nodes": nodes, "pageInfo": {"hasNextPage": False, "endCursor": None}}
+    files = None if state.get("files_unavailable") else {"nodes": nodes, "pageInfo": {"hasNextPage": False, "endCursor": None}}
     return [{"data": {"repository": {"pullRequest": {"id": f"PR_{pull['number']}", "headRefOid": pull["headRefOid"], "files": files}}}}]
 
 
-def mark_files_viewed(args, state):
-    paths = [arg.split("=", 1)[1] for arg in args if re.match(r"^p\d+=", arg)]
-    if any(path in state.get("fail_viewed", []) for path in paths):
-        fail("GraphQL: Could not mark the files as viewed")
-    state["viewed"] = [*state.get("viewed", []), *paths]
+def set_files_viewed(args, state):
+    if state.get("fail_viewed_request"):
+        fail(state["fail_viewed_request"])
+    viewed = not any("unmarkFileAsViewed" in arg for arg in args)
+    fields = {f"f{match[1]}": arg.split("=", 1)[1] for arg in args if (match := re.match(r"^p(\d+)=", arg))}
+    refused = state.get("fail_viewed", [])
+    done = [path for path in fields.values() if path not in refused]
+    current = state.get("viewed", [])
+    state["viewed"] = [*current, *done] if viewed else [path for path in current if path not in done]
+    if viewed and "push_on_mark" in state:
+        state["prs"][0]["headRefOid"] = state.pop("push_on_mark")
     STATE.write_text(json.dumps(state))
-    return {"data": {}}
+    errors = [{"path": [field], "message": f"Could not mark {path} as viewed"} for field, path in fields.items() if path in refused]
+    if errors:
+        print(json.dumps({"data": {field: None for field in fields}, "errors": errors}))
+        fail("GraphQL: Could not mark the files as viewed")
+    return {"data": {field: {"clientMutationId": None} for field in fields}}
 
 
 def main():
@@ -103,7 +113,7 @@ def main():
         print(json.dumps({"data": {"thread": {"isResolved": resolved}}}))
         return
     if args[:2] == ["api", "graphql"] and any("markFileAsViewed(input" in arg for arg in args):
-        print(json.dumps(mark_files_viewed(args, state)))
+        print(json.dumps(set_files_viewed(args, state)))
         return
     if args[:2] == ["api", "graphql"] and any("viewerViewedState" in arg for arg in args):
         print(json.dumps(file_views(args, state)))
