@@ -123,7 +123,7 @@ bussola contacts GitHub only when you press one of these buttons, or for the aut
 - Later replies and edits are sent as replies and edits of the published comments. Deleting a thread locally does not change GitHub; resolving or reopening one that is on GitHub does.
 - Sending is blocked while the pull request head differs from the reviewed commit, because line numbers would not match.
 
-Approvals stay local.
+Approvals stay local, but **Sync** ticks "Viewed" on GitHub for every file whose changes you have all approved. Files approved only in part, or changed since you approved them, are left alone, and nothing is ever unmarked. A file that cannot be marked is listed in the sync message; the rest of the sync still goes through.
 
 ## Configuration
 

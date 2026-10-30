@@ -7,6 +7,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 ### Added
 
 - Changed words inside a modified line are highlighted with a stronger background on both the removed and the added line, when the two lines are similar enough ([#25](https://github.com/Spoki-App/bussola/issues/25)).
+- **Sync** marks as viewed on GitHub the files whose changes you have all approved. Partly approved files and files changed since approval are left alone, files already viewed are not touched, and a file that cannot be marked does not fail the sync ([#26](https://github.com/Spoki-App/bussola/issues/26)).
 
 ### Changed
 

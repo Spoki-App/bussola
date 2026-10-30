@@ -299,11 +299,19 @@ class PublishOut(BaseModel):
     outcomes: list[PublishOutcomeOut]
 
 
+class ViewedFileOut(BaseModel):
+    path: str
+    status: str
+    detail: str
+
+
 class SyncOut(BaseModel):
     refresh: RefreshOut
     published: PublishOut | None
     publish_error: str | None
     unsent_comments: int
+    viewed_files: list[ViewedFileOut] = []
+    viewed_error: str | None = None
 
 
 class DirectoryEntryOut(BaseModel):

@@ -12,6 +12,7 @@ from bussola.forge.base import (
     Asset,
     Conversation,
     DiffSide,
+    FileViews,
     ForgeError,
     ForgeStatus,
     InlineComment,
@@ -80,6 +81,25 @@ mutation($threadId: ID!) {
   unresolveReviewThread(input: {threadId: $threadId}) { thread { isResolved } }
 }
 """
+FILE_VIEWS_QUERY = """
+query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      id headRefOid
+      files(first: 100, after: $cursor) {
+        nodes { path viewerViewedState }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}
+"""
+MARK_FILE_VIEWED_MUTATION = """
+mutation($pullRequestId: ID!, $path: String!) {
+  markFileAsViewed(input: {pullRequestId: $pullRequestId, path: $path}) { clientMutationId }
+}
+"""
+VIEWED_STATE = "VIEWED"
 ISSUE_COMMENT_PREFIX = "issue-"
 ASSET_URL = re.compile(r"https://github\.com/(?:user-attachments/assets/[0-9a-f-]{36}|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/assets/\d+/[0-9a-f-]{36})")
 MAX_ASSET_BYTES = 25 * 1024 * 1024
@@ -169,6 +189,26 @@ class GitHubAdapter:
     def set_thread_resolved(self, thread_id: str, resolved: bool) -> None:
         mutation = RESOLVE_THREAD_MUTATION if resolved else UNRESOLVE_THREAD_MUTATION
         self._graphql(mutation, threadId=thread_id)
+
+    def file_views(self, repository: str, number: int) -> FileViews:
+        owner, name = _repo(repository).split("/")
+        viewed: dict[str, bool] = {}
+        cursor: dict[str, str] = {}
+        while True:
+            response = self._graphql(FILE_VIEWS_QUERY, owner=owner, name=name, number=number, **cursor)
+            try:
+                pull = response["data"]["repository"]["pullRequest"]
+                files = pull["files"]
+            except (KeyError, TypeError) as error:
+                raise ForgeError(f"GitHub did not return the files of pull request #{number}") from error
+            viewed.update({str(item["path"]): item.get("viewerViewedState") == VIEWED_STATE for item in _nodes(files)})
+            page: JsonObject = files.get("pageInfo") or {}
+            if not page.get("hasNextPage") or not page.get("endCursor"):
+                return FileViews(str(pull["id"]), str(pull["headRefOid"]), viewed)
+            cursor = {"cursor": str(page["endCursor"])}
+
+    def mark_file_viewed(self, pull_id: str, path: str) -> None:
+        self._graphql(MARK_FILE_VIEWED_MUTATION, pullRequestId=pull_id, path=path)
 
     def can_reply(self, remote_id: str | None) -> bool:
         return remote_id is not None and remote_id.isdigit()

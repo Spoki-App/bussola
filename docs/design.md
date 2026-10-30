@@ -109,7 +109,7 @@ One GraphQL query returns the pull request head, conversation comments, review s
 ### Sending comments
 
 ```
-POST   /reviews/{review_id}/sync               refresh with fetch, then publish unsent comments when linked
+POST   /reviews/{review_id}/sync               refresh with fetch, then publish unsent comments and mark approved files as viewed when linked
 ```
 
 **Sync** refreshes first, then sends the comments that were not published yet (or were edited after publishing) as one pull request review with event `COMMENT`, at the pull request head commit:
@@ -122,7 +122,16 @@ POST   /reviews/{review_id}/sync               refresh with fetch, then publish 
 | Review thread | Part of the review body |
 | Reply in a thread already on GitHub | Reply to that review comment |
 
-Sending is blocked while the pull request head differs from the reviewed head, because line numbers would not match. A failed publish does not undo the refresh. Approvals are never sent.
+Sending is blocked while the pull request head differs from the reviewed head, because line numbers would not match. A failed publish does not undo the refresh. Approvals are never sent as GitHub reviews.
+
+### Viewed files
+
+After sending comments, **Sync** marks as viewed on GitHub every file whose units are all `approved` or `approved (moved)` for the current reviewer in the latest revision, so a file changed after approval does not count. Through the forge adapter:
+
+- `file_views` reads the pull request node id, its head and each file's `viewerViewedState` (GraphQL, 100 files per page).
+- `mark_file_viewed` runs the `markFileAsViewed` mutation for each fully approved file that is not viewed yet.
+
+Nothing is marked while the pull request head differs from the reviewed head. Files already viewed are left as they are, and nothing is ever unmarked. A file missing from the pull request, or a failed mutation, is reported in the sync result as not marked; it does not fail the sync. GitHub is not contacted when no file is fully approved.
 
 ### Rendering
 

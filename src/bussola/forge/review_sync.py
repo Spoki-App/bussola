@@ -1,10 +1,11 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from bussola.errors import ConflictError, InvalidRequestError
 from bussola.forge.base import ForgeAdapter, ForgeError
 from bussola.forge.conversation import import_conversation
 from bussola.forge.publish import PublishResult, pending_comment_count, publish_comments
 from bussola.forge.pulls import ForgeSession, is_pull_request_review, require_remote, sync_review
+from bussola.forge.viewed import ViewedResult, mark_approved_files_viewed
 from bussola.git import GitError, GitRepo, InvalidRefError
 from bussola.review.context import ReviewContext
 from bussola.review.revisions import RefreshResult, fetch_review_remotes, refresh_review
@@ -33,6 +34,7 @@ class SyncOutcome:
     published: PublishResult | None
     publish_error: str | None
     unsent_comments: int
+    viewed: ViewedResult = field(default_factory=lambda: ViewedResult([]))
 
 
 def refresh_with_fetch(context: ReviewContext, adapter: ForgeAdapter, git_repo: GitRepo) -> Refreshed:
@@ -53,14 +55,18 @@ def sync_and_publish(context: ReviewContext, adapter: ForgeAdapter, git_repo: Gi
     revision = refreshed.result.revision
     published: PublishResult | None = None
     publish_error = None
-    if context.store.forge.link(context.review.id) is not None and pending_comment_count(context, revision) > 0:
+    link = context.store.forge.link(context.review.id)
+    if link is None:
+        return SyncOutcome(refreshed, None, None, pending_comment_count(context, revision))
+    if pending_comment_count(context, revision) > 0:
         try:
             published = publish_comments(context, adapter, revision)
             context.store.commit()
         except PUBLISH_ERRORS as error:
             context.store.session.rollback()
             publish_error = str(error)
-    return SyncOutcome(refreshed, published, publish_error, pending_comment_count(context, revision))
+    viewed = mark_approved_files_viewed(context, adapter, link, revision)
+    return SyncOutcome(refreshed, published, publish_error, pending_comment_count(context, revision), viewed)
 
 
 def sync_pull_requests(session: ForgeSession, repo: Repo) -> SyncResult:

@@ -59,6 +59,30 @@ def pull_requests(args, state):
     return [pr for pr in state["prs"] if pr["headRefName"] == option(args, "--head") and pr["baseRefName"] == option(args, "--base")]
 
 
+def variable(args, name):
+    return next(arg.split("=", 1)[1] for arg in args if arg.startswith(f"{name}="))
+
+
+def file_views(args, state):
+    number = int(variable(args, "number"))
+    found = [pr for pr in state["prs"] if pr["number"] == number]
+    if not found:
+        return {"data": {"repository": {"pullRequest": None}}}
+    viewed = state.get("viewed", [])
+    nodes = [{"path": item["filename"], "viewerViewedState": "VIEWED" if item["filename"] in viewed else "UNVIEWED"} for item in state["files"]]
+    files = {"nodes": nodes, "pageInfo": {"hasNextPage": False, "endCursor": None}}
+    return {"data": {"repository": {"pullRequest": {"id": f"PR_{number}", "headRefOid": found[0]["headRefOid"], "files": files}}}}
+
+
+def mark_file_viewed(args, state):
+    path = variable(args, "path")
+    if path in state.get("fail_viewed", []) or path not in [item["filename"] for item in state["files"]]:
+        fail(f"GraphQL: Could not mark {path} as viewed")
+    state["viewed"] = [*state.get("viewed", []), path]
+    STATE.write_text(json.dumps(state))
+    return {"data": {"markFileAsViewed": {"clientMutationId": None}}}
+
+
 def main():
     args = sys.argv[1:]
     state = json.loads(STATE.read_text())
@@ -80,6 +104,12 @@ def main():
                 thread["isResolved"] = resolved
         STATE.write_text(json.dumps(state))
         print(json.dumps({"data": {"thread": {"isResolved": resolved}}}))
+        return
+    if args[:2] == ["api", "graphql"] and any("markFileAsViewed(input" in arg for arg in args):
+        print(json.dumps(mark_file_viewed(args, state)))
+        return
+    if args[:2] == ["api", "graphql"] and any("viewerViewedState" in arg for arg in args):
+        print(json.dumps(file_views(args, state)))
         return
     if args[:2] == ["api", "graphql"] and any("pullRequest(number" in arg for arg in args):
         conversation = state.get("conversation", {})
