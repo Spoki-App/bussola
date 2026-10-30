@@ -649,6 +649,19 @@ textarea {
   gap: 8px;
 }
 
+.unit-filters {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.unit-search {
+  flex: 0 1 320px;
+  min-width: 0;
+}
+
 .course-summary {
   display: grid;
   gap: 8px;
@@ -761,63 +774,6 @@ textarea {
 
   .review-todo {
     display: none;
-  }
-}
-
-@media (max-width: 700px) {
-  .review-layout,
-  .review-layout.with-panel,
-  .review-layout.files-hidden,
-  .review-layout.files-hidden.with-panel {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sidebar {
-    position: static;
-    height: auto;
-    max-height: none;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .page {
-    padding: 24px 16px 48px;
-  }
-
-  .review-header,
-  .review-summary {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
-  .review-title {
-    min-width: 0;
-  }
-
-  .review-title h1 {
-    font-size: 24px;
-  }
-
-  .review-list li {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px 12px;
-  }
-
-  .review-list li > .course {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
-  .review-list .comment-count {
-    min-width: 0;
-  }
-
-  .inline-form input {
-    min-width: 0;
-  }
-
-  .unit-header {
-    flex-wrap: wrap;
   }
 }
 
@@ -1017,9 +973,31 @@ textarea {
   flex-shrink: 0;
 }
 
-.unit-header > .unit-name {
+.unit-header > .qualified-name {
   flex: 0 1 auto;
   min-width: 0;
+  font-size: 13px;
+}
+
+.qualified-name {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  font-family: var(--mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+  vertical-align: bottom;
+}
+
+.qualified-name::before,
+.qualified-name::after {
+  content: '\200e';
+}
+
+.qualified-name > .unit-name {
+  font-size: inherit;
 }
 
 .unit-name {
@@ -1885,5 +1863,62 @@ button.danger {
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .review-layout,
+  .review-layout.with-panel,
+  .review-layout.files-hidden,
+  .review-layout.files-hidden.with-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .page {
+    padding: 24px 16px 48px;
+  }
+
+  .review-header,
+  .review-summary {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .review-title {
+    min-width: 0;
+  }
+
+  .review-title h1 {
+    font-size: 24px;
+  }
+
+  .review-list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+  }
+
+  .review-list li > .course {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .review-list .comment-count {
+    min-width: 0;
+  }
+
+  .inline-form input {
+    min-width: 0;
+  }
+
+  .unit-header {
+    flex-wrap: wrap;
   }
 }

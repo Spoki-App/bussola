@@ -2,27 +2,27 @@ import type { ReactNode } from 'react'
 
 import type { Unit } from '../api/types'
 import type { UnitNode } from '../review/unitTree'
-import { lastSegment } from '../review/unitTree'
 import { KindBadge } from './Badges'
+import { QualifiedName } from './QualifiedName'
 
 interface Props {
   nodes: UnitNode[]
-  renderUnit: (unit: Unit, nested: boolean) => ReactNode
-  nested?: boolean
+  renderUnit: (unit: Unit) => ReactNode
+  module: string | null
 }
 
-export function UnitTree({ nodes, renderUnit, nested = false }: Props) {
+export function UnitTree({ nodes, renderUnit, module }: Props) {
   return (
     <>
       {nodes.map((node) => {
         if (node.kind === 'unit') {
-          return renderUnit(node.unit, nested)
+          return renderUnit(node.unit)
         }
         return (
           <div key={`class-${node.name}`} className="class-group">
-            {node.unit ? renderUnit(node.unit, nested) : <ClassStandIn name={node.name} kind={node.standIn} nested={nested} />}
+            {node.unit ? renderUnit(node.unit) : <ClassStandIn name={node.name} module={module} kind={node.standIn} />}
             <div className="unit-children">
-              <UnitTree nodes={node.children} renderUnit={renderUnit} nested />
+              <UnitTree nodes={node.children} renderUnit={renderUnit} module={module} />
             </div>
           </div>
         )
@@ -31,14 +31,12 @@ export function UnitTree({ nodes, renderUnit, nested = false }: Props) {
   )
 }
 
-function ClassStandIn({ name, kind, nested }: { name: string; kind: string; nested: boolean }) {
+function ClassStandIn({ name, module, kind }: { name: string; module: string | null; kind: string }) {
   return (
     <article className="unit-card class-stand-in">
       <header className="unit-header">
         <KindBadge kind={kind} />
-        <span className="unit-name" title={name}>
-          {nested ? lastSegment(name) : name}
-        </span>
+        <QualifiedName module={module} name={name} />
         <span className="label">{kind === 'type' ? 'only its methods changed here' : 'no changes outside its methods'}</span>
       </header>
     </article>

@@ -8,6 +8,7 @@ from bussola.errors import InvalidRequestError, NotFoundError
 from bussola.review.diffs import DiffMode, build_diff, choose_diff_mode
 from bussola.review.images import image_type
 from bussola.review.keys import key_of
+from bussola.review.modules import ModulePaths
 from bussola.review.overview import UnitFilter, approval_set, unit_views
 from bussola.review.repos import open_repo
 from bussola.review.rows import Side
@@ -21,7 +22,8 @@ router = APIRouter(tags=["units"])
 def list_units(context: ContextDep, revision_id: int | None = None, filter: UnitFilter = UnitFilter.ALL) -> list[UnitOut]:  # noqa: A002
     revision = resolve_revision(context, revision_id)
     threads = open_thread_counts(context.store.threads.threads(context.review.id))
-    return [unit_out(view, threads.get(key_of(view.snapshot), 0)) for view in unit_views(context, revision, filter)]
+    modules = ModulePaths(repo_of(context), revision)
+    return [unit_out(view, threads.get(key_of(view.snapshot), 0), modules) for view in unit_views(context, revision, filter)]
 
 
 @router.get("/reviews/{review_id}/units/{unit_id}/diff")

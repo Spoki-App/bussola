@@ -9,6 +9,7 @@ function unit(id: number, kind: string, qualifiedName: string): Unit {
     revision_id: 1,
     path: 'a.py',
     old_path: null,
+    module: null,
     kind,
     qualified_name: qualifiedName,
     state: 'new',

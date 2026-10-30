@@ -24,3 +24,19 @@ test('review a branch: open it, approve a unit and comment on a line', async ({ 
   await expect(card.getByTestId('thread')).toContainText('Is len needed here?')
   await expect(card.getByText('1 open thread')).toBeVisible()
 })
+
+test('narrow screens show the files above the units, which stay visible and hoverable', async ({ page }) => {
+  await page.setViewportSize({ width: 600, height: 800 })
+  await page.goto(`/?token=${E2E_TOKEN}`)
+  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+
+  const sidebar = page.getByRole('complementary', { name: 'Files' })
+  const card = page.locator('article.unit-card', { hasText: 'total' })
+  await expect(card).toBeVisible()
+  await card.locator('.unit-header').hover({ timeout: 5000 })
+
+  const sidebarBox = await sidebar.boundingBox()
+  const cardBox = await card.boundingBox()
+  expect(sidebarBox && cardBox && sidebarBox.y + sidebarBox.height <= cardBox.y).toBe(true)
+  expect(sidebarBox?.height).toBeLessThan(800)
+})

@@ -2,13 +2,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
 
-from bussola.api.deps import ContextDep, ReviewerDep, StoreDep, resolve_revision, review_context, snapshot_of
+from bussola.api.deps import ContextDep, ReviewerDep, StoreDep, repo_of, resolve_revision, review_context, snapshot_of
 from bussola.api.schemas import CommentIn, CommentOut, ReviewerOut, ThreadAnchorOut, ThreadDeletedOut, ThreadIn, ThreadOut, ThreadPatch
 from bussola.api.state import app_state
 from bussola.errors import InvalidRequestError, NotFoundError
 from bussola.forge.conversation import push_resolution
 from bussola.review.anchoring import line_count
 from bussola.review.context import ReviewContext
+from bussola.review.modules import ModulePaths
 from bussola.review.rows import Side
 from bussola.review.thread_types import ThreadScope, ThreadStatus, is_resolvable
 from bussola.review.threads import (
@@ -49,7 +50,8 @@ def list_threads(context: ContextDep, revision_id: int | None = None) -> list[Th
     revision = resolve_revision(context, revision_id)
     views = thread_views(context, revision)
     published = context.store.forge.published([comment.id for view in views for comment in view.comments])
-    return [thread_out(context, view, published) for view in views]
+    modules = ModulePaths(repo_of(context), revision)
+    return [thread_out(context, view, modules, published) for view in views]
 
 
 @router.post("/reviews/{review_id}/threads", status_code=status.HTTP_201_CREATED)
@@ -104,7 +106,7 @@ def remove_comment(comment_id: str, context: CommentContextDep) -> CommentOut:
     return comment_out(context, comment)
 
 
-def thread_out(context: ReviewContext, view: ThreadView, published: dict[str, PublishedComment] | None = None) -> ThreadOut:
+def thread_out(context: ReviewContext, view: ThreadView, modules: ModulePaths, published: dict[str, PublishedComment] | None = None) -> ThreadOut:
     thread, anchor = view.thread, view.anchor
     if published is None:
         published = context.store.forge.published([comment.id for comment in view.comments])
@@ -112,6 +114,7 @@ def thread_out(context: ReviewContext, view: ThreadView, published: dict[str, Pu
         id=thread.id,
         scope=ThreadScope(thread.scope),
         path=thread.path,
+        module=modules.of(thread.path),
         kind=thread.kind,
         qualified_name=thread.qualified_name,
         side=Side(thread.side) if thread.side else None,
@@ -156,7 +159,7 @@ def comment_out(context: ReviewContext, comment: Comment, published: PublishedCo
 def _single_view(context: ReviewContext, thread_id: str, revision_id: int | None) -> ThreadOut:
     revision = resolve_revision(context, revision_id)
     view = next(view for view in thread_views(context, revision) if view.thread.id == thread_id)
-    return thread_out(context, view)
+    return thread_out(context, view, ModulePaths(repo_of(context), revision))
 
 
 def _comment(store: Store, comment_id: str) -> Comment:

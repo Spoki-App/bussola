@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useDeferredValue, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useSync } from '../api/forge'
@@ -19,8 +19,9 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
 import { buildUnitTree } from '../review/unitTree'
+import { searchGroups } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
-import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, groupByFile, nextTodoIndex, progressPercent, shortSha } from '../review/logic'
+import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, focusedPosition, groupByFile, nextTodoIndex, progressPercent, shortSha } from '../review/logic'
 import { plural } from '../review/text'
 import { Segmented } from '../components/Segmented'
 
@@ -133,10 +134,13 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const [filter, setFilter] = useState<UnitFilter>('all')
   const revisionId = review.data?.latest_revision?.id
   const units = useUnits(reviewId, revisionId, filter)
-  const fileTree = useMemo(() => buildFileTree(groupByFile(units.data ?? [])), [units.data])
+  const [query, setQuery] = useState('')
+  const deferredQuery = useDeferredValue(query)
+  const fileGroups = useMemo(() => groupByFile(units.data ?? []), [units.data])
+  const fileTree = useMemo(() => buildFileTree(searchGroups(fileGroups, deferredQuery)), [fileGroups, deferredQuery])
   const groups = useMemo(() => filesInOrder(fileTree).map((group) => ({ ...group, tree: buildUnitTree(group.units) })), [fileTree])
   const unitList = useMemo(() => groups.flatMap((group) => group.units), [groups])
-  const [focusedIndex, setFocusedIndex] = useState(0)
+  const [focusedId, setFocusedId] = useState<number | null>(null)
   const actions = useRef(new Map<number, UnitActions>())
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= WIDE_LAYOUT_PX)
   const [filesHidden, setFilesHidden] = useState(() => readStored(FILES_HIDDEN_KEY) === 'true')
@@ -145,12 +149,9 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     writeStored(FILES_HIDDEN_KEY, String(!filesHidden))
   }
 
-  const focusUnit = useCallback(
-    (unitId: number) => {
-      setFocusedIndex(unitList.findIndex((unit) => unit.id === unitId))
-    },
-    [unitList],
-  )
+  const focusUnit = useCallback((unitId: number) => {
+    setFocusedId(unitId)
+  }, [])
 
   const register = useCallback((unitId: number, unitActions: UnitActions | null) => {
     if (unitActions) {
@@ -165,10 +166,11 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     if (target < 0) {
       return
     }
-    setFocusedIndex(target)
+    setFocusedId(unitList[target].id)
     scrollToElement(`unit-${String(unitList[target].id)}`)
   }
-  const focusedUnit = unitList.at(clampIndex(focusedIndex, unitList.length))
+  const focusedIndex = focusedPosition(unitList, focusedId)
+  const focusedUnit = focusedIndex < 0 ? undefined : unitList[focusedIndex]
 
   useKeyboardShortcuts({
     j: () => { focus(focusedIndex + 1) },
@@ -212,7 +214,17 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
             </ul>
           </div>
           <div className="summary-controls">
-            <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
+            <div className="unit-filters">
+              <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
+              <input
+                type="search"
+                className="unit-search"
+                aria-label="Find units by module, name or path"
+                placeholder="Find by module, name or path"
+                value={query}
+                onChange={(event) => { setQuery(event.target.value) }}
+              />
+            </div>
             <DiffLayoutSwitch />
           </div>
           <div className="summary-row">
@@ -239,18 +251,18 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
         </aside>
         <main className="units">
           {units.error && <ErrorNote message={describeError(units.error)} />}
-          {units.data && unitList.length === 0 && <p className="muted">{filter === 'all' ? 'No changes between the branches.' : 'Nothing to review here.'}</p>}
+          {units.data && unitList.length === 0 && <p className="muted">{emptyMessage(filter, deferredQuery, units.data.length)}</p>}
           {groups.map((group) => (
             <section key={group.path} id={`file-${group.path}`} className="file-section">
               <FileHeader reviewId={reviewId} path={group.path} oldPath={group.oldPath} complete={group.complete} actions={extensions.fileActions?.(group.path)} />
               <UnitTree
                 nodes={group.tree}
-                renderUnit={(unit, nested) => (
+                module={group.units.at(0)?.module ?? null}
+                renderUnit={(unit) => (
                   <UnitCard
                     key={unit.id}
                     reviewId={reviewId}
                     unit={unit}
-                    nested={nested}
                     focused={focusedUnit?.id === unit.id}
                     onFocus={focusUnit}
                     register={register}
@@ -268,6 +280,13 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
       </div>
     </div>
   )
+}
+
+function emptyMessage(filter: UnitFilter, query: string, total: number): string {
+  if (total > 0) {
+    return `No units match "${query.trim()}".`
+  }
+  return filter === 'all' ? 'No changes between the branches.' : 'Nothing to review here.'
 }
 
 function SidebarIcon() {

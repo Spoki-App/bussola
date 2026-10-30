@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Unit, UnitState } from '../api/types'
-import { groupByFile, nextTodoIndex, progressPercent, unitTitle } from './logic'
+import { focusedPosition, groupByFile, nextTodoIndex, progressPercent, unitTitle } from './logic'
 
 function unit(id: number, path: string, state: UnitState, qualifiedName = `f${String(id)}`): Unit {
   return {
@@ -9,6 +9,7 @@ function unit(id: number, path: string, state: UnitState, qualifiedName = `f${St
     revision_id: 1,
     path,
     old_path: null,
+    module: null,
     kind: qualifiedName ? 'function' : 'module',
     qualified_name: qualifiedName,
     state,
@@ -34,6 +35,24 @@ describe('groupByFile', () => {
       ['a.py', 2, 0, true],
       ['b.py', 1, 1, false],
     ])
+  })
+})
+
+describe('focusedPosition', () => {
+  const units = [unit(1, 'a.py', 'new'), unit(2, 'a.py', 'new'), unit(3, 'b.py', 'new')]
+
+  it('follows the focused unit when the list changes', () => {
+    expect(focusedPosition(units, 3)).toBe(2)
+    expect(focusedPosition(units.slice(1), 3)).toBe(1)
+  })
+
+  it('focuses nothing when the focused unit is filtered out', () => {
+    expect(focusedPosition([units[0], units[1]], 3)).toBe(-1)
+  })
+
+  it('starts on the first unit', () => {
+    expect(focusedPosition(units, null)).toBe(0)
+    expect(focusedPosition([], null)).toBe(-1)
   })
 })
 

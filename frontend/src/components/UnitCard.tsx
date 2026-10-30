@@ -5,9 +5,9 @@ import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/
 import type { DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
 import { unitTitle } from '../review/logic'
 import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
-import { lastSegment } from '../review/unitTree'
 import { ErrorNote, KindBadge, StateBadge } from './Badges'
 import { ImagePreview } from './ImagePreview'
+import { QualifiedName } from './QualifiedName'
 import { UnitDiffView, type GutterSide } from './UnitDiffView'
 
 export interface UnitActions {
@@ -34,14 +34,13 @@ interface Props {
   onCommentSelectEnd?: () => void
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
-  nested?: boolean
 }
 
 const APPROVE_LABELS = { approve: 'Approve', approve_under_name: 'Approve under this name', confirm_removal: 'Confirm removal' } as const
 
 const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', base: 'Base → head' }
 
-export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, nested = false }: Props) {
+export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows }: Props) {
   const todo = unit.todo
   const [expanded, setExpanded] = useState(todo)
   const [wasTodo, setWasTodo] = useState(todo)
@@ -132,9 +131,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
           {expanded ? '▾' : '▸'}
         </button>
         <KindBadge kind={unit.kind} />
-        <span className="unit-name" title={unit.qualified_name || undefined}>
-          {nested && unit.qualified_name ? lastSegment(unit.qualified_name) : unitTitle(unit)}
-        </span>
+        <QualifiedName module={unit.qualified_name ? unit.module : null} name={unitTitle(unit)} />
         <StateBadge state={unit.state} />
         {unit.change_type !== 'modified' && <span className="label">{unit.change_type}</span>}
         {unit.base_changed && <span className="label" title="The base changed since you approved this unit">base changed</span>}

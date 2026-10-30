@@ -21,6 +21,7 @@ from bussola.forge.publish import PublishResult, pending_comment_count
 from bussola.forge.pulls import is_pull_request_review
 from bussola.review.context import ReviewContext
 from bussola.review.images import image_type
+from bussola.review.modules import ModulePaths
 from bussola.review.overview import UnitView
 from bussola.review.rows import ROW_APPROVABLE_KINDS, is_binary
 from bussola.review.scope import ChangeType
@@ -87,7 +88,7 @@ def publish_out(result: PublishResult) -> PublishOut:
     return PublishOut(review_url=result.review_url, outcomes=outcomes)
 
 
-def unit_out(view: UnitView, open_threads: int) -> UnitOut:
+def unit_out(view: UnitView, open_threads: int, modules: ModulePaths) -> UnitOut:
     snapshot, status = view.snapshot, view.status
     kind = UnitKind(snapshot.kind)
     binary = is_binary(snapshot)
@@ -96,6 +97,7 @@ def unit_out(view: UnitView, open_threads: int) -> UnitOut:
         revision_id=snapshot.revision_id,
         path=snapshot.path,
         old_path=snapshot.old_path,
+        module=modules.of(snapshot.path),
         kind=snapshot.kind,
         qualified_name=snapshot.qualified_name,
         state=status.state,

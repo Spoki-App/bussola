@@ -7,6 +7,7 @@ from bussola.units.extractors.python import PythonExtractor
 from bussola.units.extractors.typescript import TSX, TYPESCRIPT
 
 PYTHON = PythonExtractor()
+GO = GoExtractor()
 
 EXTRACTORS_BY_SUFFIX: dict[str, Extractor] = {
     ".py": PYTHON,
@@ -17,7 +18,7 @@ EXTRACTORS_BY_SUFFIX: dict[str, Extractor] = {
     ".jsx": JAVASCRIPT,
     ".mjs": JAVASCRIPT,
     ".cjs": JAVASCRIPT,
-    ".go": GoExtractor(),
+    ".go": GO,
 }
 
 

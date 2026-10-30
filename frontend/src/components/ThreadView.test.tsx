@@ -10,6 +10,7 @@ function thread(canDelete: boolean, resolvable: boolean): Thread {
     id: 't1',
     scope: 'review',
     path: null,
+    module: null,
     kind: null,
     qualified_name: null,
     side: null,
