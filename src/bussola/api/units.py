@@ -22,7 +22,7 @@ router = APIRouter(tags=["units"])
 def list_units(context: ContextDep, revision_id: int | None = None, filter: UnitFilter = UnitFilter.ALL) -> list[UnitOut]:  # noqa: A002
     revision = resolve_revision(context, revision_id)
     threads = open_thread_counts(context.store.threads.threads(context.review.id))
-    modules = ModulePaths(repo_of(context), revision.head_sha)
+    modules = ModulePaths(repo_of(context), revision)
     return [unit_out(view, threads.get(key_of(view.snapshot), 0), modules) for view in unit_views(context, revision, filter)]
 
 

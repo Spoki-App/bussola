@@ -7,8 +7,6 @@ interface Props {
   nested?: boolean
 }
 
-const LEFT_TO_RIGHT_MARK = '\u200e'
-
 export function QualifiedName({ module, name, nested = false }: Props) {
   if (nested) {
     return (
@@ -19,7 +17,7 @@ export function QualifiedName({ module, name, nested = false }: Props) {
   }
   return (
     <span className="qualified-name" title={fullName(module, name)}>
-      {module && <span className="unit-module muted">{`${LEFT_TO_RIGHT_MARK}${module}.${LEFT_TO_RIGHT_MARK}`}</span>}
+      {module && <span className="unit-module muted">{`${module}.`}</span>}
       <span className="unit-name">{name}</span>
     </span>
   )

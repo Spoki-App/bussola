@@ -10,9 +10,15 @@ describe('QualifiedName', () => {
     const name = screen.getByText('find_line')
     const module = container.querySelector('.unit-module')
     expect(name).toHaveClass('unit-name')
-    expect(module?.textContent).toBe('‎bussola.review.anchoring.‎')
+    expect(module?.textContent).toBe('bussola.review.anchoring.')
     expect(module?.nextElementSibling).toBe(name)
     expect(container.querySelector('.qualified-name')).toHaveAttribute('title', 'bussola.review.anchoring.find_line')
+  })
+
+  it('keeps copied text free of the bidi marks used for left truncation', () => {
+    const { container } = render(<QualifiedName module="bussola.review.anchoring" name="find_line" />)
+
+    expect(container.textContent).toBe('bussola.review.anchoring.find_line')
   })
 
   it('shows only the name without a module', () => {

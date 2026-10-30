@@ -139,6 +139,11 @@ class GitRepo:
         except GitError:
             return None
 
+    def tree_paths(self, commit: str) -> list[str]:
+        if not OBJECT_ID.fullmatch(commit):
+            raise InvalidRefError(commit)
+        return [path for path in self.run("ls-tree", "-r", "--name-only", "-z", commit).decode(errors="replace").split("\0") if path]
+
     def blob_reader(self) -> BlobReader:
         process = subprocess.Popen([GIT, "cat-file", "--batch"], cwd=self.root, env=_git_env(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         return BlobReader(process)

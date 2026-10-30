@@ -47,6 +47,8 @@ def test_script_module_is_the_file_path_without_extension(path: str, module: str
         ("internal/cart/cart.go", "example.com/shop/internal/cart"),
         ("tools/lint/main.go", "example.com/lint"),
         ("tools/lint/rules/rule.go", "example.com/lint/rules"),
+        ("vendor/github.com/acme/log/log.go", "github.com/acme/log"),
+        ("tools/lint/vendor/golang.org/x/mod/mod.go", "golang.org/x/mod"),
     ],
 )
 def test_go_module_is_the_package_import_path(path: str, module: str) -> None:
@@ -68,4 +70,6 @@ def test_go_module_name_reads_the_module_directive() -> None:
     assert go_module_name(b'module "example.com/quoted"\n') == "example.com/quoted"
     assert go_module_name(b"module\texample.com/tabbed\n") == "example.com/tabbed"
     assert go_module_name(b"module\n") is None
+    assert go_module_name(b"module (\n\texample.com/block // main\n)\n") == "example.com/block"
+    assert go_module_name(b"module (\n)\n") is None
     assert go_module_name(b"go 1.23\n") is None

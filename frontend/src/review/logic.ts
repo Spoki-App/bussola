@@ -53,6 +53,13 @@ export function nextTodoIndex(units: Unit[], fromIndex: number): number {
   return -1
 }
 
+export function focusedPosition(units: Unit[], focusedId: number | null): number {
+  if (focusedId === null) {
+    return units.length > 0 ? 0 : -1
+  }
+  return units.findIndex((unit) => unit.id === focusedId)
+}
+
 export function clampIndex(index: number, length: number): number {
   return length === 0 ? -1 : Math.min(Math.max(index, 0), length - 1)
 }

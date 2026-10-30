@@ -1044,6 +1044,11 @@ textarea {
   font-family: var(--mono);
 }
 
+.unit-module::before,
+.unit-module::after {
+  content: '\200e';
+}
+
 .qualified-name > .unit-name {
   flex: 0 0 auto;
   max-width: 100%;

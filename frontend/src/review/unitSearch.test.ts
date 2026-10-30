@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Unit } from '../api/types'
-import { fullName, matchesUnitQuery } from './unitSearch'
+import type { FileGroup } from './logic'
+import { fullName, matchesUnitQuery, searchGroups } from './unitSearch'
 
-function unit(path: string, module: string | null, qualifiedName: string, oldPath: string | null = null): Unit {
+function unit(path: string, module: string | null, qualifiedName: string, oldPath: string | null = null, id = 1): Unit {
   return {
-    id: 1,
+    id,
     revision_id: 1,
     path,
     old_path: oldPath,
@@ -63,5 +64,33 @@ describe('matchesUnitQuery', () => {
   it('matches the module of module code and the old path of a moved file', () => {
     expect(matchesUnitQuery(unit('src/bussola/cli.py', 'bussola.cli', ''), 'bussola.cli')).toBe(true)
     expect(matchesUnitQuery(unit('web/new.ts', 'web/new', 'run', 'web/old.ts'), 'old')).toBe(true)
+  })
+})
+
+describe('searchGroups', () => {
+  const cart = 'src/shop/cart.py'
+  const units = [
+    unit(cart, 'shop.cart', 'Cart', null, 1),
+    unit(cart, 'shop.cart', 'Cart.total', null, 2),
+    unit(cart, 'shop.cart', 'Cart.Line.price', null, 3),
+    unit(cart, 'shop.cart', 'helper', null, 4),
+  ]
+  const group: FileGroup = { path: cart, oldPath: null, units, todo: 4, complete: false }
+
+  function names(groups: FileGroup[]): string[] {
+    return groups.flatMap((found) => found.units.map((item) => item.qualified_name))
+  }
+
+  it('keeps the classes around a matching method so it is not shown as a stand-in', () => {
+    expect(names(searchGroups([group], 'total'))).toEqual(['Cart', 'Cart.total'])
+    expect(names(searchGroups([group], 'price'))).toEqual(['Cart', 'Cart.Line.price'])
+  })
+
+  it('keeps the counts of the whole file and drops files without matches', () => {
+    const other: FileGroup = { path: 'web/app.ts', oldPath: null, units: [unit('web/app.ts', 'web/app', 'run', null, 5)], todo: 1, complete: false }
+
+    const found = searchGroups([group, other], 'helper')
+
+    expect(found.map((file) => [file.path, file.todo, file.complete])).toEqual([[cart, 4, false]])
   })
 })

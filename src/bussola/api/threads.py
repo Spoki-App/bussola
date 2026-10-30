@@ -50,7 +50,7 @@ def list_threads(context: ContextDep, revision_id: int | None = None) -> list[Th
     revision = resolve_revision(context, revision_id)
     views = thread_views(context, revision)
     published = context.store.forge.published([comment.id for view in views for comment in view.comments])
-    modules = ModulePaths(repo_of(context), revision.head_sha)
+    modules = ModulePaths(repo_of(context), revision)
     return [thread_out(context, view, modules, published) for view in views]
 
 
@@ -159,7 +159,7 @@ def comment_out(context: ReviewContext, comment: Comment, published: PublishedCo
 def _single_view(context: ReviewContext, thread_id: str, revision_id: int | None) -> ThreadOut:
     revision = resolve_revision(context, revision_id)
     view = next(view for view in thread_views(context, revision) if view.thread.id == thread_id)
-    return thread_out(context, view, ModulePaths(repo_of(context), revision.head_sha))
+    return thread_out(context, view, ModulePaths(repo_of(context), revision))
 
 
 def _comment(store: Store, comment_id: str) -> Comment:
