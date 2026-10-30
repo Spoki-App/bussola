@@ -1,7 +1,9 @@
+import gc
+
 import pytest
 
 from bussola.units.model import UnitKind
-from tests.units.helpers import extract, names
+from tests.units.helpers import extract, names, unit_named
 
 TYPESCRIPT_SOURCE = """import { x } from './x'
 
@@ -121,3 +123,14 @@ def test_javascript_extensions_are_supported(path: str) -> None:
 
 def test_variable_with_several_declarators_stays_in_module() -> None:
     assert names(extract("a.ts", "const a = () => 1, b = () => 2\n")) == [(UnitKind.MODULE, "")]
+
+
+def test_positions_past_row_and_column_256_are_read_correctly() -> None:
+    padding = "".join(f"const v{index} = {index}\n" for index in range(300))
+    prefix = f"const pad = '{'x' * 300}'; "
+    before = unit_named(extract("big.ts", f"{padding}{prefix}function first() {{}}\n"), UnitKind.FUNCTION, "first")
+    after = unit_named(extract("big.ts", f"{padding}{prefix}function second() {{}}\n"), UnitKind.FUNCTION, "second")
+    gc.collect()
+
+    assert before.line_numbers == (301,)
+    assert before.content_hash == after.content_hash
