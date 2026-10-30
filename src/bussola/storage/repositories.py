@@ -1,4 +1,5 @@
 from sqlalchemy import func, select
+from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session, defer
 
 from bussola.storage.models import (
@@ -101,7 +102,8 @@ class SqlReviewRepository(_SqlRepository):
     def reviewer(self, email: str, name: str) -> Reviewer:
         existing = self._session.scalar(select(Reviewer).where(Reviewer.email == email))
         if existing is None:
-            return self._add(Reviewer(email=email, name=name))
+            self._session.execute(insert(Reviewer).values(email=email, name=name).on_conflict_do_nothing(index_elements=[Reviewer.email]))
+            existing = self._session.scalars(select(Reviewer).where(Reviewer.email == email)).one()
         if existing.name != name:
             existing.name = name
         return existing

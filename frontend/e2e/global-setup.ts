@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { E2E_PORT, E2E_TOKEN } from './constants.ts'
 
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const SERVER_LOG = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'e2e-results', 'server.log')
 const STARTUP_TIMEOUT_MS = 60_000
 const POLL_INTERVAL_MS = 250
 
@@ -73,8 +74,8 @@ export default async function globalSetup() {
   await assertPortFree()
   const root = mkdtempSync(join(tmpdir(), 'bussola-e2e-'))
   const repo = createRepository(root)
-  const logPath = join(root, 'server.log')
-  const log = openSync(logPath, 'a')
+  mkdirSync(dirname(SERVER_LOG), { recursive: true })
+  const log = openSync(SERVER_LOG, 'w')
   const server = spawn('uv', ['run', '--project', PROJECT_ROOT, 'bussola', 'serve', '--no-open', '--port', String(E2E_PORT), '--repo', repo], {
     env: { ...process.env, BUSSOLA_DATA_DIR: join(root, 'data'), BUSSOLA_TOKEN: E2E_TOKEN },
     stdio: ['ignore', log, log],
@@ -87,7 +88,7 @@ export default async function globalSetup() {
   try {
     await waitForServer(server)
   } catch (error) {
-    const output = readFileSync(logPath, 'utf8')
+    const output = readFileSync(SERVER_LOG, 'utf8')
     teardown()
     throw new Error(`${String(error)}\n${output}`, { cause: error })
   }
