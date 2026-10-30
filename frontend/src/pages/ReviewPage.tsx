@@ -5,6 +5,7 @@ import { useSync } from '../api/forge'
 import { useApprove, useFinishReview, useReview, useUnits } from '../api/hooks'
 import type { DiffRow, ReviewDetail, SyncResult, Unit, UnitDiff, UnitFilter } from '../api/types'
 import { CourseStrip, ErrorNote } from '../components/Badges'
+import { DiffLayoutSwitch } from '../components/DiffLayoutPanel'
 import { ExternalLink } from '../components/ExternalLink'
 import { FileTree } from '../components/FileTree'
 import { GitHubSyncStatus } from '../components/GitHubSyncStatus'
@@ -212,16 +213,19 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
               {data.open_threads > 0 && <li className="legend-threads">{plural(data.open_threads, 'open thread')}</li>}
             </ul>
           </div>
-          <div className="unit-filters">
-            <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
-            <input
-              type="search"
-              className="unit-search"
-              aria-label="Find units by module, name or path"
-              placeholder="Find by module, name or path"
-              value={query}
-              onChange={(event) => { setQuery(event.target.value) }}
-            />
+          <div className="summary-controls">
+            <div className="unit-filters">
+              <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
+              <input
+                type="search"
+                className="unit-search"
+                aria-label="Find units by module, name or path"
+                placeholder="Find by module, name or path"
+                value={query}
+                onChange={(event) => { setQuery(event.target.value) }}
+              />
+            </div>
+            <DiffLayoutSwitch />
           </div>
           <div className="summary-row">
             <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>

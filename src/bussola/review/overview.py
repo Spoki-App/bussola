@@ -5,7 +5,7 @@ from enum import StrEnum
 
 from bussola.review.context import ReviewContext
 from bussola.review.keys import KeyTuple, key_of
-from bussola.review.states import ApprovalSet, UnitState, UnitStatus, compute_statuses
+from bussola.review.states import DONE_STATES, ApprovalSet, UnitState, UnitStatus, compute_statuses
 from bussola.storage.models import Revision, UnitSnapshot
 
 
@@ -51,3 +51,8 @@ def seen_at_last_session(context: ReviewContext) -> set[tuple[KeyTuple, str | No
 def count_states(views: list[UnitView]) -> dict[UnitState, int]:
     counts = Counter(view.status.state for view in views)
     return {state: counts.get(state, 0) for state in UnitState}
+
+
+def complete_paths(views: list[UnitView]) -> list[str]:
+    pending = {view.snapshot.path for view in views if view.status.state not in DONE_STATES}
+    return sorted({view.snapshot.path for view in views} - pending)

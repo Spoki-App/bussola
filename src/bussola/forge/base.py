@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Protocol
@@ -104,6 +105,13 @@ class Conversation:
 
 
 @dataclass(frozen=True)
+class FileViews:
+    remote_id: str
+    head_sha: str
+    viewed: dict[str, bool]
+
+
+@dataclass(frozen=True)
 class Asset:
     content_type: str
     data: bytes
@@ -124,5 +132,7 @@ class ForgeAdapter(Protocol):
     def update_comment(self, repository: str, remote_id: str, body: str) -> None: ...
     def pull_request_conversation(self, repository: str, number: int) -> Conversation: ...
     def set_thread_resolved(self, thread_id: str, resolved: bool) -> None: ...
+    def file_views(self, repository: str, number: int) -> FileViews: ...
+    def set_files_viewed(self, pull_id: str, paths: Sequence[str], viewed: bool) -> dict[str, str]: ...
     def download_asset(self, url: str) -> Asset: ...
     def can_reply(self, remote_id: str | None) -> bool: ...

@@ -306,6 +306,9 @@ class SyncOut(BaseModel):
     published: PublishOut | None
     publish_error: str | None
     unsent_comments: int
+    marked_viewed: list[str]
+    not_viewed: dict[str, str]
+    viewed_error: str | None
 
 
 class DirectoryEntryOut(BaseModel):
