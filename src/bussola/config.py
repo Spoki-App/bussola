@@ -4,6 +4,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
+from bussola.ai.config import RepoAiConfig
+
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 STATIC_DIR = Path(__file__).parent / "static"
@@ -18,6 +20,7 @@ class RepoConfig(BaseModel):
     base_branch: str | None = None
     file_level: tuple[str, ...] = DEFAULT_FILE_LEVEL
     ignore: tuple[str, ...] = ()
+    ai: RepoAiConfig | None = None
 
 
 def load_repo_config(root: Path) -> RepoConfig:
@@ -34,3 +37,4 @@ class AppSettings:
     identity_dir: Path | None = None
     token: str | None = None
     allowed_hosts: frozenset[str] = field(default_factory=frozenset)
+    config_file: Path | None = None

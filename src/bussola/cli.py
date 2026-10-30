@@ -9,6 +9,7 @@ from typing import Annotated
 import typer
 import uvicorn
 
+from bussola.ai.config import default_config_file
 from bussola.app import create_app
 from bussola.config import DEFAULT_HOST, DEFAULT_PORT, AppSettings, load_repo_config
 from bussola.errors import DomainError
@@ -53,7 +54,13 @@ def serve(
         typer.secho(f"warning: listening on {host} exposes your repositories to other machines on the network", fg=typer.colors.YELLOW, err=True)
     identity_dir = repo or Path.cwd()
     token = os.environ.get(TOKEN_ENV) or new_token()
-    settings = AppSettings(data_dir=default_data_dir(), identity_dir=identity_dir, token=token, allowed_hosts=allowed_hosts_for(host, port))
+    settings = AppSettings(
+        data_dir=default_data_dir(),
+        identity_dir=identity_dir,
+        token=token,
+        allowed_hosts=allowed_hosts_for(host, port),
+        config_file=default_config_file(),
+    )
     _register_if_repo(settings.data_dir, identity_dir)
     url = f"http://{host}:{port}/?token={token}"
     if not no_open:

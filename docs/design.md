@@ -149,3 +149,31 @@ GET    /directories/repositories               git repositories found under the 
 ```
 
 The repository scan walks the home directory breadth first, up to four levels deep. It skips hidden folders, dependency and build folders (`node_modules`, `vendor`, `dist`, `build`, `target` and similar) and macOS media and `Library` folders, and it does not follow symlinks. It stops after five seconds or 500 results and reports that the list is incomplete. Both endpoints return only folder names, paths and whether a folder contains `.git`, never file names or contents.
+
+## AI providers
+
+Every AI feature goes through one interface, `AiProvider.complete(request, cancellation)`, which sends a system prompt, a user prompt and a JSON schema and returns the model's text. There are three implementations:
+
+| Provider | Call | Structured output |
+|---|---|---|
+| `claude-code` | `claude -p --output-format json --no-session-persistence --tools "" --system-prompt ... --json-schema ...`, prompt on stdin, in an empty temporary folder | `structured_output` of the result, or its `result` text |
+| `anthropic` | `POST {endpoint}/v1/messages` with `x-api-key` | `output_config.format` with the JSON schema |
+| `openai-compatible` | `POST {endpoint}/chat/completions` with an optional `Authorization: Bearer` key | `response_format` of type `json_schema` |
+
+`AiRunner.run(task, prompt, cancellation, content_hash)` builds the request from an `AiTask` (name, prompt version, system prompt and a Pydantic output model). Every object in the schema gets `additionalProperties: false`. The answer, with an optional code fence removed, is validated against the model; an answer that is not JSON or does not match raises `AiOutputError` naming the first fields that failed. Each call runs in a worker thread and is abandoned on timeout (`timeout` seconds from the configuration) or cancellation, and the `claude` process is killed. `run_batch` runs a task over many items in order, reports progress after each item, records per-item errors without stopping, and on cancel stops and keeps the results already produced.
+
+Results are cached in `ai_results`, keyed by task, prompt version, provider, model and the content hash given by the caller (the hash of what was sent). Changing the prompt, the model or the code therefore asks again; nothing else expires.
+
+### Configuration
+
+The user configuration (`config.toml`, `[ai]`) sets `provider`, `model`, `endpoint`, `timeout` and `api_key_env`. `.bussola.toml` may set `provider`, `model` and `endpoint`; anything else in its `[ai]` section is rejected. The two are merged field by field when the repository keeps the user's provider. When it picks another provider, only the repository's fields and the provider defaults apply. `provider = "none"` turns AI off.
+
+Keys are read from the environment at each call: `ANTHROPIC_API_KEY` for `anthropic`, `OPENAI_API_KEY` for `openai-compatible`, or the variable named by `api_key_env`. No key is sent to an endpoint that only `.bussola.toml` names, so a cloned repository cannot redirect a key.
+
+```
+GET    /ai                                     provider of the user configuration: label, model, endpoint, key variable and whether it is set, problem
+GET    /repos/{repo_id}/ai                     the same with the repository's .bussola.toml applied
+POST   /ai/test                                send a fixed prompt with a one-field schema to the user's provider
+```
+
+The UI shows AI buttons only when the repository's provider is configured. Before an action first sends code to a `provider|model|endpoint` target, it names the provider, model and endpoint and waits for confirmation, kept in the browser's local storage per target.

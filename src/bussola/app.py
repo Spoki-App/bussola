@@ -6,6 +6,9 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from bussola.ai.base import AiCancelledError, AiError, AiNotConfiguredError, AiProvider, AiTimeoutError
+from bussola.ai.config import AiSettings
+from bussola.ai.providers import build_provider
 from bussola.api import API_PREFIX, build_api_router
 from bussola.api.state import AppState, attach_state
 from bussola.config import AppSettings
@@ -30,13 +33,29 @@ ERROR_STATUS: dict[type[Exception], int] = {
     NoBaseBranchError: status.HTTP_400_BAD_REQUEST,
     GitError: status.HTTP_400_BAD_REQUEST,
     ForgeError: status.HTTP_502_BAD_GATEWAY,
+    AiNotConfiguredError: status.HTTP_400_BAD_REQUEST,
+    AiTimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,
+    AiCancelledError: status.HTTP_409_CONFLICT,
+    AiError: status.HTTP_502_BAD_GATEWAY,
 }
 
 
-def create_app(settings: AppSettings, forge: ForgeAdapter | None = None, url_opener: Callable[[str], object] | None = None) -> FastAPI:
+def create_app(
+    settings: AppSettings,
+    forge: ForgeAdapter | None = None,
+    url_opener: Callable[[str], object] | None = None,
+    ai_factory: Callable[[AiSettings], AiProvider] | None = None,
+) -> FastAPI:
     app = FastAPI(title="bussola", docs_url=None, redoc_url=None, openapi_url=None)
     database = Database.open(settings.data_dir)
-    state = AppState(settings, database, GitConfigIdentity(settings.identity_dir), forge or GitHubAdapter(), url_opener or webbrowser.open_new_tab)
+    state = AppState(
+        settings,
+        database,
+        GitConfigIdentity(settings.identity_dir),
+        forge or GitHubAdapter(),
+        url_opener or webbrowser.open_new_tab,
+        ai_factory or build_provider,
+    )
     attach_state(app, state)
     for error_type in ERROR_STATUS:
         app.add_exception_handler(error_type, _handle_error)

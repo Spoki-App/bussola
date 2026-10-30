@@ -22,10 +22,11 @@ If a change trades one of these for something else, say so in the pull request.
 | `src/bussola/review/` | Revisions, unit states, approvals, threads and their anchoring |
 | `src/bussola/forge/` | GitHub through `gh`: pull requests, importing and sending comments |
 | `src/bussola/git/` | Running `git` safely |
+| `src/bussola/ai/` | AI providers (Claude Code CLI, Anthropic API, OpenAI-compatible), their configuration, schema-checked calls, cache and batches |
 | `src/bussola/storage/` | SQLAlchemy models, repositories and Alembic migrations |
 | `src/bussola/api/` | HTTP routes and schemas |
 | `frontend/` | React UI, built into `src/bussola/static/` |
-| `tests/` | Backend tests; `tests/fakegh` is the fake `gh` used by the GitHub tests |
+| `tests/` | Backend tests; `tests/fakegh` is the fake `gh` used by the GitHub tests, `tests/fakeclaude` the fake `claude` used by the AI tests |
 | `docs/design.md` | The rules behind units, approvals, threads and GitHub sync |
 
 ## Setup
@@ -51,7 +52,7 @@ npm --prefix frontend run lint && npm --prefix frontend run typecheck && npm --p
 npm --prefix frontend run build && npm --prefix frontend run e2e
 ```
 
-The Playwright smoke test needs a browser once: `npx --prefix frontend playwright install chromium`. The GitHub tests use a fake `gh` from `tests/fakegh` and make no network calls.
+The Playwright smoke test needs a browser once: `npx --prefix frontend playwright install chromium`. The GitHub tests use a fake `gh` from `tests/fakegh` and make no network calls. The AI tests use a fake provider, a fake `claude` from `tests/fakeclaude` and a local HTTP stub; none calls a real model or needs a key.
 
 ## Database migrations
 

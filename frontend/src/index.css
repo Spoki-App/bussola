@@ -1874,6 +1874,37 @@ button.danger {
   min-width: 200px;
 }
 
+.ai-details {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.ai-details dt {
+  color: var(--muted);
+}
+
+.ai-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ai-notice {
+  height: auto;
+}
+
+.ai-notice h2,
+.ai-notice p {
+  margin: 0;
+}
+
+.ai-notice-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .image-preview {
   display: flex;
   flex-wrap: wrap;

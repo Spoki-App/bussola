@@ -6,6 +6,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Added
 
+- Pluggable AI provider for the upcoming AI features: Claude Code CLI, Anthropic API or an OpenAI-compatible endpoint (Ollama, LM Studio), chosen in the `[ai]` section of the user configuration and overridable per repository in `.bussola.toml`. Keys come only from environment variables. **Settings** shows the active provider and model and can test the connection; AI actions stay hidden until a provider is configured and name the provider before code is first sent. Answers are validated against a schema, requests have a timeout and can be cancelled, and results are cached by content hash, prompt version and model ([#16](https://github.com/Spoki-App/bussola/issues/16)).
 - Diff layout setting: split, unified or automatic, in **Settings** and in the review bar. Automatic splits units that rewrite lines when the window is at least as wide as a threshold set in **Settings** ([#10](https://github.com/Spoki-App/bussola/issues/10)).
 - Changed words inside a modified line are highlighted with a stronger background on both the removed and the added line, when the two lines are similar enough ([#25](https://github.com/Spoki-App/bussola/issues/25)).
 - Long lines in the diff wrap with a hanging indent and one line number per source line. Wrapping is on by default and can be turned off in Settings or with **Wrap lines** above the diff ([#11](https://github.com/Spoki-App/bussola/issues/11)).
