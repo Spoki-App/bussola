@@ -59,6 +59,25 @@ describe('UnitCard', () => {
     expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
   })
 
+  it('opens an approved unit revealed by a link, whether it mounts revealed or is revealed later', () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
+    const client = new QueryClient()
+    const card = (revealed: boolean) => (
+      <QueryClientProvider client={client}>
+        <UnitCard reviewId={1} unit={unit('approved')} focused={false} revealed={revealed} onFocus={() => undefined} register={() => undefined} />
+      </QueryClientProvider>
+    )
+    const mounted = render(card(true))
+    expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
+    mounted.unmount()
+
+    const { rerender } = render(card(false))
+    expect(disclosure()).toHaveAttribute('aria-expanded', 'false')
+
+    rerender(card(true))
+    expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('shows the module before the name of every unit, methods included', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
     const client = new QueryClient()

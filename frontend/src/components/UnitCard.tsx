@@ -43,7 +43,7 @@ const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current'
 
 export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, revealed = false, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows }: Props) {
   const todo = unit.todo
-  const [expanded, setExpanded] = useState(todo)
+  const [expanded, setExpanded] = useState(todo || revealed)
   const [wasTodo, setWasTodo] = useState(todo)
   if (todo !== wasTodo) {
     setWasTodo(todo)
