@@ -4,7 +4,7 @@ bussola runs a local web server that reads your repositories, runs `git` and `gh
 
 ## Reporting a vulnerability
 
-Please do not open a public issue. Use **Report a vulnerability** on the repository's **Security** tab, which opens a private advisory, and include the steps to reproduce and the version you tested. Do not include private code or real tokens: reproduce with a small public or made-up repository.
+Please do not open a public issue. Report it privately at https://github.com/Spoki-App/bussola/security/advisories/new (**Report a vulnerability** on the repository's **Security** tab), and include the steps to reproduce and the version you tested. Do not include private code or real tokens: reproduce with a small public or made-up repository.
 
 You should get a reply within a week. Once a fix is released, the advisory is published with credit to you, unless you prefer otherwise.
 

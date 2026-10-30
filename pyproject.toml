@@ -38,6 +38,13 @@ dependencies = [
     "uvicorn[standard]>=0.54.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Spoki-App/bussola"
+Repository = "https://github.com/Spoki-App/bussola"
+Issues = "https://github.com/Spoki-App/bussola/issues"
+Changelog = "https://github.com/Spoki-App/bussola/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/Spoki-App/bussola/blob/main/docs/design.md"
+
 [project.scripts]
 bussola = "bussola.cli:main"
 

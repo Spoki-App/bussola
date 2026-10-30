@@ -1,4 +1,13 @@
-# bussola
+<p align="center"><img src="https://raw.githubusercontent.com/Spoki-App/bussola/main/frontend/public/favicon.svg" alt="" width="72" height="72"></p>
+
+<h1 align="center">bussola</h1>
+
+<p align="center">
+  <a href="https://github.com/Spoki-App/bussola/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Spoki-App/bussola/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://pypi.org/project/bussola/"><img alt="PyPI" src="https://img.shields.io/pypi/v/bussola"></a>
+  <img alt="Python 3.12 and 3.13" src="https://img.shields.io/badge/python-3.12%20%7C%203.13-3776ab">
+  <a href="https://github.com/Spoki-App/bussola/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+</p>
 
 Local, per-function code review for git branches. `bussola serve` opens a review UI on `localhost` that works directly on your repository, without needing a hosting service.
 
@@ -17,14 +26,15 @@ In Go, each function, method and type is its own unit. A method is named after i
 
 ## Install
 
-Requirements:
+Requirements: Python 3.12+, git, and the [GitHub CLI](https://cli.github.com) (`gh`) for the GitHub features only.
 
-- Python 3.12+ and [uv](https://docs.astral.sh/uv/)
-- git
-- Node.js 22.12+ to build the UI (`frontend/.nvmrc` pins 24)
-- The [GitHub CLI](https://cli.github.com) (`gh`), only for the GitHub features
+```bash
+uv tool install bussola
+```
 
-bussola is developed on macOS and tested on macOS and Linux. Windows is not tested yet.
+`pipx install bussola` works too. bussola is developed on macOS and tested on macOS and Linux. Windows is not tested yet.
+
+To install from a clone instead, you also need Node.js 22.12+ to build the UI (`frontend/.nvmrc` pins 24):
 
 ```bash
 npm --prefix frontend ci
@@ -175,15 +185,15 @@ Each person runs bussola on their own machine and keeps their own approvals. Com
 
 <details><summary><b>What about other languages?</b></summary>
 
-Files that are not parsed are still reviewed, as whole files with line selections. Adding a language means adding a tree-sitter extractor in `src/bussola/units/extractors/`; see [CONTRIBUTING.md](CONTRIBUTING.md).
+Files that are not parsed are still reviewed, as whole files with line selections. Adding a language means adding a tree-sitter extractor in `src/bussola/units/extractors/`; see [CONTRIBUTING.md](https://github.com/Spoki-App/bussola/blob/main/CONTRIBUTING.md).
 </details>
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup and checks, and [docs/design.md](docs/design.md) for how units, revisions, approvals, threads and the GitHub integration work. Report security issues as described in [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](https://github.com/Spoki-App/bussola/blob/main/CONTRIBUTING.md) for the development setup and checks, and [docs/design.md](https://github.com/Spoki-App/bussola/blob/main/docs/design.md) for how units, revisions, approvals, threads and the GitHub integration work. Report security issues as described in [SECURITY.md](https://github.com/Spoki-App/bussola/blob/main/SECURITY.md).
 
 ## License
 
-bussola is released under the [MIT License](LICENSE). It is not affiliated with GitHub; GitHub is a trademark of GitHub, Inc.
+bussola is released under the [MIT License](https://github.com/Spoki-App/bussola/blob/main/LICENSE). It is not affiliated with GitHub; GitHub is a trademark of GitHub, Inc.
 
 The UI bundles third-party libraries; their licenses are listed in `THIRD_PARTY_LICENSES.md`, which the UI build writes next to the app and the package ships. Diagrams use [elkjs](https://github.com/kieler/elkjs) (EPL-2.0), whose source code is available from that repository.
