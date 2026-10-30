@@ -59,6 +59,37 @@ def pull_requests(args, state):
     return [pr for pr in state["prs"] if pr["headRefName"] == option(args, "--head") and pr["baseRefName"] == option(args, "--base")]
 
 
+def variable(args, name):
+    return next(arg.split("=", 1)[1] for arg in args if arg.startswith(f"{name}="))
+
+
+def file_views(args, state):
+    pull = next(pr for pr in state["prs"] if pr["number"] == int(variable(args, "number")))
+    viewed = state.get("viewed", [])
+    nodes = [{"path": item["filename"], "viewerViewedState": "VIEWED" if item["filename"] in viewed else "UNVIEWED"} for item in state["files"]]
+    files = None if state.get("files_unavailable") else {"nodes": nodes, "pageInfo": {"hasNextPage": False, "endCursor": None}}
+    return [{"data": {"repository": {"pullRequest": {"id": f"PR_{pull['number']}", "headRefOid": pull["headRefOid"], "files": files}}}}]
+
+
+def set_files_viewed(args, state):
+    if state.get("fail_viewed_request"):
+        fail(state["fail_viewed_request"])
+    viewed = not any("unmarkFileAsViewed" in arg for arg in args)
+    fields = {f"f{match[1]}": arg.split("=", 1)[1] for arg in args if (match := re.match(r"^p(\d+)=", arg))}
+    refused = state.get("fail_viewed", [])
+    done = [path for path in fields.values() if path not in refused]
+    current = state.get("viewed", [])
+    state["viewed"] = [*current, *done] if viewed else [path for path in current if path not in done]
+    if viewed and "push_on_mark" in state:
+        state["prs"][0]["headRefOid"] = state.pop("push_on_mark")
+    STATE.write_text(json.dumps(state))
+    errors = [{"path": [field], "message": f"Could not mark {path} as viewed"} for field, path in fields.items() if path in refused]
+    if errors:
+        print(json.dumps({"data": {field: None for field in fields}, "errors": errors}))
+        fail("GraphQL: Could not mark the files as viewed")
+    return {"data": {field: {"clientMutationId": None} for field in fields}}
+
+
 def main():
     args = sys.argv[1:]
     state = json.loads(STATE.read_text())
@@ -73,7 +104,7 @@ def main():
     if args[:2] == ["api", "graphql"] and any("ReviewThread(input" in arg for arg in args):
         if state.get("fail_resolve"):
             fail("GraphQL: Resource not accessible by integration")
-        thread_id = next(arg.split("=", 1)[1] for arg in args if arg.startswith("threadId="))
+        thread_id = variable(args, "threadId")
         resolved = not any("unresolveReviewThread" in arg for arg in args)
         for thread in state.get("conversation", {}).get("reviewThreads", []):
             if thread.get("id") == thread_id:
@@ -81,9 +112,15 @@ def main():
         STATE.write_text(json.dumps(state))
         print(json.dumps({"data": {"thread": {"isResolved": resolved}}}))
         return
+    if args[:2] == ["api", "graphql"] and any("markFileAsViewed(input" in arg for arg in args):
+        print(json.dumps(set_files_viewed(args, state)))
+        return
+    if args[:2] == ["api", "graphql"] and any("viewerViewedState" in arg for arg in args):
+        print(json.dumps(file_views(args, state)))
+        return
     if args[:2] == ["api", "graphql"] and any("pullRequest(number" in arg for arg in args):
         conversation = state.get("conversation", {})
-        number = int(next(arg.split("=", 1)[1] for arg in args if arg.startswith("number=")))
+        number = int(variable(args, "number"))
         found = [pr for pr in state["prs"] if pr["number"] == number]
         pull = None
         if found:

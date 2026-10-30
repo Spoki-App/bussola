@@ -6,7 +6,7 @@ import { syncMessage } from './sync'
 const revision = { id: 2, number: 2, head_sha: 'b', base_sha: 'a', merge_base_sha: 'a', created_at: '2026-10-28T10:00:00Z' }
 
 function result(overrides: Partial<SyncResult> = {}): SyncResult {
-  return { refresh: { revision, created: false, warning: null }, published: null, publish_error: null, unsent_comments: 0, ...overrides }
+  return { refresh: { revision, created: false, warning: null }, published: null, publish_error: null, unsent_comments: 0, marked_viewed: [], not_viewed: {}, viewed_error: null, ...overrides }
 }
 
 function outcome(status: PublishOutcome['status']): PublishOutcome {
@@ -24,5 +24,17 @@ describe('syncMessage', () => {
 
   it('explains why comments were not sent', () => {
     expect(syncMessage(result({ publish_error: 'Push the branch first.' }))).toBe('No new commits. Comments not sent: Push the branch first.')
+  })
+
+  it('reports files marked as viewed', () => {
+    expect(syncMessage(result({ marked_viewed: ['a.py', 'b.py'], not_viewed: { 'c.py': 'Not changed in the pull request' } }))).toBe(
+      'No new commits. Marked 2 approved files as viewed on GitHub.',
+    )
+  })
+
+  it('explains why no file was marked as viewed', () => {
+    expect(syncMessage(result({ viewed_error: 'The pull request head (a) differs from the reviewed head (b).' }))).toBe(
+      'No new commits. Files not marked as viewed: The pull request head (a) differs from the reviewed head (b).',
+    )
   })
 })

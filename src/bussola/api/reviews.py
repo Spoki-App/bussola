@@ -36,7 +36,15 @@ def refresh(body: RefreshIn, context: ContextDep, request: Request) -> RefreshOu
 def sync(context: ContextDep, request: Request) -> SyncOut:
     outcome = sync_and_publish(context, app_state(request).forge, open_repo(repo_of(context)))
     published = publish_out(outcome.published) if outcome.published else None
-    return SyncOut(refresh=_refresh_out(outcome.refreshed), published=published, publish_error=outcome.publish_error, unsent_comments=outcome.unsent_comments)
+    return SyncOut(
+        refresh=_refresh_out(outcome.refreshed),
+        published=published,
+        publish_error=outcome.publish_error,
+        unsent_comments=outcome.unsent_comments,
+        marked_viewed=outcome.viewed.marked,
+        not_viewed=outcome.viewed.failed,
+        viewed_error=outcome.viewed.error,
+    )
 
 
 def _refresh_out(refreshed: Refreshed) -> RefreshOut:

@@ -231,6 +231,9 @@ export interface SyncResult {
   published: PublishResult | null
   publish_error: string | null
   unsent_comments: number
+  marked_viewed: string[]
+  not_viewed: Record<string, string>
+  viewed_error: string | null
 }
 
 export interface ConversationSync {
