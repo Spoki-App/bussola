@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.types import Lifespan
 
 from bussola.api import API_PREFIX, build_api_router
 from bussola.api.state import AppState, attach_state
@@ -33,8 +34,13 @@ ERROR_STATUS: dict[type[Exception], int] = {
 }
 
 
-def create_app(settings: AppSettings, forge: ForgeAdapter | None = None, url_opener: Callable[[str], object] | None = None) -> FastAPI:
-    app = FastAPI(title="bussola", docs_url=None, redoc_url=None, openapi_url=None)
+def create_app(
+    settings: AppSettings,
+    forge: ForgeAdapter | None = None,
+    url_opener: Callable[[str], object] | None = None,
+    lifespan: Lifespan[FastAPI] | None = None,
+) -> FastAPI:
+    app = FastAPI(title="bussola", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     database = Database.open(settings.data_dir)
     state = AppState(settings, database, GitConfigIdentity(settings.identity_dir), forge or GitHubAdapter(), url_opener or webbrowser.open_new_tab)
     attach_state(app, state)

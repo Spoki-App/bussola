@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react'
 
-import { describeError } from './api/client'
+import { ApiError, describeError } from './api/client'
 import { useOpenPullRequestLink } from './api/pulls'
 import { ErrorNote } from './components/Badges'
 import { ExternalLink } from './components/ExternalLink'
 import { Link } from './Link'
 import { navigate, reviewPath } from './navigation'
+import { addRepositoryPath, focusSearch, linkFocusFromSearch, pullRequestRepository } from './review/linkFocus'
 
 export function OpenPullRequestRoute({ url }: { url: string }) {
   const open = useOpenPullRequestLink()
@@ -16,7 +17,16 @@ export function OpenPullRequestRoute({ url }: { url: string }) {
       return
     }
     started.current = true
-    open.mutate(url, { onSuccess: (review) => { navigate(reviewPath(review.id), { replace: true }) } })
+    const { pathname, search } = window.location
+    const repository = pullRequestRepository(url)
+    open.mutate(url, {
+      onSuccess: (review) => { navigate(`${reviewPath(review.id)}${focusSearch(linkFocusFromSearch(search))}`, { replace: true }) },
+      onError: (error) => {
+        if (error instanceof ApiError && error.status === 404 && repository) {
+          navigate(addRepositoryPath(repository, `${pathname}${search}`), { replace: true })
+        }
+      },
+    })
   }, [open, url])
 
   return (

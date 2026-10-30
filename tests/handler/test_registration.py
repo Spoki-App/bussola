@@ -1,0 +1,171 @@
+import plistlib
+import subprocess
+from collections.abc import Sequence
+from pathlib import Path
+
+import pytest
+
+from bussola.handler.registration import (
+    LSREGISTER,
+    CreateDirectory,
+    HandlerError,
+    RemovePath,
+    RunCommand,
+    UpdatePlist,
+    WriteFile,
+    app_properties,
+    applescript,
+    apply,
+    desktop_entry,
+    handler_command,
+    registration_for,
+)
+
+PYTHON = "/opt/tools/bussola/bin/python"
+COMMAND = (PYTHON, "-m", "bussola", "open-link")
+
+
+class Recorder:
+    def __init__(self, failing: tuple[str, ...] = ()) -> None:
+        self.commands: list[tuple[str, ...]] = []
+        self.failing = failing
+
+    def __call__(self, argv: Sequence[str]) -> None:
+        self.commands.append(tuple(argv))
+        if argv[0] in self.failing:
+            raise subprocess.CalledProcessError(1, list(argv), stderr="no such scheme\n")
+
+
+def test_linux_registers_a_desktop_file_as_default_for_the_scheme(tmp_path: Path) -> None:
+    handler = registration_for("linux", tmp_path, {}, PYTHON)
+    desktop = tmp_path / ".local/share/applications/bussola-url-handler.desktop"
+    recorder = Recorder()
+
+    apply(handler.install, recorder)
+
+    assert handler.location == str(desktop)
+    assert desktop.read_text() == desktop_entry(COMMAND)
+    assert "MimeType=x-scheme-handler/bussola;\n" in desktop.read_text()
+    assert f"Exec={PYTHON} -m bussola open-link %u\n" in desktop.read_text()
+    assert recorder.commands == [
+        ("xdg-mime", "default", "bussola-url-handler.desktop", "x-scheme-handler/bussola"),
+        ("update-desktop-database", str(desktop.parent)),
+    ]
+
+    apply(handler.uninstall, recorder)
+
+    assert not desktop.exists()
+
+
+def test_linux_follows_xdg_data_home(tmp_path: Path) -> None:
+    handler = registration_for("linux", tmp_path / "home", {"XDG_DATA_HOME": str(tmp_path / "data")}, PYTHON)
+
+    assert handler.location == str(tmp_path / "data/applications/bussola-url-handler.desktop")
+
+
+def test_desktop_entry_quotes_arguments_with_reserved_characters() -> None:
+    entry = desktop_entry(['/home/me/my tools/py"thon$', "-m", "bussola", "open-link", "50%"])
+
+    assert 'Exec="/home/me/my tools/py\\\\"thon\\\\$" -m bussola open-link 50%% %u\n' in entry
+
+
+def test_desktop_entry_refuses_line_breaks() -> None:
+    with pytest.raises(HandlerError):
+        desktop_entry(["/bin/py\nthon"])
+
+
+def test_macos_builds_an_app_bundle_declaring_the_scheme(tmp_path: Path) -> None:
+    handler = registration_for("darwin", tmp_path, {}, PYTHON)
+    app = tmp_path / "Applications/bussola.app"
+    plist = app / "Contents/Info.plist"
+
+    assert handler.location == str(app)
+    assert handler.install == (
+        RemovePath(app),
+        CreateDirectory(tmp_path / "Applications"),
+        RunCommand(("osacompile", "-o", str(app), *[part for line in applescript(COMMAND) for part in ("-e", line)])),
+        UpdatePlist(plist, app_properties()),
+        RunCommand(("codesign", "--force", "--sign", "-", str(app))),
+        RunCommand((LSREGISTER, "-f", str(app))),
+    )
+    assert handler.uninstall == (RunCommand((LSREGISTER, "-u", str(app)), required=False), RemovePath(app))
+
+
+def test_macos_app_bundle_info_plist_after_install(tmp_path: Path) -> None:
+    handler = registration_for("darwin", tmp_path, {}, PYTHON)
+    plist = tmp_path / "Applications/bussola.app/Contents/Info.plist"
+
+    def fake_osacompile(argv: Sequence[str]) -> None:
+        if argv[0] == "osacompile":
+            plist.parent.mkdir(parents=True)
+            plist.write_bytes(plistlib.dumps({"CFBundleExecutable": "applet", "CFBundleIdentifier": "com.apple.ScriptEditor.id.bussola"}))
+
+    apply(handler.install, fake_osacompile)
+
+    properties = plistlib.loads(plist.read_bytes())
+    assert properties["CFBundleExecutable"] == "applet"
+    assert properties["CFBundleIdentifier"] == "io.github.spoki-app.bussola"
+    assert properties["CFBundleURLTypes"] == [{"CFBundleURLName": "bussola link", "CFBundleURLSchemes": ["bussola"]}]
+    assert properties["LSUIElement"] is True
+
+    apply(handler.uninstall, lambda _argv: None)
+
+    assert not plist.parent.parent.exists()
+
+
+def test_applescript_passes_the_link_as_one_quoted_argument() -> None:
+    script = applescript(("/Users/me/my tools/python", "-m", "bussola", "open-link"))
+
+    assert script == [
+        "on run",
+        'do shell script "\'/Users/me/my tools/python\' -m bussola open-link " & quoted form of "bussola://" & " > /dev/null 2>&1 &"',
+        "end run",
+        "on open location linkURL",
+        'do shell script "\'/Users/me/my tools/python\' -m bussola open-link " & quoted form of linkURL & " > /dev/null 2>&1 &"',
+        "end open location",
+    ]
+
+
+def test_windows_writes_the_url_protocol_keys_under_hkcu(tmp_path: Path) -> None:
+    python = tmp_path / "Python 3.13" / "python.exe"
+    python.parent.mkdir()
+    python.touch()
+    (python.parent / "pythonw.exe").touch()
+    handler = registration_for("win32", tmp_path, {}, str(python))
+    windowless = python.parent / "pythonw.exe"
+
+    assert handler.location == "HKCU\\Software\\Classes\\bussola"
+    assert handler.install == (
+        RunCommand(("reg", "add", "HKCU\\Software\\Classes\\bussola", "/ve", "/d", "URL:bussola link", "/f")),
+        RunCommand(("reg", "add", "HKCU\\Software\\Classes\\bussola", "/v", "URL Protocol", "/d", "", "/f")),
+        RunCommand(("reg", "add", "HKCU\\Software\\Classes\\bussola\\shell\\open\\command", "/ve", "/d", f'"{windowless}" -m bussola open-link "%1"', "/f")),
+    )
+    assert handler.uninstall == (RunCommand(("reg", "delete", "HKCU\\Software\\Classes\\bussola", "/f"), required=False),)
+
+
+def test_handler_command_uses_the_current_python() -> None:
+    assert handler_command("linux", PYTHON) == COMMAND
+    assert handler_command("win32", "C:/missing/python.exe") == ("C:/missing/python.exe", "-m", "bussola", "open-link")
+
+
+def test_unsupported_platform_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(HandlerError):
+        registration_for("aix", tmp_path, {}, PYTHON)
+
+
+def test_a_failing_required_command_stops_the_install_with_its_error(tmp_path: Path) -> None:
+    handler = registration_for("linux", tmp_path, {}, PYTHON)
+
+    with pytest.raises(HandlerError, match="xdg-mime failed: no such scheme"):
+        apply(handler.install, Recorder(failing=("xdg-mime",)))
+
+
+def test_optional_commands_may_fail_or_be_missing(tmp_path: Path) -> None:
+    def missing(argv: Sequence[str]) -> None:
+        raise FileNotFoundError(argv[0])
+
+    apply((RunCommand(("update-desktop-database",), required=False), WriteFile(tmp_path / "a", "x")), missing)
+
+    assert (tmp_path / "a").read_text() == "x"
+    with pytest.raises(HandlerError, match="Could not run xdg-mime"):
+        apply((RunCommand(("xdg-mime",)),), missing)

@@ -7,6 +7,7 @@ import { ErrorNote } from './Badges'
 import { ExternalLink } from './ExternalLink'
 import { Composer } from './Composer'
 import { Markdown } from './Markdown'
+import { threadElementId } from '../review/linkFocus'
 import { plural } from '../review/text'
 
 interface Props {
@@ -25,7 +26,7 @@ export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
   const failure = reply.error ?? setStatus.error ?? remove.error
 
   return (
-    <div className={`thread${resolved ? ' resolved' : ''}${thread.anchor?.outdated ? ' outdated' : ''}`} data-testid="thread">
+    <div id={threadElementId(thread.id)} className={`thread${resolved ? ' resolved' : ''}${thread.anchor?.outdated ? ' outdated' : ''}`} data-testid="thread">
       <div className="thread-header">
         <button type="button" className="disclosure" aria-expanded={!collapsed} onClick={() => { setCollapsed(!collapsed) }}>
           {collapsed ? '▸' : '▾'}

@@ -115,6 +115,8 @@ class UnitOut(BaseModel):
     todo: bool
     action: ApprovalAction
     open_threads: int
+    head_start: int | None
+    head_end: int | None
 
 
 class DiffRowOut(BaseModel):

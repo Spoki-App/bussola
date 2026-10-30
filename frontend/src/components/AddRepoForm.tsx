@@ -5,9 +5,9 @@ import { useAddRepo } from '../api/hooks'
 import { ErrorNote } from './Badges'
 import { DirectoryPicker } from './DirectoryPicker'
 
-export function AddRepoForm({ onAdded }: { onAdded: () => void }) {
+export function AddRepoForm({ onAdded, filter }: { onAdded: () => void; filter?: string }) {
   const [path, setPath] = useState('')
-  const [browsing, setBrowsing] = useState(false)
+  const [browsing, setBrowsing] = useState(filter !== undefined)
   const addRepo = useAddRepo()
   const add = (target: string, done: () => void) => {
     addRepo.mutate(target.trim(), {
@@ -38,6 +38,7 @@ export function AddRepoForm({ onAdded }: { onAdded: () => void }) {
       {!browsing && addRepo.error && <ErrorNote message={describeError(addRepo.error)} />}
       {browsing && (
         <DirectoryPicker
+          filter={filter}
           busy={addRepo.isPending}
           error={addRepo.error}
           onSelect={(target) => { add(target, () => { setBrowsing(false) }) }}

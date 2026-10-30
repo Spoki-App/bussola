@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useSync } from '../api/forge'
@@ -19,6 +19,7 @@ import { UnitTree } from '../components/UnitTree'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
+import { scrollWhenPresent, type FocusTarget } from '../review/linkFocus'
 import { buildUnitTree } from '../review/unitTree'
 import { searchGroups } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
@@ -33,6 +34,7 @@ export interface ReviewExtensions {
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
   fileActions?: (path: string) => ReactNode
   sidePanel?: { label: string; content: ReactNode }
+  linkTarget?: (units: Unit[]) => FocusTarget | null | undefined
 }
 
 interface Props {
@@ -145,10 +147,22 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const actions = useRef(new Map<number, UnitActions>())
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= WIDE_LAYOUT_PX)
   const [filesHidden, setFilesHidden] = useState(() => readStored(FILES_HIDDEN_KEY) === 'true')
+  const [appliedLink, setAppliedLink] = useState<FocusTarget | null | undefined>(undefined)
+  const { linkTarget } = extensions
   const toggleFiles = () => {
     setFilesHidden(!filesHidden)
     writeStored(FILES_HIDDEN_KEY, String(!filesHidden))
   }
+
+  const linkedTarget = appliedLink === undefined && linkTarget && units.data ? linkTarget(units.data) : undefined
+  if (linkedTarget !== undefined) {
+    setAppliedLink(linkedTarget)
+    if (linkedTarget) {
+      setFocusedId(linkedTarget.unitId)
+      setPanelOpen(panelOpen || linkedTarget.inPanel)
+    }
+  }
+  useEffect(() => (appliedLink ? scrollWhenPresent(appliedLink) : undefined), [appliedLink])
 
   const focusUnit = useCallback((unitId: number) => {
     setFocusedId(unitId)
@@ -268,6 +282,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                     reviewId={reviewId}
                     unit={unit}
                     focused={focusedUnit?.id === unit.id}
+                    revealed={appliedLink?.unitId === unit.id}
                     onFocus={focusUnit}
                     register={register}
                     onComment={extensions.onComment}

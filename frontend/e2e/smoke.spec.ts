@@ -40,3 +40,25 @@ test('narrow screens show the files above the units, which stay visible and hove
   expect(sidebarBox && cardBox && sidebarBox.y + sidebarBox.height <= cardBox.y).toBe(true)
   expect(sidebarBox?.height).toBeLessThan(800)
 })
+
+test('a review link with a path and line expands and focuses the unit containing that line', async ({ page }) => {
+  await page.goto(`/?token=${E2E_TOKEN}`)
+  const href = await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().getAttribute('href')
+
+  await page.goto(`${href ?? ''}?path=app.py&line=2`)
+
+  const card = page.locator('article.unit-card', { hasText: 'total' })
+  await expect(card).toHaveClass(/focused/)
+  await expect(card.getByRole('button', { name: 'Collapse unit' })).toBeVisible()
+})
+
+test('a pull request link of an unknown repository opens the add repository flow prefilled', async ({ page }) => {
+  await page.goto(`/?token=${E2E_TOKEN}`)
+
+  await page.goto('/github.com/acme/no-such-repository/pull/7?path=app.py&line=2')
+
+  await expect(page.getByRole('heading', { name: 'Add acme/no-such-repository' })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Add a repository' })).toBeVisible()
+  await expect(page.getByLabel('Filter repositories')).toHaveValue('no-such-repository')
+  expect(new URL(page.url()).searchParams.get('then')).toBe('/github.com/acme/no-such-repository/pull/7?path=app.py&line=2')
+})

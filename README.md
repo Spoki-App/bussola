@@ -119,6 +119,30 @@ For a repository with a GitHub remote, **Pull requests** on its card lists the o
 
 bussola contacts GitHub only when you press one of these buttons, or for the automatic sync while a pull request review is open.
 
+### Opening bussola:// links
+
+Register the `bussola://` URL scheme once, so links in GitHub, Slack or a terminal open straight in bussola:
+
+```bash
+bussola install-handler
+```
+
+| Link | Opens |
+|---|---|
+| `bussola://` | the home page |
+| `bussola://review?repo=<owner>/<name>&pr=<number>` | the review of that pull request, started if there is none yet |
+| `bussola://review?repo=<owner>/<name>&pr=<number>&path=src/app.py&line=42` | the same review, scrolled to the unit containing that line |
+| `bussola://review?repo=<owner>/<name>&pr=<number>&thread=<id>` | the same review, scrolled to that thread |
+| `bussola://github.com/<owner>/<name>/pull/<number>` | a GitHub pull request link with `https` replaced by `bussola`; `/files` and other pages of the pull request work too, and a `#discussion_r<id>` anchor scrolls to the imported thread |
+
+If bussola is not running, the link starts `bussola serve --no-open` in the background on `127.0.0.1:8765`, waits for it, then opens the browser. A running `bussola serve` writes its address and session token to `server.json` in the data folder (readable only by you) so links can find it. The repository is found as **Open pull request** finds it; if there is no local clone, the home page opens with **Add a repository** filtered on its name, and the pull request opens once you add it. `bussola open-link '<link>'` does the same from a terminal.
+
+- **macOS:** builds `~/Applications/bussola.app`, a small AppleScript app that declares the scheme, and registers it with Launch Services. Opening the app itself opens bussola.
+- **Linux:** writes `bussola-url-handler.desktop` to `~/.local/share/applications` (or `$XDG_DATA_HOME/applications`) and makes it the default for `x-scheme-handler/bussola` with `xdg-mime`.
+- **Windows:** writes the `HKCU\Software\Classes\bussola` registry keys for the current user.
+
+The handler runs the Python that ran `install-handler`, so run it again after reinstalling bussola somewhere else. `bussola uninstall-handler` removes the registration.
+
 ### Sending comments to GitHub
 
 **Sync** sends the comments you have not sent yet as one pull request review. A pull request review is already linked; for a branch review with unsent comments, Sync offers the open pull requests of that branch (or a PR number) and sends once you pick one. It uses the [GitHub CLI](https://cli.github.com), so run `gh auth login` once; bussola never stores a token.
@@ -159,6 +183,7 @@ The server is meant for one person on one machine.
 - **Session token:** every API call needs the session token cookie (HttpOnly, SameSite=Strict).
 - **Host check:** requests whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` are rejected, which blocks DNS rebinding.
 - **Git refs and files:** refs are validated with `git rev-parse --verify --end-of-options` before use. File contents are read only from the git object database.
+- **bussola:// links:** a link only chooses what to open. Its parameters are validated (repository name, numbers, a relative file path, a thread id), anything else in it is ignored, and no link approves, resolves, sends or deletes anything.
 - **Opening links:** GitHub links are opened by the server in your default browser, as a new tab, so they work even when the bussola page runs in an app-style window. The server only opens `https://github.com` addresses.
 - **Outbound traffic:** the only network access is `git fetch` when you ask for it, `gh` when you sync or have a pull request review open, and downloads of images attached on GitHub shown in comments and descriptions.
 - **Rendered Markdown:** HTML in comments and descriptions is sanitized with GitHub's rules before it is shown. Attached images are served from `/api/forge/asset` only for `https://github.com/.../assets/...` links and only when they are images, with a sandboxing Content-Security-Policy.

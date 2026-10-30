@@ -3,12 +3,14 @@ import { useState, type SubmitEvent } from 'react'
 import { describeError } from '../api/client'
 import { useCreateReview, useRefs, useRepos, useReviews } from '../api/hooks'
 import type { Repo } from '../api/types'
+import { AddRepoForm } from '../components/AddRepoForm'
 import { CourseStrip, ErrorNote } from '../components/Badges'
 import { CommentCount } from '../components/CommentCount'
 import { PullRequestsPanel } from '../components/PullRequestsPanel'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { Link } from '../Link'
-import { navigate, reviewPath } from '../navigation'
+import { navigate, reviewPath, useSearch } from '../navigation'
+import { addRepositoryRequestFromSearch, type AddRepositoryRequest } from '../review/linkFocus'
 import { progressPercent } from '../review/logic'
 import { REVIEW_FILTER_LABELS, loadReviewFilter, matchesReviewFilter, saveReviewFilter, type ReviewFilter } from '../review/reviewFilter'
 import { defaultReviewRefs, reviewFormProblem } from '../review/newReview'
@@ -18,6 +20,7 @@ import { plural } from '../review/text'
 
 export function HomePage() {
   const repos = useRepos()
+  const addRequest = addRepositoryRequestFromSearch(useSearch())
   const [filter, setFilter] = useState<ReviewFilter>(loadReviewFilter)
   const choose = (option: ReviewFilter) => {
     setFilter(option)
@@ -29,10 +32,22 @@ export function HomePage() {
         <h1>Repositories</h1>
         <Segmented label="Show reviews" labels={REVIEW_FILTER_LABELS} value={filter} onChange={choose} />
       </div>
+      {addRequest && <AddRepositoryPrompt request={addRequest} />}
       {repos.error && <ErrorNote message={describeError(repos.error)} />}
       {repos.data?.length === 0 && <p className="muted">No repositories yet. Add one from Settings (top right), or run `bussola serve` inside a repository.</p>}
       {repos.data?.map((repo) => <RepoSection key={repo.id} repo={repo} filter={filter} />)}
     </div>
+  )
+}
+
+function AddRepositoryPrompt({ request }: { request: AddRepositoryRequest }) {
+  const name = request.repository.split('/').at(-1) ?? request.repository
+  return (
+    <section className="repo" aria-labelledby="add-repository-title">
+      <h2 id="add-repository-title">{`Add ${request.repository}`}</h2>
+      <p className="muted">{`No local clone of github.com/${request.repository} was found. Add its folder as a repository and the pull request opens.`}</p>
+      <AddRepoForm filter={name} onAdded={() => { navigate(request.then, { replace: true }) }} />
+    </section>
   )
 }
 

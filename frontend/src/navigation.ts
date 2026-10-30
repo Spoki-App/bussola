@@ -15,6 +15,10 @@ export function usePathname(): string {
   return useSyncExternalStore(subscribe, () => window.location.pathname)
 }
 
+export function useSearch(): string {
+  return useSyncExternalStore(subscribe, () => window.location.search)
+}
+
 export function navigate(to: string, { replace = false }: { replace?: boolean } = {}) {
   if (replace) {
     window.history.replaceState(null, '', to)

@@ -11,6 +11,7 @@ import { FileCommentButton } from './components/FileCommentButton'
 import { ThreadPanel } from './components/ThreadPanel'
 import { ThreadView } from './components/ThreadView'
 import { ReviewPage } from './pages/ReviewPage'
+import { linkFocusFromSearch, resolveLinkFocus } from './review/linkFocus'
 import { draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, isOpen, nextDraft, threadRow, type Draft } from './review/threadPlacement'
 
 export function ReviewRoute({ reviewId }: { reviewId: number }) {
@@ -29,6 +30,16 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
     return grouped
   }, [threads.data])
   const openCount = (threads.data ?? []).filter(isOpen).length
+  const [linkFocus] = useState(() => linkFocusFromSearch(window.location.search))
+  const linkTarget = useCallback(
+    (units: Unit[]) => {
+      if (linkFocus === null) {
+        return null
+      }
+      return threads.data || threads.error ? resolveLinkFocus(linkFocus, units, threads.data ?? []) : undefined
+    },
+    [linkFocus, threads.data, threads.error],
+  )
 
   const renderWidgets = useCallback(
     (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => {
@@ -87,6 +98,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
         renderWidgets,
         fileActions,
         sidePanel: { label: `conversation (${String(openCount)})`, content: sidePanelContent },
+        linkTarget,
       }}
     />
   )

@@ -1,0 +1,201 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import type { Comment, Thread, Unit } from '../api/types'
+import {
+  addRepositoryPath,
+  addRepositoryRequestFromSearch,
+  focusSearch,
+  linkFocusFromSearch,
+  pullRequestRepository,
+  resolveLinkFocus,
+  scrollWhenPresent,
+  type LinkFocus,
+} from './linkFocus'
+
+const THREAD_ID = '0123456789abcdef0123456789abcdef'
+
+function unit(id: number, path: string, headStart: number | null, headEnd: number | null): Unit {
+  return {
+    id,
+    revision_id: 1,
+    path,
+    old_path: null,
+    module: null,
+    kind: 'function',
+    qualified_name: `f${String(id)}`,
+    state: 'new',
+    change_type: 'modified',
+    base_changed: false,
+    approval_id: null,
+    row_approvable: false,
+    rows_total: 0,
+    rows_approved: 0,
+    binary: false,
+    image: false,
+    todo: true,
+    action: 'approve',
+    open_threads: 0,
+    head_start: headStart,
+    head_end: headEnd,
+  }
+}
+
+function comment(remoteUrl: string | null): Comment {
+  return {
+    id: 'c',
+    thread_id: 't',
+    author: { id: 1, email: 'a@b.c', name: 'A' },
+    body: 'hi',
+    created_at: '',
+    edited_at: null,
+    deleted: false,
+    mine: false,
+    remote_url: remoteUrl,
+  }
+}
+
+function thread(id: string, unitId: number | null, remoteUrl: string | null = null, scope: Thread['scope'] = 'unit'): Thread {
+  return {
+    id,
+    scope,
+    path: 'src/app.py',
+    module: null,
+    kind: 'function',
+    qualified_name: 'f',
+    side: 'head',
+    status: 'open',
+    resolvable: true,
+    created_by: { id: 1, email: 'a@b.c', name: 'A' },
+    created_at: '',
+    line_text: null,
+    line_count: 1,
+    context_before: [],
+    context_after: [],
+    anchor: scope === 'unit' ? { revision_id: 1, line_offset: 0, outdated: unitId === null, unit_id: unitId, file_line: 4, end_file_line: 4 } : null,
+    comments: [comment(remoteUrl)],
+    can_delete: false,
+  }
+}
+
+const focus = (values: Partial<LinkFocus>): LinkFocus => ({ path: null, line: null, thread: null, comment: null, ...values })
+const units = [unit(1, 'src/app.py', 1, 9), unit(2, 'src/app.py', 12, 30), unit(3, 'README.md', null, null)]
+
+describe('linkFocusFromSearch', () => {
+  it('reads the focus of a link and round-trips it', () => {
+    const search = `?path=src%2Fapp.py&line=42&thread=${THREAD_ID}&comment=501`
+    const parsed = linkFocusFromSearch(search)
+
+    expect(parsed).toEqual({ path: 'src/app.py', line: 42, thread: THREAD_ID, comment: '501' })
+    expect(linkFocusFromSearch(focusSearch(parsed))).toEqual(parsed)
+  })
+
+  it('drops values that are not valid and returns null when nothing is left', () => {
+    expect(linkFocusFromSearch('')).toBeNull()
+    expect(linkFocusFromSearch('?line=4')).toBeNull()
+    expect(linkFocusFromSearch('?path=../secret&thread=x&comment=-1')).toBeNull()
+    expect(linkFocusFromSearch('?path=%2Fetc%2Fpasswd')).toBeNull()
+    expect(linkFocusFromSearch('?path=a.py&line=0')).toEqual(focus({ path: 'a.py' }))
+    expect(focusSearch(null)).toBe('')
+  })
+})
+
+describe('resolveLinkFocus', () => {
+  it('picks the unit of the file that contains the line', () => {
+    expect(resolveLinkFocus(focus({ path: 'src/app.py', line: 20 }), units, [])).toEqual({ unitId: 2, elementId: 'unit-2', fallbackId: null, inPanel: false })
+  })
+
+  it('falls back to the first unit of the file', () => {
+    expect(resolveLinkFocus(focus({ path: 'src/app.py', line: 11 }), units, [])?.unitId).toBe(1)
+    expect(resolveLinkFocus(focus({ path: 'README.md', line: 3 }), units, [])?.unitId).toBe(3)
+    expect(resolveLinkFocus(focus({ path: 'missing.py' }), units, [])).toBeNull()
+  })
+
+  it('focuses an inline thread inside its unit', () => {
+    const target = resolveLinkFocus(focus({ thread: THREAD_ID }), units, [thread(THREAD_ID, 2)])
+
+    expect(target).toEqual({ unitId: 2, elementId: `thread-${THREAD_ID}`, fallbackId: 'unit-2', inPanel: false })
+  })
+
+  it('opens the conversation panel for threads that are not shown in a unit', () => {
+    expect(resolveLinkFocus(focus({ thread: THREAD_ID }), units, [thread(THREAD_ID, null)])).toEqual({
+      unitId: null,
+      elementId: `thread-${THREAD_ID}`,
+      fallbackId: null,
+      inPanel: true,
+    })
+    expect(resolveLinkFocus(focus({ thread: THREAD_ID }), units, [thread(THREAD_ID, null, null, 'file')])?.inPanel).toBe(true)
+  })
+
+  it('finds the imported thread of a GitHub discussion anchor', () => {
+    const threads = [thread('a', 1, 'https://github.com/acme/widgets/pull/7#discussion_r5010'), thread('b', 2, 'https://github.com/acme/widgets/pull/7#discussion_r501')]
+
+    expect(resolveLinkFocus(focus({ comment: '501' }), units, threads)?.elementId).toBe('thread-b')
+  })
+
+  it('uses the path when the thread is unknown', () => {
+    expect(resolveLinkFocus(focus({ comment: '9', path: 'README.md' }), units, [])?.unitId).toBe(3)
+    expect(resolveLinkFocus(focus({ comment: '9' }), units, [])).toBeNull()
+  })
+})
+
+function recordScrolls(): string[] {
+  const scrolled: string[] = []
+  Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
+    scrolled.push(this.id)
+  }
+  return scrolled
+}
+
+describe('scrollWhenPresent', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+    document.body.innerHTML = ''
+  })
+
+  it('scrolls to the unit first, then to the thread once it is rendered', () => {
+    vi.useFakeTimers()
+    const scrolled = recordScrolls()
+    document.body.innerHTML = '<article id="unit-2"></article>'
+
+    scrollWhenPresent({ unitId: 2, elementId: 'thread-t', fallbackId: 'unit-2', inPanel: false })
+    vi.advanceTimersByTime(300)
+    document.body.insertAdjacentHTML('beforeend', '<div id="thread-t"></div>')
+    vi.advanceTimersByTime(1000)
+
+    expect(scrolled).toEqual(['unit-2', 'thread-t'])
+  })
+
+  it('gives up after the timeout', () => {
+    vi.useFakeTimers()
+    const scrolled = recordScrolls()
+
+    scrollWhenPresent({ unitId: null, elementId: 'thread-t', fallbackId: null, inPanel: true }, 500)
+    vi.advanceTimersByTime(1000)
+    document.body.innerHTML = '<div id="thread-t"></div>'
+    vi.advanceTimersByTime(1000)
+
+    expect(scrolled).toEqual([])
+  })
+})
+
+describe('add repository request', () => {
+  it('round-trips the repository and the pull request to open next', () => {
+    const then = '/github.com/acme/widgets/pull/7?path=src%2Fapp.py&line=4'
+    const path = addRepositoryPath('acme/widgets', then)
+
+    expect(path.startsWith('/?')).toBe(true)
+    expect(addRepositoryRequestFromSearch(path.slice(1))).toEqual({ repository: 'acme/widgets', then })
+  })
+
+  it('refuses anything but a pull request page to open next', () => {
+    expect(addRepositoryRequestFromSearch('?add_repo=acme/widgets&then=https://evil.example')).toBeNull()
+    expect(addRepositoryRequestFromSearch('?add_repo=acme/widgets&then=//evil.example/github.com/a/b/pull/1')).toBeNull()
+    expect(addRepositoryRequestFromSearch('?add_repo=acme&then=/github.com/acme/widgets/pull/7')).toBeNull()
+  })
+
+  it('reads the repository of a pull request link', () => {
+    expect(pullRequestRepository('https://github.com/acme/widgets/pull/7/files')).toBe('acme/widgets')
+    expect(pullRequestRepository('https://example.com/acme/widgets/pull/7')).toBeNull()
+  })
+})

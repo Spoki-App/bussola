@@ -26,6 +26,8 @@ function unit(state: UnitState, overrides: Partial<Unit> = {}): Unit {
     todo: !state.startsWith('approved'),
     action: state.startsWith('approved') ? 'revoke' : 'approve',
     open_threads: 0,
+    head_start: null,
+    head_end: null,
     ...overrides,
   }
 }
