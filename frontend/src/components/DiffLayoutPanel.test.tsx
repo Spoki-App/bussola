@@ -43,18 +43,31 @@ describe('DiffLayoutPanel', () => {
     expect(stored()).toEqual({ layout: 'unified', threshold: 1400 })
   })
 
-  it('saves the Automatic threshold only once it is valid', () => {
+  it('saves the Automatic threshold when the field is left, not while typing', () => {
     render(<DiffLayoutPanel />)
     const threshold = screen.getByLabelText('Automatic split from window width (px)')
 
-    fireEvent.change(threshold, { target: { value: '12' } })
+    for (const value of ['8', '80', '800', '8000']) {
+      fireEvent.change(threshold, { target: { value } })
+    }
     expect(stored()).toBeNull()
 
+    fireEvent.blur(threshold)
+    expect(stored()).toEqual({ layout: 'auto', threshold: 4000 })
+    expect(threshold).toHaveValue(4000)
+  })
+
+  it('saves the threshold on Enter and keeps it when the field is cleared', () => {
+    render(<DiffLayoutPanel />)
+    const threshold = screen.getByLabelText('Automatic split from window width (px)')
+
     fireEvent.change(threshold, { target: { value: '1800' } })
+    fireEvent.keyDown(threshold, { key: 'Enter' })
     expect(stored()).toEqual({ layout: 'auto', threshold: 1800 })
 
     fireEvent.change(threshold, { target: { value: '' } })
     fireEvent.blur(threshold)
     expect(threshold).toHaveValue(1800)
+    expect(stored()).toEqual({ layout: 'auto', threshold: 1800 })
   })
 })

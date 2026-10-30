@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DiffRow } from '../api/types'
 import { DEFAULT_DIFF_LAYOUT, hasModification, loadDiffLayout, resolveViewType, saveDiffLayout } from './diffLayout'
@@ -24,22 +24,33 @@ describe('hasModification', () => {
 })
 
 describe('resolveViewType', () => {
+  const wide = () => true
+  const narrow = () => false
+
   it('splits a rewritten unit on a wide window', () => {
-    expect(resolveViewType('auto', true, true)).toBe('split')
+    expect(resolveViewType('auto', true, wide)).toBe('split')
   })
 
   it('keeps one column on a narrow window', () => {
-    expect(resolveViewType('auto', false, true)).toBe('unified')
+    expect(resolveViewType('auto', true, narrow)).toBe('unified')
   })
 
   it('keeps one column for a new or deleted unit even on a wide window', () => {
-    expect(resolveViewType('auto', true, hasModification(inserted))).toBe('unified')
-    expect(resolveViewType('auto', true, hasModification(deleted))).toBe('unified')
+    expect(resolveViewType('auto', hasModification(inserted), wide)).toBe('unified')
+    expect(resolveViewType('auto', hasModification(deleted), wide)).toBe('unified')
   })
 
   it('follows a fixed layout whatever the width and the change', () => {
-    expect(resolveViewType('split', false, false)).toBe('split')
-    expect(resolveViewType('unified', true, true)).toBe('unified')
+    expect(resolveViewType('split', false, narrow)).toBe('split')
+    expect(resolveViewType('unified', true, wide)).toBe('unified')
+  })
+
+  it('measures the width only when it can change the result', () => {
+    const isWide = vi.fn(() => true)
+    resolveViewType('split', true, isWide)
+    resolveViewType('unified', true, isWide)
+    resolveViewType('auto', false, isWide)
+    expect(isWide).not.toHaveBeenCalled()
   })
 })
 

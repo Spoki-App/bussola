@@ -112,6 +112,35 @@ describe('UnitDiffView layout', () => {
     expect(view({ rows: inserted })).toHaveClass('diff-unified')
   })
 
+  it('pairs each removed line with its replacement in a multi-line rewrite', () => {
+    const rows = [header, row('removed', 1, null, '    a = 0'), row('removed', 2, null, '    b = 0'), row('added', null, 1, '    a = 1'), row('added', null, 2, '    b = 1')]
+    chooseLayout('split')
+    const table = view({ rows })
+
+    expect(cellsOf(codeCell(table, '    a = 0'))[3]).toHaveTextContent('a = 1')
+    expect(cellsOf(codeCell(table, '    b = 0'))[3]).toHaveTextContent('b = 1')
+  })
+
+  it('keeps removed lines before added lines in unified view', () => {
+    const rows = [header, row('removed', 1, null, '    a = 0'), row('removed', 2, null, '    b = 0'), row('added', null, 1, '    a = 1'), row('added', null, 2, '    b = 1')]
+    chooseLayout('unified')
+    const table = view({ rows })
+
+    const lines = [...table.querySelectorAll('td.diff-code')].map((cell) => cell.textContent.trim())
+    expect(lines).toEqual(['def total(items):', 'a = 0', 'b = 0', 'a = 1', 'b = 1'])
+  })
+
+  it('follows a layout chosen in another tab', () => {
+    const table = view()
+    expect(table).toHaveClass('diff-unified')
+
+    act(() => {
+      window.localStorage.setItem('bussola.diffLayout', JSON.stringify({ layout: 'split', threshold: 1400 }))
+      window.dispatchEvent(new StorageEvent('storage', { key: 'bussola.diffLayout' }))
+    })
+    expect(table).toHaveClass('diff-split')
+  })
+
   it.each([
     ['removed', removed, 0],
     ['added', added, 1],

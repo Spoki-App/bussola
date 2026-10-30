@@ -161,7 +161,10 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
     return segmentRows(diff.rows, expanded, pinned)
   }, [diff.rows, expanded, index, pinnedKeys])
   const header = diff.unified.split('\n').slice(0, FILE_HEADER_LINES).join('\n')
-  const file = useMemo(() => parseDiff(collapsedUnified(header, diff.rows, segments))[0], [header, diff.rows, segments])
+  const file = useMemo(
+    () => parseDiff(collapsedUnified(header, diff.rows, segments), viewType === 'split' ? { nearbySequences: 'zip' } : {})[0],
+    [header, diff.rows, segments, viewType],
+  )
   const tokens = useMemo(() => {
     const whole: Segment[] = diff.rows.length > 0 ? [{ kind: 'rows', start: 0, end: diff.rows.length - 1 }] : []
     return diffTokens(parseDiff(collapsedUnified(header, diff.rows, whole))[0]?.hunks ?? [], languageFor(path))

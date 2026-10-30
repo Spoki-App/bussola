@@ -1,29 +1,59 @@
 import { useSyncExternalStore } from 'react'
 import type { ViewType } from 'react-diff-view'
 
-import { loadDiffLayout, resolveViewType, saveDiffLayout, type DiffLayoutSettings } from '../settings/diffLayout'
+import { isDiffLayoutKey, loadDiffLayout, resolveViewType, saveDiffLayout, type DiffLayoutSettings } from '../settings/diffLayout'
 
 const listeners = new Set<() => void>()
 let current: DiffLayoutSettings | null = null
+let wideMedia: { threshold: number; query: MediaQueryList } | null = null
 
 function snapshot(): DiffLayoutSettings {
   current ??= loadDiffLayout()
   return current
 }
 
-function subscribe(listener: () => void) {
-  listeners.add(listener)
-  return () => {
-    listeners.delete(listener)
+function notify() {
+  listeners.forEach((listener) => { listener() })
+}
+
+function releaseWideMedia() {
+  wideMedia?.query.removeEventListener('change', notify)
+  wideMedia = null
+}
+
+function isWide(threshold: number): boolean {
+  if (wideMedia?.threshold !== threshold) {
+    releaseWideMedia()
+    const query = window.matchMedia(`(min-width: ${String(threshold)}px)`)
+    query.addEventListener('change', notify)
+    wideMedia = { threshold, query }
+  }
+  return wideMedia.query.matches
+}
+
+function replace(settings: DiffLayoutSettings) {
+  current = settings
+  releaseWideMedia()
+  notify()
+}
+
+function onStorage(event: StorageEvent) {
+  if (isDiffLayoutKey(event.key)) {
+    replace(loadDiffLayout())
   }
 }
 
-function subscribeWithResize(listener: () => void) {
-  const unsubscribe = subscribe(listener)
-  window.addEventListener('resize', listener)
+function subscribe(listener: () => void) {
+  if (listeners.size === 0) {
+    window.addEventListener('storage', onStorage)
+  }
+  listeners.add(listener)
   return () => {
-    unsubscribe()
-    window.removeEventListener('resize', listener)
+    listeners.delete(listener)
+    if (listeners.size === 0) {
+      window.removeEventListener('storage', onStorage)
+      releaseWideMedia()
+    }
   }
 }
 
@@ -32,9 +62,8 @@ export function setDiffLayout(settings: DiffLayoutSettings): void {
   if (previous.layout === settings.layout && previous.threshold === settings.threshold) {
     return
   }
-  current = settings
   saveDiffLayout(settings)
-  listeners.forEach((listener) => { listener() })
+  replace(settings)
 }
 
 export function useDiffLayout(): DiffLayoutSettings {
@@ -42,8 +71,8 @@ export function useDiffLayout(): DiffLayoutSettings {
 }
 
 export function useViewType(modified: boolean): ViewType {
-  return useSyncExternalStore(subscribeWithResize, () => {
+  return useSyncExternalStore(subscribe, () => {
     const { layout, threshold } = snapshot()
-    return resolveViewType(layout, window.innerWidth >= threshold, modified)
+    return resolveViewType(layout, modified, () => isWide(threshold))
   })
 }

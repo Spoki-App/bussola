@@ -13,12 +13,11 @@ export function DiffLayoutPanel() {
   const settings = useDiffLayout()
   const [thresholdText, setThresholdText] = useState(() => String(settings.threshold))
 
-  const changeThreshold = (text: string) => {
-    setThresholdText(text)
-    const threshold = Number(text)
-    if (text !== '' && clampThreshold(threshold) === threshold) {
-      setDiffLayout({ ...settings, threshold })
-    }
+  const commitThreshold = () => {
+    const typed = Number(thresholdText)
+    const threshold = thresholdText.trim() === '' || !Number.isFinite(typed) ? settings.threshold : clampThreshold(typed)
+    setThresholdText(String(threshold))
+    setDiffLayout({ ...settings, threshold })
   }
 
   return (
@@ -32,8 +31,13 @@ export function DiffLayoutPanel() {
         min={MIN_SPLIT_THRESHOLD}
         max={MAX_SPLIT_THRESHOLD}
         value={thresholdText}
-        onChange={(event) => { changeThreshold(event.target.value) }}
-        onBlur={() => { setThresholdText(String(settings.threshold)) }}
+        onChange={(event) => { setThresholdText(event.target.value) }}
+        onBlur={commitThreshold}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            commitThreshold()
+          }
+        }}
       />
     </div>
   )

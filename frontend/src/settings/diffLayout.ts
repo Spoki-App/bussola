@@ -39,6 +39,10 @@ export function loadDiffLayout(): DiffLayoutSettings {
   return DEFAULT_DIFF_LAYOUT
 }
 
+export function isDiffLayoutKey(key: string | null): boolean {
+  return key === null || key === STORAGE_KEY
+}
+
 export function saveDiffLayout(settings: DiffLayoutSettings): void {
   writeStored(STORAGE_KEY, JSON.stringify(settings))
 }
@@ -61,9 +65,9 @@ export function hasModification(rows: DiffRow[]): boolean {
   return false
 }
 
-export function resolveViewType(layout: DiffLayout, wide: boolean, modified: boolean): ViewType {
+export function resolveViewType(layout: DiffLayout, modified: boolean, isWide: () => boolean): ViewType {
   if (layout !== 'auto') {
     return layout
   }
-  return wide && modified ? 'split' : 'unified'
+  return modified && isWide() ? 'split' : 'unified'
 }
