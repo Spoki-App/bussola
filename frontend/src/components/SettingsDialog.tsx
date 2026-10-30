@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { navigate } from '../navigation'
 import { AddRepoForm } from './AddRepoForm'
 import { CodeFontPanel } from './CodeFontPanel'
+import { DiffLayoutPanel } from './DiffLayoutPanel'
 import { OpenPullRequestForm } from './OpenPullRequestForm'
 import { useModalDialog } from '../hooks/useModalDialog'
 
@@ -10,7 +11,7 @@ export function SettingsButton() {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <button type="button" aria-haspopup="dialog" aria-expanded={open} title="Open a pull request, add a repository, choose the code font" onClick={() => { setOpen(true) }}>
+      <button type="button" aria-haspopup="dialog" aria-expanded={open} title="Open a pull request, add a repository, choose the code font and the diff layout" onClick={() => { setOpen(true) }}>
         Settings
       </button>
       {open && <SettingsModal onClose={() => { setOpen(false) }} />}
@@ -45,6 +46,10 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
       <section aria-labelledby="settings-code-font">
         <h3 id="settings-code-font">Code font</h3>
         <CodeFontPanel />
+      </section>
+      <section aria-labelledby="settings-diff-layout">
+        <h3 id="settings-diff-layout">Diff layout</h3>
+        <DiffLayoutPanel />
       </section>
     </dialog>
   )

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import { Decoration, Diff, Hunk, getChangeKey, isDelete, isInsert, parseDiff, type ChangeData, type HunkData } from 'react-diff-view'
+import { Decoration, Diff, Hunk, getChangeKey, isDelete, isInsert, parseDiff, type ChangeData, type HunkData, type ViewType } from 'react-diff-view'
 import 'react-diff-view/style/index.css'
 
 import type { DiffRow, UnitDiff } from '../api/types'
+import { useDiffLayout, useWindowAtLeast } from '../hooks/useDiffLayout'
 import { collapsedUnified, segmentRows, type Segment } from '../review/collapse'
 import { diffTokens, languageFor } from '../review/highlight'
 import { isSelectable, rowKey } from '../review/selection'
 import { plural } from '../review/text'
+import { resolveViewType } from '../settings/diffLayout'
 
 const PLACEHOLDER_GUTTER = '⋯'
 const FILE_HEADER_LINES = 3
@@ -81,6 +83,31 @@ function gutterSide(row: DiffRow): GutterSide {
   return row.change === 'removed' ? 'old' : 'new'
 }
 
+function rowClasses(row: DiffRow | undefined, highlighted: ReadonlySet<string> | undefined): string[] {
+  if (!row) {
+    return []
+  }
+  return [
+    ...(row.approved ? ['row-approved'] : []),
+    ...(row.placeholder ? ['row-placeholder'] : []),
+    ...(highlighted?.has(rowKey(row)) ? ['row-commented'] : []),
+  ]
+}
+
+function lineClasses(rows: (DiffRow | undefined)[], sided: boolean, highlighted?: ReadonlySet<string>): string[] {
+  const [oldRow, newRow] = rows
+  if (sided && rows.length === 2 && oldRow !== newRow) {
+    return [...rowClasses(oldRow, highlighted).map((name) => `${name}-old`), ...rowClasses(newRow, highlighted).map((name) => `${name}-new`)]
+  }
+  return [...new Set(rows.flatMap((row) => rowClasses(row, highlighted)))]
+}
+
+function useViewType(rows: DiffRow[]): ViewType {
+  const { layout, threshold } = useDiffLayout()
+  const wide = useWindowAtLeast(threshold)
+  return resolveViewType(layout, wide, rows)
+}
+
 function hiddenLabel(segment: Segment): string {
   const count = segment.end - segment.start + 1
   return `Show ${plural(count, 'hidden line')}`
@@ -105,6 +132,7 @@ function renderSegments(segments: Segment[], hunks: HunkData[], expand: (id: str
 }
 
 export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted }: Props) {
+  const viewType = useViewType(diff.rows)
   const dragging = useRef(false)
   const endSelection = useRef(onLineSelectEnd)
 
@@ -158,7 +186,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
 
   return (
     <Diff
-      viewType="unified"
+      viewType={viewType}
       diffType={file.type}
       hunks={file.hunks}
       tokens={tokens}
@@ -166,18 +194,8 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       widgets={widgetMap}
       className={selectable ? 'diff selectable' : 'diff'}
       generateLineClassName={({ changes, defaultGenerate }) => {
-        const rows = changes.map((change) => index.rowOf(change))
-        const classes = [defaultGenerate()]
-        if (rows.some((row) => row?.approved)) {
-          classes.push('row-approved')
-        }
-        if (rows.some((row) => row?.placeholder)) {
-          classes.push('row-placeholder')
-        }
-        if (highlighted && rows.some((row) => row && highlighted.has(rowKey(row)))) {
-          classes.push('row-commented')
-        }
-        return classes.join(' ')
+        const rows = (changes as (ChangeData | null)[]).map((change) => (change ? index.rowOf(change) : undefined))
+        return [defaultGenerate(), ...lineClasses(rows, viewType === 'split', highlighted)].join(' ')
       }}
       renderGutter={({ change, side }) => gutterNumber(index.rowOf(change), side)}
       gutterEvents={{
