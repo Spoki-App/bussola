@@ -15,7 +15,7 @@ describe('SettingsButton', () => {
     }
   })
 
-  it('opens a dialog with the pull request, repository, code font and line wrap sections', () => {
+  it('opens a dialog with the pull request, repository, code font, diff layout and line wrap sections', () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <SettingsButton />
@@ -25,7 +25,7 @@ describe('SettingsButton', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
 
     const dialog = screen.getByRole('dialog', { name: 'Settings' })
-    expect(['Open pull request', 'Add repository', 'Code font', 'Line wrap'].map((name) => screen.getByRole('region', { name }).closest('dialog'))).toEqual([dialog, dialog, dialog, dialog])
+    expect(['Open pull request', 'Add repository', 'Code font', 'Diff layout', 'Line wrap'].map((name) => screen.getByRole('region', { name }).closest('dialog'))).toEqual([dialog, dialog, dialog, dialog, dialog])
     expect(screen.getByLabelText('GitHub link')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))

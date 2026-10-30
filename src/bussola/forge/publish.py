@@ -5,6 +5,7 @@ from enum import StrEnum
 
 from bussola.errors import ConflictError
 from bussola.forge.base import DiffSide, ForgeAdapter, ForgeError, InlineComment, LineRanges, RemoteComment, ReviewSubmission
+from bussola.forge.heads import HeadMismatchError, head_mismatch
 from bussola.review.context import ReviewContext
 from bussola.review.rows import Side
 from bussola.review.thread_types import ThreadScope
@@ -12,7 +13,6 @@ from bussola.review.threads import ThreadView, thread_views
 from bussola.storage.models import Comment, ForgeLink, PublishedComment, Revision
 
 GROUP_SEPARATOR = "\n\n---\n\n"
-SHORT_SHA = 8
 
 
 class PublishStatus(StrEnum):
@@ -49,9 +49,8 @@ class PublishPlan:
 def publish_comments(context: ReviewContext, adapter: ForgeAdapter, revision: Revision) -> PublishResult:
     link = require_link(context)
     pull = adapter.pull_request(link.repository, link.pr_number)
-    if pull.head_sha != revision.head_sha:
-        pr_head, reviewed = pull.head_sha[:SHORT_SHA], revision.head_sha[:SHORT_SHA]
-        raise ConflictError(f"The pull request head ({pr_head}) differs from the reviewed head ({reviewed}). Push the branch or refresh the review first.")
+    if (mismatch := head_mismatch(pull.head_sha, revision.head_sha)) is not None:
+        raise HeadMismatchError(f"{mismatch} Push the branch or refresh the review first.")
     plan = build_plan(context, adapter, revision, adapter.diff_ranges(link.repository, link.pr_number))
     publisher = _Publisher(context, adapter, link, revision.head_sha, list(plan.skipped))
     review_url = publisher.submit_review(plan)

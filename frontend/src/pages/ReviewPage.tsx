@@ -5,6 +5,7 @@ import { useSync } from '../api/forge'
 import { useApprove, useFinishReview, useReview, useUnits } from '../api/hooks'
 import type { DiffRow, ReviewDetail, SyncResult, Unit, UnitDiff, UnitFilter } from '../api/types'
 import { CourseStrip, ErrorNote } from '../components/Badges'
+import { DiffLayoutSwitch } from '../components/DiffLayoutPanel'
 import { DiffWrapButton } from '../components/DiffWrapToggle'
 import { ExternalLink } from '../components/ExternalLink'
 import { FileTree } from '../components/FileTree'
@@ -211,7 +212,10 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
               {data.open_threads > 0 && <li className="legend-threads">{plural(data.open_threads, 'open thread')}</li>}
             </ul>
           </div>
-          <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
+          <div className="summary-controls">
+            <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
+            <DiffLayoutSwitch />
+          </div>
           <div className="summary-row">
             <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>
             <div className="summary-actions">
