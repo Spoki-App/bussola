@@ -1475,6 +1475,14 @@ button.danger {
   color: inherit;
 }
 
+.hljs-subst {
+  color: var(--text);
+}
+
+.hljs-subst > .hljs-punctuation {
+  color: var(--hl-keyword);
+}
+
 .hljs-comment,
 .hljs-quote {
   color: var(--muted);
