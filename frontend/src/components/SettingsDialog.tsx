@@ -4,6 +4,7 @@ import { navigate } from '../navigation'
 import { AddRepoForm } from './AddRepoForm'
 import { CodeFontPanel } from './CodeFontPanel'
 import { DiffLayoutPanel } from './DiffLayoutPanel'
+import { DiffWrapCheckbox } from './DiffWrapToggle'
 import { OpenPullRequestForm } from './OpenPullRequestForm'
 import { useModalDialog } from '../hooks/useModalDialog'
 
@@ -11,7 +12,7 @@ export function SettingsButton() {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <button type="button" aria-haspopup="dialog" aria-expanded={open} title="Open a pull request, add a repository, choose the code font and the diff layout" onClick={() => { setOpen(true) }}>
+      <button type="button" aria-haspopup="dialog" aria-expanded={open} title="Open a pull request, add a repository, choose the code font, the diff layout and line wrap" onClick={() => { setOpen(true) }}>
         Settings
       </button>
       {open && <SettingsModal onClose={() => { setOpen(false) }} />}
@@ -50,6 +51,10 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
       <section aria-labelledby="settings-diff-layout">
         <h3 id="settings-diff-layout">Diff layout</h3>
         <DiffLayoutPanel />
+      </section>
+      <section aria-labelledby="settings-diff-wrap">
+        <h3 id="settings-diff-wrap">Line wrap</h3>
+        <DiffWrapCheckbox />
       </section>
     </dialog>
   )

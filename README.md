@@ -50,7 +50,7 @@ The UI build goes to `src/bussola/static/` and is packaged with the Python wheel
 bussola serve
 ```
 
-Run inside a repository to register it and open the browser. **Settings** (top right) opens a window with **Open pull request**, **Add repository**, **Code font** and **Diff layout**. To add other repositories, use **Browse...** under **Add repository**: it lists the git repositories found in your home folder (up to four levels deep, skipping hidden folders, `node_modules`, `Library` and similar), and its **Browse folders** tab lets you pick any other folder. You can also paste a path. Options: `--repo PATH`, `--host 127.0.0.1`, `--port 8765`, `--no-open`.
+Run inside a repository to register it and open the browser. **Settings** (top right) opens a window with **Open pull request**, **Add repository**, **Code font**, **Diff layout** and **Line wrap**. To add other repositories, use **Browse...** under **Add repository**: it lists the git repositories found in your home folder (up to four levels deep, skipping hidden folders, `node_modules`, `Library` and similar), and its **Browse folders** tab lets you pick any other folder. You can also paste a path. Options: `--repo PATH`, `--host 127.0.0.1`, `--port 8765`, `--no-open`.
 
 The printed link contains a one-time session token. Opening it stores the token in a cookie for that browser; if you open bussola another way and see "Not authorized", use the printed link again.
 
@@ -75,6 +75,8 @@ Diffs are syntax highlighted with the colors GitHub uses, by file extension (Pyt
 **Code font** in **Settings** sets the font and size used for code. It suggests the common coding fonts installed on your computer; in Chrome and Edge, **List all installed monospaced fonts** asks the browser for permission and lists every installed monospaced font. You can also type the name of any installed font. **Ligatures** turns ligatures on or off for fonts that have them (Fira Code, JetBrains Mono, Victor Mono and similar; SF Mono, Menlo and Monaco have none), and **Font features** turns on OpenType features such as stylistic sets (`ss01`, Monaspace's ligatures) or `zero`. The choice is kept in this browser.
 
 **Diff layout** in **Settings** chooses how diffs are shown: **Split** puts the old code on the left and the new code on the right, **Unified** shows one column, and **Automatic** (the default) splits a unit only when it rewrites lines (a block of changes with both removed and added lines) and the window is at least as wide as the threshold (1400px unless you change it). New and deleted units stay in one column, and the choice is made again when the window is resized. The same switch sits in the review bar next to the unit filter. The choice is kept in this browser.
+
+Long lines in the diff wrap by default. A wrapped line keeps the indentation of its first part and shows its line number only once, and clicking any part of it selects the whole line. Turn wrapping off with **Wrap long lines** under **Line wrap** in **Settings**, or with **Wrap lines** above the diff; lines then stay on one row and the diff scrolls sideways. Units shown in split view always wrap, so the old and new code stay side by side. The choice is kept in this browser.
 
 Units that still need review start open and the others closed. Approving a unit closes its card, and a card opens again when its unit needs review again (approval revoked, or new changes).
 

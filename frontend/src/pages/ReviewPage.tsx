@@ -6,6 +6,7 @@ import { useApprove, useFinishReview, useReview, useUnits } from '../api/hooks'
 import type { DiffRow, ReviewDetail, SyncResult, Unit, UnitDiff, UnitFilter } from '../api/types'
 import { CourseStrip, ErrorNote } from '../components/Badges'
 import { DiffLayoutSwitch } from '../components/DiffLayoutPanel'
+import { DiffWrapButton } from '../components/DiffWrapToggle'
 import { ExternalLink } from '../components/ExternalLink'
 import { FileTree } from '../components/FileTree'
 import { GitHubSyncStatus } from '../components/GitHubSyncStatus'
@@ -229,11 +230,14 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           </div>
           <div className="summary-row">
             <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>
-            {extensions.sidePanel && (
-              <button type="button" aria-pressed={panelOpen} onClick={() => { setPanelOpen(!panelOpen) }}>
-                {panelOpen ? `Hide ${extensions.sidePanel.label}` : `Show ${extensions.sidePanel.label}`}
-              </button>
-            )}
+            <div className="summary-actions">
+              <DiffWrapButton />
+              {extensions.sidePanel && (
+                <button type="button" aria-pressed={panelOpen} onClick={() => { setPanelOpen(!panelOpen) }}>
+                  {panelOpen ? `Hide ${extensions.sidePanel.label}` : `Show ${extensions.sidePanel.label}`}
+                </button>
+              )}
+            </div>
           </div>
         </section>
       </div>

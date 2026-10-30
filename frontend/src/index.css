@@ -178,6 +178,41 @@ pre,
   overflow-wrap: anywhere;
 }
 
+:root:not([data-diff-wrap='off']) .diff .line-indent,
+.diff.diff-split .line-indent {
+  float: left;
+  max-width: 50%;
+  overflow: hidden;
+  white-space: pre;
+}
+
+:root:not([data-diff-wrap='off']) .diff .line-body,
+.diff.diff-split .line-body {
+  display: flow-root;
+}
+
+:root[data-diff-wrap='off'] .diff.diff-unified {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+:root[data-diff-wrap='off'] .diff-unified .diff-code {
+  white-space: pre;
+}
+
+:root[data-diff-wrap='off'] .diff-unified .diff-widget-content {
+  padding: 0;
+}
+
+:root[data-diff-wrap='off'] .diff-unified .diff-widget-content > *,
+:root[data-diff-wrap='off'] .diff-unified .gap-button {
+  position: sticky;
+  left: 0;
+  width: 100cqi;
+  box-sizing: border-box;
+}
+
 h1,
 h2 {
   font-stretch: var(--narrow);
@@ -748,6 +783,18 @@ textarea {
   gap: 8px;
 }
 
+.summary-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+button.toggle[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--info-bg);
+  color: var(--accent);
+}
+
 @media (max-width: 1100px) {
   .review-layout,
   .review-layout.with-panel {
@@ -1019,6 +1066,10 @@ textarea {
 .unit-body {
   border-top: 1px solid var(--border);
   overflow-x: auto;
+}
+
+:root[data-diff-wrap='off'] .unit-body:has(> .diff-unified) {
+  container-type: inline-size;
 }
 
 .class-group > .unit-card {

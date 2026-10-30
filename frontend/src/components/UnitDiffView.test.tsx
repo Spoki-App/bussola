@@ -51,17 +51,18 @@ interface Options {
   rows?: DiffRow[]
   threads?: DiffRow[]
   highlighted?: ReadonlySet<string>
+  onRowClick?: (row: DiffRow, extend: boolean) => void
   onLineNumberClick?: (row: DiffRow, side: 'old' | 'new', extend: boolean) => void
 }
 
-function view({ rows = rewritten, threads = [], highlighted, onLineNumberClick }: Options = {}) {
+function view({ rows = rewritten, threads = [], highlighted, onRowClick, onLineNumberClick }: Options = {}) {
   const { container } = render(
     <UnitDiffView
       diff={diff(rows)}
       path="app.py"
-      selectable={false}
+      selectable={onRowClick !== undefined}
       selected={new Set()}
-      onRowClick={() => undefined}
+      onRowClick={onRowClick ?? (() => undefined)}
       onLineNumberClick={onLineNumberClick}
       highlighted={highlighted}
       widgets={(changeKeyOf) => Object.fromEntries(threads.map((thread) => [changeKeyOf(thread) ?? '', <p key={thread.text}>{`thread on ${thread.text.trim()}`}</p>]))}
@@ -187,5 +188,51 @@ describe('UnitDiffView layout', () => {
     expect(line).toHaveClass('row-commented-old')
     expect(line).not.toHaveClass('row-commented')
     expect(line).not.toHaveClass('row-commented-new')
+  })
+})
+
+const LONG_LINE = `        total = combine(${Array.from({ length: 30 }, (_, index) => `argument_${String(index)}`).join(', ')})`
+const wrapped = [header, row('removed', 1, null, '    return 0'), row('added', null, 1, LONG_LINE)]
+
+function newGutter(table: HTMLTableElement, text: string, layout: DiffLayout): HTMLTableCellElement {
+  return cellsOf(codeCell(table, text))[layout === 'split' ? 2 : 1]
+}
+
+describe('UnitDiffView hanging indent', () => {
+  afterEach(() => {
+    act(() => {
+      setDiffLayout(DEFAULT_DIFF_LAYOUT)
+    })
+    window.localStorage.clear()
+  })
+
+  it.each(['unified', 'split'] as const)('splits indentation from code with one line number per source line in %s view', (layout) => {
+    chooseLayout(layout)
+    const table = view({ rows: wrapped })
+    const cell = codeCell(table, LONG_LINE)
+
+    expect(cell.querySelector('.line-indent')?.textContent).toBe('        ')
+    expect(cell.querySelector('.line-body')?.textContent).toBe(LONG_LINE.trimStart())
+    expect(codeCell(table, '    return 0').querySelector('.line-indent')?.textContent).toBe('    ')
+    expect(newGutter(table, LONG_LINE, layout)).toHaveTextContent(/^2$/)
+  })
+
+  it.each(['unified', 'split'] as const)('selects the whole source line from any part of a wrapped line in %s view', (layout) => {
+    chooseLayout(layout)
+    const onRowClick = vi.fn()
+    const onLineNumberClick = vi.fn()
+    const table = view({ rows: wrapped, onRowClick, onLineNumberClick })
+    const body = codeCell(table, LONG_LINE).querySelector('.line-body') as HTMLElement
+
+    fireEvent.click(body)
+    fireEvent.click(body, { shiftKey: true })
+    fireEvent.mouseDown(newGutter(table, LONG_LINE, layout), { button: 0, shiftKey: true })
+    fireEvent.mouseUp(window)
+
+    expect(onRowClick.mock.calls).toEqual([
+      [wrapped[2], false],
+      [wrapped[2], true],
+    ])
+    expect(onLineNumberClick).toHaveBeenCalledWith(wrapped[2], 'new', true)
   })
 })
