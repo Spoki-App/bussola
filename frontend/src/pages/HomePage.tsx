@@ -3,7 +3,7 @@ import { useState, type SubmitEvent } from 'react'
 import { describeError } from '../api/client'
 import { useCreateReview, useRefs, useRepos, useReviews } from '../api/hooks'
 import type { Repo } from '../api/types'
-import { ErrorNote, ProgressBar } from '../components/Badges'
+import { CourseStrip, ErrorNote } from '../components/Badges'
 import { CommentCount } from '../components/CommentCount'
 import { PullRequestsPanel } from '../components/PullRequestsPanel'
 import { ReviewTitle } from '../components/ReviewTitle'
@@ -47,7 +47,7 @@ function RepoSection({ repo, filter }: { repo: Repo; filter: ReviewFilter }) {
     <section className="repo">
       <div className="repo-header">
         <h2>{repo.name}</h2>
-        <span className="muted">{repo.path}</span>
+        <span className="repo-path">{repo.path}</span>
         <span className="spacer" />
         {!repo.missing && (
           <>
@@ -70,9 +70,12 @@ function RepoSection({ repo, filter }: { repo: Repo; filter: ReviewFilter }) {
             <Link to={reviewPath(review.id)} className="review-link">
               <ReviewTitle review={review} />
             </Link>
-            <ProgressBar percent={progressPercent(review)} label={`Progress of ${review.head_ref}`} />
-            <span className="muted">{`${String(review.approved)}/${String(review.total)} approved`}</span>
-            <span className="muted">{`${String(review.total - review.approved)} to review`}</span>
+            <CourseStrip counts={review.counts} percent={progressPercent(review)} label={`Progress of ${review.head_ref}`} />
+            <span className="review-count">
+              <strong>{review.approved}</strong>
+              {`/${String(review.total)}`}
+            </span>
+            <span className="muted review-todo">{review.total === review.approved ? 'done' : `${String(review.total - review.approved)} to review`}</span>
             <CommentCount total={review.total_threads} unresolved={review.open_threads} totalLabel="thread" />
           </li>
         ))}

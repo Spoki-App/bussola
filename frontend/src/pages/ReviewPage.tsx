@@ -4,7 +4,7 @@ import { describeError } from '../api/client'
 import { useSync } from '../api/forge'
 import { useApprove, useFinishReview, useReview, useUnits } from '../api/hooks'
 import type { DiffRow, ReviewDetail, SyncResult, Unit, UnitDiff, UnitFilter } from '../api/types'
-import { ErrorNote, ProgressBar } from '../components/Badges'
+import { CourseStrip, ErrorNote } from '../components/Badges'
 import { ExternalLink } from '../components/ExternalLink'
 import { FileTree } from '../components/FileTree'
 import { GitHubSyncStatus } from '../components/GitHubSyncStatus'
@@ -20,6 +20,7 @@ import { buildFileTree, filesInOrder } from '../review/fileTree'
 import { buildUnitTree } from '../review/unitTree'
 import { readStored, writeStored } from '../settings/storage'
 import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, groupByFile, nextTodoIndex, progressPercent, shortSha } from '../review/logic'
+import { plural } from '../review/text'
 import { Segmented } from '../components/Segmented'
 
 export interface ReviewExtensions {
@@ -73,25 +74,27 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
   return (
     <header className="review-header">
       <div className="review-title">
-        <Link to="/" className="muted">
+        <Link to="/" className="crumb">
           {review.repo_path.split('/').at(-1)}
         </Link>
         <h1>
           <ReviewTitle review={review} />
         </h1>
         {review.pull_request?.url && (
-          <p className="muted">
+          <p className="meta">
             <ExternalLink href={review.pull_request.url}>
               View on GitHub
             </ExternalLink>
-            {review.pull_request.author && ` \u00b7 by ${review.pull_request.author}`}
+            {review.pull_request.author && <span>{`by ${review.pull_request.author}`}</span>}
           </p>
         )}
         {isPullRequest && <GitHubSyncStatus reviewId={review.id} headSha={revision?.head_sha} />}
         {revision && (
-          <p className="muted">
-            {`Revision ${String(revision.number)} \u00b7 ${shortSha(revision.head_sha)} \u00b7 checked ${new Date(revision.created_at).toLocaleString()}`}
-            {` \u00b7 ${review.last_session_at ? `marked as reviewed ${new Date(review.last_session_at).toLocaleString()}` : 'not marked as reviewed yet'}`}
+          <p className="meta">
+            <span>{`Revision ${String(revision.number)}`}</span>
+            <code>{shortSha(revision.head_sha)}</code>
+            <span>{`checked ${new Date(revision.created_at).toLocaleString()}`}</span>
+            <span>{review.last_session_at ? `marked as reviewed ${new Date(review.last_session_at).toLocaleString()}` : 'not marked as reviewed yet'}</span>
           </p>
         )}
       </div>
@@ -193,14 +196,19 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
       <ReviewHeader review={data} />
       {data.pull_request && <PullRequestDescription pull={data.pull_request} />}
       <section className="review-summary">
-        <ProgressBar percent={percent} />
-        <p>
-          <strong>{`${String(data.approved)} / ${String(data.total)}`}</strong> units approved
-          {STATE_ORDER.filter((state) => data.counts[state] > 0).map((state) => (
-            <span key={state} className={`count-chip state-${state}`}>{`${STATE_LABELS[state]}: ${String(data.counts[state])}`}</span>
-          ))}
-          {data.open_threads > 0 && <span className="count-chip">{`Open threads: ${String(data.open_threads)}`}</span>}
-        </p>
+        <div className="course-summary">
+          <p className="course-total">
+            <strong>{data.approved}</strong>
+            {` of ${plural(data.total, 'unit')} approved`}
+          </p>
+          <CourseStrip counts={data.counts} percent={percent} label="Review progress" />
+          <ul className="legend">
+            {STATE_ORDER.filter((state) => data.counts[state] > 0).map((state) => (
+              <li key={state} className={`state-${state}`}>{`${STATE_LABELS[state]} ${String(data.counts[state])}`}</li>
+            ))}
+            {data.open_threads > 0 && <li className="legend-threads">{plural(data.open_threads, 'open thread')}</li>}
+          </ul>
+        </div>
         <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
         <div className="summary-row">
           <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>

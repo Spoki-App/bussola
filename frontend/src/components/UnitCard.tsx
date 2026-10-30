@@ -126,7 +126,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
   const canSwitchMode = diff.data?.available_modes.includes('approved') ?? false
 
   return (
-    <article id={`unit-${String(unit.id)}`} className={`unit-card${focused ? ' focused' : ''}`} onClick={() => { onFocus(unit.id) }}>
+    <article id={`unit-${String(unit.id)}`} className={`unit-card state-${unit.state}${focused ? ' focused' : ''}`} onClick={() => { onFocus(unit.id) }}>
       <header className="unit-header">
         <button type="button" className="disclosure" aria-expanded={expanded} aria-label={expanded ? 'Collapse unit' : 'Expand unit'} onClick={() => { setExpanded(!expanded) }}>
           {expanded ? '▾' : '▸'}
@@ -151,7 +151,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
           </div>
         )}
         {selected.size > 0 && (
-          <button type="button" className="primary" disabled={busy} onClick={approveSelection}>
+          <button type="button" className="approve" disabled={busy} onClick={approveSelection}>
             {`Approve selection (${String(selected.size)})`}
           </button>
         )}
@@ -166,7 +166,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
           </button>
         )}
         {unit.action in APPROVE_LABELS && (
-          <button type="button" className={selected.size > 0 ? '' : 'primary'} disabled={busy} onClick={approveUnit}>
+          <button type="button" className={selected.size > 0 ? 'approve-quiet' : 'approve'} disabled={busy} onClick={approveUnit}>
             {APPROVE_LABELS[unit.action as keyof typeof APPROVE_LABELS]}
           </button>
         )}

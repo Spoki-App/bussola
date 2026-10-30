@@ -13,7 +13,7 @@ test('review a branch: open it, approve a unit and comment on a line', async ({ 
   const card = page.locator('article.unit-card', { hasText: 'total' })
   await card.getByRole('button', { name: 'Approve', exact: true }).click()
   await expect(card.getByText('Approved', { exact: true })).toBeVisible()
-  await expect(page.getByText('1 / 1')).toBeVisible()
+  await expect(page.getByRole('progressbar', { name: 'Review progress' })).toHaveAttribute('aria-valuenow', '100')
   await expect(card.getByRole('button', { name: 'Expand unit' })).toBeVisible()
 
   await card.getByRole('button', { name: 'Expand unit' }).click()

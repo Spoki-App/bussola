@@ -21,7 +21,7 @@ export default function App() {
           bussola
         </Link>
         <span className="spacer" />
-        {me.data && <span className="muted">{`${me.data.name} <${me.data.email}>`}</span>}
+        {me.data && <span className="who" title={me.data.email}>{me.data.name}</span>}
         <SettingsButton />
       </header>
       {reviewId !== null ? (
