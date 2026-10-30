@@ -777,63 +777,6 @@ textarea {
   }
 }
 
-@media (max-width: 700px) {
-  .review-layout,
-  .review-layout.with-panel,
-  .review-layout.files-hidden,
-  .review-layout.files-hidden.with-panel {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sidebar {
-    position: static;
-    height: auto;
-    max-height: none;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .page {
-    padding: 24px 16px 48px;
-  }
-
-  .review-header,
-  .review-summary {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
-  .review-title {
-    min-width: 0;
-  }
-
-  .review-title h1 {
-    font-size: 24px;
-  }
-
-  .review-list li {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px 12px;
-  }
-
-  .review-list li > .course {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
-  .review-list .comment-count {
-    min-width: 0;
-  }
-
-  .inline-form input {
-    min-width: 0;
-  }
-
-  .unit-header {
-    flex-wrap: wrap;
-  }
-}
-
 .sidebar {
   position: sticky;
   top: 0;
@@ -1920,5 +1863,62 @@ button.danger {
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .review-layout,
+  .review-layout.with-panel,
+  .review-layout.files-hidden,
+  .review-layout.files-hidden.with-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .page {
+    padding: 24px 16px 48px;
+  }
+
+  .review-header,
+  .review-summary {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .review-title {
+    min-width: 0;
+  }
+
+  .review-title h1 {
+    font-size: 24px;
+  }
+
+  .review-list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+  }
+
+  .review-list li > .course {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .review-list .comment-count {
+    min-width: 0;
+  }
+
+  .inline-form input {
+    min-width: 0;
+  }
+
+  .unit-header {
+    flex-wrap: wrap;
   }
 }

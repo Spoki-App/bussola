@@ -19,6 +19,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 - Comments on the whole review, including pull request comments and review summaries imported from GitHub, no longer have a Resolve button and no longer count as open threads, as on GitHub.
 - Expressions inside Python f-strings and JavaScript/TypeScript template literals are highlighted as code instead of string, with the braces, conversions and format specs set apart ([#21](https://github.com/Spoki-App/bussola/issues/21)).
+- Below 700px wide, the Files list sits above the units again instead of covering the whole page, and unit headers wrap as intended. The narrow-screen styles were overridden by base rules declared after them.
 
 ## [0.1.0] - 2026-10-30
 
