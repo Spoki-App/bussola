@@ -3,7 +3,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from bussola.ai.base import AiProviderError, Cancellation, json_object, run_cancellable
+from bussola.ai.base import AiProviderError, AiTimeoutError, Cancellation, json_object, run_cancellable
 
 MAX_ERROR_LENGTH = 300
 HTTP_SCHEMES = ("http://", "https://")
@@ -23,9 +23,11 @@ def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeou
     except urllib.error.HTTPError as error:
         raise AiProviderError(f"{url} answered HTTP {error.code}: {_error_detail(error)}") from error
     except urllib.error.URLError as error:
+        if isinstance(error.reason, TimeoutError):
+            raise AiTimeoutError(f"No answer within {timeout:g} seconds") from error
         raise AiProviderError(f"Cannot reach {url}: {error.reason}") from error
     except TimeoutError as error:
-        raise AiProviderError(f"Cannot reach {url}: timed out") from error
+        raise AiTimeoutError(f"No answer within {timeout:g} seconds") from error
     try:
         decoded = json_object(json.loads(body))
     except json.JSONDecodeError as error:

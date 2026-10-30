@@ -1,5 +1,7 @@
 import json
 import threading
+import urllib.error
+import urllib.request
 from collections.abc import Generator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -151,6 +153,17 @@ def test_a_slow_endpoint_times_out(stub: StubServer) -> None:
 
     with pytest.raises(AiTimeoutError):
         OpenAiCompatibleProvider("gpt", stub.url, None, 0.3).complete(REQUEST, Cancellation())
+
+
+@pytest.mark.parametrize("error", [TimeoutError("timed out"), urllib.error.URLError(TimeoutError("timed out"))])
+def test_a_socket_timeout_is_reported_as_a_timeout(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
+    def time_out(*_args: Any, **_kwargs: Any) -> None:
+        raise error
+
+    monkeypatch.setattr(urllib.request, "urlopen", time_out)
+
+    with pytest.raises(AiTimeoutError, match=r"No answer within 0\.3 seconds"):
+        OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 0.3).complete(REQUEST, Cancellation())
 
 
 def test_a_request_to_an_endpoint_can_be_cancelled(stub: StubServer) -> None:
