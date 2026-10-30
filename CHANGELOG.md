@@ -4,6 +4,8 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-30
+
 First public release.
 
 ### Added
