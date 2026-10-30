@@ -1,4 +1,5 @@
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from pydantic import BaseModel
@@ -30,9 +31,10 @@ class ConnectionResult:
     elapsed_ms: int
 
 
-def check_connection(provider: AiProvider, cancellation: Cancellation) -> ConnectionResult:
+def check_connection(connect: Callable[[], AiProvider], cancellation: Cancellation) -> ConnectionResult:
     started = time.monotonic()
     try:
+        provider = connect()
         AiRunner(provider).run(CONNECTION_CHECK, CONNECTION_PROMPT, cancellation)
     except AiError as error:
         return ConnectionResult(False, str(error), _elapsed(started))

@@ -1,18 +1,19 @@
 from typing import Any, cast
 
 from bussola.ai.base import AiOutputError, AiRequest, Cancellation, json_object
+from bussola.ai.config import PROVIDER_LABELS, ProviderName
 from bussola.ai.http import post_json
 
 COMPLETIONS_PATH = "/chat/completions"
 
 
 class OpenAiCompatibleProvider:
-    name = "openai-compatible"
-    label = "OpenAI-compatible endpoint"
+    name: str = ProviderName.OPENAI_COMPATIBLE
+    label = PROVIDER_LABELS[ProviderName.OPENAI_COMPATIBLE]
 
     def __init__(self, model: str, endpoint: str, api_key: str | None, timeout: float) -> None:
         self.model: str | None = model
-        self.endpoint: str | None = endpoint
+        self._endpoint = endpoint
         self._api_key = api_key
         self._timeout = timeout
 
@@ -24,7 +25,7 @@ class OpenAiCompatibleProvider:
             "response_format": {"type": "json_schema", "json_schema": {"name": request.name, "schema": request.schema, "strict": True}},
         }
         headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
-        response = post_json(f"{self.endpoint}{COMPLETIONS_PATH}", headers, payload, self._timeout, cancellation)
+        response = post_json(f"{self._endpoint}{COMPLETIONS_PATH}", headers, payload, self._timeout, cancellation)
         choice = _first_choice(response)
         if choice.get("finish_reason") == "length":
             raise AiOutputError("The answer was cut off before it was complete")

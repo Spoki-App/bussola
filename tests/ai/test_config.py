@@ -115,3 +115,17 @@ def test_the_configuration_directory_can_be_moved(tmp_path: Path, monkeypatch: p
     monkeypatch.setenv(CONFIG_DIR_ENV, str(tmp_path))
 
     assert default_config_file() == tmp_path / "config.toml"
+
+
+def test_a_repository_naming_the_default_endpoint_keeps_the_key() -> None:
+    settings = resolve_ai_settings(UserAiConfig(provider=ProviderName.ANTHROPIC), RepoAiConfig(endpoint="https://api.anthropic.com"))
+
+    assert settings.api_key_env == "ANTHROPIC_API_KEY"
+
+
+def test_a_repository_switching_provider_gets_no_key_for_the_user_endpoint() -> None:
+    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="gpt", endpoint="http://localhost:11434/v1")
+
+    settings = resolve_ai_settings(user, RepoAiConfig(provider=ProviderName.ANTHROPIC, endpoint="http://localhost:11434/v1"))
+
+    assert settings.api_key_env is None

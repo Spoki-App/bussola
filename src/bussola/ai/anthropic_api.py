@@ -1,6 +1,7 @@
 from typing import Any, cast
 
 from bussola.ai.base import AiOutputError, AiRequest, Cancellation, json_object
+from bussola.ai.config import PROVIDER_LABELS, ProviderName
 from bussola.ai.http import post_json
 
 API_VERSION = "2026-10-21"
@@ -12,12 +13,12 @@ STOP_MESSAGES = {
 
 
 class AnthropicProvider:
-    name = "anthropic"
-    label = "Anthropic API"
+    name: str = ProviderName.ANTHROPIC
+    label = PROVIDER_LABELS[ProviderName.ANTHROPIC]
 
     def __init__(self, model: str, endpoint: str, api_key: str, timeout: float) -> None:
         self.model: str | None = model
-        self.endpoint: str | None = endpoint
+        self._endpoint = endpoint
         self._api_key = api_key
         self._timeout = timeout
 
@@ -30,7 +31,7 @@ class AnthropicProvider:
             "output_config": {"format": {"type": "json_schema", "schema": request.schema}},
         }
         headers = {"x-api-key": self._api_key, "anthropic-version": API_VERSION}
-        response = post_json(f"{self.endpoint}{MESSAGES_PATH}", headers, payload, self._timeout, cancellation)
+        response = post_json(f"{self._endpoint}{MESSAGES_PATH}", headers, payload, self._timeout, cancellation)
         stop_message = STOP_MESSAGES.get(str(response.get("stop_reason")))
         if stop_message:
             raise AiOutputError(stop_message)

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
 POLL_SECONDS = 0.05
+MAX_ERROR_LENGTH = 300
 
 
 class AiError(Exception):
@@ -38,14 +39,13 @@ class AiRequest:
     system: str
     prompt: str
     schema: dict[str, Any]
-    max_tokens: int = 4096
+    max_tokens: int
 
 
 class AiProvider(Protocol):
     name: str
     label: str
     model: str | None
-    endpoint: str | None
 
     def complete(self, request: AiRequest, cancellation: "Cancellation") -> str: ...
 
@@ -82,9 +82,16 @@ def run_cancellable[T](work: Callable[[], T], cancellation: Cancellation, timeou
         cancellation.check()
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            raise AiTimeoutError(f"No answer within {timeout:g} seconds")
+            raise _timed_out(timeout)
         wait([future], timeout=min(POLL_SECONDS, remaining))
-    return future.result()
+    try:
+        return future.result()
+    except TimeoutError as error:
+        raise _timed_out(timeout) from error
+
+
+def _timed_out(timeout: float) -> AiTimeoutError:
+    return AiTimeoutError(f"No answer within {timeout:g} seconds")
 
 
 def json_object(value: Any) -> dict[str, Any] | None:

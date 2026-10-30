@@ -12,7 +12,6 @@ type Answer = str | dict[str, Any] | Exception
 class FakeProvider:
     name = "fake"
     label = "Fake provider"
-    endpoint: str | None = None
 
     def __init__(self, *answers: Answer, model: str | None = "fake-model", delay: float = 0.0, timeout: float = 5.0) -> None:
         self.model = model

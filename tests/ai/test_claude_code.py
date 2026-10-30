@@ -12,7 +12,7 @@ from bussola.ai.config import AiSettings, ProviderName
 from bussola.ai.providers import build_provider
 
 FAKE_CLAUDE_DIR = Path(__file__).parent.parent / "fakeclaude"
-REQUEST = AiRequest(name="rate", system="Rate the change.", prompt="def pay(): ...", schema={"type": "object"})
+REQUEST = AiRequest(name="rate", system="Rate the change.", prompt="def pay(): ...", schema={"type": "object"}, max_tokens=512)
 
 
 class FakeClaude:

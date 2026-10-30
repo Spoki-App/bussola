@@ -5,11 +5,11 @@ import subprocess
 import tempfile
 from typing import Any
 
-from bussola.ai.base import AiNotConfiguredError, AiOutputError, AiProviderError, AiRequest, Cancellation, json_object, run_cancellable
+from bussola.ai.base import MAX_ERROR_LENGTH, AiNotConfiguredError, AiOutputError, AiProviderError, AiRequest, Cancellation, json_object, run_cancellable
+from bussola.ai.config import PROVIDER_LABELS, ProviderName
 
 CLAUDE = "claude"
 CLAUDE_ENV = {"NO_COLOR": "1"}
-MAX_ERROR_LENGTH = 300
 
 
 def find_claude() -> str:
@@ -20,9 +20,8 @@ def find_claude() -> str:
 
 
 class ClaudeCodeProvider:
-    name = "claude-code"
-    label = "Claude Code CLI"
-    endpoint: str | None = None
+    name: str = ProviderName.CLAUDE_CODE
+    label = PROVIDER_LABELS[ProviderName.CLAUDE_CODE]
 
     def __init__(self, executable: str, model: str | None, timeout: float) -> None:
         self.model = model

@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import APIRouter, Request
@@ -26,12 +27,8 @@ def get_repo_ai(repo: RepoDep, request: Request) -> AiStatusOut:
 @router.post("/ai/test")
 def test_ai(request: Request) -> AiTestOut:
     state = app_state(request)
-    try:
-        provider = state.ai_factory(load_ai_settings(state.settings.config_file))
-    except AiError as error:
-        return AiTestOut(ok=False, message=str(error), elapsed_ms=0)
-    result = check_connection(provider, Cancellation())
-    return AiTestOut(ok=result.ok, message=result.message, elapsed_ms=result.elapsed_ms)
+    result = check_connection(lambda: state.ai_factory(load_ai_settings(state.settings.config_file)), Cancellation())
+    return AiTestOut(**asdict(result))
 
 
 def _status(state: AppState, repo_root: Path | None) -> AiStatusOut:
@@ -43,7 +40,7 @@ def _status(state: AppState, repo_root: Path | None) -> AiStatusOut:
     return AiStatusOut(
         configured=settings.configured,
         provider=settings.provider if settings.configured else None,
-        label=settings.label if settings.configured else None,
+        label=settings.label,
         model=settings.model,
         endpoint=settings.endpoint,
         source=settings.source,
@@ -51,7 +48,7 @@ def _status(state: AppState, repo_root: Path | None) -> AiStatusOut:
         api_key_set=settings.api_key() is not None,
         problem=_problem(state, settings),
         config_file=config_file,
-        target=settings.target if settings.configured else None,
+        target=settings.target,
     )
 
 

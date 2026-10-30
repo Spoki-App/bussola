@@ -76,12 +76,12 @@ class AiSettings:
         return self.provider != ProviderName.NONE
 
     @property
-    def label(self) -> str:
-        return PROVIDER_LABELS.get(self.provider, "None")
+    def label(self) -> str | None:
+        return PROVIDER_LABELS.get(self.provider)
 
     @property
-    def target(self) -> str:
-        return "|".join((self.provider, self.model or "", self.endpoint or ""))
+    def target(self) -> str | None:
+        return "|".join((self.provider, self.model or "", self.endpoint or "")) if self.configured else None
 
     def api_key(self) -> str | None:
         return (os.environ.get(self.api_key_env) or None) if self.api_key_env else None
@@ -103,18 +103,18 @@ def load_user_config(path: Path | None) -> UserConfig:
 
 def resolve_ai_settings(user: UserAiConfig, repo: RepoAiConfig | None = None) -> AiSettings:
     override = repo or RepoAiConfig()
-    switched = override.provider is not None and override.provider != user.provider
-    inherited = RepoAiConfig() if switched else user
+    source: ConfigSource = "repository" if override != RepoAiConfig() else "user"
     provider = override.provider or user.provider or ProviderName.NONE
     if provider == ProviderName.NONE:
-        return AiSettings(ProviderName.NONE, source="repository" if override.provider else "user")
-    endpoint_from_repo = override.endpoint is not None and override.endpoint != user.endpoint
-    key_env = None if endpoint_from_repo else (user.api_key_env if not switched and user.api_key_env else DEFAULT_KEY_ENV.get(provider))
+        return AiSettings(ProviderName.NONE, source=source)
+    base = user if provider == user.provider else UserAiConfig(provider=provider)
+    base_endpoint = base.endpoint or DEFAULT_ENDPOINTS.get(provider)
+    endpoint = override.endpoint or base_endpoint
     return AiSettings(
         provider=provider,
-        model=override.model or inherited.model or DEFAULT_MODELS.get(provider),
-        endpoint=override.endpoint or inherited.endpoint or DEFAULT_ENDPOINTS.get(provider),
+        model=override.model or base.model or DEFAULT_MODELS.get(provider),
+        endpoint=endpoint,
         timeout=user.timeout,
-        api_key_env=key_env,
-        source="repository" if override != RepoAiConfig() else "user",
+        api_key_env=(base.api_key_env or DEFAULT_KEY_ENV.get(provider)) if endpoint == base_endpoint else None,
+        source=source,
     )
