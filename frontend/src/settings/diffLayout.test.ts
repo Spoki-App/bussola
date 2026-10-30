@@ -25,21 +25,21 @@ describe('hasModification', () => {
 
 describe('resolveViewType', () => {
   it('splits a rewritten unit on a wide window', () => {
-    expect(resolveViewType('auto', true, rewritten)).toBe('split')
+    expect(resolveViewType('auto', true, true)).toBe('split')
   })
 
   it('keeps one column on a narrow window', () => {
-    expect(resolveViewType('auto', false, rewritten)).toBe('unified')
+    expect(resolveViewType('auto', false, true)).toBe('unified')
   })
 
   it('keeps one column for a new or deleted unit even on a wide window', () => {
-    expect(resolveViewType('auto', true, inserted)).toBe('unified')
-    expect(resolveViewType('auto', true, deleted)).toBe('unified')
+    expect(resolveViewType('auto', true, hasModification(inserted))).toBe('unified')
+    expect(resolveViewType('auto', true, hasModification(deleted))).toBe('unified')
   })
 
   it('follows a fixed layout whatever the width and the change', () => {
-    expect(resolveViewType('split', false, inserted)).toBe('split')
-    expect(resolveViewType('unified', true, rewritten)).toBe('unified')
+    expect(resolveViewType('split', false, false)).toBe('split')
+    expect(resolveViewType('unified', true, true)).toBe('unified')
   })
 })
 

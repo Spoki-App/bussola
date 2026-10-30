@@ -112,28 +112,18 @@ describe('UnitDiffView layout', () => {
     expect(view({ rows: inserted })).toHaveClass('diff-unified')
   })
 
-  it('follows a fixed layout whatever the width', () => {
+  it.each([
+    ['removed', removed, 0],
+    ['added', added, 1],
+  ] as const)('puts a thread on a %s line on its own side', (_, line, side) => {
     chooseLayout('split')
-    expect(view({ rows: inserted })).toHaveClass('diff-split')
-  })
+    view({ threads: [line] })
 
-  it('puts a thread on a removed line on the left', () => {
-    chooseLayout('split')
-    view({ threads: [removed] })
-
-    const cell = screen.getByText('thread on return 0').closest('td') as HTMLTableCellElement
-    expect(cellsOf(cell)).toHaveLength(2)
-    expect(cellsOf(cell)[0]).toBe(cell)
-    expect(cellsOf(cell)[1]).toBeEmptyDOMElement()
-  })
-
-  it('puts a thread on an added line on the right', () => {
-    chooseLayout('split')
-    view({ threads: [added] })
-
-    const cell = screen.getByText('thread on return sum(items)').closest('td') as HTMLTableCellElement
-    expect(cellsOf(cell)[1]).toBe(cell)
-    expect(cellsOf(cell)[0]).toBeEmptyDOMElement()
+    const cell = screen.getByText(`thread on ${line.text.trim()}`).closest('td') as HTMLTableCellElement
+    const cells = cellsOf(cell)
+    expect(cells).toHaveLength(2)
+    expect(cells[side]).toBe(cell)
+    expect(cells[1 - side]).toBeEmptyDOMElement()
   })
 
   it('spans both columns with a thread on an unchanged line', () => {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { setDiffLayout, useDiffLayout } from '../hooks/useDiffLayout'
-import { DIFF_LAYOUT_LABELS, MAX_SPLIT_THRESHOLD, MIN_SPLIT_THRESHOLD } from '../settings/diffLayout'
+import { DIFF_LAYOUT_LABELS, MAX_SPLIT_THRESHOLD, MIN_SPLIT_THRESHOLD, clampThreshold } from '../settings/diffLayout'
 import { Segmented } from './Segmented'
 
 export function DiffLayoutSwitch() {
@@ -16,7 +16,7 @@ export function DiffLayoutPanel() {
   const changeThreshold = (text: string) => {
     setThresholdText(text)
     const threshold = Number(text)
-    if (text !== '' && Number.isInteger(threshold) && threshold >= MIN_SPLIT_THRESHOLD && threshold <= MAX_SPLIT_THRESHOLD) {
+    if (text !== '' && clampThreshold(threshold) === threshold) {
       setDiffLayout({ ...settings, threshold })
     }
   }

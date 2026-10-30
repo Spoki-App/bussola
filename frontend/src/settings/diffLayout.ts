@@ -1,8 +1,9 @@
+import type { ViewType } from 'react-diff-view'
+
 import type { DiffRow } from '../api/types'
 import { readStored, writeStored } from './storage'
 
 export type DiffLayout = 'auto' | 'split' | 'unified'
-export type ViewType = 'split' | 'unified'
 
 export interface DiffLayoutSettings {
   layout: DiffLayout
@@ -16,7 +17,7 @@ export const MAX_SPLIT_THRESHOLD = 4000
 
 const STORAGE_KEY = 'bussola.diffLayout'
 
-export function isDiffLayout(value: unknown): value is DiffLayout {
+function isDiffLayout(value: unknown): value is DiffLayout {
   return typeof value === 'string' && Object.hasOwn(DIFF_LAYOUT_LABELS, value)
 }
 
@@ -60,9 +61,9 @@ export function hasModification(rows: DiffRow[]): boolean {
   return false
 }
 
-export function resolveViewType(layout: DiffLayout, wide: boolean, rows: DiffRow[]): ViewType {
+export function resolveViewType(layout: DiffLayout, wide: boolean, modified: boolean): ViewType {
   if (layout !== 'auto') {
     return layout
   }
-  return wide && hasModification(rows) ? 'split' : 'unified'
+  return wide && modified ? 'split' : 'unified'
 }

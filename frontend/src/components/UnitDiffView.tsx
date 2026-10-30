@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import { Decoration, Diff, Hunk, getChangeKey, isDelete, isInsert, parseDiff, type ChangeData, type HunkData, type ViewType } from 'react-diff-view'
+import { Decoration, Diff, Hunk, getChangeKey, isDelete, isInsert, parseDiff, type ChangeData, type HunkData } from 'react-diff-view'
 import 'react-diff-view/style/index.css'
 
 import type { DiffRow, UnitDiff } from '../api/types'
-import { useDiffLayout, useWindowAtLeast } from '../hooks/useDiffLayout'
+import { useViewType } from '../hooks/useDiffLayout'
 import { collapsedUnified, segmentRows, type Segment } from '../review/collapse'
 import { diffTokens, languageFor } from '../review/highlight'
 import { isSelectable, rowKey } from '../review/selection'
 import { plural } from '../review/text'
-import { resolveViewType } from '../settings/diffLayout'
+import { hasModification } from '../settings/diffLayout'
 
 const PLACEHOLDER_GUTTER = '⋯'
 const FILE_HEADER_LINES = 3
@@ -28,7 +28,7 @@ interface Props {
 }
 
 interface RowIndex {
-  rowOf: (change: ChangeData) => DiffRow | undefined
+  rowOf: (change: ChangeData | null) => DiffRow | undefined
   changeKeyOf: (row: DiffRow) => string | undefined
 }
 
@@ -47,6 +47,9 @@ function buildIndex(rows: DiffRow[]): RowIndex {
   }
   return {
     rowOf: (change) => {
+      if (!change) {
+        return undefined
+      }
       if (isInsert(change)) {
         return inserted.get(change.lineNumber)
       }
@@ -94,18 +97,12 @@ function rowClasses(row: DiffRow | undefined, highlighted: ReadonlySet<string> |
   ]
 }
 
-function lineClasses(rows: (DiffRow | undefined)[], sided: boolean, highlighted?: ReadonlySet<string>): string[] {
+function lineClasses(rows: (DiffRow | undefined)[], highlighted: ReadonlySet<string> | undefined): string[] {
   const [oldRow, newRow] = rows
-  if (sided && rows.length === 2 && oldRow !== newRow) {
+  if (rows.length === 2 && oldRow !== newRow) {
     return [...rowClasses(oldRow, highlighted).map((name) => `${name}-old`), ...rowClasses(newRow, highlighted).map((name) => `${name}-new`)]
   }
-  return [...new Set(rows.flatMap((row) => rowClasses(row, highlighted)))]
-}
-
-function useViewType(rows: DiffRow[]): ViewType {
-  const { layout, threshold } = useDiffLayout()
-  const wide = useWindowAtLeast(threshold)
-  return resolveViewType(layout, wide, rows)
+  return rowClasses(oldRow, highlighted)
 }
 
 function hiddenLabel(segment: Segment): string {
@@ -132,7 +129,8 @@ function renderSegments(segments: Segment[], hunks: HunkData[], expand: (id: str
 }
 
 export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted }: Props) {
-  const viewType = useViewType(diff.rows)
+  const modified = useMemo(() => hasModification(diff.rows), [diff.rows])
+  const viewType = useViewType(modified)
   const dragging = useRef(false)
   const endSelection = useRef(onLineSelectEnd)
 
@@ -194,13 +192,13 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       widgets={widgetMap}
       className={selectable ? 'diff selectable' : 'diff'}
       generateLineClassName={({ changes, defaultGenerate }) => {
-        const rows = (changes as (ChangeData | null)[]).map((change) => (change ? index.rowOf(change) : undefined))
-        return [defaultGenerate(), ...lineClasses(rows, viewType === 'split', highlighted)].join(' ')
+        const rows = (changes as (ChangeData | null)[]).map(index.rowOf)
+        return [defaultGenerate(), ...lineClasses(rows, highlighted)].join(' ')
       }}
       renderGutter={({ change, side }) => gutterNumber(index.rowOf(change), side)}
       gutterEvents={{
         onMouseDown: ({ change, side }, event: MouseEvent<HTMLElement>) => {
-          const row = change ? index.rowOf(change) : undefined
+          const row = index.rowOf(change)
           if (!row || !onLineNumberClick || event.button !== 0) {
             return
           }
@@ -209,7 +207,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
           onLineNumberClick(row, side ?? gutterSide(row), event.shiftKey)
         },
         onMouseEnter: ({ change, side }) => {
-          const row = change ? index.rowOf(change) : undefined
+          const row = index.rowOf(change)
           if (row && onLineNumberClick && dragging.current) {
             onLineNumberClick(row, side ?? gutterSide(row), true)
           }
@@ -217,7 +215,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       }}
       codeEvents={{
         onClick: ({ change }, event: MouseEvent<HTMLElement>) => {
-          const row = change ? index.rowOf(change) : undefined
+          const row = index.rowOf(change)
           if (selectable && row && isSelectable(row)) {
             onRowClick(row, event.shiftKey)
           }

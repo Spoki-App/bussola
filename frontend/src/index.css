@@ -1087,6 +1087,7 @@ textarea {
   --diff-code-delete-edit-background-color: rgba(229, 72, 77, 0.26);
   --diff-code-selected-background-color: rgba(41, 82, 204, 0.14);
   --diff-gutter-selected-background-color: rgba(41, 82, 204, 0.22);
+  --diff-omit-gutter-line-color: transparent;
 
   font-family: var(--mono);
   font-size: var(--code-size);
@@ -1123,10 +1124,6 @@ textarea {
 .diff .diff-gutter-omit,
 .diff .diff-code-omit {
   background: var(--bg-subtle);
-}
-
-.diff .diff-gutter-omit::before {
-  content: none;
 }
 
 .diff .diff-gap td {
