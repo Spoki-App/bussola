@@ -60,6 +60,8 @@ describe('loadDiffLayout', () => {
   it('ignores unknown layouts and clamps the threshold', () => {
     window.localStorage.setItem('bussola.diffLayout', JSON.stringify({ layout: 'sideways', threshold: 10 }))
     expect(loadDiffLayout()).toEqual({ layout: 'auto', threshold: 600 })
+    window.localStorage.setItem('bussola.diffLayout', JSON.stringify({ layout: 'constructor', threshold: 1400 }))
+    expect(loadDiffLayout()).toEqual(DEFAULT_DIFF_LAYOUT)
     window.localStorage.setItem('bussola.diffLayout', 'not json')
     expect(loadDiffLayout()).toEqual(DEFAULT_DIFF_LAYOUT)
   })

@@ -17,7 +17,7 @@ export const MAX_SPLIT_THRESHOLD = 4000
 const STORAGE_KEY = 'bussola.diffLayout'
 
 export function isDiffLayout(value: unknown): value is DiffLayout {
-  return typeof value === 'string' && value in DIFF_LAYOUT_LABELS
+  return typeof value === 'string' && Object.hasOwn(DIFF_LAYOUT_LABELS, value)
 }
 
 export function clampThreshold(threshold: number): number {
