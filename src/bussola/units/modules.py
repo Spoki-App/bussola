@@ -25,9 +25,9 @@ def module_path(path: str, go_module: GoModuleLookup) -> str | None:
 
 def go_module_name(go_mod: bytes) -> str | None:
     for line in go_mod.decode("utf-8", errors="replace").splitlines():
-        directive, _, value = line.split("//", 1)[0].strip().partition(" ")
-        if directive == "module" and value.strip():
-            return value.strip().strip('"`')
+        words = line.split("//", 1)[0].split(maxsplit=1)
+        if len(words) > 1 and words[0] == "module":
+            return words[1].strip().strip('"`')
     return None
 
 

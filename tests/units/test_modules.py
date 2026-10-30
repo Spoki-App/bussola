@@ -66,4 +66,6 @@ def test_other_files_have_no_module() -> None:
 def test_go_module_name_reads_the_module_directive() -> None:
     assert go_module_name(b"// shop\nmodule example.com/shop // main\n\ngo 1.23\n") == "example.com/shop"
     assert go_module_name(b'module "example.com/quoted"\n') == "example.com/quoted"
+    assert go_module_name(b"module\texample.com/tabbed\n") == "example.com/tabbed"
+    assert go_module_name(b"module\n") is None
     assert go_module_name(b"go 1.23\n") is None
