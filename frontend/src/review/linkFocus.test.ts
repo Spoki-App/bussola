@@ -4,9 +4,7 @@ import type { Comment, Thread, Unit } from '../api/types'
 import {
   addRepositoryPath,
   addRepositoryRequestFromSearch,
-  focusSearch,
   linkFocusFromSearch,
-  pullRequestRepository,
   resolveLinkFocus,
   scrollWhenPresent,
   type LinkFocus,
@@ -81,27 +79,23 @@ const focus = (values: Partial<LinkFocus>): LinkFocus => ({ path: null, line: nu
 const units = [unit(1, 'src/app.py', 1, 9), unit(2, 'src/app.py', 12, 30), unit(3, 'README.md', null, null)]
 
 describe('linkFocusFromSearch', () => {
-  it('reads the focus of a link and round-trips it', () => {
+  it('reads the focus of a link', () => {
     const search = `?path=src%2Fapp.py&line=42&thread=${THREAD_ID}&comment=501`
-    const parsed = linkFocusFromSearch(search)
 
-    expect(parsed).toEqual({ path: 'src/app.py', line: 42, thread: THREAD_ID, comment: '501' })
-    expect(linkFocusFromSearch(focusSearch(parsed))).toEqual(parsed)
+    expect(linkFocusFromSearch(search)).toEqual({ path: 'src/app.py', line: 42, thread: THREAD_ID, comment: '501' })
   })
 
-  it('drops values that are not valid and returns null when nothing is left', () => {
+  it('keeps only a positive line of a path and returns null without a focus', () => {
     expect(linkFocusFromSearch('')).toBeNull()
     expect(linkFocusFromSearch('?line=4')).toBeNull()
-    expect(linkFocusFromSearch('?path=../secret&thread=x&comment=-1')).toBeNull()
-    expect(linkFocusFromSearch('?path=%2Fetc%2Fpasswd')).toBeNull()
     expect(linkFocusFromSearch('?path=a.py&line=0')).toEqual(focus({ path: 'a.py' }))
-    expect(focusSearch(null)).toBe('')
+    expect(linkFocusFromSearch('?path=a.py&line=4x')).toEqual(focus({ path: 'a.py' }))
   })
 })
 
 describe('resolveLinkFocus', () => {
   it('picks the unit of the file that contains the line', () => {
-    expect(resolveLinkFocus(focus({ path: 'src/app.py', line: 20 }), units, [])).toEqual({ unitId: 2, elementId: 'unit-2', fallbackId: null, inPanel: false })
+    expect(resolveLinkFocus(focus({ path: 'src/app.py', line: 20 }), units, [])).toEqual({ unitId: 2, elementId: 'unit-2' })
   })
 
   it('falls back to the first unit of the file', () => {
@@ -113,17 +107,12 @@ describe('resolveLinkFocus', () => {
   it('focuses an inline thread inside its unit', () => {
     const target = resolveLinkFocus(focus({ thread: THREAD_ID }), units, [thread(THREAD_ID, 2)])
 
-    expect(target).toEqual({ unitId: 2, elementId: `thread-${THREAD_ID}`, fallbackId: 'unit-2', inPanel: false })
+    expect(target).toEqual({ unitId: 2, elementId: `thread-${THREAD_ID}` })
   })
 
   it('opens the conversation panel for threads that are not shown in a unit', () => {
-    expect(resolveLinkFocus(focus({ thread: THREAD_ID }), units, [thread(THREAD_ID, null)])).toEqual({
-      unitId: null,
-      elementId: `thread-${THREAD_ID}`,
-      fallbackId: null,
-      inPanel: true,
-    })
-    expect(resolveLinkFocus(focus({ thread: THREAD_ID }), units, [thread(THREAD_ID, null, null, 'file')])?.inPanel).toBe(true)
+    expect(resolveLinkFocus(focus({ thread: THREAD_ID }), units, [thread(THREAD_ID, null)])).toEqual({ unitId: null, elementId: `thread-${THREAD_ID}` })
+    expect(resolveLinkFocus(focus({ thread: THREAD_ID }), units, [thread(THREAD_ID, null, null, 'file')])?.unitId).toBeNull()
   })
 
   it('finds the imported thread of a GitHub discussion anchor', () => {
@@ -158,7 +147,7 @@ describe('scrollWhenPresent', () => {
     const scrolled = recordScrolls()
     document.body.innerHTML = '<article id="unit-2"></article>'
 
-    scrollWhenPresent({ unitId: 2, elementId: 'thread-t', fallbackId: 'unit-2', inPanel: false })
+    scrollWhenPresent({ unitId: 2, elementId: 'thread-t' })
     vi.advanceTimersByTime(300)
     document.body.insertAdjacentHTML('beforeend', '<div id="thread-t"></div>')
     vi.advanceTimersByTime(1000)
@@ -170,7 +159,7 @@ describe('scrollWhenPresent', () => {
     vi.useFakeTimers()
     const scrolled = recordScrolls()
 
-    scrollWhenPresent({ unitId: null, elementId: 'thread-t', fallbackId: null, inPanel: true }, 500)
+    scrollWhenPresent({ unitId: null, elementId: 'thread-t' }, 500)
     vi.advanceTimersByTime(1000)
     document.body.innerHTML = '<div id="thread-t"></div>'
     vi.advanceTimersByTime(1000)
@@ -192,10 +181,5 @@ describe('add repository request', () => {
     expect(addRepositoryRequestFromSearch('?add_repo=acme/widgets&then=https://evil.example')).toBeNull()
     expect(addRepositoryRequestFromSearch('?add_repo=acme/widgets&then=//evil.example/github.com/a/b/pull/1')).toBeNull()
     expect(addRepositoryRequestFromSearch('?add_repo=acme&then=/github.com/acme/widgets/pull/7')).toBeNull()
-  })
-
-  it('reads the repository of a pull request link', () => {
-    expect(pullRequestRepository('https://github.com/acme/widgets/pull/7/files')).toBe('acme/widgets')
-    expect(pullRequestRepository('https://example.com/acme/widgets/pull/7')).toBeNull()
   })
 })

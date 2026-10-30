@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 from bussola.errors import InvalidRequestError
+from bussola.forge.pulls import parse_pull_request_url
 
 SCHEME = "bussola"
 HOME_PATH = "/"
@@ -15,7 +16,6 @@ NAME = r"[A-Za-z0-9_.-]{1,100}"
 NUMBER = re.compile(r"^[1-9][0-9]{0,8}$")
 REPOSITORY = re.compile(rf"^(?P<owner>{NAME})/(?P<name>{NAME})$")
 THREAD_ID = re.compile(r"^[0-9a-f]{32}$")
-GITHUB_PULL_PATH = re.compile(rf"^/(?P<repository>{NAME}/{NAME})/pull/(?P<number>[1-9][0-9]{{0,8}})(?:/.*)?$")
 DISCUSSION_ANCHOR = re.compile(r"^discussion_r(?P<comment>[1-9][0-9]{0,19})$")
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 
@@ -72,7 +72,8 @@ def _review_link(query: str) -> ReviewLink:
         return values[0]
 
     path = _file_path(single("path"))
-    line = _optional_number("line", single("line"))
+    raw_line = single("line")
+    line = None if raw_line is None else _number("line", raw_line)
     if line is not None and path is None:
         raise InvalidLinkError("The line parameter needs a path")
     return ReviewLink(
@@ -85,13 +86,14 @@ def _review_link(query: str) -> ReviewLink:
 
 
 def _github_link(path: str, fragment: str) -> ReviewLink:
-    match = GITHUB_PULL_PATH.match(path)
-    if match is None:
-        raise InvalidLinkError(f"Not a GitHub pull request link. Expected {SCHEME}://github.com/<owner>/<name>/pull/<number>.")
+    try:
+        address = parse_pull_request_url(f"github.com{path}")
+    except InvalidRequestError as error:
+        raise InvalidLinkError(f"Not a GitHub pull request link. Expected {SCHEME}://github.com/<owner>/<name>/pull/<number>.") from error
     anchor = DISCUSSION_ANCHOR.match(fragment)
     return ReviewLink(
-        repository=_repository(match["repository"]),
-        number=int(match["number"]),
+        repository=_repository(address.repository),
+        number=_number("pr", str(address.number)),
         comment=int(anchor["comment"]) if anchor else None,
     )
 
@@ -107,10 +109,6 @@ def _number(name: str, value: str | None) -> int:
     if value is None or NUMBER.match(value) is None:
         raise InvalidLinkError(f"The {name} parameter must be a positive number")
     return int(value)
-
-
-def _optional_number(name: str, value: str | None) -> int | None:
-    return None if value is None else _number(name, value)
 
 
 def _file_path(value: str | None) -> str | None:

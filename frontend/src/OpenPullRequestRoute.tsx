@@ -6,7 +6,8 @@ import { ErrorNote } from './components/Badges'
 import { ExternalLink } from './components/ExternalLink'
 import { Link } from './Link'
 import { navigate, reviewPath } from './navigation'
-import { addRepositoryPath, focusSearch, linkFocusFromSearch, pullRequestRepository } from './review/linkFocus'
+import { addRepositoryPath } from './review/linkFocus'
+import { pullRequestRepository } from './review/pullRequestLink'
 
 export function OpenPullRequestRoute({ url }: { url: string }) {
   const open = useOpenPullRequestLink()
@@ -20,7 +21,7 @@ export function OpenPullRequestRoute({ url }: { url: string }) {
     const { pathname, search } = window.location
     const repository = pullRequestRepository(url)
     open.mutate(url, {
-      onSuccess: (review) => { navigate(`${reviewPath(review.id)}${focusSearch(linkFocusFromSearch(search))}`, { replace: true }) },
+      onSuccess: (review) => { navigate(`${reviewPath(review.id)}${search}`, { replace: true }) },
       onError: (error) => {
         if (error instanceof ApiError && error.status === 404 && repository) {
           navigate(addRepositoryPath(repository, `${pathname}${search}`), { replace: true })

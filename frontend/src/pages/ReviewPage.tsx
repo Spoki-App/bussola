@@ -19,7 +19,7 @@ import { UnitTree } from '../components/UnitTree'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
-import { scrollWhenPresent, type FocusTarget } from '../review/linkFocus'
+import { scrollToElement, scrollWhenPresent, unitElementId, type FocusTarget } from '../review/linkFocus'
 import { buildUnitTree } from '../review/unitTree'
 import { searchGroups } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
@@ -34,7 +34,7 @@ export interface ReviewExtensions {
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
   fileActions?: (path: string) => ReactNode
   sidePanel?: { label: string; content: ReactNode }
-  linkTarget?: (units: Unit[]) => FocusTarget | null | undefined
+  linkTarget?: (units: Unit[]) => FocusTarget | null
 }
 
 interface Props {
@@ -44,10 +44,6 @@ interface Props {
 
 const WIDE_LAYOUT_PX = 1400
 const FILES_HIDDEN_KEY = 'bussola.filesHidden'
-
-function scrollToElement(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
 
 const SYNC_TITLE =
   'Fetch the branch from its remote and record any new commits as a new revision. If the review is linked to a GitHub pull request, also bring in its comments and send your unsent comments as one review.'
@@ -159,10 +155,18 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     setAppliedLink(linkedTarget)
     if (linkedTarget) {
       setFocusedId(linkedTarget.unitId)
-      setPanelOpen(panelOpen || linkedTarget.inPanel)
+      setPanelOpen(panelOpen || linkedTarget.unitId === null)
     }
   }
-  useEffect(() => (appliedLink ? scrollWhenPresent(appliedLink) : undefined), [appliedLink])
+  useEffect(() => {
+    if (!appliedLink) {
+      return undefined
+    }
+    if (appliedLink.unitId !== null) {
+      actions.current.get(appliedLink.unitId)?.reveal()
+    }
+    return scrollWhenPresent(appliedLink)
+  }, [appliedLink])
 
   const focusUnit = useCallback((unitId: number) => {
     setFocusedId(unitId)
@@ -182,7 +186,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
       return
     }
     setFocusedId(unitList[target].id)
-    scrollToElement(`unit-${String(unitList[target].id)}`)
+    scrollToElement(unitElementId(unitList[target].id))
   }
   const focusedIndex = focusedPosition(unitList, focusedId)
   const focusedUnit = focusedIndex < 0 ? undefined : unitList[focusedIndex]
@@ -282,7 +286,6 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                     reviewId={reviewId}
                     unit={unit}
                     focused={focusedUnit?.id === unit.id}
-                    revealed={appliedLink?.unitId === unit.id}
                     onFocus={focusUnit}
                     register={register}
                     onComment={extensions.onComment}

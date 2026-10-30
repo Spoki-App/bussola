@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Unit, UnitState } from '../api/types'
-import { UnitCard } from './UnitCard'
+import { UnitCard, type UnitActions } from './UnitCard'
 
 function unit(state: UnitState, overrides: Partial<Unit> = {}): Unit {
   return {
@@ -59,22 +59,28 @@ describe('UnitCard', () => {
     expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('opens an approved unit revealed by a link, whether it mounts revealed or is revealed later', () => {
+  it('registers a reveal action that opens a collapsed unit', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
-    const client = new QueryClient()
-    const card = (revealed: boolean) => (
-      <QueryClientProvider client={client}>
-        <UnitCard reviewId={1} unit={unit('approved')} focused={false} revealed={revealed} onFocus={() => undefined} register={() => undefined} />
-      </QueryClientProvider>
+    const registered = new Map<number, UnitActions>()
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <UnitCard
+          reviewId={1}
+          unit={unit('approved')}
+          focused={false}
+          onFocus={() => undefined}
+          register={(unitId, actions) => {
+            if (actions) {
+              registered.set(unitId, actions)
+            }
+          }}
+        />
+      </QueryClientProvider>,
     )
-    const mounted = render(card(true))
-    expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
-    mounted.unmount()
-
-    const { rerender } = render(card(false))
     expect(disclosure()).toHaveAttribute('aria-expanded', 'false')
 
-    rerender(card(true))
+    act(() => { registered.get(1)?.reveal() })
+
     expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
   })
 

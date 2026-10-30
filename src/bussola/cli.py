@@ -1,7 +1,7 @@
 import os
 import threading
 import webbrowser
-from collections.abc import Generator
+from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated
@@ -74,19 +74,20 @@ def open_link(link: Annotated[str, typer.Argument(help="A bussola:// link")]) ->
 @app.command("install-handler")
 def install_handler() -> None:
     """Register bussola:// links with the operating system."""
-    with _cli_errors():
-        handler = registration.current_registration()
-        registration.apply(handler.install)
-    typer.echo(f"bussola:// links now open bussola ({handler.location})")
+    _apply_registration(lambda handler: handler.install, "bussola:// links now open bussola")
 
 
 @app.command("uninstall-handler")
 def uninstall_handler() -> None:
     """Remove the bussola:// link registration."""
+    _apply_registration(lambda handler: handler.uninstall, "bussola:// links are no longer registered")
+
+
+def _apply_registration(steps: Callable[[registration.Registration], Sequence[registration.Step]], done: str) -> None:
     with _cli_errors():
         handler = registration.current_registration()
-        registration.apply(handler.uninstall)
-    typer.echo(f"bussola:// links are no longer registered ({handler.location})")
+        registration.apply(steps(handler))
+    typer.echo(f"{done} ({handler.location})")
 
 
 @app.command()

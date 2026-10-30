@@ -3,6 +3,7 @@ import { memo, useEffect, useState, type ReactNode } from 'react'
 import { describeError } from '../api/client'
 import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/hooks'
 import type { DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
+import { unitElementId } from '../review/linkFocus'
 import { unitTitle } from '../review/logic'
 import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
 import { ErrorNote, KindBadge, StateBadge } from './Badges'
@@ -13,6 +14,7 @@ import { UnitDiffView, type GutterSide } from './UnitDiffView'
 export interface UnitActions {
   toggleApproval: () => void
   comment: () => void
+  reveal: () => void
 }
 
 export interface CommentTarget {
@@ -28,7 +30,6 @@ interface Props {
   reviewId: number
   unit: Unit
   focused: boolean
-  revealed?: boolean
   onFocus: (unitId: number) => void
   register: (unitId: number, actions: UnitActions | null) => void
   onComment?: (target: CommentTarget) => void
@@ -41,18 +42,13 @@ const APPROVE_LABELS = { approve: 'Approve', approve_under_name: 'Approve under 
 
 const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', base: 'Base → head' }
 
-export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, revealed = false, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows }: Props) {
+export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows }: Props) {
   const todo = unit.todo
-  const [expanded, setExpanded] = useState(todo || revealed)
+  const [expanded, setExpanded] = useState(todo)
   const [wasTodo, setWasTodo] = useState(todo)
   if (todo !== wasTodo) {
     setWasTodo(todo)
     setExpanded(todo)
-  }
-  const [wasRevealed, setWasRevealed] = useState(revealed)
-  if (revealed !== wasRevealed) {
-    setWasRevealed(revealed)
-    setExpanded(expanded || revealed)
   }
   const [mode, setMode] = useState<DiffMode | undefined>(undefined)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
@@ -106,7 +102,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, reveal
   }
 
   useEffect(() => {
-    register(unit.id, { toggleApproval, comment: commentOnFirstChange })
+    register(unit.id, { toggleApproval, comment: commentOnFirstChange, reveal: () => { setExpanded(true) } })
     return () => {
       register(unit.id, null)
     }
@@ -131,7 +127,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, reveal
   const canSwitchMode = diff.data?.available_modes.includes('approved') ?? false
 
   return (
-    <article id={`unit-${String(unit.id)}`} className={`unit-card state-${unit.state}${focused ? ' focused' : ''}`} onClick={() => { onFocus(unit.id) }}>
+    <article id={unitElementId(unit.id)} className={`unit-card state-${unit.state}${focused ? ' focused' : ''}`} onClick={() => { onFocus(unit.id) }}>
       <header className="unit-header">
         <button type="button" className="disclosure" aria-expanded={expanded} aria-label={expanded ? 'Collapse unit' : 'Expand unit'} onClick={() => { setExpanded(!expanded) }}>
           {expanded ? '▾' : '▸'}

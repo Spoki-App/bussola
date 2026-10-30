@@ -204,12 +204,12 @@ def apply(steps: Sequence[Step], run: Runner | None = None) -> None:
 def _run(run: Runner, argv: Sequence[str], *, required: bool) -> None:
     try:
         run(argv)
-    except subprocess.CalledProcessError as error:
-        if required:
+    except (subprocess.CalledProcessError, OSError) as error:
+        if not required:
+            return
+        if isinstance(error, subprocess.CalledProcessError):
             raise HandlerError(f"{argv[0]} failed: {(error.stderr or '').strip() or error}") from error
-    except OSError as error:
-        if required:
-            raise HandlerError(f"Could not run {argv[0]}: {error}") from error
+        raise HandlerError(f"Could not run {argv[0]}: {error}") from error
 
 
 def _remove(path: Path) -> None:

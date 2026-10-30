@@ -31,14 +31,10 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
   }, [threads.data])
   const openCount = (threads.data ?? []).filter(isOpen).length
   const [linkFocus] = useState(() => linkFocusFromSearch(window.location.search))
-  const linkTarget = useCallback(
-    (units: Unit[]) => {
-      if (linkFocus === null) {
-        return null
-      }
-      return threads.data || threads.error ? resolveLinkFocus(linkFocus, units, threads.data ?? []) : undefined
-    },
-    [linkFocus, threads.data, threads.error],
+  const threadsSettled = threads.data !== undefined || threads.error !== null
+  const linkTarget = useMemo(
+    () => (linkFocus && threadsSettled ? (units: Unit[]) => resolveLinkFocus(linkFocus, units, threads.data ?? []) : undefined),
+    [linkFocus, threadsSettled, threads.data],
   )
 
   const renderWidgets = useCallback(
