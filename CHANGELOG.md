@@ -4,6 +4,10 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Added
+
+- Changed words inside a modified line are highlighted with a stronger background on both the removed and the added line, when the two lines are similar enough ([#25](https://github.com/Spoki-App/bussola/issues/25)).
+
 ### Changed
 
 - Allow tree-sitter 0.26. Syntax tree positions are read as plain tuples, because the `Point.row` and `Point.column` properties in tree-sitter 0.26.0 drop a reference on every read and crash the process on files longer than 256 lines.
@@ -11,6 +15,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 ### Fixed
 
 - Comments on the whole review, including pull request comments and review summaries imported from GitHub, no longer have a Resolve button and no longer count as open threads, as on GitHub.
+- Expressions inside Python f-strings and JavaScript/TypeScript template literals are highlighted as code instead of string, with the braces, conversions and format specs set apart ([#21](https://github.com/Spoki-App/bussola/issues/21)).
 
 ## [0.1.0] - 2026-10-30
 

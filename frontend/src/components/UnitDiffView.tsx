@@ -4,7 +4,7 @@ import 'react-diff-view/style/index.css'
 
 import type { DiffRow, UnitDiff } from '../api/types'
 import { collapsedUnified, segmentRows, type Segment } from '../review/collapse'
-import { highlightTokens, languageFor } from '../review/highlight'
+import { diffTokens, languageFor } from '../review/highlight'
 import { isSelectable, rowKey } from '../review/selection'
 import { plural } from '../review/text'
 
@@ -138,7 +138,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
   const file = useMemo(() => parseDiff(collapsedUnified(header, diff.rows, segments))[0], [header, diff.rows, segments])
   const tokens = useMemo(() => {
     const whole: Segment[] = diff.rows.length > 0 ? [{ kind: 'rows', start: 0, end: diff.rows.length - 1 }] : []
-    return highlightTokens(parseDiff(collapsedUnified(header, diff.rows, whole))[0]?.hunks ?? [], languageFor(path))
+    return diffTokens(parseDiff(collapsedUnified(header, diff.rows, whole))[0]?.hunks ?? [], languageFor(path))
   }, [header, diff.rows, path])
 
   if (diff.binary) {

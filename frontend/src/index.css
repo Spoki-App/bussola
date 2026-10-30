@@ -100,6 +100,8 @@
     --diff-gutter-delete-background-color: rgba(255, 99, 105, 0.2);
     --diff-code-insert-background-color: rgba(60, 199, 156, 0.1);
     --diff-code-delete-background-color: rgba(255, 99, 105, 0.1);
+    --diff-code-insert-edit-background-color: rgba(60, 199, 156, 0.34);
+    --diff-code-delete-edit-background-color: rgba(255, 99, 105, 0.34);
     --diff-code-selected-background-color: rgba(138, 171, 255, 0.25);
     --diff-gutter-selected-background-color: rgba(138, 171, 255, 0.35);
   }
@@ -1077,6 +1079,8 @@ textarea {
   --diff-gutter-delete-background-color: rgba(229, 72, 77, 0.16);
   --diff-code-insert-background-color: rgba(18, 134, 106, 0.08);
   --diff-code-delete-background-color: rgba(229, 72, 77, 0.08);
+  --diff-code-insert-edit-background-color: rgba(18, 134, 106, 0.26);
+  --diff-code-delete-edit-background-color: rgba(229, 72, 77, 0.26);
   --diff-code-selected-background-color: rgba(41, 82, 204, 0.14);
   --diff-gutter-selected-background-color: rgba(41, 82, 204, 0.22);
 
@@ -1093,6 +1097,11 @@ textarea {
 
 .diff .diff-gutter:hover {
   color: var(--accent);
+}
+
+.diff .diff-code .diff-code-edit {
+  color: inherit;
+  border-radius: 2px;
 }
 
 .diff.selectable .diff-code-insert,
@@ -1473,6 +1482,14 @@ button.danger {
 
 .hljs-literal > .hljs-keyword {
   color: inherit;
+}
+
+.hljs-subst {
+  color: var(--text);
+}
+
+.hljs-subst > .hljs-punctuation {
+  color: var(--hl-keyword);
 }
 
 .hljs-comment,
