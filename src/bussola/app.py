@@ -19,6 +19,7 @@ from bussola.security import install_security
 from bussola.storage.database import Database
 
 INDEX_FILE = "index.html"
+REVALIDATE = {"Cache-Control": "no-cache"}
 ASSETS_DIR = "assets"
 ERROR_STATUS: dict[type[Exception], int] = {
     NotFoundError: status.HTTP_404_NOT_FOUND,
@@ -61,4 +62,4 @@ def _mount_frontend(app: FastAPI, static_dir: Path) -> None:
     def serve_frontend(path: str) -> FileResponse:
         if path.startswith(API_PREFIX.lstrip("/")) or index is None:
             raise HTTPException(status_code=404)
-        return FileResponse(root_files.get(path, index))
+        return FileResponse(root_files.get(path, index), headers=REVALIDATE)

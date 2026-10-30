@@ -24,6 +24,7 @@ def test_frontend_routes_fall_back_to_index(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert "bussola" in response.text
+    assert response.headers["cache-control"] == "no-cache"
 
 
 def test_unknown_api_route_is_not_served_as_index(tmp_path: Path) -> None:

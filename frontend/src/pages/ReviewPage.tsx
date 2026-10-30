@@ -194,31 +194,33 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   return (
     <div className="review-page">
       <ReviewHeader review={data} />
-      {data.pull_request && <PullRequestDescription pull={data.pull_request} />}
-      <section className="review-summary">
-        <div className="course-summary">
-          <p className="course-total">
-            <strong>{data.approved}</strong>
-            {` of ${plural(data.total, 'unit')} approved`}
-          </p>
-          <CourseStrip counts={data.counts} percent={percent} label="Review progress" />
-          <ul className="legend">
-            {STATE_ORDER.filter((state) => data.counts[state] > 0).map((state) => (
-              <li key={state} className={`state-${state}`}>{`${STATE_LABELS[state]} ${String(data.counts[state])}`}</li>
-            ))}
-            {data.open_threads > 0 && <li className="legend-threads">{plural(data.open_threads, 'open thread')}</li>}
-          </ul>
-        </div>
-        <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
-        <div className="summary-row">
-          <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>
-          {extensions.sidePanel && (
-            <button type="button" aria-pressed={panelOpen} onClick={() => { setPanelOpen(!panelOpen) }}>
-              {panelOpen ? `Hide ${extensions.sidePanel.label}` : `Show ${extensions.sidePanel.label}`}
-            </button>
-          )}
-        </div>
-      </section>
+      <div className={`review-overview${data.pull_request ? ' with-description' : ''}`}>
+        {data.pull_request && <PullRequestDescription pull={data.pull_request} />}
+        <section className="review-summary">
+          <div className="course-summary">
+            <p className="course-total">
+              <strong>{data.approved}</strong>
+              {` of ${plural(data.total, 'unit')} approved`}
+            </p>
+            <CourseStrip counts={data.counts} percent={percent} label="Review progress" />
+            <ul className="legend">
+              {STATE_ORDER.filter((state) => data.counts[state] > 0).map((state) => (
+                <li key={state} className={`state-${state}`}>{`${STATE_LABELS[state]} ${String(data.counts[state])}`}</li>
+              ))}
+              {data.open_threads > 0 && <li className="legend-threads">{plural(data.open_threads, 'open thread')}</li>}
+            </ul>
+          </div>
+          <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
+          <div className="summary-row">
+            <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>
+            {extensions.sidePanel && (
+              <button type="button" aria-pressed={panelOpen} onClick={() => { setPanelOpen(!panelOpen) }}>
+                {panelOpen ? `Hide ${extensions.sidePanel.label}` : `Show ${extensions.sidePanel.label}`}
+              </button>
+            )}
+          </div>
+        </section>
+      </div>
       <div className={`review-layout${panelOpen && extensions.sidePanel ? ' with-panel' : ''}${filesHidden ? ' files-hidden' : ''}`}>
         <aside className="sidebar" aria-label="Files">
           <button type="button" className="sidebar-toggle" aria-expanded={!filesHidden} aria-controls={filesHidden ? undefined : 'file-tree'} title={filesHidden ? 'Show files' : 'Hide files'} onClick={toggleFiles}>

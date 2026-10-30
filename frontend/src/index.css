@@ -44,6 +44,8 @@
   --narrow: 82%;
   --radius-box: 10px;
   --radius-control: 6px;
+  --page-max: 1760px;
+  --page-inset: max(24px, calc((100% - var(--page-max)) / 2 + 24px));
 
   font: 14px/1.5 var(--sans);
   color-scheme: light dark;
@@ -285,7 +287,7 @@ textarea {
   align-items: center;
   gap: 16px;
   height: 52px;
-  padding: 0 20px;
+  padding: 0 var(--page-inset);
   border-bottom: 1px solid var(--border);
   background: var(--bg);
 }
@@ -510,6 +512,48 @@ textarea {
   background: var(--bg);
   color: var(--text);
   box-shadow: var(--shadow-lift);
+}
+
+.review-page {
+  max-width: var(--page-max);
+  margin: 0 auto;
+}
+
+@media (min-width: 1761px) {
+  .review-page {
+    border-inline: 1px solid var(--border);
+  }
+}
+
+@media (min-width: 1400px) {
+  .review-overview.with-description {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 460px);
+    align-items: start;
+    gap: 40px;
+    padding: 0 24px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .review-overview.with-description .pr-description {
+    padding: 0;
+  }
+
+  .review-overview.with-description .review-summary {
+    position: sticky;
+    top: 16px;
+    padding: 16px 18px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-box);
+  }
+
+  .review-overview.with-description .shortcuts {
+    flex: 1;
+  }
+
+  .review-overview.with-description .summary-row {
+    flex-wrap: wrap;
+  }
 }
 
 .review-header {
