@@ -93,8 +93,8 @@ describe('diffTokens', () => {
     ].join('\n')
     const tokens = diffTokens(parseDiff(diff)[0].hunks, 'python')
 
-    expect(tokens?.old.map(markedRuns)).toEqual([['declaration.start_point.row', '.start_point.row'], []])
-    expect(tokens?.new.map(markedRuns)).toEqual([['start_row(declaration)', 'start_row(', ')'], []])
+    expect(tokens?.old.map(markedRuns)).toEqual([['.start_point.row', '.start_point.row'], []])
+    expect(tokens?.new.map(markedRuns)).toEqual([['start_row(', ')', 'start_row(', ')'], []])
   })
 
   it('marks changed words without syntax colours when the language is unknown', () => {

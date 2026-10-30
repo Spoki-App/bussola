@@ -49,9 +49,7 @@ function wordDiff(before: string, after: string): Diff[] {
   const encodedBefore = encode(before)
   const encodedAfter = encode(after)
   const words = [...vocabulary.keys()]
-  const diffs = matcher.diff_main(encodedBefore, encodedAfter, false)
-  matcher.diff_cleanupSemantic(diffs)
-  return diffs.map(([operation, codes]) => [operation, Array.from({ length: codes.length }, (_, position) => words[codes.charCodeAt(position) - 1]).join('')])
+  return matcher.diff_main(encodedBefore, encodedAfter, false).map(([operation, codes]) => [operation, Array.from({ length: codes.length }, (_, position) => words[codes.charCodeAt(position) - 1]).join('')])
 }
 
 function lineEdits(removed: ChangedLine, added: ChangedLine): [RangeTokenNode[], RangeTokenNode[]] {
