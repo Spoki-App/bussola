@@ -128,8 +128,8 @@ Sending is blocked while the pull request head differs from the reviewed head, b
 
 After sending comments, **Sync** marks as viewed on GitHub every file whose units are all `approved` or `approved (moved)` for the current reviewer in the latest revision, so a file changed after approval does not count. Through the forge adapter:
 
-- `file_views` reads the pull request node id, its head and each file's `viewerViewedState` (GraphQL, 100 files per page).
-- `mark_file_viewed` runs the `markFileAsViewed` mutation for each fully approved file that is not viewed yet.
+- `file_views` reads the pull request node id, its head and each file's `viewerViewedState` (GraphQL, paged by `gh api --paginate`).
+- `mark_files_viewed` marks the fully approved files that are not viewed yet with one GraphQL request of aliased `markFileAsViewed` mutations per 50 files. If a request fails, its files are retried one at a time, so only the files that fail are reported.
 
 Nothing is marked while the pull request head differs from the reviewed head. Files already viewed are left as they are, and nothing is ever unmarked. A file missing from the pull request, or a failed mutation, is reported in the sync result as not marked; it does not fail the sync. GitHub is not contacted when no file is fully approved.
 

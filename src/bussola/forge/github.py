@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import urllib.error
 import urllib.request
+from collections.abc import Sequence
 from typing import Any
 
 from bussola.errors import InvalidRequestError
@@ -82,11 +83,11 @@ mutation($threadId: ID!) {
 }
 """
 FILE_VIEWS_QUERY = """
-query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       id headRefOid
-      files(first: 100, after: $cursor) {
+      files(first: 100, after: $endCursor) {
         nodes { path viewerViewedState }
         pageInfo { hasNextPage endCursor }
       }
@@ -94,11 +95,7 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
   }
 }
 """
-MARK_FILE_VIEWED_MUTATION = """
-mutation($pullRequestId: ID!, $path: String!) {
-  markFileAsViewed(input: {pullRequestId: $pullRequestId, path: $path}) { clientMutationId }
-}
-"""
+MARK_FILE_VIEWED_FIELD = "f{index}: markFileAsViewed(input: {{pullRequestId: $pullRequestId, path: $p{index}}}) {{ clientMutationId }}"
 VIEWED_STATE = "VIEWED"
 ISSUE_COMMENT_PREFIX = "issue-"
 ASSET_URL = re.compile(r"https://github\.com/(?:user-attachments/assets/[0-9a-f-]{36}|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/assets/\d+/[0-9a-f-]{36})")
@@ -192,23 +189,19 @@ class GitHubAdapter:
 
     def file_views(self, repository: str, number: int) -> FileViews:
         owner, name = _repo(repository).split("/")
-        viewed: dict[str, bool] = {}
-        cursor: dict[str, str] = {}
-        while True:
-            response = self._graphql(FILE_VIEWS_QUERY, owner=owner, name=name, number=number, **cursor)
-            try:
-                pull = response["data"]["repository"]["pullRequest"]
-                files = pull["files"]
-            except (KeyError, TypeError) as error:
-                raise ForgeError(f"GitHub did not return the files of pull request #{number}") from error
-            viewed.update({str(item["path"]): item.get("viewerViewedState") == VIEWED_STATE for item in _nodes(files)})
-            page: JsonObject = files.get("pageInfo") or {}
-            if not page.get("hasNextPage") or not page.get("endCursor"):
-                return FileViews(str(pull["id"]), str(pull["headRefOid"]), viewed)
-            cursor = {"cursor": str(page["endCursor"])}
+        pages = self._graphql(FILE_VIEWS_QUERY, "--paginate", "--slurp", owner=owner, name=name, number=number)
+        try:
+            pulls = [page["data"]["repository"]["pullRequest"] for page in pages]
+            viewed = {str(item["path"]): item.get("viewerViewedState") == VIEWED_STATE for pull in pulls for item in _nodes(pull["files"])}
+            return FileViews(str(pulls[0]["id"]), str(pulls[0]["headRefOid"]), viewed)
+        except (KeyError, TypeError, IndexError) as error:
+            raise ForgeError(f"GitHub did not return the files of pull request #{number}") from error
 
-    def mark_file_viewed(self, pull_id: str, path: str) -> None:
-        self._graphql(MARK_FILE_VIEWED_MUTATION, pullRequestId=pull_id, path=path)
+    def mark_files_viewed(self, pull_id: str, paths: Sequence[str]) -> None:
+        declarations = "".join(f", $p{index}: String!" for index in range(len(paths)))
+        fields = "\n  ".join(MARK_FILE_VIEWED_FIELD.format(index=index) for index in range(len(paths)))
+        mutation = f"mutation($pullRequestId: ID!{declarations}) {{\n  {fields}\n}}"
+        self._graphql(mutation, pullRequestId=pull_id, **{f"p{index}": path for index, path in enumerate(paths)})
 
     def can_reply(self, remote_id: str | None) -> bool:
         return remote_id is not None and remote_id.isdigit()
@@ -229,8 +222,8 @@ class GitHubAdapter:
             raise ForgeError(f"{url} is not an image bussola can show")
         return Asset(content_type, data)
 
-    def _graphql(self, query: str, **variables: str | int) -> Any:
-        args = ["api", "graphql", "-f", f"query={query}"]
+    def _graphql(self, query: str, *flags: str, **variables: str | int) -> Any:
+        args = ["api", "graphql", *flags, "-f", f"query={query}"]
         for name, value in variables.items():
             args += ["-F" if isinstance(value, int) else "-f", f"{name}={value}"]
         return self._json(args)

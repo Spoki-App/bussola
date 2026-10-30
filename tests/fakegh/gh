@@ -64,23 +64,20 @@ def variable(args, name):
 
 
 def file_views(args, state):
-    number = int(variable(args, "number"))
-    found = [pr for pr in state["prs"] if pr["number"] == number]
-    if not found:
-        return {"data": {"repository": {"pullRequest": None}}}
+    pull = next(pr for pr in state["prs"] if pr["number"] == int(variable(args, "number")))
     viewed = state.get("viewed", [])
     nodes = [{"path": item["filename"], "viewerViewedState": "VIEWED" if item["filename"] in viewed else "UNVIEWED"} for item in state["files"]]
     files = {"nodes": nodes, "pageInfo": {"hasNextPage": False, "endCursor": None}}
-    return {"data": {"repository": {"pullRequest": {"id": f"PR_{number}", "headRefOid": found[0]["headRefOid"], "files": files}}}}
+    return [{"data": {"repository": {"pullRequest": {"id": f"PR_{pull['number']}", "headRefOid": pull["headRefOid"], "files": files}}}}]
 
 
-def mark_file_viewed(args, state):
-    path = variable(args, "path")
-    if path in state.get("fail_viewed", []) or path not in [item["filename"] for item in state["files"]]:
-        fail(f"GraphQL: Could not mark {path} as viewed")
-    state["viewed"] = [*state.get("viewed", []), path]
+def mark_files_viewed(args, state):
+    paths = [arg.split("=", 1)[1] for arg in args if re.match(r"^p\d+=", arg)]
+    if any(path in state.get("fail_viewed", []) for path in paths):
+        fail("GraphQL: Could not mark the files as viewed")
+    state["viewed"] = [*state.get("viewed", []), *paths]
     STATE.write_text(json.dumps(state))
-    return {"data": {"markFileAsViewed": {"clientMutationId": None}}}
+    return {"data": {}}
 
 
 def main():
@@ -97,7 +94,7 @@ def main():
     if args[:2] == ["api", "graphql"] and any("ReviewThread(input" in arg for arg in args):
         if state.get("fail_resolve"):
             fail("GraphQL: Resource not accessible by integration")
-        thread_id = next(arg.split("=", 1)[1] for arg in args if arg.startswith("threadId="))
+        thread_id = variable(args, "threadId")
         resolved = not any("unresolveReviewThread" in arg for arg in args)
         for thread in state.get("conversation", {}).get("reviewThreads", []):
             if thread.get("id") == thread_id:
@@ -106,14 +103,14 @@ def main():
         print(json.dumps({"data": {"thread": {"isResolved": resolved}}}))
         return
     if args[:2] == ["api", "graphql"] and any("markFileAsViewed(input" in arg for arg in args):
-        print(json.dumps(mark_file_viewed(args, state)))
+        print(json.dumps(mark_files_viewed(args, state)))
         return
     if args[:2] == ["api", "graphql"] and any("viewerViewedState" in arg for arg in args):
         print(json.dumps(file_views(args, state)))
         return
     if args[:2] == ["api", "graphql"] and any("pullRequest(number" in arg for arg in args):
         conversation = state.get("conversation", {})
-        number = int(next(arg.split("=", 1)[1] for arg in args if arg.startswith("number=")))
+        number = int(variable(args, "number"))
         found = [pr for pr in state["prs"] if pr["number"] == number]
         pull = None
         if found:

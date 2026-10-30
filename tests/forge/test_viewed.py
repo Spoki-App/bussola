@@ -1,8 +1,5 @@
-from typing import Any
+import re
 
-import pytest
-
-from bussola.forge.github import GitHubAdapter
 from tests.apiclient import ApiClient, Json
 from tests.forge.conftest import FakeGh
 from tests.gitrepo import GitFixture
@@ -49,31 +46,26 @@ def sync(api: ApiClient, review: int) -> Json:
     return api.call("POST", f"/reviews/{review}/sync")
 
 
-def statuses(result: Json) -> dict[str, str]:
-    return {item["path"]: item["status"] for item in result["viewed_files"]}
+def viewed(fake_gh: FakeGh) -> list[str]:
+    return fake_gh.state().get("viewed", [])
 
 
-def marked(fake_gh: FakeGh) -> list[str]:
-    return [
-        arg.split("=", 1)[1]
-        for call in fake_gh.calls()
-        if any("markFileAsViewed" in arg for arg in call["args"])
-        for arg in call["args"]
-        if arg.startswith("path=")
-    ]
+def mark_calls(fake_gh: FakeGh) -> list[list[str]]:
+    calls = [call["args"] for call in fake_gh.calls() if any("markFileAsViewed" in arg for arg in call["args"])]
+    return [[arg.split("=", 1)[1] for arg in args if re.match(r"^p\d+=", arg)] for args in calls]
 
 
-def test_sync_marks_fully_approved_files_as_viewed(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
+def test_sync_marks_fully_approved_files_as_viewed_in_one_call(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
     review = setup_review(api, git_repo, fake_gh)
     api.approve(review, "util.py::double")
     api.approve(review, "lib.py::name")
 
     result = sync(api, review)
 
-    assert statuses(result) == {"lib.py": "marked", "util.py": "marked"}
-    assert result["viewed_error"] is None
-    assert sorted(fake_gh.state()["viewed"]) == ["lib.py", "util.py"]
+    assert (result["marked_viewed"], result["not_viewed"], result["viewed_error"]) == (["lib.py", "util.py"], {}, None)
+    assert mark_calls(fake_gh) == [["lib.py", "util.py"]]
     assert any("pullRequestId=PR_7" in arg for call in fake_gh.calls() for arg in call["args"])
+    assert sorted(viewed(fake_gh)) == ["lib.py", "util.py"]
 
 
 def test_partly_approved_files_stay_not_viewed(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
@@ -83,8 +75,8 @@ def test_partly_approved_files_stay_not_viewed(api: ApiClient, git_repo: GitFixt
 
     result = sync(api, review)
 
-    assert statuses(result) == {"util.py": "marked"}
-    assert marked(fake_gh) == ["util.py"]
+    assert result["marked_viewed"] == ["util.py"]
+    assert viewed(fake_gh) == ["util.py"]
 
 
 def test_file_approved_by_selected_lines_counts_as_fully_approved(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
@@ -95,11 +87,11 @@ def test_file_approved_by_selected_lines_counts_as_fully_approved(api: ApiClient
     fake_gh.configure(files=[{"filename": "notes.txt", "patch": ""}])
     api.refresh(review)
     api.approve_rows(review, "notes.txt", head_range=(2, 2))
-    assert sync(api, review)["viewed_files"] == []
+    assert sync(api, review)["marked_viewed"] == []
 
     api.approve_rows(review, "notes.txt", head_range=(3, 3))
 
-    assert statuses(sync(api, review)) == {"notes.txt": "marked"}
+    assert sync(api, review)["marked_viewed"] == ["notes.txt"]
 
 
 def test_files_changed_after_approval_stay_not_viewed(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
@@ -111,8 +103,8 @@ def test_files_changed_after_approval_stay_not_viewed(api: ApiClient, git_repo: 
     result = sync(api, review)
 
     assert result["refresh"]["created"] is True
-    assert statuses(result) == {"lib.py": "marked"}
-    assert marked(fake_gh) == ["lib.py"]
+    assert result["marked_viewed"] == ["lib.py"]
+    assert viewed(fake_gh) == ["lib.py"]
 
 
 def test_files_already_viewed_on_github_are_left_as_they_are(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
@@ -122,9 +114,9 @@ def test_files_already_viewed_on_github_are_left_as_they_are(api: ApiClient, git
 
     result = sync(api, review)
 
-    assert statuses(result) == {"util.py": "already_viewed"}
-    assert marked(fake_gh) == []
-    assert fake_gh.state()["viewed"] == ["app.py", "util.py"]
+    assert (result["marked_viewed"], result["not_viewed"]) == ([], {})
+    assert mark_calls(fake_gh) == []
+    assert viewed(fake_gh) == ["app.py", "util.py"]
 
 
 def test_a_file_that_cannot_be_marked_does_not_fail_the_sync(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
@@ -135,10 +127,10 @@ def test_a_file_that_cannot_be_marked_does_not_fail_the_sync(api: ApiClient, git
 
     result = sync(api, review)
 
-    assert statuses(result) == {"lib.py": "failed", "util.py": "marked"}
-    failed = next(item for item in result["viewed_files"] if item["path"] == "lib.py")
-    assert "Could not mark lib.py" in failed["detail"]
-    assert fake_gh.state()["viewed"] == ["util.py"]
+    assert result["marked_viewed"] == ["util.py"]
+    assert result["not_viewed"] == {"lib.py": "GraphQL: Could not mark the files as viewed"}
+    assert mark_calls(fake_gh) == [["lib.py", "util.py"], ["lib.py"], ["util.py"]]
+    assert viewed(fake_gh) == ["util.py"]
 
 
 def test_files_missing_from_the_pull_request_are_reported_as_not_marked(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
@@ -148,8 +140,8 @@ def test_files_missing_from_the_pull_request_are_reported_as_not_marked(api: Api
 
     result = sync(api, review)
 
-    assert result["viewed_files"] == [{"path": "util.py", "status": "failed", "detail": "Not changed in the pull request"}]
-    assert marked(fake_gh) == []
+    assert (result["marked_viewed"], result["not_viewed"]) == ([], {"util.py": "Not changed in the pull request"})
+    assert mark_calls(fake_gh) == []
 
 
 def test_nothing_is_marked_while_the_pull_request_head_differs(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
@@ -159,9 +151,9 @@ def test_nothing_is_marked_while_the_pull_request_head_differs(api: ApiClient, g
 
     result = sync(api, review)
 
-    assert result["viewed_files"] == []
+    assert result["marked_viewed"] == []
     assert result["viewed_error"].startswith("The pull request head (ffffffff) differs")
-    assert marked(fake_gh) == []
+    assert mark_calls(fake_gh) == []
 
 
 def test_github_is_not_asked_when_no_file_is_fully_approved(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
@@ -170,7 +162,7 @@ def test_github_is_not_asked_when_no_file_is_fully_approved(api: ApiClient, git_
 
     result = sync(api, review)
 
-    assert result["viewed_files"] == []
+    assert result["marked_viewed"] == []
     assert not any("viewerViewedState" in arg for call in fake_gh.calls() for arg in call["args"])
 
 
@@ -183,21 +175,5 @@ def test_a_review_without_pull_request_marks_nothing(api: ApiClient, git_repo: G
 
     result = sync(api, review)
 
-    assert result["viewed_files"] == []
+    assert result["marked_viewed"] == []
     assert fake_gh.calls() == []
-
-
-def test_file_views_follow_every_page(monkeypatch: pytest.MonkeyPatch) -> None:
-    pages = {
-        None: {"nodes": [{"path": "a.py", "viewerViewedState": "VIEWED"}], "pageInfo": {"hasNextPage": True, "endCursor": "c1"}},
-        "c1": {"nodes": [{"path": "b.py", "viewerViewedState": "UNVIEWED"}], "pageInfo": {"hasNextPage": False, "endCursor": "c2"}},
-    }
-
-    def graphql(_self: GitHubAdapter, _query: str, **variables: Any) -> Any:
-        return {"data": {"repository": {"pullRequest": {"id": "PR_1", "headRefOid": "abc", "files": pages[variables.get("cursor")]}}}}
-
-    monkeypatch.setattr(GitHubAdapter, "_graphql", graphql)
-
-    views = GitHubAdapter().file_views("acme/widgets", 1)
-
-    assert (views.remote_id, views.head_sha, views.viewed) == ("PR_1", "abc", {"a.py": True, "b.py": False})

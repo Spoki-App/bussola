@@ -49,9 +49,8 @@ class PublishPlan:
 def publish_comments(context: ReviewContext, adapter: ForgeAdapter, revision: Revision) -> PublishResult:
     link = require_link(context)
     pull = adapter.pull_request(link.repository, link.pr_number)
-    if pull.head_sha != revision.head_sha:
-        pr_head, reviewed = pull.head_sha[:SHORT_SHA], revision.head_sha[:SHORT_SHA]
-        raise ConflictError(f"The pull request head ({pr_head}) differs from the reviewed head ({reviewed}). Push the branch or refresh the review first.")
+    if (mismatch := head_mismatch(pull.head_sha, revision.head_sha)) is not None:
+        raise ConflictError(f"{mismatch} Push the branch or refresh the review first.")
     plan = build_plan(context, adapter, revision, adapter.diff_ranges(link.repository, link.pr_number))
     publisher = _Publisher(context, adapter, link, revision.head_sha, list(plan.skipped))
     review_url = publisher.submit_review(plan)
@@ -62,6 +61,12 @@ def publish_comments(context: ReviewContext, adapter: ForgeAdapter, revision: Re
     for comments, remote_id, body in plan.updates:
         publisher.update(comments, remote_id, body)
     return PublishResult(review_url, publisher.outcomes)
+
+
+def head_mismatch(pull_head: str, reviewed_head: str) -> str | None:
+    if pull_head == reviewed_head:
+        return None
+    return f"The pull request head ({pull_head[:SHORT_SHA]}) differs from the reviewed head ({reviewed_head[:SHORT_SHA]})."
 
 
 def require_link(context: ReviewContext) -> ForgeLink:

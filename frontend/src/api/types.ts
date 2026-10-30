@@ -226,18 +226,13 @@ export interface PublishOutcome {
   url: string | null
 }
 
-export interface ViewedFile {
-  path: string
-  status: 'marked' | 'already_viewed' | 'failed'
-  detail: string
-}
-
 export interface SyncResult {
   refresh: RefreshResult
   published: PublishResult | null
   publish_error: string | null
   unsent_comments: number
-  viewed_files: ViewedFile[]
+  marked_viewed: string[]
+  not_viewed: Record<string, string>
   viewed_error: string | null
 }
 

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Request, status
 from bussola.api.deps import ContextDep, ReviewerDep, repo_of, resolve_revision
 from bussola.api.schemas import RefreshIn, RefreshOut, ReviewDetailOut, ReviewerOut, SessionOut, SyncOut
 from bussola.api.state import app_state
-from bussola.api.views import publish_out, review_detail_out, revision_out, viewed_out
+from bussola.api.views import publish_out, review_detail_out, revision_out
 from bussola.forge.review_sync import Refreshed, refresh_with_fetch, sync_and_publish
 from bussola.review.repos import open_repo
 from bussola.review.revisions import refresh_review
@@ -41,7 +41,8 @@ def sync(context: ContextDep, request: Request) -> SyncOut:
         published=published,
         publish_error=outcome.publish_error,
         unsent_comments=outcome.unsent_comments,
-        viewed_files=viewed_out(outcome.viewed),
+        marked_viewed=outcome.viewed.marked,
+        not_viewed=outcome.viewed.failed,
         viewed_error=outcome.viewed.error,
     )
 

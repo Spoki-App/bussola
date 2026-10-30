@@ -15,12 +15,10 @@ from bussola.api.schemas import (
     RevisionOut,
     RowApprovalOut,
     UnitOut,
-    ViewedFileOut,
 )
 from bussola.forge.base import ForgeStatus, PullRequest
 from bussola.forge.publish import PublishResult, pending_comment_count
 from bussola.forge.pulls import is_pull_request_review
-from bussola.forge.viewed import ViewedResult
 from bussola.review.context import ReviewContext
 from bussola.review.images import image_type
 from bussola.review.overview import UnitView
@@ -87,10 +85,6 @@ def review_detail_out(context: ReviewContext, repo: Repo) -> ReviewDetailOut:
 def publish_out(result: PublishResult) -> PublishOut:
     outcomes = [PublishOutcomeOut(comment_ids=list(item.comment_ids), status=item.status.value, detail=item.detail, url=item.url) for item in result.outcomes]
     return PublishOut(review_url=result.review_url, outcomes=outcomes)
-
-
-def viewed_out(result: ViewedResult) -> list[ViewedFileOut]:
-    return [ViewedFileOut(path=item.path, status=item.status.value, detail=item.detail) for item in result.files]
 
 
 def unit_out(view: UnitView, open_threads: int) -> UnitOut:

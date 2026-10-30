@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from bussola.errors import ConflictError, InvalidRequestError
 from bussola.forge.base import ForgeAdapter, ForgeError
@@ -34,7 +34,7 @@ class SyncOutcome:
     published: PublishResult | None
     publish_error: str | None
     unsent_comments: int
-    viewed: ViewedResult = field(default_factory=lambda: ViewedResult([]))
+    viewed: ViewedResult
 
 
 def refresh_with_fetch(context: ReviewContext, adapter: ForgeAdapter, git_repo: GitRepo) -> Refreshed:
@@ -56,17 +56,17 @@ def sync_and_publish(context: ReviewContext, adapter: ForgeAdapter, git_repo: Gi
     published: PublishResult | None = None
     publish_error = None
     link = context.store.forge.link(context.review.id)
-    if link is None:
-        return SyncOutcome(refreshed, None, None, pending_comment_count(context, revision))
-    if pending_comment_count(context, revision) > 0:
+    pending = pending_comment_count(context, revision)
+    if link is not None and pending > 0:
         try:
             published = publish_comments(context, adapter, revision)
             context.store.commit()
         except PUBLISH_ERRORS as error:
             context.store.session.rollback()
             publish_error = str(error)
-    viewed = mark_approved_files_viewed(context, adapter, link, revision)
-    return SyncOutcome(refreshed, published, publish_error, pending_comment_count(context, revision), viewed)
+    viewed = mark_approved_files_viewed(context, adapter, link, revision) if link is not None else ViewedResult([], {})
+    unsent = pending_comment_count(context, revision) if published else pending
+    return SyncOutcome(refreshed, published, publish_error, unsent, viewed)
 
 
 def sync_pull_requests(session: ForgeSession, repo: Repo) -> SyncResult:

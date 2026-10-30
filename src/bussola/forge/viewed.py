@@ -1,63 +1,45 @@
 from dataclasses import dataclass
-from enum import StrEnum
+from itertools import batched
 
 from bussola.forge.base import ForgeAdapter, ForgeError
+from bussola.forge.publish import head_mismatch
 from bussola.review.context import ReviewContext
-from bussola.review.overview import unit_views
-from bussola.review.states import DONE_STATES
+from bussola.review.overview import complete_paths, unit_views
 from bussola.storage.models import ForgeLink, Revision
 
-SHORT_SHA = 8
-
-
-class ViewedStatus(StrEnum):
-    MARKED = "marked"
-    ALREADY_VIEWED = "already_viewed"
-    FAILED = "failed"
-
-
-@dataclass(frozen=True)
-class ViewedFile:
-    path: str
-    status: ViewedStatus
-    detail: str = ""
+MARK_BATCH_SIZE = 50
+NOT_IN_PULL_REQUEST = "Not changed in the pull request"
 
 
 @dataclass(frozen=True)
 class ViewedResult:
-    files: list[ViewedFile]
+    marked: list[str]
+    failed: dict[str, str]
     error: str | None = None
 
 
-def fully_approved_paths(context: ReviewContext, revision: Revision) -> list[str]:
-    approved: dict[str, bool] = {}
-    for view in unit_views(context, revision, texts=False):
-        path = view.snapshot.path
-        approved[path] = approved.get(path, True) and view.status.state in DONE_STATES
-    return sorted(path for path, done in approved.items() if done)
-
-
 def mark_approved_files_viewed(context: ReviewContext, adapter: ForgeAdapter, link: ForgeLink, revision: Revision) -> ViewedResult:
-    paths = fully_approved_paths(context, revision)
+    paths = complete_paths(unit_views(context, revision, texts=False))
     if not paths:
-        return ViewedResult([])
+        return ViewedResult([], {})
     try:
         views = adapter.file_views(link.repository, link.pr_number)
     except ForgeError as error:
-        return ViewedResult([], str(error))
-    if views.head_sha != revision.head_sha:
-        pr_head, reviewed = views.head_sha[:SHORT_SHA], revision.head_sha[:SHORT_SHA]
-        return ViewedResult([], f"The pull request head ({pr_head}) differs from the reviewed head ({reviewed}).")
-    return ViewedResult([_mark(adapter, views.remote_id, views.viewed, path) for path in paths])
+        return ViewedResult([], {}, str(error))
+    if (mismatch := head_mismatch(views.head_sha, revision.head_sha)) is not None:
+        return ViewedResult([], {}, mismatch)
+    failed = {path: NOT_IN_PULL_REQUEST for path in paths if path not in views.viewed}
+    to_mark = [path for path in paths if path in views.viewed and not views.viewed[path]]
+    for batch in batched(to_mark, MARK_BATCH_SIZE):
+        failed.update(_mark(adapter, views.remote_id, list(batch)))
+    return ViewedResult([path for path in to_mark if path not in failed], failed)
 
 
-def _mark(adapter: ForgeAdapter, pull_id: str, viewed: dict[str, bool], path: str) -> ViewedFile:
-    if path not in viewed:
-        return ViewedFile(path, ViewedStatus.FAILED, "Not changed in the pull request")
-    if viewed[path]:
-        return ViewedFile(path, ViewedStatus.ALREADY_VIEWED)
+def _mark(adapter: ForgeAdapter, pull_id: str, paths: list[str]) -> dict[str, str]:
     try:
-        adapter.mark_file_viewed(pull_id, path)
+        adapter.mark_files_viewed(pull_id, paths)
     except ForgeError as error:
-        return ViewedFile(path, ViewedStatus.FAILED, str(error))
-    return ViewedFile(path, ViewedStatus.MARKED)
+        if len(paths) == 1:
+            return {paths[0]: str(error)}
+        return {path: reason for single in paths for path, reason in _mark(adapter, pull_id, [single]).items()}
+    return {}
