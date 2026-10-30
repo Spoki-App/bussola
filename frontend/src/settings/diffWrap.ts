@@ -7,7 +7,7 @@ const STORAGE_KEY = 'bussola.diffWrap'
 const listeners = new Set<() => void>()
 let current: boolean | undefined
 
-export function loadDiffWrap(): boolean {
+function loadDiffWrap(): boolean {
   return readStored(STORAGE_KEY) !== 'false'
 }
 

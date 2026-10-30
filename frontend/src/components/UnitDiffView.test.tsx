@@ -80,14 +80,13 @@ describe('UnitDiffView line wrap', () => {
     expect(onLineNumberClick).toHaveBeenCalledWith(rows[2], 'new', true)
   })
 
-  it('keeps lines on one row without the indent wrapper when wrap is off', () => {
+  it('switches only the table class when wrap is turned off', () => {
     const { table, longCell } = renderDiff()
+    const body = longCell.querySelector('.line-body')
 
     act(() => { setDiffWrap(false) })
 
     expect(table).toHaveClass('nowrap')
-    expect(table).not.toHaveClass('wrap')
-    expect(longCell.querySelector('.line-indent, .line-body')).toBeNull()
-    expect(longCell.textContent).toBe(LONG_LINE)
+    expect(longCell.querySelector('.line-body')).toBe(body)
   })
 })

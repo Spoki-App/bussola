@@ -195,7 +195,6 @@ pre,
 
 .diff.nowrap .diff-code {
   white-space: pre;
-  overflow-wrap: normal;
 }
 
 .diff.nowrap .diff-widget-content > * {
@@ -1076,6 +1075,9 @@ textarea {
 .unit-body {
   border-top: 1px solid var(--border);
   overflow-x: auto;
+}
+
+.unit-body:has(> .diff.nowrap) {
   container-type: inline-size;
 }
 

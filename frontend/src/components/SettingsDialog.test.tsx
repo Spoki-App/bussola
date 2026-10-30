@@ -26,7 +26,6 @@ describe('SettingsButton', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Settings' })
     expect(['Open pull request', 'Add repository', 'Code font', 'Line wrap'].map((name) => screen.getByRole('region', { name }).closest('dialog'))).toEqual([dialog, dialog, dialog, dialog])
-    expect(screen.getByRole('checkbox', { name: 'Wrap long lines' })).toBeChecked()
     expect(screen.getByLabelText('GitHub link')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))

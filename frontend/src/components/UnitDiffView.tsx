@@ -7,7 +7,6 @@ import { collapsedUnified, segmentRows, type Segment } from '../review/collapse'
 import { diffTokens, languageFor } from '../review/highlight'
 import { isSelectable, rowKey } from '../review/selection'
 import { plural } from '../review/text'
-import { withHangingIndent } from '../review/wrap'
 import { useDiffWrap } from '../settings/diffWrap'
 
 const PLACEHOLDER_GUTTER = '⋯'
@@ -143,7 +142,6 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
     const whole: Segment[] = diff.rows.length > 0 ? [{ kind: 'rows', start: 0, end: diff.rows.length - 1 }] : []
     return diffTokens(parseDiff(collapsedUnified(header, diff.rows, whole))[0]?.hunks ?? [], languageFor(path))
   }, [header, diff.rows, path])
-  const shownTokens = useMemo(() => (wrap && tokens ? withHangingIndent(tokens) : tokens), [wrap, tokens])
 
   if (diff.binary) {
     return <p className="diff-note">Binary file, no diff available.</p>
@@ -165,7 +163,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       viewType="unified"
       diffType={file.type}
       hunks={file.hunks}
-      tokens={shownTokens}
+      tokens={tokens}
       selectedChanges={selectedChanges}
       widgets={widgetMap}
       className={`diff ${wrap ? 'wrap' : 'nowrap'}${selectable ? ' selectable' : ''}`}

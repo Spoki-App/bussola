@@ -3,6 +3,7 @@ import { common, createLowlight } from 'lowlight'
 import { tokenize, type HunkData, type HunkTokens } from 'react-diff-view'
 
 import { markChangedWords } from './edits'
+import { withHangingIndent } from './wrap'
 
 const lowlight = createLowlight(common)
 
@@ -105,7 +106,7 @@ export function diffTokens(hunks: HunkData[], language: string | null): HunkToke
   }
   const enhancers = [markChangedWords(hunks)]
   try {
-    return language === null ? tokenize(hunks, { highlight: false, enhancers }) : tokenize(hunks, { highlight: true, refractor, language, enhancers })
+    return withHangingIndent(language === null ? tokenize(hunks, { highlight: false, enhancers }) : tokenize(hunks, { highlight: true, refractor, language, enhancers }))
   } catch {
     return undefined
   }

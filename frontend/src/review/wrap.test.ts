@@ -1,6 +1,7 @@
-import type { TokenNode } from 'react-diff-view'
+import { parseDiff, type TokenNode } from 'react-diff-view'
 import { describe, expect, it } from 'vitest'
 
+import { diffTokens } from './highlight'
 import { hangingIndent, withHangingIndent } from './wrap'
 
 function text(value: string): TokenNode {
@@ -33,6 +34,13 @@ describe('hanging indent', () => {
     expect(hangingIndent(plain)).toBe(plain)
     expect(hangingIndent(blank)).toBe(blank)
     expect(hangingIndent([])).toEqual([])
+  })
+
+  it('is part of the highlighted diff tokens', () => {
+    const unified = ['--- a/app.py', '+++ b/app.py', '@@ -1,2 +1,2 @@', ' def total(items):', '-    return 0', '+    return sum(items)', ''].join('\n')
+    const tokens = diffTokens(parseDiff(unified)[0].hunks, 'python')
+    expect(tokens?.new[1].map((token) => token.type)).toEqual(['indent', 'body'])
+    expect(tokens?.old[1].map((token) => token.type)).toEqual(['indent', 'body'])
   })
 
   it('applies to both sides of the diff', () => {
