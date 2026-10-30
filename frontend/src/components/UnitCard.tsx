@@ -34,14 +34,13 @@ interface Props {
   onCommentSelectEnd?: () => void
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
-  nested?: boolean
 }
 
 const APPROVE_LABELS = { approve: 'Approve', approve_under_name: 'Approve under this name', confirm_removal: 'Confirm removal' } as const
 
 const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', base: 'Base → head' }
 
-export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, nested = false }: Props) {
+export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows }: Props) {
   const todo = unit.todo
   const [expanded, setExpanded] = useState(todo)
   const [wasTodo, setWasTodo] = useState(todo)
@@ -132,7 +131,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
           {expanded ? '▾' : '▸'}
         </button>
         <KindBadge kind={unit.kind} />
-        <QualifiedName module={unit.qualified_name ? unit.module : null} name={unitTitle(unit)} nested={nested && Boolean(unit.qualified_name)} />
+        <QualifiedName module={unit.qualified_name ? unit.module : null} name={unitTitle(unit)} />
         <StateBadge state={unit.state} />
         {unit.change_type !== 'modified' && <span className="label">{unit.change_type}</span>}
         {unit.base_changed && <span className="label" title="The base changed since you approved this unit">base changed</span>}

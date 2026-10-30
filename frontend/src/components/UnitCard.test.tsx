@@ -57,23 +57,20 @@ describe('UnitCard', () => {
     expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('shows the module before the name of a top-level unit only', () => {
+  it('shows the module before the name of every unit, methods included', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
     const client = new QueryClient()
-    const card = (nested: boolean, overrides: Partial<Unit>) => (
+    const card = (overrides: Partial<Unit>) => (
       <QueryClientProvider client={client}>
-        <UnitCard reviewId={1} unit={unit('approved', overrides)} nested={nested} focused={false} onFocus={() => undefined} register={() => undefined} />
+        <UnitCard reviewId={1} unit={unit('approved', overrides)} focused={false} onFocus={() => undefined} register={() => undefined} />
       </QueryClientProvider>
     )
-    const { container, rerender } = render(card(false, { module: 'shop.app', qualified_name: 'Cart.total' }))
-    expect(container.querySelector('.unit-header .qualified-name')).toHaveAttribute('title', 'shop.app.Cart.total')
-    expect(container.querySelector('.unit-module')?.textContent).toContain('shop.app.')
+    const { container, rerender } = render(card({ kind: 'method', module: 'shop.billing.invoices', qualified_name: 'InvoiceService.create' }))
+    expect(container.querySelector('.unit-header .qualified-name')).toHaveAttribute('title', 'shop.billing.invoices.InvoiceService.create')
+    expect(container.querySelector('.unit-header .qualified-name')?.textContent).toBe('shop.billing.invoices.InvoiceService.create')
+    expect(screen.getByText('create')).toHaveClass('unit-name')
 
-    rerender(card(true, { module: 'shop.app', qualified_name: 'Cart.total' }))
-    expect(container.querySelector('.unit-module')).toBeNull()
-    expect(screen.getByText('total')).toHaveAttribute('title', 'Cart.total')
-
-    rerender(card(false, { module: 'shop.app', kind: 'module', qualified_name: '' }))
+    rerender(card({ module: 'shop.app', kind: 'module', qualified_name: '' }))
     expect(container.querySelector('.unit-module')).toBeNull()
     expect(screen.getByText('Module code')).toBeInTheDocument()
   })

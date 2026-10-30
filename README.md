@@ -89,7 +89,7 @@ Units that still need review start open and the others closed. Approving a unit 
 
 Methods are shown inside their class's card. When only methods of a class changed, the class still gets a card, marked "no changes outside its methods", with nothing to approve.
 
-A unit's name starts with its module, muted: the dotted Python module (`bussola.review.anchoring.find_line`, without a leading `src/` or `__init__`), the file path without extension for TypeScript and JavaScript, and the package import path from `go.mod` for Go. Long modules are cut from the left; hover the name to see it whole. Methods inside a class card show only their own name. The box next to the unit filters finds units by any part of their module, name or path.
+A unit's name starts with its module, muted: the dotted Python module (`bussola.review.anchoring.find_line`, without a leading `src/` or `__init__`), the file path without extension for TypeScript and JavaScript, and the package import path from `go.mod` for Go. Methods keep their class too (`shop.billing.invoices.InvoiceService.create`), with the module muted and the unit's own name in bold. A title too long for its card is cut at the start with an ellipsis, so the name stays visible; hover it to see it whole. The box next to the unit filters finds units by any part of their module, name or path.
 
 A unit's own name does not count towards its content, so renaming a function with an unchanged body keeps the approval.
 

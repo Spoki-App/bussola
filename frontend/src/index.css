@@ -1030,37 +1030,30 @@ textarea {
   flex-shrink: 0;
 }
 
-.unit-header > .unit-name,
 .unit-header > .qualified-name {
   flex: 0 1 auto;
   min-width: 0;
-}
-
-.unit-header > .qualified-name {
   font-size: 13px;
 }
 
 .qualified-name {
-  display: inline-flex;
-  align-items: baseline;
-  min-width: 0;
+  display: inline-block;
   max-width: 100%;
+  overflow: hidden;
+  font-family: var(--mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
   vertical-align: bottom;
 }
 
-.unit-module {
-  flex: 0 1 auto;
-  font-family: var(--mono);
-}
-
-.unit-module::before,
-.unit-module::after {
+.qualified-name::before,
+.qualified-name::after {
   content: '\200e';
 }
 
 .qualified-name > .unit-name {
-  flex: 0 0 auto;
-  max-width: 100%;
   font-size: inherit;
 }
 
@@ -1622,8 +1615,7 @@ button.danger {
   justify-content: space-between;
 }
 
-.picker-path code,
-.unit-module {
+.picker-path code {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

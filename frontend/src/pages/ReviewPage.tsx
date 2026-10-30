@@ -258,12 +258,11 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
               <UnitTree
                 nodes={group.tree}
                 module={group.units.at(0)?.module ?? null}
-                renderUnit={(unit, nested) => (
+                renderUnit={(unit) => (
                   <UnitCard
                     key={unit.id}
                     reviewId={reviewId}
                     unit={unit}
-                    nested={nested}
                     focused={focusedUnit?.id === unit.id}
                     onFocus={focusUnit}
                     register={register}
