@@ -2,6 +2,8 @@ import type { Element, ElementContent, Text } from 'hast'
 import { common, createLowlight } from 'lowlight'
 import { tokenize, type HunkData, type HunkTokens } from 'react-diff-view'
 
+import { markChangedWords } from './edits'
+
 const lowlight = createLowlight(common)
 
 const EXTENSION_LANGUAGES: Record<string, string> = {
@@ -97,12 +99,13 @@ export function languageFor(path: string): string | null {
   return language && lowlight.registered(language) ? language : null
 }
 
-export function highlightTokens(hunks: HunkData[], language: string | null): HunkTokens | undefined {
-  if (language === null || hunks.length === 0) {
+export function diffTokens(hunks: HunkData[], language: string | null): HunkTokens | undefined {
+  if (hunks.length === 0) {
     return undefined
   }
+  const enhancers = [markChangedWords(hunks)]
   try {
-    return tokenize(hunks, { highlight: true, refractor, language })
+    return language === null ? tokenize(hunks, { highlight: false, enhancers }) : tokenize(hunks, { highlight: true, refractor, language, enhancers })
   } catch {
     return undefined
   }
