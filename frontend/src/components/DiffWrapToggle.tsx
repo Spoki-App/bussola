@@ -15,7 +15,7 @@ export function DiffWrapCheckbox() {
 export function DiffWrapButton() {
   const wrap = useDiffWrap()
   return (
-    <button type="button" aria-pressed={wrap} title={WRAP_TITLE} onClick={() => { setDiffWrap(!wrap) }}>
+    <button type="button" className="toggle" aria-pressed={wrap} title={WRAP_TITLE} onClick={() => { setDiffWrap(!wrap) }}>
       Wrap lines
     </button>
   )

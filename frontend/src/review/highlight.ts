@@ -105,9 +105,11 @@ export function diffTokens(hunks: HunkData[], language: string | null): HunkToke
     return undefined
   }
   const enhancers = [markChangedWords(hunks)]
+  let tokens: HunkTokens
   try {
-    return withHangingIndent(language === null ? tokenize(hunks, { highlight: false, enhancers }) : tokenize(hunks, { highlight: true, refractor, language, enhancers }))
+    tokens = language === null ? tokenize(hunks, { highlight: false, enhancers }) : tokenize(hunks, { highlight: true, refractor, language, enhancers })
   } catch {
     return undefined
   }
+  return withHangingIndent(tokens)
 }

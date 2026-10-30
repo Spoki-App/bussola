@@ -28,6 +28,21 @@ describe('hanging indent', () => {
     ])
   })
 
+  it('stops at the indentation and keeps the rest of the line as it is', () => {
+    const name = span('hljs-title', text('total'))
+    const rest = span('hljs-params', text('(items)'))
+    const [, body] = hangingIndent([text('  def '), name, rest])
+    expect(body.children?.[1]).toBe(name)
+    expect(body.children?.[2]).toBe(rest)
+  })
+
+  it('treats nodes without text or children as part of the indentation', () => {
+    expect(hangingIndent([{ type: 'element' }, text('  x')])).toEqual([
+      { type: 'indent', className: 'line-indent', children: [{ type: 'element' }, text('  ')] },
+      { type: 'body', className: 'line-body', children: [text('x')] },
+    ])
+  })
+
   it('leaves lines without indentation and blank lines as they are', () => {
     const plain = [text('def total():')]
     const blank = [text('    ')]

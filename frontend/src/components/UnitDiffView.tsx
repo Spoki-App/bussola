@@ -7,7 +7,6 @@ import { collapsedUnified, segmentRows, type Segment } from '../review/collapse'
 import { diffTokens, languageFor } from '../review/highlight'
 import { isSelectable, rowKey } from '../review/selection'
 import { plural } from '../review/text'
-import { useDiffWrap } from '../settings/diffWrap'
 
 const PLACEHOLDER_GUTTER = '⋯'
 const FILE_HEADER_LINES = 3
@@ -126,7 +125,6 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
     }
   }, [])
 
-  const wrap = useDiffWrap()
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const index = useMemo(() => buildIndex(diff.rows), [diff.rows])
   const widgetMap = widgets ? widgets(index.changeKeyOf) : undefined
@@ -166,7 +164,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       tokens={tokens}
       selectedChanges={selectedChanges}
       widgets={widgetMap}
-      className={`diff ${wrap ? 'wrap' : 'nowrap'}${selectable ? ' selectable' : ''}`}
+      className={selectable ? 'diff selectable' : 'diff'}
       generateLineClassName={({ changes, defaultGenerate }) => {
         const rows = changes.map((change) => index.rowOf(change))
         const classes = [defaultGenerate()]

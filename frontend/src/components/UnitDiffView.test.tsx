@@ -1,8 +1,7 @@
-import { act, fireEvent, render } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { DiffRow, UnitDiff } from '../api/types'
-import { setDiffWrap } from '../settings/diffWrap'
 import { UnitDiffView } from './UnitDiffView'
 
 const LONG_LINE = `        total = combine(${Array.from({ length: 30 }, (_, index) => `argument_${String(index)}`).join(', ')})`
@@ -37,24 +36,17 @@ function renderDiff() {
   const onRowClick = vi.fn()
   const onLineNumberClick = vi.fn()
   const view = render(<UnitDiffView diff={diff} path="app.py" selectable selected={new Set()} onRowClick={onRowClick} onLineNumberClick={onLineNumberClick} />)
-  const table = view.container.querySelector('table.diff')
   const longCell = [...view.container.querySelectorAll('td.diff-code')].find((cell) => cell.textContent === LONG_LINE)
-  if (!table || !longCell) {
+  if (!longCell) {
     throw new Error('diff not rendered')
   }
-  return { ...view, table, longCell, onRowClick, onLineNumberClick }
+  return { ...view, longCell, onRowClick, onLineNumberClick }
 }
 
-describe('UnitDiffView line wrap', () => {
-  afterEach(() => {
-    setDiffWrap(true)
-    window.localStorage.clear()
-  })
-
+describe('UnitDiffView hanging indent', () => {
   it('wraps by default with a hanging indent and one line number per source line', () => {
-    const { table, longCell } = renderDiff()
+    const { longCell } = renderDiff()
 
-    expect(table).toHaveClass('wrap')
     expect(longCell.querySelector('.line-indent')?.textContent).toBe('        ')
     expect(longCell.querySelector('.line-body')?.textContent).toBe(LONG_LINE.trimStart())
     const gutters = [...(longCell.closest('tr')?.querySelectorAll('td.diff-gutter') ?? [])].map((cell) => cell.textContent)
@@ -78,15 +70,5 @@ describe('UnitDiffView line wrap', () => {
       [rows[2], true],
     ])
     expect(onLineNumberClick).toHaveBeenCalledWith(rows[2], 'new', true)
-  })
-
-  it('switches only the table class when wrap is turned off', () => {
-    const { table, longCell } = renderDiff()
-    const body = longCell.querySelector('.line-body')
-
-    act(() => { setDiffWrap(false) })
-
-    expect(table).toHaveClass('nowrap')
-    expect(longCell.querySelector('.line-body')).toBe(body)
   })
 })

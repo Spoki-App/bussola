@@ -2,52 +2,54 @@ import type { HunkTokens, TokenNode } from 'react-diff-view'
 
 const NOT_INDENT = /[^ \t]/
 
-function textOf(token: TokenNode): string {
-  if (typeof token.value === 'string') {
-    return token.value
-  }
-  return (token.children ?? []).map(textOf).join('')
+interface IndentSplit {
+  head: TokenNode[]
+  tail: TokenNode[]
+  found: boolean
 }
 
-function splitToken(token: TokenNode, offset: number): [TokenNode, TokenNode] {
-  if (typeof token.value === 'string') {
-    return [
-      { ...token, value: token.value.slice(0, offset) },
-      { ...token, value: token.value.slice(offset) },
-    ]
+function splitText(token: TokenNode, value: string): IndentSplit {
+  const indent = value.search(NOT_INDENT)
+  if (indent < 0) {
+    return { head: [token], tail: [], found: false }
   }
-  const [head, tail] = splitTokens(token.children ?? [], offset)
-  return [
-    { ...token, children: head },
-    { ...token, children: tail },
-  ]
+  return {
+    head: indent > 0 ? [{ ...token, value: value.slice(0, indent) }] : [],
+    tail: [{ ...token, value: value.slice(indent) }],
+    found: true,
+  }
 }
 
-function splitTokens(tokens: TokenNode[], offset: number): [TokenNode[], TokenNode[]] {
-  let remaining = offset
+function splitTokenIndent(token: TokenNode): IndentSplit {
+  if (typeof token.value === 'string') {
+    return splitText(token, token.value)
+  }
+  const inner = splitIndent(token.children ?? [])
+  if (!inner.found) {
+    return { head: [token], tail: [], found: false }
+  }
+  return {
+    head: inner.head.length > 0 ? [{ ...token, children: inner.head }] : [],
+    tail: [{ ...token, children: inner.tail }],
+    found: true,
+  }
+}
+
+function splitIndent(tokens: TokenNode[]): IndentSplit {
   for (const [index, token] of tokens.entries()) {
-    const length = textOf(token).length
-    if (length === remaining) {
-      return [tokens.slice(0, index + 1), tokens.slice(index + 1)]
+    const split = splitTokenIndent(token)
+    if (split.found) {
+      return { head: [...tokens.slice(0, index), ...split.head], tail: [...split.tail, ...tokens.slice(index + 1)], found: true }
     }
-    if (length > remaining) {
-      const [head, tail] = splitToken(token, remaining)
-      return [
-        [...tokens.slice(0, index), head],
-        [tail, ...tokens.slice(index + 1)],
-      ]
-    }
-    remaining -= length
   }
-  return [tokens, []]
+  return { head: tokens, tail: [], found: false }
 }
 
 export function hangingIndent(line: TokenNode[]): TokenNode[] {
-  const indent = line.map(textOf).join('').search(NOT_INDENT)
-  if (indent <= 0) {
+  const { head, tail, found } = splitIndent(line)
+  if (!found || head.length === 0) {
     return line
   }
-  const [head, tail] = splitTokens(line, indent)
   return [
     { type: 'indent', className: 'line-indent', children: head },
     { type: 'body', className: 'line-body', children: tail },

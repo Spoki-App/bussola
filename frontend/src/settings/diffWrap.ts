@@ -16,12 +16,26 @@ function snapshot(): boolean {
   return current
 }
 
-export function setDiffWrap(wrap: boolean): void {
+function update(wrap: boolean): void {
   current = wrap
-  writeStored(STORAGE_KEY, String(wrap))
+  document.documentElement.dataset.diffWrap = wrap ? 'on' : 'off'
   for (const listener of listeners) {
     listener()
   }
+}
+
+export function setDiffWrap(wrap: boolean): void {
+  writeStored(STORAGE_KEY, String(wrap))
+  update(wrap)
+}
+
+export function syncDiffWrap(): void {
+  update(loadDiffWrap())
+  window.addEventListener('storage', (event) => {
+    if (event.key === STORAGE_KEY || event.key === null) {
+      update(loadDiffWrap())
+    }
+  })
 }
 
 function subscribe(listener: () => void): () => void {
