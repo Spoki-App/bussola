@@ -1,13 +1,15 @@
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from pydantic import BaseModel
 
-from bussola.ai.base import AiProvider, Cancellation
+from bussola.ai.base import AiError, AiProvider, Cancellation
 from bussola.ai.runner import AiRunner, AiTask
 
 MILLISECONDS = 1000
+logger = logging.getLogger(__name__)
 CONNECTION_TIMEOUT_SECONDS = 120.0
 
 
@@ -37,6 +39,8 @@ def check_connection(connect: Callable[[], AiProvider], cancellation: Cancellati
         provider = connect()
         check = AiRunner(provider).run(CONNECTION_CHECK, CONNECTION_PROMPT, cancellation)
     except Exception as error:
+        if not isinstance(error, AiError):
+            logger.exception("AI connection check failed")
         return ConnectionResult(False, str(error) or type(error).__name__, _elapsed(started))
     if not check.ok:
         return ConnectionResult(False, f"{provider.label} answered, but not with the expected result", _elapsed(started))

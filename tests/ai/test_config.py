@@ -319,3 +319,7 @@ def test_a_config_path_that_is_not_a_file_is_reported(tmp_path: Path) -> None:
 def test_an_endpoint_with_an_impossible_port_is_rejected() -> None:
     with pytest.raises(ValueError, match="Port out of range"):
         RepoAiConfig(endpoint="http://localhost:99999/v1")
+
+
+def test_claude_code_has_no_api_key_variable() -> None:
+    assert resolve_ai_settings(UserAiConfig(provider=ProviderName.CLAUDE_CODE, api_key_env="WORK_KEY")).api_key_env is None

@@ -159,6 +159,6 @@ def _merge(user: UserAiConfig, override: RepoAiConfig) -> AiSettings:
         model=model,
         endpoint=endpoint,
         timeout=user.timeout,
-        api_key_env=user_key if keeps_key else None,
+        api_key_env=user_key if keeps_key and provider != ProviderName.CLAUDE_CODE else None,
         max_tokens=user.max_tokens if own_provider else None,
     )

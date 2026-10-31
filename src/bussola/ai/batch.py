@@ -63,7 +63,10 @@ def run_batch[K: Hashable, T](
         else:
             repeats, previous_error = 0, None
         if on_progress is not None:
-            on_progress(BatchProgress(done, failed, len(items)))
+            try:
+                on_progress(BatchProgress(done, failed, len(items)))
+            except Exception:
+                logger.exception("AI batch progress report failed")
         if outcome.stopped_by is not None:
             break
     return outcome

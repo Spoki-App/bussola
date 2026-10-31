@@ -200,3 +200,12 @@ def test_different_errors_in_a_row_do_not_stop_the_batch() -> None:
 
     assert outcome.stopped_by is None
     assert len(outcome.errors) == 3
+
+
+def test_a_failing_progress_report_does_not_lose_the_results() -> None:
+    def report(_progress: BatchProgress) -> None:
+        raise RuntimeError("socket closed")
+
+    outcome = run_batch([1, 2], lambda item: item * 10, Cancellation(), report)
+
+    assert outcome.results == {1: 10, 2: 20}

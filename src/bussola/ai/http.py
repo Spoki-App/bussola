@@ -190,7 +190,7 @@ def _decode(url: str, body: bytes) -> dict[str, Any]:
         raise AiProviderError(f"{url} answered with more than {MAX_RESPONSE_BYTES // (1024 * 1024)} MB")
     try:
         decoded = json_object(json.loads(body))
-    except ValueError as error:
+    except (ValueError, RecursionError) as error:
         raise AiProviderError(f"{url} did not answer with JSON") from error
     if decoded is None:
         raise AiProviderError(f"{url} answered with unexpected JSON")

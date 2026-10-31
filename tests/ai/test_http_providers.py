@@ -386,6 +386,26 @@ def test_a_huge_answer_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
         OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 5.0).complete(REQUEST, Cancellation())
 
 
+def test_absurdly_nested_json_is_a_provider_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Response:
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return
+
+        def read(self, _size: int = -1) -> bytes:
+            return b"[" * 200_000 + b"]" * 200_000
+
+    def open_response(*_args: object, **_kwargs: object) -> Response:
+        return Response()
+
+    monkeypatch.setattr(urllib.request.OpenerDirector, "open", open_response)
+
+    with pytest.raises(AiProviderError, match="did not answer with JSON"):
+        OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 5.0).complete(REQUEST, Cancellation())
+
+
 def test_an_unreachable_endpoint_is_reported() -> None:
     with pytest.raises(AiProviderError, match=r"Cannot reach http://127\.0\.0\.1:9/chat/completions"):
         OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 5.0).complete(REQUEST, Cancellation())
