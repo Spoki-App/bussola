@@ -160,10 +160,18 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     writeStored(FILES_HIDDEN_KEY, String(!filesHidden))
   }
 
+  const [seenLinkKey, setSeenLinkKey] = useState<string | null>(null)
+  const linkIsNew = link !== undefined && link.key !== seenLinkKey
+  if (linkIsNew) {
+    setSeenLinkKey(link.key)
+    setAppliedLink(undefined)
+    setFilter('all')
+    setQuery('')
+  }
   const viewChanged = filter !== 'all' || query !== ''
   const resolveLink = () => (link?.ready && units.data && !units.isPlaceholderData ? link.resolve(units.data) : undefined)
-  const unitsUnavailable = units.isError || review.data?.latest_revision === null
-  const linkedTarget = !link || appliedLink !== undefined ? undefined : viewChanged || unitsUnavailable ? null : resolveLink()
+  const unitsUnavailable = review.isError || units.isError || review.data?.latest_revision === null
+  const linkedTarget = !link || linkIsNew || appliedLink !== undefined ? undefined : viewChanged || unitsUnavailable ? null : resolveLink()
   if (linkedTarget !== undefined) {
     setAppliedLink(linkedTarget)
     if (linkedTarget) {

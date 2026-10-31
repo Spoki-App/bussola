@@ -66,6 +66,19 @@ test('a review link with a thread opens its collapsed unit and shows the thread'
   await expect(page.locator(`#${threadId}`)).toBeInViewport()
 })
 
+test('a link to the review already open is applied too', async ({ page }) => {
+  await page.goto(`/?token=${E2E_TOKEN}`)
+  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  const card = page.locator('article.unit-card', { hasText: 'total' })
+  await expect(card.getByRole('button', { name: 'Expand unit' })).toBeVisible()
+
+  await page.evaluate("history.pushState(null, '', location.pathname + '?path=app.py&line=2'); dispatchEvent(new Event('bussola:navigate'))")
+
+  await expect(card).toHaveClass(/focused/)
+  await expect(card.getByRole('button', { name: 'Collapse unit' })).toBeVisible()
+  await expect(page).toHaveURL(/\/reviews\/\d+$/)
+})
+
 test('a pull request link of an unknown repository opens the add repository flow prefilled', async ({ page }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
 

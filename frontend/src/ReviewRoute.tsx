@@ -10,6 +10,7 @@ import { Composer } from './components/Composer'
 import { FileCommentButton } from './components/FileCommentButton'
 import { ThreadPanel } from './components/ThreadPanel'
 import { ThreadView } from './components/ThreadView'
+import { useSearch } from './navigation'
 import { ReviewPage } from './pages/ReviewPage'
 import { linkFocusFromSearch, resolveLinkFocus } from './review/linkFocus'
 import { draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, isOpen, nextDraft, threadRow, type Draft } from './review/threadPlacement'
@@ -30,17 +31,19 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
     return grouped
   }, [threads.data])
   const openCount = (threads.data ?? []).filter(isOpen).length
-  const [linkFocus] = useState(() => linkFocusFromSearch(window.location.search))
+  const search = useSearch()
+  const linkFocus = useMemo(() => linkFocusFromSearch(search), [search])
   const threadsSettled = threads.data !== undefined || threads.error !== null
   const link = useMemo(
     () =>
       linkFocus
         ? {
+            key: search,
             ready: threadsSettled || (linkFocus.thread === null && linkFocus.comment === null),
             resolve: (units: Unit[]) => resolveLinkFocus(linkFocus, units, threads.data ?? []),
           }
         : undefined,
-    [linkFocus, threadsSettled, threads.data],
+    [search, linkFocus, threadsSettled, threads.data],
   )
 
   const renderWidgets = useCallback(

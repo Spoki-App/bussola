@@ -23,6 +23,7 @@ export interface LinkState {
 }
 
 export interface PendingLink {
+  key: string
   ready: boolean
   resolve: (units: Unit[]) => FocusTarget | null
 }
@@ -44,7 +45,8 @@ const POSITIVE_NUMBER = /^[1-9]\d*$/
 
 export const LinkScrollContext = createContext<LinkScroll | null>(null)
 
-const FOCUS_PARAMS = ['path', 'line', 'thread', 'comment']
+const FOCUS_KEYS: Record<keyof LinkFocus, true> = { path: true, line: true, thread: true, comment: true }
+const FOCUS_PARAMS = Object.keys(FOCUS_KEYS)
 
 export function withoutLinkFocus(search: string): string {
   const params = new URLSearchParams(search)
