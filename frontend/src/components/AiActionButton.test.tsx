@@ -19,12 +19,15 @@ const LOCAL: AiStatus = {
   target: 'openai-compatible|qwen2.5-coder|http://localhost:11434/v1',
 }
 
-function renderButton(status: AiStatus, onRun = vi.fn(), later: AiStatus = status) {
+function renderButton(status: AiStatus, onRun = vi.fn(), later: AiStatus | null = status) {
   let calls = 0
   vi.stubGlobal(
     'fetch',
     vi.fn(() => {
       calls += 1
+      if (calls > 1 && later === null) {
+        return Promise.resolve(Response.json({ detail: 'Server error' }, { status: 500 }))
+      }
       return Promise.resolve(Response.json(calls === 1 ? status : later))
     }),
   )
@@ -137,5 +140,31 @@ describe('AiActionButton', () => {
 
     expect(await screen.findByRole('dialog')).toHaveTextContent('at http://other.example/v1.')
     expect(onRun).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when the status cannot be read again at click time', async () => {
+    window.localStorage.setItem('bussola.aiConsent', JSON.stringify([LOCAL.target]))
+    const onRun = renderButton(LOCAL, vi.fn(), null)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Describe' }))
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(onRun).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('runs once for a double click', async () => {
+    window.localStorage.setItem('bussola.aiConsent', JSON.stringify([LOCAL.target]))
+    const onRun = renderButton(LOCAL)
+
+    const button = await screen.findByRole('button', { name: 'Describe' })
+    fireEvent.click(button)
+    fireEvent.click(button)
+
+    await waitFor(() => {
+      expect(onRun).toHaveBeenCalledTimes(1)
+    })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(onRun).toHaveBeenCalledTimes(1)
   })
 })

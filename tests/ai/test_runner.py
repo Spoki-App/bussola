@@ -34,8 +34,9 @@ def test_the_answer_is_validated_against_the_task_schema() -> None:
     assert request.schema["required"] == ["impact", "reason"]
 
 
-def test_an_answer_in_a_code_fence_is_accepted() -> None:
-    assert parse_output('```json\n{"impact": "low", "reason": "Typo"}\n```', Rating) == Rating(impact="low", reason="Typo")
+@pytest.mark.parametrize("fence", ["json", "JSON", "jsonc", ""])
+def test_an_answer_in_a_code_fence_is_accepted(fence: str) -> None:
+    assert parse_output(f'```{fence}\n{{"impact": "low", "reason": "Typo"}}\n```', Rating) == Rating(impact="low", reason="Typo")
 
 
 @pytest.mark.parametrize(

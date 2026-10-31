@@ -1,7 +1,7 @@
 from collections.abc import Callable, Hashable, Sequence
 from dataclasses import dataclass, field
 
-from bussola.ai.base import AiCancelledError, AiNotConfiguredError, Cancellation
+from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiTargetChangedError, Cancellation
 
 
 @dataclass(frozen=True)
@@ -16,6 +16,7 @@ class BatchResult[K: Hashable, T]:
     results: dict[K, T] = field(default_factory=dict)
     errors: dict[K, str] = field(default_factory=dict)
     cancelled: bool = False
+    stopped_by: str | None = None
 
 
 def run_batch[K: Hashable, T](
@@ -35,8 +36,8 @@ def run_batch[K: Hashable, T](
         except AiCancelledError:
             outcome.cancelled = True
             break
-        except AiNotConfiguredError as error:
-            outcome.errors[item] = str(error)
+        except (AiNotConfiguredError, AiTargetChangedError) as error:
+            outcome.stopped_by = str(error)
             break
         except Exception as error:
             outcome.errors[item] = str(error) or type(error).__name__

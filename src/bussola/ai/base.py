@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
 POLL_SECONDS = 0.05
+WORKER_NAME = "bussola-ai-call"
 MAX_ERROR_LENGTH = 300
 
 
@@ -71,7 +72,7 @@ class Cancellation:
             raise AiCancelledError("Cancelled")
 
 
-def run_cancellable[T](work: Callable[[], T], cancellation: Cancellation, timeout: float) -> T:
+def run_cancellable[T](work: Callable[[], T], cancellation: Cancellation, timeout: float, abort: Callable[[], None] | None = None) -> T:
     cancellation.check()
     future: Future[T] = Future()
 
@@ -81,14 +82,19 @@ def run_cancellable[T](work: Callable[[], T], cancellation: Cancellation, timeou
         except BaseException as error:
             future.set_exception(error)
 
-    threading.Thread(target=target, daemon=True).start()
+    threading.Thread(target=target, name=WORKER_NAME, daemon=True).start()
     deadline = time.monotonic() + timeout
-    while not future.done():
-        cancellation.check()
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise _timed_out(timeout)
-        wait([future], timeout=min(POLL_SECONDS, remaining))
+    try:
+        while not future.done():
+            cancellation.check()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise _timed_out(timeout)
+            wait([future], timeout=min(POLL_SECONDS, remaining))
+    except AiError:
+        if abort is not None:
+            abort()
+        raise
     try:
         return future.result()
     except TimeoutError as error:

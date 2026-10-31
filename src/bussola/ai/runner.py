@@ -25,7 +25,7 @@ UNSUPPORTED_KEYWORDS = frozenset(
         "uniqueItems",
     }
 )
-CODE_FENCE = re.compile(r"^```(?:json)?\s*(?P<body>.*?)\s*```$", re.DOTALL)
+CODE_FENCE = re.compile(r"^```[\w-]*\s*(?P<body>.*?)\s*```$", re.DOTALL)
 REPORTED_ERRORS = 3
 
 

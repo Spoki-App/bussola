@@ -16,19 +16,29 @@ interface AiActionButtonProps {
 export function AiActionButton({ repoId, label, title, disabled = false, onRun }: AiActionButtonProps) {
   const status = useAiStatus(repoId)
   const [asking, setAsking] = useState<AiStatus | null>(null)
+  const starting = useRef(false)
   const ai = status.data
   if (ai === undefined || (!ai.configured && ai.problem === null)) {
     return null
   }
   const start = async () => {
-    const fresh = (await status.refetch()).data
-    if (!fresh?.configured || fresh.problem !== null || fresh.target === null) {
+    if (starting.current) {
       return
     }
-    if (hasAiConsent(fresh.target)) {
-      onRun(fresh.target)
-    } else {
-      setAsking(fresh)
+    starting.current = true
+    try {
+      const result = await status.refetch()
+      const fresh = result.isError ? undefined : result.data
+      if (!fresh?.configured || fresh.problem !== null || fresh.target === null) {
+        return
+      }
+      if (hasAiConsent(fresh.target)) {
+        onRun(fresh.target)
+      } else {
+        setAsking(fresh)
+      }
+    } finally {
+      starting.current = false
     }
   }
   return (

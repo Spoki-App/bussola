@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -119,6 +120,20 @@ def test_cancelling_also_stops_the_processes_the_cli_started(fake_claude: FakeCl
     with pytest.raises(AiCancelledError):
         provider().complete(REQUEST, cancellation)
 
+    child_pid = child_pid_file.read_text()
+    assert subprocess.run(["ps", "-o", "stat=", "-p", child_pid], capture_output=True, text=True, check=False).stdout.strip() in {"", "Z"}
+
+
+def test_processes_left_behind_by_the_cli_do_not_hold_up_its_answer(fake_claude: FakeClaude, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    child_pid_file = tmp_path / "child.pid"
+    monkeypatch.setenv("FAKE_CLAUDE_CHILD_PID", str(child_pid_file))
+    fake_claude.answer({"type": "result", "is_error": False, "result": '{"impact": "low"}'})
+    started = time.monotonic()
+
+    answer = provider(timeout=20).complete(REQUEST, Cancellation())
+
+    assert answer == '{"impact": "low"}'
+    assert time.monotonic() - started < 5
     child_pid = child_pid_file.read_text()
     assert subprocess.run(["ps", "-o", "stat=", "-p", child_pid], capture_output=True, text=True, check=False).stdout.strip() in {"", "Z"}
 

@@ -179,3 +179,17 @@ def test_max_tokens_is_a_user_only_cap() -> None:
     assert resolve_ai_settings(UserAiConfig(provider=ProviderName.ANTHROPIC, max_tokens=4000)).max_tokens == 4000
     with pytest.raises(ValueError, match="max_tokens"):
         RepoAiConfig.model_validate({"max_tokens": 4000})
+
+
+def test_a_repository_that_changes_nothing_is_not_named_as_the_source() -> None:
+    user = UserAiConfig(provider=ProviderName.CLAUDE_CODE)
+
+    assert resolve_ai_settings(user, RepoAiConfig(endpoint="http://ignored.example.com")).source == "user"
+    assert resolve_ai_settings(user, RepoAiConfig(provider=ProviderName.CLAUDE_CODE)).source == "user"
+
+
+def test_a_repository_switching_provider_does_not_inherit_max_tokens() -> None:
+    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="small", endpoint="http://localhost:11434/v1", max_tokens=512)
+
+    assert resolve_ai_settings(user, RepoAiConfig(provider=ProviderName.ANTHROPIC)).max_tokens is None
+    assert resolve_ai_settings(user, RepoAiConfig(model="bigger")).max_tokens == 512

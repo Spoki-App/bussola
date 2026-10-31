@@ -5,6 +5,7 @@ import shutil
 import signal
 import subprocess
 import tempfile
+import threading
 from typing import Any
 
 from bussola.ai.base import MAX_ERROR_LENGTH, AiNotConfiguredError, AiOutputError, AiProviderError, AiRequest, Cancellation, json_object, run_cancellable
@@ -12,6 +13,8 @@ from bussola.ai.config import PROVIDER_LABELS, ProviderName
 
 CLAUDE = "claude"
 CLAUDE_ENV = {"NO_COLOR": "1"}
+EXIT_POLL_SECONDS = 0.1
+PIPE_GRACE_SECONDS = 0.5
 
 
 def find_claude() -> str:
@@ -80,18 +83,28 @@ class ClaudeCodeProvider:
                 )
             except OSError as error:
                 raise AiProviderError(f"Cannot run claude: {error}") from error
+            finished = threading.Event()
+            threading.Thread(target=_stop_leftovers, args=(process, finished), daemon=True).start()
             try:
                 stdout, stderr = run_cancellable(lambda: process.communicate(prompt), cancellation, self._timeout)
             finally:
-                _kill_group(process)
+                finished.set()
+                if process.poll() is None:
+                    _kill_group(process)
+                process.wait()
         return process.returncode, stdout, stderr
 
 
+def _stop_leftovers(process: subprocess.Popen[str], finished: threading.Event) -> None:
+    while process.poll() is None and not finished.is_set():
+        finished.wait(EXIT_POLL_SECONDS)
+    if not finished.wait(PIPE_GRACE_SECONDS):
+        _kill_group(process)
+
+
 def _kill_group(process: subprocess.Popen[str]) -> None:
-    if process.poll() is None:
-        with contextlib.suppress(OSError):
-            os.killpg(process.pid, signal.SIGKILL)
-    process.wait()
+    with contextlib.suppress(OSError):
+        os.killpg(process.pid, signal.SIGKILL)
 
 
 def _envelope(stdout: str) -> dict[str, Any] | None:

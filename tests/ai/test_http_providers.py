@@ -1,5 +1,7 @@
 import json
 import threading
+import time
+import urllib.request
 from collections.abc import Generator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -7,9 +9,9 @@ from typing import Any
 import pytest
 
 from bussola.ai.anthropic_api import API_VERSION, AnthropicProvider
-from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiOutputError, AiProviderError, AiRequest, AiTimeoutError, Cancellation
+from bussola.ai.base import WORKER_NAME, AiCancelledError, AiNotConfiguredError, AiOutputError, AiProviderError, AiRequest, AiTimeoutError, Cancellation
 from bussola.ai.config import AiSettings, ProviderName
-from bussola.ai.http import LOCAL_OPENER, MAX_RESPONSE_BYTES, OPENER, opener_for
+from bussola.ai.http import MAX_RESPONSE_BYTES, bypasses_proxy
 from bussola.ai.openai_compatible import OpenAiCompatibleProvider
 from bussola.ai.providers import build_provider
 
@@ -192,7 +194,7 @@ def test_an_answer_that_is_not_utf8_is_a_provider_error(monkeypatch: pytest.Monk
     def open_response(*_args: object, **_kwargs: object) -> Response:
         return Response()
 
-    monkeypatch.setattr(LOCAL_OPENER, "open", open_response)
+    monkeypatch.setattr(urllib.request.OpenerDirector, "open", open_response)
 
     with pytest.raises(AiProviderError, match="did not answer with JSON"):
         OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 5.0).complete(REQUEST, Cancellation())
@@ -213,12 +215,14 @@ def test_a_redirect_is_refused_so_the_key_does_not_follow_it(stub: StubServer) -
         ("http://localhost:11434/v1", True),
         ("http://127.0.0.1:1234/v1", True),
         ("http://[::1]:8000/v1", True),
+        ("http://localhost.:11434/v1", True),
+        ("http://ollama.localhost/v1", True),
         ("https://api.anthropic.com", False),
         ("http://192.168.1.20:11434/v1", False),
     ],
 )
 def test_loopback_endpoints_never_go_through_a_proxy(url: str, local: bool) -> None:
-    assert opener_for(url) is (LOCAL_OPENER if local else OPENER)
+    assert bypasses_proxy(url) is local
 
 
 def test_a_huge_answer_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -235,7 +239,7 @@ def test_a_huge_answer_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
     def open_response(*_args: object, **_kwargs: object) -> Response:
         return Response()
 
-    monkeypatch.setattr(LOCAL_OPENER, "open", open_response)
+    monkeypatch.setattr(urllib.request.OpenerDirector, "open", open_response)
 
     with pytest.raises(AiProviderError, match=f"more than {MAX_RESPONSE_BYTES // (1024 * 1024)} MB"):
         OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 5.0).complete(REQUEST, Cancellation())
@@ -257,10 +261,29 @@ def test_a_socket_timeout_is_reported_as_a_timeout(monkeypatch: pytest.MonkeyPat
     def time_out(*_args: Any, **_kwargs: Any) -> None:
         raise TimeoutError("timed out")
 
-    monkeypatch.setattr(LOCAL_OPENER, "open", time_out)
+    monkeypatch.setattr(urllib.request.OpenerDirector, "open", time_out)
 
     with pytest.raises(AiTimeoutError, match=r"No answer within 0\.3 seconds"):
         OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 0.3).complete(REQUEST, Cancellation())
+
+
+def test_cancelling_closes_the_connection_instead_of_waiting_for_the_answer(stub: StubServer) -> None:
+    stub.reply({"choices": []}, delay=10)
+    cancellation = Cancellation()
+    threading.Timer(0.2, cancellation.cancel).start()
+
+    with pytest.raises(AiCancelledError):
+        OpenAiCompatibleProvider("gpt", stub.url, None, 10.0).complete(REQUEST, cancellation)
+
+    deadline = time.monotonic() + 2
+    while any(thread.name == WORKER_NAME for thread in threading.enumerate()) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not any(thread.name == WORKER_NAME for thread in threading.enumerate())
+
+
+def test_a_key_that_cannot_be_sent_in_a_header_is_a_provider_error(stub: StubServer) -> None:
+    with pytest.raises(AiProviderError, match="could not be sent"):
+        OpenAiCompatibleProvider("gpt", stub.url, "key\nwith a newline", 5.0).complete(REQUEST, Cancellation())
 
 
 def test_a_request_to_an_endpoint_can_be_cancelled(stub: StubServer) -> None:

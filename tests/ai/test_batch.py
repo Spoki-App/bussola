@@ -1,4 +1,4 @@
-from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiOutputError, Cancellation
+from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiOutputError, AiTargetChangedError, Cancellation
 from bussola.ai.batch import BatchProgress, run_batch
 
 
@@ -68,7 +68,8 @@ def test_a_configuration_error_stops_the_batch() -> None:
     outcome = run_batch([1, 2, 3], work, Cancellation())
 
     assert calls == [1]
-    assert outcome.errors == {1: "Set the ANTHROPIC_API_KEY environment variable"}
+    assert outcome.stopped_by == "Set the ANTHROPIC_API_KEY environment variable"
+    assert outcome.errors == {}
 
 
 def test_progress_counts_every_item_even_when_items_repeat() -> None:
@@ -77,3 +78,13 @@ def test_progress_counts_every_item_even_when_items_repeat() -> None:
     run_batch(["a", "b", "a"], str.upper, Cancellation(), progress.append)
 
     assert progress[-1] == BatchProgress(3, 0, 3)
+
+
+def test_a_changed_target_stops_the_batch() -> None:
+    def work(_item: int) -> int:
+        raise AiTargetChangedError("Confirm again")
+
+    outcome = run_batch([1, 2], work, Cancellation())
+
+    assert outcome.stopped_by == "Confirm again"
+    assert outcome.results == {}

@@ -1,6 +1,6 @@
 import os
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal
@@ -107,11 +107,15 @@ def load_user_config(path: Path | None) -> UserConfig:
 def resolve_ai_settings(user: UserAiConfig, repo: RepoAiConfig | None = None) -> AiSettings:
     if user.provider in (None, ProviderName.NONE):
         return AiSettings(ProviderName.NONE)
-    override = repo or RepoAiConfig()
-    source: ConfigSource = "repository" if override != RepoAiConfig() else "user"
-    provider = override.provider or user.provider
+    own = _merge(user, RepoAiConfig())
+    merged = _merge(user, repo or RepoAiConfig())
+    return merged if merged == own else replace(merged, source="repository")
+
+
+def _merge(user: UserAiConfig, override: RepoAiConfig) -> AiSettings:
+    provider = override.provider or user.provider or ProviderName.NONE
     if provider == ProviderName.NONE:
-        return AiSettings(ProviderName.NONE, source=source)
+        return AiSettings(ProviderName.NONE)
     own_provider = provider == user.provider
     base = user if own_provider else UserAiConfig(provider=provider)
     base_endpoint = base.endpoint or DEFAULT_ENDPOINTS.get(provider)
@@ -122,6 +126,5 @@ def resolve_ai_settings(user: UserAiConfig, repo: RepoAiConfig | None = None) ->
         endpoint=endpoint,
         timeout=user.timeout,
         api_key_env=(user.api_key_env or DEFAULT_KEY_ENV.get(provider)) if own_provider and endpoint == base_endpoint else None,
-        source=source,
-        max_tokens=user.max_tokens,
+        max_tokens=user.max_tokens if own_provider else None,
     )
