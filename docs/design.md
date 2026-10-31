@@ -168,9 +168,9 @@ Results are cached in `ai_results`, keyed by task, prompt version, provider, mod
 
 The user configuration (`config.toml`, `[ai]`) sets `provider`, `model`, `endpoint`, `timeout` and `api_key_env`. `.bussola.toml` may set `provider`, `model` and `endpoint`; anything else in its `[ai]` section is rejected. The repository applies only when the user chose a provider, so a cloned repository cannot turn AI on. The two are merged field by field when the repository keeps the user's provider. When it picks another provider, only the repository's fields and the provider defaults apply. `provider = "none"` turns AI off.
 
-`.bussola.toml` keeps its `[ai]` section as raw data and it is validated only when AI settings are loaded, so a mistake there turns AI off for the repository with the reason shown in Settings, and reviews keep working.
+`.bussola.toml` keeps its `[ai]` section as raw data and it is validated only when AI settings are loaded, so a mistake there turns AI off for the repository, with the reason on its AI buttons, and reviews keep working.
 
-Keys are read from the environment at each call: `ANTHROPIC_API_KEY` for `anthropic`, `OPENAI_API_KEY` for `openai-compatible`, or the variable named by `api_key_env`. No key is sent to an endpoint that only `.bussola.toml` names, so a cloned repository cannot redirect a key.
+Keys are read from the environment at each call: the variable named by `api_key_env`, or `ANTHROPIC_API_KEY` for `anthropic`. `openai-compatible` sends a key only when `api_key_env` names one. A key is used only with the user's own provider and endpoint (or that provider's default endpoint), so a cloned repository can neither redirect a key nor spend it on another provider. `claude-code` has no endpoint; one set in either file is ignored.
 
 ```
 GET    /ai                                     provider of the user configuration: label, model, endpoint, key variable and whether it is set, problem

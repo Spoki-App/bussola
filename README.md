@@ -167,7 +167,7 @@ provider = "anthropic"
 model = "claude-opus-5-5"  # the default
 ```
 
-**OpenAI-compatible endpoint** covers Ollama, LM Studio, vLLM and similar local servers, and hosted services with the same API. The key is optional and read from `OPENAI_API_KEY`. The answer length is capped with `max_completion_tokens`; servers that do not know it ignore it:
+**OpenAI-compatible endpoint** covers Ollama, LM Studio, vLLM and similar local servers, and hosted services with the same API. The key is optional: set `api_key_env` to the environment variable that holds it, and bussola sends it as a bearer token. The answer length is capped with `max_completion_tokens`; servers that do not know it ignore it:
 
 ```toml
 [ai]
@@ -176,11 +176,11 @@ endpoint = "http://localhost:11434/v1"  # Ollama; LM Studio uses http://localhos
 model = "qwen2.5-coder"
 ```
 
-Other options: `timeout` (seconds per request, default 120) and `api_key_env` (the name of another environment variable that holds the key, for example `api_key_env = "WORK_ANTHROPIC_KEY"`).
+Other options: `timeout` (seconds per request, default 600, at most 3600) and `api_key_env` (the name of the environment variable that holds the key, for example `api_key_env = "WORK_ANTHROPIC_KEY"`; the Anthropic API defaults to `ANTHROPIC_API_KEY`). Claude Code ignores `endpoint`.
 
 Keys are read only from environment variables. bussola never writes them to the database or to a configuration file, and `api_key` is not an accepted option.
 
-Once you have chosen a provider, a repository can override `provider`, `model` and `endpoint` in the `[ai]` section of its `.bussola.toml`, for example to use a local model for a confidential project or to turn AI off with `provider = "none"`. A repository cannot turn AI on when you have not chosen a provider, and cannot set `timeout` or `api_key_env`. A mistake in its `[ai]` section turns AI off for that repository and is shown in **Settings**; reviews keep working. When the repository chooses a different provider, nothing else is taken from your configuration, and API keys are never sent to an endpoint that only the repository's `.bussola.toml` names.
+Once you have chosen a provider, a repository can override `provider`, `model` and `endpoint` in the `[ai]` section of its `.bussola.toml`, for example to use a local model for a confidential project or to turn AI off with `provider = "none"`. A repository cannot turn AI on when you have not chosen a provider, and cannot set `timeout` or `api_key_env`. A mistake in its `[ai]` section turns AI off for that repository, and the AI buttons there show the reason; reviews keep working. When the repository chooses a different provider, nothing else is taken from your configuration and no API key is used. API keys are also never sent to an endpoint that only the repository's `.bussola.toml` names.
 
 ### What leaves your machine
 

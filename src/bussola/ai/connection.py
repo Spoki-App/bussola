@@ -34,9 +34,11 @@ def check_connection(connect: Callable[[], AiProvider], cancellation: Cancellati
     started = time.monotonic()
     try:
         provider = connect()
-        AiRunner(provider).run(CONNECTION_CHECK, CONNECTION_PROMPT, cancellation)
+        check = AiRunner(provider).run(CONNECTION_CHECK, CONNECTION_PROMPT, cancellation)
     except AiError as error:
         return ConnectionResult(False, str(error), _elapsed(started))
+    if not check.ok:
+        return ConnectionResult(False, f"{provider.label} answered, but not with the expected result", _elapsed(started))
     model = f" ({provider.model})" if provider.model else ""
     return ConnectionResult(True, f"{provider.label}{model} answered", _elapsed(started))
 

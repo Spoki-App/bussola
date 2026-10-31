@@ -17,11 +17,14 @@ export function AiActionButton({ repoId, label, title, disabled = false, onRun }
   const status = useAiStatus(repoId)
   const [asking, setAsking] = useState(false)
   const ai = status.data
-  if (!ai?.configured || ai.target === null) {
+  if (ai === undefined || (!ai.configured && ai.problem === null)) {
     return null
   }
   const target = ai.target
   const start = () => {
+    if (target === null) {
+      return
+    }
     if (hasAiConsent(target)) {
       onRun()
     } else {
@@ -30,7 +33,7 @@ export function AiActionButton({ repoId, label, title, disabled = false, onRun }
   }
   return (
     <>
-      <button type="button" title={ai.problem ?? title} disabled={disabled || ai.problem !== null} onClick={start}>
+      <button type="button" title={ai.problem ?? title} disabled={disabled || ai.problem !== null || target === null} onClick={start}>
         {label}
       </button>
       {asking && (
@@ -38,7 +41,7 @@ export function AiActionButton({ repoId, label, title, disabled = false, onRun }
           ai={ai}
           onAnswer={(accepted) => {
             setAsking(false)
-            if (accepted) {
+            if (accepted && target !== null) {
               rememberAiConsent(target)
               onRun()
             }

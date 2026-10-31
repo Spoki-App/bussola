@@ -9,11 +9,12 @@ import platformdirs
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from bussola.ai.base import AiNotConfiguredError
+from bussola.storage.database import APP_NAME
 
-APP_NAME = "bussola"
 CONFIG_DIR_ENV = "BUSSOLA_CONFIG_DIR"
 CONFIG_FILE = "config.toml"
-DEFAULT_TIMEOUT_SECONDS = 120.0
+DEFAULT_TIMEOUT_SECONDS = 600.0
+MAX_TIMEOUT_SECONDS = 3600.0
 HTTP_SCHEMES = ("http://", "https://")
 
 
@@ -31,7 +32,7 @@ PROVIDER_LABELS = {
 }
 DEFAULT_MODELS = {ProviderName.ANTHROPIC: "claude-opus-5-5"}
 DEFAULT_ENDPOINTS = {ProviderName.ANTHROPIC: "https://api.anthropic.com"}
-DEFAULT_KEY_ENV = {ProviderName.ANTHROPIC: "ANTHROPIC_API_KEY", ProviderName.OPENAI_COMPATIBLE: "OPENAI_API_KEY"}
+DEFAULT_KEY_ENV = {ProviderName.ANTHROPIC: "ANTHROPIC_API_KEY"}
 
 type ConfigSource = Literal["user", "repository"]
 
@@ -52,7 +53,7 @@ class RepoAiConfig(BaseModel):
 
 
 class UserAiConfig(RepoAiConfig):
-    timeout: float = Field(default=DEFAULT_TIMEOUT_SECONDS, gt=0)
+    timeout: float = Field(default=DEFAULT_TIMEOUT_SECONDS, gt=0, le=MAX_TIMEOUT_SECONDS)
     api_key_env: str | None = None
 
 
@@ -109,14 +110,15 @@ def resolve_ai_settings(user: UserAiConfig, repo: RepoAiConfig | None = None) ->
     provider = override.provider or user.provider
     if provider == ProviderName.NONE:
         return AiSettings(ProviderName.NONE, source=source)
-    base = user if provider == user.provider else UserAiConfig(provider=provider)
+    own_provider = provider == user.provider
+    base = user if own_provider else UserAiConfig(provider=provider)
     base_endpoint = base.endpoint or DEFAULT_ENDPOINTS.get(provider)
-    endpoint = override.endpoint or base_endpoint
+    endpoint = None if provider == ProviderName.CLAUDE_CODE else override.endpoint or base_endpoint
     return AiSettings(
         provider=provider,
         model=override.model or base.model or DEFAULT_MODELS.get(provider),
         endpoint=endpoint,
         timeout=user.timeout,
-        api_key_env=(base.api_key_env or DEFAULT_KEY_ENV.get(provider)) if endpoint == base_endpoint else None,
+        api_key_env=(user.api_key_env or DEFAULT_KEY_ENV.get(provider)) if own_provider and endpoint == base_endpoint else None,
         source=source,
     )

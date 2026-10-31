@@ -56,6 +56,15 @@ describe('AiActionButton', () => {
     expect(screen.queryByRole('button', { name: 'Describe' })).toBeNull()
   })
 
+  it('is disabled with the reason when the repository configuration is invalid', async () => {
+    renderButton({ ...LOCAL, configured: false, provider: null, label: null, target: null, problem: 'Invalid configuration in /repo/.bussola.toml' })
+
+    const button = await screen.findByRole('button', { name: 'Describe' })
+
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('title', 'Invalid configuration in /repo/.bussola.toml')
+  })
+
   it('is disabled with the reason when the provider cannot be used', async () => {
     const onRun = renderButton({ ...LOCAL, problem: 'Set model in the [ai] section of the configuration' })
 

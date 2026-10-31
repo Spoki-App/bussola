@@ -132,6 +132,15 @@ def test_test_connection_asks_the_provider_for_a_tiny_structured_answer(data_dir
     assert provider.requests[0].max_tokens == DEFAULT_MAX_TOKENS
 
 
+def test_test_connection_fails_when_the_model_does_not_answer_ok(data_dir: Path, config_file: Path) -> None:
+    write(config_file, ANTHROPIC)
+
+    result = client(data_dir, config_file, FakeProvider({"ok": False})).post("/api/ai/test").json()
+
+    assert result["ok"] is False
+    assert result["message"] == "Fake provider answered, but not with the expected result"
+
+
 def test_test_connection_reports_a_failure(data_dir: Path, config_file: Path) -> None:
     write(config_file, ANTHROPIC)
     provider = FakeProvider(AiProviderError("Cannot reach https://api.anthropic.com/v1/messages: timed out"))

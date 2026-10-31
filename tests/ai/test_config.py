@@ -20,7 +20,7 @@ def test_the_user_configuration_selects_the_provider(tmp_path: Path) -> None:
 
     settings = load_ai_settings(config)
 
-    assert settings == AiSettings(ProviderName.OPENAI_COMPATIBLE, "qwen2.5-coder", "http://localhost:11434/v1", 30, "OPENAI_API_KEY", "user")
+    assert settings == AiSettings(ProviderName.OPENAI_COMPATIBLE, "qwen2.5-coder", "http://localhost:11434/v1", 30, None, "user")
     assert settings.label == "OpenAI-compatible endpoint"
     assert settings.target == "openai-compatible|qwen2.5-coder|http://localhost:11434/v1"
 
@@ -47,6 +47,8 @@ def test_the_key_comes_only_from_the_environment(monkeypatch: pytest.MonkeyPatch
         ('[ai]\napi_key = "sk-test"\n', "api_key"),
         ('[ai]\nendpoint = "file:///etc/passwd"\n', "endpoint must start with http:// or https://"),
         ("[ai\n", "Invalid configuration"),
+        ("[ai]\ntimeout = inf\n", "timeout"),
+        ("[ai]\ntimeout = 0\n", "timeout"),
     ],
 )
 def test_an_invalid_user_configuration_is_reported(tmp_path: Path, content: str, detail: str) -> None:
@@ -75,6 +77,31 @@ def test_a_repository_switching_provider_does_not_inherit_the_user_model() -> No
     assert settings == AiSettings(ProviderName.CLAUDE_CODE, source="repository")
 
 
+def test_a_repository_switching_to_a_cloud_provider_gets_no_key() -> None:
+    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="qwen2.5-coder", endpoint="http://localhost:11434/v1")
+
+    settings = resolve_ai_settings(user, RepoAiConfig(provider=ProviderName.ANTHROPIC))
+
+    assert settings.endpoint == "https://api.anthropic.com"
+    assert settings.api_key_env is None
+
+
+def test_an_openai_compatible_key_is_sent_only_when_its_variable_is_named() -> None:
+    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="gpt", endpoint="https://models.example.com/v1")
+
+    assert resolve_ai_settings(user).api_key_env is None
+    assert resolve_ai_settings(user.model_copy(update={"api_key_env": "MODELS_KEY"})).api_key_env == "MODELS_KEY"
+
+
+def test_claude_code_has_no_endpoint_even_when_one_is_set() -> None:
+    user = UserAiConfig(provider=ProviderName.CLAUDE_CODE, endpoint="https://ignored.example.com")
+
+    settings = resolve_ai_settings(user, RepoAiConfig(endpoint="https://collector.example.com"))
+
+    assert settings.endpoint is None
+    assert settings.target == "claude-code||"
+
+
 def test_a_repository_can_turn_ai_off() -> None:
     settings = resolve_ai_settings(UserAiConfig(provider=ProviderName.ANTHROPIC), RepoAiConfig(provider=ProviderName.NONE))
 
@@ -83,12 +110,12 @@ def test_a_repository_can_turn_ai_off() -> None:
 
 
 def test_no_key_is_sent_to_an_endpoint_set_by_the_repository() -> None:
-    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="gpt", endpoint="http://localhost:11434/v1")
+    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="gpt", endpoint="http://localhost:11434/v1", api_key_env="LOCAL_KEY")
 
     same = resolve_ai_settings(user, RepoAiConfig(endpoint="http://localhost:11434/v1"))
     other = resolve_ai_settings(user, RepoAiConfig(endpoint="https://models.example.com/v1"))
 
-    assert same.api_key_env == "OPENAI_API_KEY"
+    assert same.api_key_env == "LOCAL_KEY"
     assert other.api_key_env is None
     assert other.endpoint == "https://models.example.com/v1"
 
