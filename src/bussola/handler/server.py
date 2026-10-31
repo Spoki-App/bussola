@@ -1,7 +1,6 @@
 import contextlib
 import http.client
 import ipaddress
-import json
 import logging
 import os
 import re
@@ -27,7 +26,7 @@ from pydantic import TypeAdapter, ValidationError
 from bussola.config import DEFAULT_HOST, DEFAULT_PORT
 from bussola.errors import DomainError
 from bussola.handler.links import browser_path, parse_link
-from bussola.security import INVALID_TOKEN_DETAIL, TOKEN_COOKIE, TOKEN_ENV, TOKEN_QUERY, host_port, new_token
+from bussola.security import TOKEN_COOKIE, TOKEN_ENV, TOKEN_QUERY, host_port, new_token
 from bussola.storage.database import DATA_DIR_ENV
 
 SERVERS_DIR = "servers"
@@ -36,7 +35,6 @@ HEALTH_PATH = "/api/health"
 HEALTH_TIMEOUT_SECONDS = 2.0
 START_TIMEOUT_SECONDS = 30.0
 EXIT_GRACE_SECONDS = 5.0
-MAX_PROBE_BODY = 512
 IPV6_LOOPBACK = "::1"
 UNSAFE_FILE_CHARACTERS = re.compile(r"[^A-Za-z0-9.-]")
 POLL_INTERVAL_SECONDS = 0.25
@@ -110,7 +108,6 @@ def _read_address(path: Path) -> ServerAddress | None:
 
 class Probe(StrEnum):
     READY = "ready"
-    OTHER_BUSSOLA = "other_bussola"
     CLOSED = "closed"
     UNKNOWN = "unknown"
 
@@ -119,24 +116,20 @@ def probe_server(address: ServerAddress) -> Probe:
     connection = http.client.HTTPConnection(address.host, address.port, timeout=HEALTH_TIMEOUT_SECONDS)
     try:
         connection.request("GET", HEALTH_PATH, headers={"Cookie": f"{TOKEN_COOKIE}={address.token}"})
-        response = connection.getresponse()
-        status, body = response.status, response.read(MAX_PROBE_BODY)
+        status = connection.getresponse().status
     except ConnectionRefusedError:
         return Probe.CLOSED
     except (OSError, http.client.HTTPException):
         return Probe.UNKNOWN
     finally:
         connection.close()
-    if status == HTTPStatus.OK:
-        return Probe.READY
-    return Probe.OTHER_BUSSOLA if status == HTTPStatus.FORBIDDEN and _is_token_refusal(body) else Probe.UNKNOWN
+    return Probe.READY if status == HTTPStatus.OK else Probe.UNKNOWN
 
 
-def _is_token_refusal(body: bytes) -> bool:
-    try:
-        return json.loads(body) == {"detail": INVALID_TOKEN_DETAIL}
-    except ValueError:
-        return False
+def free_port(host: str) -> int:
+    with socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET) as probe:
+        probe.bind((host, 0))
+        return probe.getsockname()[1]
 
 
 def record_link_error(data_dir: Path, link: str, error: Exception) -> None:
@@ -215,8 +208,12 @@ class Launcher:
             running = self._first_ready(self._probe_all(pool))
             if running is not None:
                 return running
-            address = ServerAddress(DEFAULT_HOST, DEFAULT_PORT, new_token())
-            return self._wait_for_server(pool, address, self.start(address, self.data_dir))
+            for port in (DEFAULT_PORT, None):
+                address = ServerAddress(DEFAULT_HOST, port or free_port(DEFAULT_HOST), new_token())
+                found = self._wait_for_server(pool, address, self.start(address, self.data_dir))
+                if found is not None:
+                    return found
+        raise ServerStartError("bussola did not start. Run `bussola serve` to see why.")
 
     def _probe_all(self, pool: ThreadPoolExecutor, *extra: ServerAddress) -> dict[ServerAddress, Probe]:
         published = published_servers(self.data_dir)
@@ -231,23 +228,14 @@ class Launcher:
     def _first_ready(self, states: dict[ServerAddress, Probe]) -> ServerAddress | None:
         return next((candidate for candidate, state in states.items() if state == Probe.READY), None)
 
-    def _wait_for_server(self, pool: ThreadPoolExecutor, started: ServerAddress, process: Process) -> ServerAddress:
+    def _wait_for_server(self, pool: ThreadPoolExecutor, started: ServerAddress, process: Process) -> ServerAddress | None:
         deadline = time.monotonic() + self.timeout
         while True:
-            states = self._probe_all(pool, started)
-            found = self._first_ready(states)
+            found = self._first_ready(self._probe_all(pool, started))
             if found is not None:
                 return found
             if process.poll() is not None:
                 deadline = min(deadline, time.monotonic() + self.exit_grace)
             if time.monotonic() >= deadline:
-                raise _start_error(started, states[started])
+                return None
             self.sleep(POLL_INTERVAL_SECONDS)
-
-
-def _start_error(address: ServerAddress, state: Probe) -> ServerStartError:
-    where = host_port(address.host, address.port)
-    if state == Probe.OTHER_BUSSOLA:
-        reason = "it was started with another BUSSOLA_DATA_DIR or by an older version. Stop it, or open the link it printed."
-        return ServerStartError(f"Another bussola is running on {where} but this link cannot use it: {reason}")
-    return ServerStartError(f"bussola did not start on {where}. Another program may be using that port. Run `bussola serve` to see why.")
