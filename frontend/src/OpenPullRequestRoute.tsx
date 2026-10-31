@@ -9,6 +9,8 @@ import { navigate, reviewPath } from './navigation'
 import { addRepositoryPath } from './review/linkFocus'
 import { pullRequestRepository } from './review/pullRequestLink'
 
+const NO_LOCAL_CLONE = 'no_local_clone'
+
 export function OpenPullRequestRoute({ url }: { url: string }) {
   const open = useOpenPullRequestLink()
   const started = useRef(false)
@@ -23,7 +25,7 @@ export function OpenPullRequestRoute({ url }: { url: string }) {
     open.mutate(url, {
       onSuccess: (review) => { navigate(`${reviewPath(review.id)}${search}`, { replace: true }) },
       onError: (error) => {
-        if (error instanceof ApiError && error.status === 404 && repository) {
+        if (error instanceof ApiError && error.code === NO_LOCAL_CLONE && repository) {
           navigate(addRepositoryPath(repository, `${pathname}${search}`), { replace: true })
         }
       },

@@ -2,10 +2,12 @@ const API_BASE = '/api'
 
 export class ApiError extends Error {
   readonly status: number
+  readonly code: string | null
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code: string | null = null) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -17,24 +19,26 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   if (!response.ok) {
-    throw new ApiError(response.status, await errorMessage(response))
+    throw await apiError(response)
   }
   return (await response.json()) as T
 }
 
-async function errorMessage(response: Response): Promise<string> {
+async function apiError(response: Response): Promise<ApiError> {
+  const fallback = `Request failed with status ${String(response.status)}`
   try {
-    const payload = (await response.json()) as { detail?: unknown }
+    const payload = (await response.json()) as { detail?: unknown; code?: unknown }
+    const code = typeof payload.code === 'string' ? payload.code : null
     if (typeof payload.detail === 'string') {
-      return payload.detail
+      return new ApiError(response.status, payload.detail, code)
     }
     if (Array.isArray(payload.detail)) {
-      return payload.detail.map((item: { msg?: string }) => item.msg ?? '').join('; ')
+      return new ApiError(response.status, payload.detail.map((item: { msg?: string }) => item.msg ?? '').join('; '), code)
     }
   } catch {
-    return `Request failed with status ${String(response.status)}`
+    return new ApiError(response.status, fallback)
   }
-  return `Request failed with status ${String(response.status)}`
+  return new ApiError(response.status, fallback)
 }
 
 export const getJson = <T>(path: string) => request<T>('GET', path)

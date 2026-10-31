@@ -156,6 +156,7 @@ def test_a_pull_request_link_without_a_local_clone_is_reported(api: ApiClient, g
     error = open_link(api, "https://github.com/acme/gadgets/pull/7", 404)
 
     assert "github.com/acme/gadgets" in error["detail"]
+    assert error["code"] == "no_local_clone"
 
 
 def test_a_link_that_is_not_a_pull_request_is_rejected(api: ApiClient) -> None:

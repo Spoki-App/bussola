@@ -12,6 +12,7 @@ def test_unknown_branch_is_a_clear_client_error(api: ApiClient, git_repo: GitFix
     error = api.call("POST", f"/repos/{repo['id']}/reviews", 400, {"head_ref": "nope", "base_ref": "main"})
 
     assert "nope" in error["detail"]
+    assert "code" not in error
 
 
 def test_refresh_after_branch_deletion_reports_the_missing_ref(api: ApiClient, git_repo: GitFixture) -> None:

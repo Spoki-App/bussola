@@ -19,6 +19,10 @@ OPEN_STATE = "OPEN"
 PULL_URL = re.compile(r"^(?:https?://)?(?:www\.)?github\.com/(?P<repository>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(?P<number>\d+)(?:[/?#].*)?$")
 
 
+class NoLocalCloneError(NotFoundError):
+    code = "no_local_clone"
+
+
 @dataclass(frozen=True)
 class GitHubRemote:
     remote: str
@@ -69,7 +73,7 @@ def find_repo_for(store: Store, adapter: ForgeAdapter, repository: str, candidat
             continue
         if matches:
             return register_repo(store, path)
-    raise NotFoundError(f"No local clone of github.com/{repository} was found. Add its folder as a repository first.")
+    raise NoLocalCloneError(f"No local clone of github.com/{repository} was found. Add its folder as a repository first.")
 
 
 def is_pull_request_review(review: Review) -> bool:
