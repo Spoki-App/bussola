@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
 from bussola.cli import app
 from bussola.handler import registration, server
+from tests.apiclient import ApiClient
 from tests.gitrepo import GitFixture
 
 runner = CliRunner()
@@ -75,7 +75,7 @@ def test_bussola_toml_file_level_and_ignore_globs(git_repo: GitFixture) -> None:
 
 def test_install_and_uninstall_handler_apply_the_platform_registration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     commands: list[tuple[str, ...]] = []
-    handler = registration.linux_registration(("/usr/bin/python3", "-m", "bussola", "open-link"), tmp_path / "applications")
+    handler = registration.linux_registration(("/usr/bin/python3", "-m", "bussola", "open-link"), tmp_path / "applications", tmp_path / "mimeapps.list")
 
     def record(argv: Sequence[str]) -> None:
         commands.append(tuple(argv))
@@ -105,28 +105,32 @@ def test_install_handler_reports_unsupported_platforms(monkeypatch: pytest.Monke
     assert "not supported on aix" in result.output
 
 
-def test_open_link_refuses_invalid_links_before_looking_for_the_server(data_dir: Path) -> None:
+def test_open_link_refuses_invalid_links_before_looking_for_the_server_and_logs_why(data_dir: Path) -> None:
     result = runner.invoke(app, ["open-link", "bussola://review?repo=acme/widgets"])
 
     assert result.exit_code == 2
     assert "pr parameter" in result.output
-    assert not data_dir.exists()
+    assert not (data_dir / "server.json").exists()
+    log = (data_dir / "open-link.log").read_text()
+    assert "'bussola://review?repo=acme/widgets': The pr parameter must be a positive number" in log
 
 
-def test_serve_publishes_its_address_while_running(git_repo: GitFixture, data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_serve_registers_the_folder_unless_told_not_to(git_repo: GitFixture, data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     git_repo.commit({"a.txt": "a\n"})
-    seen: list[server.ServerAddress | None] = []
+    published: list[server.ServerAddress] = []
 
-    def run(application: FastAPI, **_options: object) -> None:
-        with TestClient(application):
-            seen.append(server.published_server(data_dir))
+    def run(_application: FastAPI, _data_dir: Path, address: server.ServerAddress) -> None:
+        published.append(address)
 
     monkeypatch.setenv("BUSSOLA_TOKEN", "fixed-token")
-    monkeypatch.setattr("uvicorn.run", run)
+    monkeypatch.setattr("bussola.cli.run_published", run)
+    repos = ApiClient.create(git_repo, data_dir)
 
-    result = runner.invoke(app, ["serve", "--no-open", "--port", "9123", "--repo", str(git_repo.root)])
+    skipped = runner.invoke(app, ["serve", "--no-open", "--no-register", "--port", "9123", "--repo", str(git_repo.root)])
+    assert repos.call("GET", "/repos") == []
+    registered = runner.invoke(app, ["serve", "--no-open", "--port", "9123", "--repo", str(git_repo.root)])
 
-    assert result.exit_code == 0, result.output
-    assert "http://127.0.0.1:9123/?token=fixed-token" in result.output
-    assert seen == [server.ServerAddress("127.0.0.1", 9123, "fixed-token")]
-    assert server.published_server(data_dir) is None
+    assert skipped.exit_code == registered.exit_code == 0, skipped.output + registered.output
+    assert "http://127.0.0.1:9123/?token=fixed-token" in registered.output
+    assert [repo["path"] for repo in repos.call("GET", "/repos")] == [str(git_repo.root)]
+    assert published == [server.ServerAddress("127.0.0.1", 9123, "fixed-token")] * 2

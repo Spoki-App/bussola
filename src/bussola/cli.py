@@ -7,14 +7,13 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-import uvicorn
 
 from bussola.app import create_app
 from bussola.config import DEFAULT_HOST, DEFAULT_PORT, AppSettings, load_repo_config
 from bussola.errors import DomainError
 from bussola.git import GitError, GitRepo, InvalidRefError
 from bussola.handler import registration
-from bussola.handler.server import Launcher, ServerAddress, published_while_running
+from bussola.handler.server import Launcher, ServerAddress, record_link_error, run_published
 from bussola.identity import GitConfigIdentity
 from bussola.review.context import ReviewContext
 from bussola.review.overview import unit_views
@@ -48,6 +47,7 @@ def serve(
     host: Annotated[str, typer.Option(help="Interface to bind")] = DEFAULT_HOST,
     port: Annotated[int, typer.Option(help="Port to listen on")] = DEFAULT_PORT,
     no_open: Annotated[bool, typer.Option("--no-open", help="Do not open the browser")] = False,
+    register: Annotated[bool, typer.Option("--register/--no-register", hidden=True)] = True,
 ) -> None:
     """Start the review UI."""
     if host not in LOCAL_HOSTS:
@@ -55,20 +55,26 @@ def serve(
     identity_dir = repo or Path.cwd()
     token = os.environ.get(TOKEN_ENV) or new_token()
     settings = AppSettings(data_dir=default_data_dir(), identity_dir=identity_dir, token=token, allowed_hosts=allowed_hosts_for(host, port))
-    _register_if_repo(settings.data_dir, identity_dir)
+    if register:
+        _register_if_repo(settings.data_dir, identity_dir)
     address = ServerAddress(host, port, token)
     url = address.url("/")
     if not no_open:
         threading.Timer(BROWSER_OPEN_DELAY_SECONDS, webbrowser.open, args=[url]).start()
     typer.echo(f"bussola listening on {url}")
-    uvicorn.run(create_app(settings, lifespan=published_while_running(settings.data_dir, address)), host=host, port=port, log_level="warning")
+    run_published(create_app(settings), settings.data_dir, address)
 
 
 @app.command("open-link")
 def open_link(link: Annotated[str, typer.Argument(help="A bussola:// link")]) -> None:
     """Open a bussola:// link, starting the server if it is not running."""
+    data_dir = default_data_dir()
     with _cli_errors():
-        Launcher(default_data_dir()).open(link)
+        try:
+            Launcher(data_dir).open(link)
+        except DomainError as error:
+            record_link_error(data_dir, link, error)
+            raise
 
 
 @app.command("install-handler")

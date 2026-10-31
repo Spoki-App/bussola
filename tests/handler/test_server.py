@@ -1,16 +1,30 @@
+import socket
 import stat
 import subprocess
 import sys
 import threading
+import time
 from collections.abc import Generator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
 import pytest
+import uvicorn
+from fastapi import FastAPI
 
 from bussola.errors import InvalidRequestError
-from bussola.handler.server import Launcher, ServerAddress, ServerStartError, claim_server, is_healthy, published_server, start_server, withdraw_server
+from bussola.handler.server import (
+    Launcher,
+    PublishedServer,
+    ServerAddress,
+    ServerStartError,
+    claim_server,
+    is_healthy,
+    published_server,
+    start_server,
+    withdraw_server,
+)
 
 TOKEN = "secret-token"
 
@@ -44,7 +58,7 @@ def test_address_url_carries_the_token_after_the_link_query() -> None:
 def test_published_server_is_private_and_withdrawn_only_by_its_owner(tmp_path: Path) -> None:
     address = ServerAddress("127.0.0.1", 8765, TOKEN)
 
-    assert claim_server(tmp_path, address, healthy=lambda _address: False)
+    claim_server(tmp_path, address, healthy=lambda _address: False)
     withdraw_server(tmp_path, ServerAddress("127.0.0.1", 8765, "other"))
 
     assert published_server(tmp_path) == address
@@ -59,9 +73,10 @@ def test_a_second_server_does_not_replace_a_healthy_one(tmp_path: Path) -> None:
     second = ServerAddress("127.0.0.1", 8766, "other")
     claim_server(tmp_path, first)
 
-    assert not claim_server(tmp_path, second, healthy=lambda address: address == first)
+    claim_server(tmp_path, second, healthy=lambda address: address == first)
     assert published_server(tmp_path) == first
-    assert claim_server(tmp_path, second, healthy=lambda _address: False)
+
+    claim_server(tmp_path, second, healthy=lambda _address: False)
     assert published_server(tmp_path) == second
 
 
@@ -94,6 +109,20 @@ def test_open_starts_the_server_when_it_is_not_running(tmp_path: Path) -> None:
     assert servers.opened == [f"http://127.0.0.1:8765/?token={started.token}"] == [url]
 
 
+def test_open_finds_a_server_published_while_it_waits(tmp_path: Path) -> None:
+    other = ServerAddress("127.0.0.1", 9000, TOKEN)
+    servers = FakeServers(comes_up=False)
+
+    def start(address: ServerAddress) -> None:
+        servers.start(address)
+        claim_server(tmp_path, other, healthy=lambda _address: False)
+        servers.healthy.add(other)
+
+    launcher = Launcher(tmp_path, start=start, healthy=servers.is_healthy, open_browser=servers.opened.append, sleep=lambda _seconds: None, timeout=0)
+
+    assert launcher.open("bussola://") == f"http://127.0.0.1:9000/?token={TOKEN}"
+
+
 def test_open_reports_a_server_that_does_not_come_up(tmp_path: Path) -> None:
     servers = FakeServers(comes_up=False)
 
@@ -113,6 +142,44 @@ def test_invalid_links_neither_start_the_server_nor_open_the_browser(tmp_path: P
     assert servers.opened == []
 
 
+def free_port() -> int:
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+def test_published_server_announces_itself_only_while_it_listens(tmp_path: Path) -> None:
+    address = ServerAddress("127.0.0.1", free_port(), TOKEN)
+    instance = PublishedServer(uvicorn.Config(FastAPI(), host=address.host, port=address.port, log_level="warning"), tmp_path, address)
+    thread = threading.Thread(target=instance.run)
+    thread.start()
+    deadline = time.monotonic() + 10
+    while published_server(tmp_path) is None and time.monotonic() < deadline:
+        time.sleep(0.05)
+
+    assert instance.started
+    assert published_server(tmp_path) == address
+
+    instance.should_exit = True
+    thread.join(10)
+    assert published_server(tmp_path) is None
+
+
+def test_a_server_that_cannot_listen_leaves_the_published_one_alone(tmp_path: Path) -> None:
+    running = ServerAddress("127.0.0.1", 9000, "running")
+    claim_server(tmp_path, running, healthy=lambda _address: False)
+    with socket.socket() as taken:
+        taken.bind(("127.0.0.1", 0))
+        taken.listen()
+        address = ServerAddress("127.0.0.1", taken.getsockname()[1], TOKEN)
+        instance = PublishedServer(uvicorn.Config(FastAPI(), host=address.host, port=address.port, log_level="critical"), tmp_path, address)
+
+        with pytest.raises(SystemExit):
+            instance.run()
+
+    assert published_server(tmp_path) == running
+
+
 def test_start_server_runs_serve_detached_with_the_token(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[list[str], dict[str, Any]]] = []
 
@@ -124,7 +191,7 @@ def test_start_server_runs_serve_detached_with_the_token(monkeypatch: pytest.Mon
     start_server(ServerAddress("127.0.0.1", 8765, TOKEN))
 
     [(command, options)] = calls
-    assert command == [sys.executable, "-m", "bussola", "serve", "--no-open", "--host", "127.0.0.1", "--port", "8765"]
+    assert command == [sys.executable, "-m", "bussola", "serve", "--no-open", "--no-register", "--host", "127.0.0.1", "--port", "8765"]
     assert options["env"]["BUSSOLA_TOKEN"] == TOKEN
     assert options["stdin"] == options["stdout"] == options["stderr"] == subprocess.DEVNULL
 

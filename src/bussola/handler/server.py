@@ -1,17 +1,21 @@
+import asyncio
 import http.client
 import os
+import socket
 import subprocess
 import sys
+import tempfile
 import time
 import webbrowser
-from collections.abc import AsyncGenerator, Callable
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
+import uvicorn
 from pydantic import TypeAdapter, ValidationError
 
 from bussola.config import DEFAULT_HOST, DEFAULT_PORT
@@ -20,11 +24,11 @@ from bussola.handler.links import browser_path, parse_link
 from bussola.security import TOKEN_COOKIE, TOKEN_ENV, TOKEN_QUERY, new_token
 
 SERVER_FILE = "server.json"
+LINK_LOG_FILE = "open-link.log"
 HEALTH_PATH = "/api/health"
 HEALTH_TIMEOUT_SECONDS = 2.0
 START_TIMEOUT_SECONDS = 30.0
 POLL_INTERVAL_SECONDS = 0.25
-PRIVATE_FILE_MODE = 0o600
 
 
 class ServerStartError(DomainError):
@@ -51,11 +55,10 @@ def server_file(data_dir: Path) -> Path:
 
 def publish_server(data_dir: Path, address: ServerAddress) -> None:
     data_dir.mkdir(parents=True, exist_ok=True)
-    path = server_file(data_dir)
-    path.unlink(missing_ok=True)
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, PRIVATE_FILE_MODE)
+    descriptor, temporary = tempfile.mkstemp(dir=data_dir, prefix=".server-", suffix=".json")
     with os.fdopen(descriptor, "w", encoding="utf-8") as file:
         file.write(SERVER_ADDRESS.dump_json(address).decode())
+    Path(temporary).replace(server_file(data_dir))
 
 
 def withdraw_server(data_dir: Path, address: ServerAddress) -> None:
@@ -81,28 +84,39 @@ def is_healthy(address: ServerAddress) -> bool:
         connection.close()
 
 
-def claim_server(data_dir: Path, address: ServerAddress, healthy: Callable[[ServerAddress], bool] = is_healthy) -> bool:
+def claim_server(data_dir: Path, address: ServerAddress, healthy: Callable[[ServerAddress], bool] = is_healthy) -> None:
     running = published_server(data_dir)
-    if running is not None and running != address and healthy(running):
-        return False
-    publish_server(data_dir, address)
-    return True
+    if running is None or running == address or not healthy(running):
+        publish_server(data_dir, address)
 
 
-def published_while_running(data_dir: Path, address: ServerAddress) -> Callable[[object], AbstractAsyncContextManager[None]]:
-    @asynccontextmanager
-    async def lifespan(_app: object) -> AsyncGenerator[None]:
-        claim_server(data_dir, address)
-        try:
-            yield
-        finally:
-            withdraw_server(data_dir, address)
+def record_link_error(data_dir: Path, link: str, error: Exception) -> None:
+    data_dir.mkdir(parents=True, exist_ok=True)
+    with (data_dir / LINK_LOG_FILE).open("a", encoding="utf-8") as file:
+        file.write(f"{datetime.now(UTC).isoformat(timespec='seconds')} {link!r}: {error}\n")
 
-    return lifespan
+
+class PublishedServer(uvicorn.Server):
+    def __init__(self, config: uvicorn.Config, data_dir: Path, address: ServerAddress) -> None:
+        super().__init__(config)
+        self.data_dir = data_dir
+        self.address = address
+
+    async def startup(self, sockets: list[socket.socket] | None = None) -> None:
+        await super().startup(sockets)
+        await asyncio.to_thread(claim_server, self.data_dir, self.address)
+
+    async def shutdown(self, sockets: list[socket.socket] | None = None) -> None:
+        withdraw_server(self.data_dir, self.address)
+        await super().shutdown(sockets)
+
+
+def run_published(app: Any, data_dir: Path, address: ServerAddress) -> None:
+    PublishedServer(uvicorn.Config(app, host=address.host, port=address.port, log_level="warning"), data_dir, address).run()
 
 
 def start_server(address: ServerAddress) -> None:
-    command = [sys.executable, "-m", "bussola", "serve", "--no-open", "--host", address.host, "--port", str(address.port)]
+    command = [sys.executable, "-m", "bussola", "serve", "--no-open", "--no-register", "--host", address.host, "--port", str(address.port)]
     subprocess.Popen(
         command,
         env={**os.environ, TOKEN_ENV: address.token},
@@ -141,14 +155,17 @@ class Launcher:
             return running
         address = ServerAddress(DEFAULT_HOST, DEFAULT_PORT, new_token())
         self.start(address)
-        if not self._wait_until_healthy(address):
+        found = self._wait_for_server(address)
+        if found is None:
             raise ServerStartError(f"bussola did not start on {address.host}:{address.port}. Run `bussola serve` to see why.")
-        return address
+        return found
 
-    def _wait_until_healthy(self, address: ServerAddress) -> bool:
+    def _wait_for_server(self, started: ServerAddress) -> ServerAddress | None:
         deadline = time.monotonic() + self.timeout
-        while not self.healthy(address):
-            if time.monotonic() >= deadline:
-                return False
+        while True:
+            published = published_server(self.data_dir)
+            candidates = [started] if published in (None, started) else [started, published]
+            found = next((candidate for candidate in candidates if self.healthy(candidate)), None)
+            if found is not None or time.monotonic() >= deadline:
+                return found
             self.sleep(POLL_INTERVAL_SECONDS)
-        return True
