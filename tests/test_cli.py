@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
+from click import unstyle
 from fastapi import FastAPI
 from typer.testing import CliRunner
 
@@ -202,7 +203,7 @@ def test_serve_refuses_port_0() -> None:
     result = runner.invoke(app, ["serve", "--no-open", "--port", "0"])
 
     assert result.exit_code == 2
-    assert "--port" in result.output
+    assert "--port" in unstyle(result.output)
 
 
 @pytest.mark.usefixtures("data_dir")
