@@ -1,4 +1,6 @@
 import contextlib
+import datetime
+import email.utils
 import errno
 import functools
 import http.client
@@ -195,11 +197,21 @@ def _decode(url: str, body: bytes) -> dict[str, Any]:
 
 def _retry_after(error: urllib.error.HTTPError) -> float | None:
     value = error.headers.get("retry-after") if error.headers else None
-    try:
-        seconds = float(value) if value else None
-    except ValueError:
+    if not value:
         return None
+    try:
+        seconds = float(value)
+    except ValueError:
+        seconds = _seconds_until(value)
     return max(seconds, 0.0) if seconds is not None and math.isfinite(seconds) else None
+
+
+def _seconds_until(http_date: str) -> float | None:
+    try:
+        moment = email.utils.parsedate_to_datetime(http_date)
+    except (TypeError, ValueError):
+        return None
+    return (moment - datetime.datetime.now(datetime.UTC)).total_seconds() if moment.tzinfo else None
 
 
 def _unreachable(reason: object) -> bool:

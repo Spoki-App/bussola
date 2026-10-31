@@ -188,7 +188,7 @@ Once you have chosen a provider, a repository can adjust it in the `[ai]` sectio
 - Code is sent only when you start an AI action, and only the code that action works on. The first time an action would send code to a provider, model and endpoint, bussola names them and waits for **Send code**; the choice is kept in that browser.
 - With Claude Code or the Anthropic API, the code goes to Anthropic under the terms of your account. With an OpenAI-compatible endpoint, it goes only to the address you configured, which stays on your machine for a local server.
 - Answers are checked against the format each action expects, and a clear error is shown when the model returns something unusable. Each request has a timeout and can be cancelled.
-- Results are cached in the local database by the content hash of what was sent, the prompt version, the model and the endpoint, so unchanged code is not sent again. With Claude Code and no `model` set, the model actually used is not known, so nothing is cached.
+- Results are cached in the local database by the content hash of what was sent, the prompt version, the model and the endpoint, so unchanged code is not sent again. With Claude Code and no `model` set, the model actually used is not known, so nothing is cached. Set `model` to a full model ID rather than an alias such as `opus`, so that cached results follow the model you use.
 
 ## Data
 

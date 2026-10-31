@@ -1,3 +1,5 @@
+import datetime
+import email.utils
 import json
 import socket
 import threading
@@ -182,6 +184,16 @@ def test_an_odd_retry_after_falls_back_to_the_normal_pause(stub: StubServer, val
         OpenAiCompatibleProvider("gpt", stub.url, None, 5.0).complete(REQUEST, Cancellation())
 
     assert len(stub.requests) == MAX_ATTEMPTS
+
+
+def test_a_retry_after_date_is_honoured(stub: StubServer) -> None:
+    later = email.utils.format_datetime(datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=120), usegmt=True)
+    stub.reply({"error": {"message": "come back later"}}, status=429, headers={"Retry-After": later})
+
+    with pytest.raises(AiRejectedError, match="HTTP 429"):
+        OpenAiCompatibleProvider("gpt", stub.url, None, 5.0).complete(REQUEST, Cancellation())
+
+    assert len(stub.requests) == 1
 
 
 def test_a_client_error_is_not_asked_again(stub: StubServer) -> None:

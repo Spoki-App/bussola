@@ -239,8 +239,16 @@ def test_an_unreadable_configuration_directory_is_reported(tmp_path: Path, monke
         load_user_config(tmp_path / "config.toml")
 
 
-def test_the_endpoint_scheme_is_not_case_sensitive() -> None:
-    assert RepoAiConfig(endpoint="HTTP://localhost:11434/v1").endpoint == "HTTP://localhost:11434/v1"
+def test_the_endpoint_scheme_and_host_are_not_case_sensitive() -> None:
+    assert RepoAiConfig(endpoint="HTTP://LocalHost:11434/V1/").endpoint == "http://localhost:11434/V1"
+
+
+def test_the_same_endpoint_written_differently_keeps_the_key() -> None:
+    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="gpt", endpoint="https://api.example.com/v1", api_key_env="WORK_KEY")
+
+    settings = resolve_ai_settings(user, RepoAiConfig(endpoint="HTTPS://API.EXAMPLE.COM/v1/"))
+
+    assert settings.api_key_env == "WORK_KEY"
 
 
 def test_targets_that_join_to_the_same_text_stay_distinct() -> None:

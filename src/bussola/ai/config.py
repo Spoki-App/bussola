@@ -1,6 +1,7 @@
 import json
 import os
 import tomllib
+import urllib.parse
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
@@ -50,9 +51,12 @@ class RepoAiConfig(BaseModel):
     @field_validator("endpoint")
     @classmethod
     def _http_endpoint(cls, endpoint: str | None) -> str | None:
-        if endpoint is not None and not endpoint.lower().startswith(HTTP_SCHEMES):
+        if endpoint is None:
+            return None
+        if not endpoint.lower().startswith(HTTP_SCHEMES):
             raise ValueError("endpoint must start with http:// or https://")
-        return endpoint.rstrip("/") if endpoint else endpoint
+        parts = urllib.parse.urlsplit(endpoint.rstrip("/"))
+        return urllib.parse.urlunsplit(parts._replace(scheme=parts.scheme.lower(), netloc=parts.netloc.lower()))
 
 
 class UserAiConfig(RepoAiConfig):

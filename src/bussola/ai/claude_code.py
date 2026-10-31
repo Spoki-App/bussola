@@ -51,11 +51,14 @@ class _VersionCheck:
 
 
 _version_checks: dict[str, tuple[float, _VersionCheck]] = {}
-_version_lock = threading.Lock()
+_version_locks: dict[str, threading.Lock] = {}
+_version_locks_guard = threading.Lock()
 
 
 def _version_problem(executable: str, modified: float) -> str | None:
-    with _version_lock:
+    with _version_locks_guard:
+        lock = _version_locks.setdefault(executable, threading.Lock())
+    with lock:
         cached_modified, cached = _version_checks.get(executable, (None, None))
         if cached is not None and cached_modified == modified and (cached.lasting or time.monotonic() - cached.checked_at < FAILED_CHECK_SECONDS):
             return cached.problem
@@ -135,7 +138,8 @@ class ClaudeCodeProvider:
         return [*arguments, "--model", self.model] if self.model else arguments
 
     def _run(self, command: list[str], prompt: str, cancellation: Cancellation) -> tuple[int, str, str]:
-        with tempfile.TemporaryDirectory(prefix="bussola-ai-") as workdir:
+        cancellation.check()
+        with tempfile.TemporaryDirectory(prefix="bussola-ai-", ignore_cleanup_errors=True) as workdir:
             try:
                 process = subprocess.Popen(
                     command,

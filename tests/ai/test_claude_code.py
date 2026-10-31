@@ -274,6 +274,16 @@ def test_a_version_check_is_not_held_up_by_a_child_keeping_the_output(tmp_path: 
     assert time.monotonic() - started < 5
 
 
+def test_a_cancelled_call_does_not_start_claude(fake_claude: FakeClaude) -> None:
+    cancellation = Cancellation()
+    cancellation.cancel()
+
+    with pytest.raises(AiCancelledError):
+        provider().complete(REQUEST, cancellation)
+
+    assert not fake_claude.log.exists()
+
+
 def test_the_provider_needs_the_claude_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("PATH", str(tmp_path))
 
