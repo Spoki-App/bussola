@@ -1,7 +1,6 @@
 import contextlib
 import http.client
 import ipaddress
-import json
 import logging
 import os
 import re
@@ -22,12 +21,12 @@ from typing import Any, Protocol
 from urllib.parse import urlencode
 
 import uvicorn
-from pydantic import TypeAdapter, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from bussola.config import DEFAULT_HOST, DEFAULT_PORT
 from bussola.errors import DomainError
 from bussola.handler.links import browser_path, parse_link
-from bussola.security import INVALID_TOKEN_DETAIL, TOKEN_COOKIE, TOKEN_ENV, TOKEN_QUERY, host_port, new_token
+from bussola.security import INVALID_TOKEN_CODE, TOKEN_COOKIE, TOKEN_ENV, TOKEN_QUERY, host_port, is_local_host, new_token
 from bussola.storage.database import DATA_DIR_ENV
 
 SERVERS_DIR = "servers"
@@ -36,6 +35,7 @@ HEALTH_PATH = "/api/health"
 HEALTH_TIMEOUT_SECONDS = 2.0
 START_TIMEOUT_SECONDS = 30.0
 EXIT_GRACE_SECONDS = 5.0
+FREE_PORT_ATTEMPTS = 3
 MAX_PROBE_BODY = 512
 IPV6_LOOPBACK = "::1"
 UNSAFE_FILE_CHARACTERS = re.compile(r"[^A-Za-z0-9.-]")
@@ -112,7 +112,8 @@ class Probe(StrEnum):
     READY = "ready"
     OTHER_BUSSOLA = "other_bussola"
     CLOSED = "closed"
-    UNKNOWN = "unknown"
+    WRONG = "wrong"
+    SILENT = "silent"
 
 
 def probe_server(address: ServerAddress) -> Probe:
@@ -124,26 +125,23 @@ def probe_server(address: ServerAddress) -> Probe:
     except ConnectionRefusedError:
         return Probe.CLOSED
     except (OSError, http.client.HTTPException):
-        return Probe.UNKNOWN
+        return Probe.SILENT
     finally:
         connection.close()
     if status == HTTPStatus.OK:
         return Probe.READY
-    return Probe.OTHER_BUSSOLA if status == HTTPStatus.FORBIDDEN and _refuses_the_token(body) else Probe.UNKNOWN
+    return Probe.OTHER_BUSSOLA if status == HTTPStatus.FORBIDDEN and _error_code(body) == INVALID_TOKEN_CODE else Probe.WRONG
 
 
-def _refuses_the_token(body: bytes) -> bool:
+class ErrorBody(BaseModel):
+    code: str | None = None
+
+
+def _error_code(body: bytes) -> str | None:
     try:
-        return json.loads(body) == {"detail": INVALID_TOKEN_DETAIL}
-    except ValueError:
-        return False
-
-
-def _is_loopback(host: str) -> bool:
-    try:
-        return ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        return host == "localhost"
+        return ErrorBody.model_validate_json(body).code
+    except ValidationError:
+        return None
 
 
 def free_port(host: str) -> int:
@@ -167,9 +165,6 @@ class PublishedServer(uvicorn.Server):
 
     async def startup(self, sockets: list[socket.socket] | None = None) -> None:
         await super().startup(sockets)
-        listening = [sock.getsockname()[1] for server in self.servers for sock in server.sockets]
-        if listening:
-            self.address = ServerAddress(self.address.host, listening[0], self.address.token)
         try:
             publish_server(self.data_dir, self.address)
         except OSError as error:
@@ -230,13 +225,11 @@ class Launcher:
     def ensure_server(self) -> ServerAddress:
         with ThreadPoolExecutor() as pool:
             states = self._probe_all(pool)
-            running = self._first_ready(states)
-            if running is not None:
-                return running
-            busy = [address for address, state in states.items() if state == Probe.UNKNOWN and _is_loopback(address.host)]
-            if busy:
-                return self._wait_for_busy(pool, busy)
-            for port in (DEFAULT_PORT, None):
+            silent = [address for address, state in states.items() if state == Probe.SILENT]
+            found = self._first_ready(states) or (self._wait_for_silent(pool, silent) if silent else None)
+            if found is not None:
+                return found
+            for port in (DEFAULT_PORT, *[None] * FREE_PORT_ATTEMPTS):
                 address = ServerAddress(DEFAULT_HOST, port or free_port(DEFAULT_HOST), new_token())
                 found = self._wait_for_server(pool, address, self.start(address, self.data_dir))
                 if found is not None:
@@ -244,23 +237,31 @@ class Launcher:
         raise ServerStartError("bussola did not start. Run `bussola serve` to see why.")
 
     def _probe_all(self, pool: ThreadPoolExecutor, *extra: ServerAddress) -> dict[ServerAddress, Probe]:
-        published = [address for address in published_servers(self.data_dir) if _is_loopback(address.host) or not extra]
+        published = published_servers(self.data_dir)
         candidates = list(dict.fromkeys([*extra, *published]))
         states = dict(zip(candidates, pool.map(self.probe, candidates), strict=True))
         for candidate in published:
-            if states[candidate] == Probe.CLOSED:
-                with contextlib.suppress(OSError):
-                    withdraw_server(self.data_dir, candidate)
+            state = states[candidate]
+            if state in (Probe.CLOSED, Probe.WRONG) or (state == Probe.SILENT and not is_local_host(candidate.host)):
+                self._forget(candidate)
         return states
 
-    def _wait_for_busy(self, pool: ThreadPoolExecutor, busy: list[ServerAddress]) -> ServerAddress:
+    def _wait_for_silent(self, pool: ThreadPoolExecutor, silent: list[ServerAddress]) -> ServerAddress | None:
         deadline = time.monotonic() + self.timeout
-        while time.monotonic() < deadline:
+        while silent and time.monotonic() < deadline:
             self.sleep(POLL_INTERVAL_SECONDS)
-            found = self._first_ready(dict(zip(busy, pool.map(self.probe, busy), strict=True)))
+            states = dict(zip(silent, pool.map(self.probe, silent), strict=True))
+            found = self._first_ready(states)
             if found is not None:
                 return found
-        raise ServerStartError(f"bussola on {host_port(busy[0].host, busy[0].port)} is not answering. Open the link again in a moment.")
+            silent = [address for address in silent if states[address] == Probe.SILENT]
+        for address in silent:
+            self._forget(address)
+        return None
+
+    def _forget(self, address: ServerAddress) -> None:
+        with contextlib.suppress(OSError):
+            withdraw_server(self.data_dir, address)
 
     def _first_ready(self, states: dict[ServerAddress, Probe]) -> ServerAddress | None:
         return next((candidate for candidate, state in states.items() if state == Probe.READY), None)

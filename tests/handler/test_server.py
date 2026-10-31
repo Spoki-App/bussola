@@ -28,7 +28,7 @@ from bussola.handler.server import (
     start_server,
     withdraw_server,
 )
-from bussola.security import INVALID_TOKEN_DETAIL
+from bussola.security import INVALID_TOKEN_CODE
 
 TOKEN = "secret-token"
 
@@ -66,7 +66,7 @@ class FakeServers:
     def probe(self, address: ServerAddress) -> Probe:
         if self.busy.get(address, 0) > 0:
             self.busy[address] -= 1
-            return Probe.UNKNOWN
+            return Probe.SILENT
         if address in self.healthy:
             return Probe.READY
         listening = {(running.host, running.port) for running in self.healthy}
@@ -189,6 +189,27 @@ def test_open_finds_the_server_another_link_started_once_it_publishes(tmp_path: 
     assert len(naps) == 3
 
 
+def test_open_tries_another_free_port_if_the_first_one_is_taken_meanwhile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ports = iter([20001, 20002])
+
+    def next_port(_host: str) -> int:
+        return next(ports)
+
+    monkeypatch.setattr("bussola.handler.server.free_port", next_port)
+    servers = FakeServers(taken_port=8765)
+
+    def start(address: ServerAddress, data_dir: Path) -> FakeProcess:
+        if address.port == 20001:
+            servers.started.append(address)
+            return FakeProcess(1)
+        return servers.start(address, data_dir)
+
+    launcher = Launcher(tmp_path, start=start, probe=servers.probe, open_browser=servers.open_browser, sleep=lambda _seconds: None, timeout=60)
+
+    assert launcher.open("bussola://").startswith("http://127.0.0.1:20002/")
+    assert [address.port for address in servers.started] == [8765, 20001, 20002]
+
+
 def test_open_starts_on_a_free_port_at_once_when_another_program_holds_8765(tmp_path: Path) -> None:
     servers = FakeServers(taken_port=8765)
     naps: list[float] = []
@@ -224,16 +245,31 @@ def test_open_waits_for_a_local_server_that_is_busy_instead_of_starting_another(
     assert servers.started == []
 
 
-def test_open_reports_a_local_server_that_never_answers(tmp_path: Path) -> None:
-    running = ServerAddress("127.0.0.1", 8765, TOKEN)
-    publish_server(tmp_path, running)
-    servers = FakeServers({running})
-    servers.busy[running] = 10**6
+def test_open_gives_up_on_a_local_server_that_never_answers_and_starts_its_own(tmp_path: Path) -> None:
+    hung = ServerAddress("127.0.0.1", 8765, "hung")
+    publish_server(tmp_path, hung)
+    servers = FakeServers(taken_port=8765)
+    servers.busy[hung] = 10**6
 
-    with pytest.raises(ServerStartError, match="not answering"):
-        servers.launcher(tmp_path, timeout=0).open("bussola://")
+    url = servers.launcher(tmp_path, timeout=0).open("bussola://")
 
-    assert servers.started == []
+    [_, started] = servers.started
+    assert url == f"http://127.0.0.1:{started.port}/?token={started.token}"
+    assert hung not in published_servers(tmp_path)
+
+
+def test_open_forgets_a_server_file_whose_port_now_answers_as_something_else(tmp_path: Path) -> None:
+    stale = ServerAddress("127.0.0.1", 9000, "stale")
+    publish_server(tmp_path, stale)
+    servers = FakeServers()
+
+    def probe(address: ServerAddress) -> Probe:
+        return Probe.WRONG if address == stale else servers.probe(address)
+
+    launcher = Launcher(tmp_path, start=servers.start, probe=probe, open_browser=servers.open_browser, sleep=lambda _seconds: None, timeout=0)
+    launcher.open("bussola://")
+
+    assert stale not in published_servers(tmp_path)
 
 
 def test_open_ignores_a_silent_server_on_another_host(tmp_path: Path) -> None:
@@ -298,7 +334,7 @@ def test_open_stops_waiting_as_soon_as_the_started_server_exits(tmp_path: Path) 
         launcher.open("bussola://")
 
     assert naps == []
-    assert len(servers.started) == 2
+    assert len(servers.started) == 4
 
 
 def test_invalid_links_neither_start_the_server_nor_open_the_browser(tmp_path: Path) -> None:
@@ -331,23 +367,6 @@ def test_published_server_announces_itself_only_while_it_listens(tmp_path: Path)
 
     instance.should_exit = True
     thread.join(10)
-    assert published_servers(tmp_path) == []
-
-
-def test_a_server_on_port_0_publishes_the_port_it_got(tmp_path: Path) -> None:
-    address = ServerAddress("127.0.0.1", 0, TOKEN)
-    instance = PublishedServer(uvicorn.Config(FastAPI(), host=address.host, port=0, log_level="warning"), tmp_path, address)
-    thread = threading.Thread(target=instance.run)
-    thread.start()
-    deadline = time.monotonic() + 10
-    while not published_servers(tmp_path) and time.monotonic() < deadline:
-        time.sleep(0.05)
-
-    [published] = published_servers(tmp_path)
-    instance.should_exit = True
-    thread.join(10)
-
-    assert published.port != 0
     assert published_servers(tmp_path) == []
 
 
@@ -413,7 +432,7 @@ def serve_http(answer: Callable[[BaseHTTPRequestHandler], None]) -> ThreadingHTT
 
 def answer_like_bussola(request: BaseHTTPRequestHandler) -> None:
     ok = request.path == "/api/health" and request.headers.get("Cookie") == f"bussola_token={TOKEN}"
-    body = b'{"status":"ok"}' if ok else json.dumps({"detail": INVALID_TOKEN_DETAIL}).encode()
+    body = b'{"status":"ok"}' if ok else json.dumps({"detail": "Missing or invalid session token", "code": INVALID_TOKEN_CODE}).encode()
     request.send_response(200 if ok else 403)
     request.send_header("Content-Length", str(len(body)))
     request.end_headers()
@@ -451,10 +470,10 @@ def test_probe_does_not_take_any_403_for_bussola() -> None:
 
     httpd.shutdown()
     httpd.server_close()
-    assert state == Probe.UNKNOWN
+    assert state == Probe.WRONG
 
 
-def test_probe_of_a_port_that_does_not_speak_http_is_unknown() -> None:
+def test_probe_of_a_port_that_does_not_speak_http_is_silent() -> None:
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         listener.listen()
@@ -470,7 +489,7 @@ def test_probe_of_a_port_that_does_not_speak_http_is_unknown() -> None:
         state = probe_server(ServerAddress("127.0.0.1", listener.getsockname()[1], TOKEN))
         thread.join(5)
 
-    assert state == Probe.UNKNOWN
+    assert state == Probe.SILENT
 
 
 def test_probe_of_a_closed_port_says_so() -> None:

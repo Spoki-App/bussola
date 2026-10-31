@@ -149,6 +149,13 @@ def test_open_link_uses_the_data_dir_it_is_given_as_an_absolute_path(tmp_path: P
     assert used == [tmp_path.resolve() / "other"]
 
 
+def test_serve_refuses_port_0() -> None:
+    result = runner.invoke(app, ["serve", "--no-open", "--port", "0"])
+
+    assert result.exit_code == 2
+    assert "--port" in result.output
+
+
 @pytest.mark.usefixtures("data_dir")
 def test_serve_exits_quietly_on_ctrl_c(git_repo: GitFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     git_repo.commit({"a.txt": "a\n"})

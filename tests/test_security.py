@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from bussola.app import create_app
 from bussola.config import AppSettings
-from bussola.security import TOKEN_COOKIE, allowed_hosts_for
+from bussola.security import TOKEN_COOKIE, allowed_hosts_for, is_local_host
 from tests.gitrepo import GitFixture
 
 TOKEN = "secret-token"
@@ -35,6 +35,15 @@ def test_foreign_host_header_is_forbidden_even_with_token(client: TestClient) ->
     response = client.get("/api/health", headers={"host": f"evil.example:{PORT}"})
 
     assert response.status_code == 403
+
+
+def test_loopback_hosts_are_local() -> None:
+    assert is_local_host("127.0.0.1")
+    assert is_local_host("127.0.0.2")
+    assert is_local_host("::1")
+    assert is_local_host("localhost")
+    assert not is_local_host("192.168.1.5")
+    assert not is_local_host("example.com")
 
 
 def test_ipv6_hosts_are_allowed_as_browsers_send_them() -> None:

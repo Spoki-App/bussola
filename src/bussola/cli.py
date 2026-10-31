@@ -20,7 +20,7 @@ from bussola.review.overview import unit_views
 from bussola.review.refs import NoBaseBranchError, default_base_ref
 from bussola.review.repos import register_repo
 from bussola.review.revisions import refresh_review
-from bussola.security import LOCAL_HOSTS, TOKEN_ENV, allowed_hosts_for, new_token
+from bussola.security import TOKEN_ENV, allowed_hosts_for, is_local_host, new_token
 from bussola.storage.database import Database, default_data_dir
 from bussola.storage.repositories import Store
 
@@ -45,12 +45,12 @@ def root() -> None:
 def serve(
     repo: RepoOption = None,
     host: Annotated[str, typer.Option(help="Interface to bind")] = DEFAULT_HOST,
-    port: Annotated[int, typer.Option(help="Port to listen on")] = DEFAULT_PORT,
+    port: Annotated[int, typer.Option(help="Port to listen on", min=1, max=65535)] = DEFAULT_PORT,
     no_open: Annotated[bool, typer.Option("--no-open", help="Do not open the browser")] = False,
     register: Annotated[bool, typer.Option("--register/--no-register", hidden=True)] = True,
 ) -> None:
     """Start the review UI."""
-    if host not in LOCAL_HOSTS:
+    if not is_local_host(host):
         typer.secho(f"warning: listening on {host} exposes your repositories to other machines on the network", fg=typer.colors.YELLOW, err=True)
     identity_dir = repo or Path.cwd()
     token = os.environ.pop(TOKEN_ENV, None) or new_token()
