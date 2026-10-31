@@ -177,6 +177,15 @@ describe('AiActionButton', () => {
     expect(onRun).not.toHaveBeenCalled()
   })
 
+  it('says why when AI was turned off after the page loaded', async () => {
+    const onRun = renderButton(LOCAL, vi.fn(), { ...LOCAL, configured: false, provider: null, label: null, target: null, problem: null })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Describe' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('AI is turned off for this repository')
+    expect(onRun).not.toHaveBeenCalled()
+  })
+
   it('runs once for a double click', async () => {
     window.localStorage.setItem('bussola.aiConsent', JSON.stringify([LOCAL.target]))
     const onRun = renderButton(LOCAL)

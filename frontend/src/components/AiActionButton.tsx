@@ -30,7 +30,7 @@ export function AiActionButton({ repoId, label, title, disabled = false, onRun }
     )
   }
   if (ai === undefined || (!ai.configured && ai.problem === null)) {
-    return null
+    return notice ? <ErrorNote message={notice} /> : null
   }
   const start = async () => {
     if (starting.current) {

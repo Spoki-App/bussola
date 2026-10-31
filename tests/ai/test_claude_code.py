@@ -158,8 +158,11 @@ def test_processes_left_behind_by_the_cli_do_not_hold_up_its_answer(fake_claude:
 
     assert answer == '{"impact": "low"}'
     assert time.monotonic() - started < 5
-    child_pid = child_pid_file.read_text()
-    assert subprocess.run(["ps", "-o", "stat=", "-p", child_pid], capture_output=True, text=True, check=False).stdout.strip() in {"", "Z"}
+    child_pid = int(child_pid_file.read_text())
+    if hasattr(os, "waitid"):
+        assert subprocess.run(["ps", "-o", "stat=", "-p", str(child_pid)], capture_output=True, text=True, check=False).stdout.strip() in {"", "Z"}
+    else:
+        os.kill(child_pid, signal.SIGKILL)
 
 
 @pytest.mark.skipif(not hasattr(os, "waitid"), reason="needs os.waitid to wait for claude without reaping it")

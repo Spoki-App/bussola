@@ -198,15 +198,7 @@ class _ClaudeSession:
         self._wait_for_exit()
         self._stop_group()
         returncode = self._reap()
-        if not (stdout.wait(PIPE_GRACE_SECONDS) and stderr.wait(PIPE_GRACE_SECONDS)):
-            _kill_group(self._process)
-            stdout.wait(PIPE_GRACE_SECONDS)
-            stderr.wait(PIPE_GRACE_SECONDS)
-        stdout.stop()
-        stderr.stop()
-        stdout.wait(PIPE_GRACE_SECONDS)
-        stderr.wait(PIPE_GRACE_SECONDS)
-        return returncode, stdout.text(), stderr.text()
+        return returncode, stdout.finish(PIPE_GRACE_SECONDS), stderr.finish(PIPE_GRACE_SECONDS)
 
     def finish(self) -> None:
         with self._lock:
@@ -257,15 +249,12 @@ class _Collector:
         else:
             threading.Thread(target=self._read, args=(stream,), name=READER_NAME, daemon=True).start()
 
-    def wait(self, timeout: float) -> bool:
-        return self._done.wait(timeout)
-
-    def text(self) -> str:
+    def finish(self, grace: float) -> str:
+        if not self._done.wait(grace):
+            self._stopped.set()
+            self._done.wait(grace)
         with self._lock:
             return b"".join(self._chunks).decode(errors="replace")
-
-    def stop(self) -> None:
-        self._stopped.set()
 
     def _read(self, stream: IO[bytes]) -> None:
         with contextlib.suppress(OSError, ValueError), selectors.DefaultSelector() as selector:
