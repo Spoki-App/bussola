@@ -30,17 +30,28 @@ def find_claude() -> str:
     executable = shutil.which(CLAUDE)
     if executable is None:
         raise AiNotConfiguredError("The claude command is not on PATH. Install Claude Code and run claude once to sign in.")
-    if REQUIRED_FLAG not in _help_text(executable, Path(executable).stat().st_mtime):
-        raise AiNotConfiguredError(f"This version of Claude Code has no {REQUIRED_FLAG}. Update it with claude update.")
+    problem = _version_problem(executable, Path(executable).stat().st_mtime)
+    if problem is not None:
+        raise AiNotConfiguredError(problem)
     return executable
 
 
 @functools.cache
-def _help_text(executable: str, _modified: float) -> str:
+def _version_problem(executable: str, _modified: float) -> str | None:
     try:
-        return subprocess.run([executable, "--help"], capture_output=True, text=True, errors="replace", timeout=HELP_TIMEOUT_SECONDS, check=False).stdout
+        help_text = subprocess.run(
+            [executable, "--help"],
+            cwd=tempfile.gettempdir(),
+            env=_claude_environment(),
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=HELP_TIMEOUT_SECONDS,
+            check=False,
+        ).stdout
     except (OSError, subprocess.SubprocessError) as error:
-        raise AiNotConfiguredError(f"Cannot run claude --help: {error}") from error
+        return f"Cannot run claude --help: {error}"
+    return None if REQUIRED_FLAG in help_text else f"This version of Claude Code has no {REQUIRED_FLAG}. Update it with claude update."
 
 
 class ClaudeCodeProvider:

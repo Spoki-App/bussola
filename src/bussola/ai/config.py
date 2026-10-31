@@ -142,11 +142,13 @@ def _merge(user: UserAiConfig, override: RepoAiConfig) -> AiSettings:
     base = user if own_provider else UserAiConfig(provider=provider)
     base_endpoint = base.endpoint or DEFAULT_ENDPOINTS.get(provider)
     endpoint = None if provider == ProviderName.CLAUDE_CODE else override.endpoint or base_endpoint
+    base_model = base.model or DEFAULT_MODELS.get(provider)
+    model = override.model or base_model
     return AiSettings(
         provider=provider,
-        model=override.model or base.model or DEFAULT_MODELS.get(provider),
+        model=model,
         endpoint=endpoint,
         timeout=user.timeout,
-        api_key_env=(user.api_key_env or DEFAULT_KEY_ENV.get(provider)) if own_provider and endpoint == base_endpoint else None,
+        api_key_env=(user.api_key_env or DEFAULT_KEY_ENV.get(provider)) if own_provider and endpoint == base_endpoint and model == base_model else None,
         max_tokens=user.max_tokens if own_provider else None,
     )

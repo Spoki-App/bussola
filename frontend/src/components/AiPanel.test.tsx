@@ -97,6 +97,14 @@ describe('AiPanel', () => {
     expect(screen.queryByText('Default of the claude command')).toBeNull()
   })
 
+  it('says the configuration file is not set when the server does not know it', async () => {
+    stubApi({ ...ANTHROPIC, config_file: null })
+    renderPanel()
+
+    expect(await screen.findByText('Configuration')).toBeInTheDocument()
+    expect(screen.getByText('Configuration').nextElementSibling?.textContent).toBe('Not set')
+  })
+
   it('shows the claude command default when no model is set', async () => {
     stubApi({ ...ANTHROPIC, provider: 'claude-code', label: 'Claude Code CLI', model: null, endpoint: null, api_key_env: null })
     renderPanel()

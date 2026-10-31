@@ -62,12 +62,12 @@ def test_an_invalid_user_configuration_is_reported(tmp_path: Path, content: str,
     assert detail in str(raised.value)
 
 
-def test_the_repository_overrides_the_model_of_an_openai_compatible_endpoint() -> None:
+def test_the_repository_overrides_the_model_of_an_openai_compatible_endpoint_without_your_key() -> None:
     user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="qwen2.5-coder", endpoint="http://localhost:11434/v1", api_key_env="LOCAL_KEY")
 
     settings = resolve_ai_settings(user, RepoAiConfig(model="llama3"))
 
-    assert settings == AiSettings(ProviderName.OPENAI_COMPATIBLE, "llama3", "http://localhost:11434/v1", api_key_env="LOCAL_KEY", source="repository")
+    assert settings == AiSettings(ProviderName.OPENAI_COMPATIBLE, "llama3", "http://localhost:11434/v1", api_key_env=None, source="repository")
 
 
 @pytest.mark.parametrize("provider", [ProviderName.ANTHROPIC, ProviderName.CLAUDE_CODE])

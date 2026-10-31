@@ -153,6 +153,27 @@ def test_a_rate_limit_that_lasts_is_reported_after_a_few_tries(stub: StubServer)
     assert len(stub.requests) == MAX_ATTEMPTS
 
 
+@pytest.mark.parametrize("status", [507, 520, 529])
+def test_any_server_error_is_asked_again(stub: StubServer, status: int) -> None:
+    stub.reply({"error": {"message": "busy"}}, status=status)
+
+    with pytest.raises(AiProviderError, match=f"HTTP {status}"):
+        OpenAiCompatibleProvider("gpt", stub.url, None, 5.0).complete(REQUEST, Cancellation())
+
+    assert len(stub.requests) == MAX_ATTEMPTS
+
+
+def test_a_retry_after_longer_than_the_timeout_is_not_waited_for(stub: StubServer) -> None:
+    stub.reply({"error": {"message": "come back later"}}, status=429, headers={"Retry-After": "120"})
+    started = time.monotonic()
+
+    with pytest.raises(AiRejectedError, match="HTTP 429"):
+        OpenAiCompatibleProvider("gpt", stub.url, None, 5.0).complete(REQUEST, Cancellation())
+
+    assert len(stub.requests) == 1
+    assert time.monotonic() - started < 2
+
+
 def test_a_client_error_is_not_asked_again(stub: StubServer) -> None:
     stub.reply({"error": {"message": "bad request"}}, status=400)
 

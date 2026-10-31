@@ -210,6 +210,26 @@ def test_a_claude_without_safe_mode_is_reported(tmp_path: Path, monkeypatch: pyt
         find_claude()
 
 
+def test_the_version_check_runs_like_the_real_call_and_is_asked_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    log = tmp_path / "calls.log"
+    checker = tmp_path / "claude"
+    checker.write_text(f'#!/bin/sh\necho "$BUSSOLA_TOKEN|$(pwd)" >> {log}\nexit 3\n')
+    checker.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setenv("BUSSOLA_TOKEN", "session-secret")
+    monkeypatch.chdir(tmp_path)
+
+    for _ in range(3):
+        with pytest.raises(AiNotConfiguredError, match="has no --safe-mode"):
+            find_claude()
+
+    calls = log.read_text().splitlines()
+    assert len(calls) == 1
+    token, cwd = calls[0].split("|")
+    assert token == ""
+    assert Path(cwd).resolve() != tmp_path.resolve()
+
+
 def test_the_provider_needs_the_claude_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("PATH", str(tmp_path))
 

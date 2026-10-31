@@ -52,9 +52,7 @@ function ActiveProvider({ ai }: { ai: AiStatus }) {
           </>
         )}
         <dt>Configuration</dt>
-        <dd>
-          <code>{ai.config_file}</code>
-        </dd>
+        <dd>{ai.config_file ? <code>{ai.config_file}</code> : 'Not set'}</dd>
       </dl>
       {ai.problem && <ErrorNote message={ai.problem} />}
       <button type="button" disabled={test.isPending} onClick={() => { test.mutate() }}>

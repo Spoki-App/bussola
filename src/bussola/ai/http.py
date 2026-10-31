@@ -29,10 +29,10 @@ SOCKET_GRACE_SECONDS = 5.0
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 MAX_ERROR_BODY_BYTES = 64 * 1024
 REJECTING_STATUSES = frozenset({401, 403, 429})
-RETRY_STATUSES = frozenset({429, 500, 502, 503, 504, 529})
+TOO_MANY_REQUESTS = 429
+FIRST_SERVER_ERROR = 500
 MAX_ATTEMPTS = 3
 RETRY_BASE_SECONDS = 1.0
-MAX_RETRY_WAIT_SECONDS = 30.0
 UNREACHABLE_ERRNOS = frozenset({errno.ENETUNREACH, errno.EHOSTUNREACH})
 LOOPBACK_NAME = "localhost"
 
@@ -145,8 +145,9 @@ def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeou
         except AiTimeoutError as error:
             raise timed_out(timeout) from error
         except _HttpStatusError as error:
-            pause = min(error.retry_after or RETRY_BASE_SECONDS * attempt, MAX_RETRY_WAIT_SECONDS)
-            if error.code not in RETRY_STATUSES or attempt == MAX_ATTEMPTS or time.monotonic() + pause >= deadline:
+            pause = error.retry_after if error.retry_after is not None else RETRY_BASE_SECONDS * attempt
+            retryable = error.code == TOO_MANY_REQUESTS or error.code >= FIRST_SERVER_ERROR
+            if not retryable or attempt == MAX_ATTEMPTS or time.monotonic() + pause >= deadline:
                 failure = AiRejectedError if error.code in REJECTING_STATUSES else AiProviderError
                 raise failure(f"{url} answered HTTP {error.code}: {error.detail}") from error
             cancellation.sleep(pause)
