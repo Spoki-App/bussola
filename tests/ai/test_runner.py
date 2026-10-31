@@ -94,11 +94,12 @@ def test_field_names_that_look_like_keywords_are_kept() -> None:
     assert output_schema(Range)["required"] == ["minimum", "default"]
 
 
-def test_a_mapping_field_keeps_its_value_schema() -> None:
+def test_a_mapping_field_is_refused_because_structured_outputs_cannot_express_it() -> None:
     class Counts(BaseModel):
         counts: dict[str, int]
 
-    assert output_schema(Counts)["properties"]["counts"]["additionalProperties"] == {"type": "integer"}
+    with pytest.raises(TypeError, match="free-form mappings"):
+        output_schema(Counts)
 
 
 def test_results_are_cached_by_content_hash_prompt_version_and_model(tmp_path: Path) -> None:

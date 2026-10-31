@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { getJson, postJson } from './client'
 import type { AiStatus, AiTestResult } from './types'
@@ -14,5 +14,9 @@ export function useAiStatus(repoId?: number) {
 }
 
 export function useTestAiConnection() {
-  return useMutation({ mutationFn: () => postJson<AiTestResult>('/ai/test') })
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () => postJson<AiTestResult>('/ai/test'),
+    onSettled: () => client.invalidateQueries({ queryKey: ['ai'] }),
+  })
 }

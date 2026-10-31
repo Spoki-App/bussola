@@ -113,7 +113,9 @@ def _portable(schema: Any) -> Any:
             node[key] = {name: _portable(item) for name, item in cast(dict[str, Any], value).items()}
         elif key not in UNSUPPORTED_KEYWORDS:
             node[key] = _portable(value)
-    if node.get("type") == "object" and "additionalProperties" not in node:
+    if node.get("type") == "object" and node.get("additionalProperties") not in (None, False):
+        raise TypeError("Structured outputs cannot express free-form mappings; use a list of objects instead of a dict field")
+    if node.get("type") == "object":
         node["additionalProperties"] = False
     if "properties" in node:
         node["required"] = list(node["properties"])

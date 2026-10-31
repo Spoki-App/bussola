@@ -56,8 +56,9 @@ class RepoAiConfig(BaseModel):
         if not endpoint.lower().startswith(HTTP_SCHEMES):
             raise ValueError("endpoint must start with http:// or https://")
         parts = urllib.parse.urlsplit(endpoint.rstrip("/"))
-        if parts.query or parts.fragment or parts.username is not None or not parts.hostname:
+        if any(character.isspace() for character in endpoint) or parts.query or parts.fragment or parts.username is not None or not parts.hostname:
             raise ValueError("endpoint must be a plain http:// or https:// address with a host, without login, query or fragment")
+        _ = parts.port
         return urllib.parse.urlunsplit(parts._replace(scheme=parts.scheme.lower(), netloc=parts.netloc.lower()))
 
 

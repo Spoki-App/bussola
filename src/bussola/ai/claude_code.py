@@ -209,6 +209,11 @@ class _ClaudeSession:
         self._stop_group()
         if started:
             self._exchanged.wait(FINISH_WAIT_SECONDS)
+        else:
+            for stream in (self._process.stdin, self._process.stdout, self._process.stderr):
+                if stream is not None:
+                    with contextlib.suppress(OSError):
+                        stream.close()
         self._reap()
 
     def _send(self, prompt: str) -> None:

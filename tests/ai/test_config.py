@@ -300,7 +300,7 @@ def test_a_repository_can_send_code_to_a_local_keyless_server_instead_of_your_ke
 
 @pytest.mark.parametrize(
     "endpoint",
-    ["https://x.example/v1?api-version=2024", "https://x.example/v1#part", "https://user:secret@x.example/v1", "http:///v1"],
+    ["https://x.example/v1?api-version=2024", "https://x.example/v1#part", "https://user:secret@x.example/v1", "http:///v1", "http://h /v1"],
 )
 def test_an_endpoint_with_query_fragment_or_login_is_rejected(endpoint: str) -> None:
     with pytest.raises(ValueError, match="plain http"):
@@ -314,3 +314,8 @@ def test_a_config_path_that_is_not_a_file_is_reported(tmp_path: Path) -> None:
     for name in ("config.toml", "linked.toml"):
         with pytest.raises(AiNotConfiguredError, match="Invalid configuration"):
             load_user_config(tmp_path / name)
+
+
+def test_an_endpoint_with_an_impossible_port_is_rejected() -> None:
+    with pytest.raises(ValueError, match="Port out of range"):
+        RepoAiConfig(endpoint="http://localhost:99999/v1")
