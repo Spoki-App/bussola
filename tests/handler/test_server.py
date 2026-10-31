@@ -302,6 +302,17 @@ def test_open_waits_for_a_local_server_that_is_busy_instead_of_starting_another(
     assert servers.started == []
 
 
+def test_open_forgets_a_silent_server_as_soon_as_it_turns_out_closed(tmp_path: Path) -> None:
+    gone = ServerAddress("127.0.0.1", 9000, "gone")
+    publish_server(tmp_path, gone)
+    servers = FakeServers()
+    servers.busy[gone] = 1
+
+    servers.launcher(tmp_path, timeout=60).open("bussola://")
+
+    assert gone not in published_servers(tmp_path)
+
+
 def test_open_gives_up_on_a_local_server_that_never_answers_and_starts_its_own(tmp_path: Path) -> None:
     hung = ServerAddress("127.0.0.1", 8765, "hung")
     publish_server(tmp_path, hung)
@@ -314,6 +325,31 @@ def test_open_gives_up_on_a_local_server_that_never_answers_and_starts_its_own(t
     assert started.port != 8765
     assert url == f"http://127.0.0.1:{started.port}/?token={started.token}"
     assert hung not in published_servers(tmp_path)
+
+
+def test_open_probes_again_a_new_server_that_was_slow_to_answer_once(tmp_path: Path) -> None:
+    winner = ServerAddress("127.0.0.1", 8765, "winner")
+    servers = FakeServers({winner})
+
+    def winner_publishes(_seconds: float) -> None:
+        if winner not in published_servers(tmp_path):
+            publish_server(tmp_path, winner)
+            servers.busy[winner] = 1
+
+    url = servers.launcher(tmp_path, sleep=winner_publishes, timeout=60, exit_grace=60).open("bussola://")
+
+    assert url == "http://127.0.0.1:8765/?token=winner"
+    assert servers.started == []
+
+
+def test_open_forgets_a_server_file_whose_port_another_bussola_now_holds(tmp_path: Path) -> None:
+    dead = ServerAddress("127.0.0.1", 9000, "dead")
+    publish_server(tmp_path, dead)
+    servers = FakeServers({ServerAddress("127.0.0.1", 9000, "someone else")})
+
+    servers.launcher(tmp_path).open("bussola://")
+
+    assert dead not in published_servers(tmp_path)
 
 
 def test_open_forgets_a_server_file_whose_port_now_answers_as_something_else(tmp_path: Path) -> None:

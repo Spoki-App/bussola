@@ -34,7 +34,7 @@ LINK_LOG_FILE = "open-link.log"
 HEALTH_PATH = "/api/health"
 HEALTH_TIMEOUT_SECONDS = 2.0
 START_TIMEOUT_SECONDS = 30.0
-EXIT_GRACE_SECONDS = 5.0
+EXIT_GRACE_SECONDS = 1.0
 FREE_PORT_ATTEMPTS = 3
 NOTHING_TO_SKIP: frozenset["ServerAddress"] = frozenset()
 MAX_PROBE_BODY = 512
@@ -268,7 +268,7 @@ class Launcher:
         states = dict(zip(candidates, pool.map(self.probe, candidates), strict=True))
         for candidate in published:
             state = states[candidate]
-            if state in (Probe.CLOSED, Probe.WRONG) or (state == Probe.SILENT and not is_local_host(candidate.host)):
+            if state in (Probe.CLOSED, Probe.WRONG, Probe.OTHER_BUSSOLA) or (state == Probe.SILENT and not is_local_host(candidate.host)):
                 self._forget(candidate)
         return states
 
@@ -280,6 +280,9 @@ class Launcher:
             found = self._first_ready(states)
             if found is not None:
                 return found
+            for address in silent:
+                if states[address] != Probe.SILENT:
+                    self._forget(address)
             silent = [address for address in silent if states[address] == Probe.SILENT]
         for address in silent:
             self._forget(address)
@@ -300,7 +303,7 @@ class Launcher:
             found = self._first_ready(states)
             if found is not None:
                 return found
-            tried.update(address for address in states if address != started)
+            tried.update(address for address, state in states.items() if address != started and state != Probe.SILENT)
             exited = process is None or process.poll() is not None
             if exited and states[started] != Probe.OTHER_BUSSOLA:
                 return None
