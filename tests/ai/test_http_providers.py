@@ -2,6 +2,7 @@ import json
 import socket
 import threading
 import time
+import urllib.error
 import urllib.request
 from collections.abc import Generator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -19,6 +20,7 @@ from bussola.ai.base import (
     AiRejectedError,
     AiRequest,
     AiTimeoutError,
+    AiUnreachableError,
     Cancellation,
 )
 from bussola.ai.config import AiSettings, ProviderName
@@ -176,6 +178,23 @@ class DroppingHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
         return
+
+
+def test_a_refused_connection_means_the_endpoint_is_unreachable() -> None:
+    with pytest.raises(AiUnreachableError, match="Cannot reach"):
+        OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 5.0).complete(REQUEST, Cancellation())
+
+
+def test_a_reset_while_sending_does_not_mean_the_endpoint_is_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
+    def reset(*_args: object, **_kwargs: object) -> None:
+        raise urllib.error.URLError(ConnectionResetError("Connection reset by peer"))
+
+    monkeypatch.setattr(urllib.request.OpenerDirector, "open", reset)
+
+    with pytest.raises(AiProviderError) as raised:
+        OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 5.0).complete(REQUEST, Cancellation())
+
+    assert not isinstance(raised.value, AiUnreachableError)
 
 
 def test_a_connection_dropped_before_the_answer_is_a_provider_error(monkeypatch: pytest.MonkeyPatch) -> None:

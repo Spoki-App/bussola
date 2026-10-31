@@ -173,3 +173,26 @@ def test_the_item_that_stops_the_batch_is_counted_in_the_progress() -> None:
     run_batch([1, 2], work, Cancellation(), progress.append)
 
     assert progress == [BatchProgress(1, 1, 2)]
+
+
+def test_the_same_error_twice_in_a_row_stops_the_batch() -> None:
+    calls: list[int] = []
+
+    def work(item: int) -> int:
+        calls.append(item)
+        raise AiProviderError("http://localhost:11434/chat/completions answered HTTP 404: not found")
+
+    outcome = run_batch([1, 2, 3, 4], work, Cancellation())
+
+    assert calls == [1, 2]
+    assert outcome.stopped_by == "http://localhost:11434/chat/completions answered HTTP 404: not found"
+
+
+def test_different_errors_in_a_row_do_not_stop_the_batch() -> None:
+    def work(item: int) -> int:
+        raise AiOutputError(f"unusable answer for item {item}")
+
+    outcome = run_batch([1, 2, 3], work, Cancellation())
+
+    assert outcome.stopped_by is None
+    assert len(outcome.errors) == 3

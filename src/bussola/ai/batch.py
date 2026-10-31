@@ -7,12 +7,11 @@ from bussola.ai.base import (
     AiNotConfiguredError,
     AiRejectedError,
     AiTargetChangedError,
-    AiTimeoutError,
     AiUnreachableError,
     Cancellation,
 )
 
-TIMEOUTS_IN_A_ROW_TO_STOP = 2
+SAME_ERRORS_IN_A_ROW_TO_STOP = 2
 STOPPING_ERRORS = (AiNotConfiguredError, AiTargetChangedError, AiUnreachableError, AiRejectedError)
 
 
@@ -38,7 +37,8 @@ def run_batch[K: Hashable, T](
     on_progress: Callable[[BatchProgress], None] | None = None,
 ) -> BatchResult[K, T]:
     outcome: BatchResult[K, T] = BatchResult()
-    failed = timeouts_in_a_row = 0
+    failed = repeats = 0
+    previous_error: str | None = None
     for done, item in enumerate(items, start=1):
         if cancellation.cancelled:
             outcome.cancelled = True
@@ -49,13 +49,15 @@ def run_batch[K: Hashable, T](
             outcome.cancelled = True
             break
         except Exception as error:
-            outcome.errors[item] = str(error) or type(error).__name__
+            message = str(error) or type(error).__name__
+            outcome.errors[item] = message
             failed += 1
-            timeouts_in_a_row = timeouts_in_a_row + 1 if isinstance(error, AiTimeoutError) else 0
-            if not isinstance(error, AiError) or isinstance(error, STOPPING_ERRORS) or timeouts_in_a_row >= TIMEOUTS_IN_A_ROW_TO_STOP:
-                outcome.stopped_by = outcome.errors[item]
+            repeats = repeats + 1 if message == previous_error else 1
+            previous_error = message
+            if not isinstance(error, AiError) or isinstance(error, STOPPING_ERRORS) or repeats >= SAME_ERRORS_IN_A_ROW_TO_STOP:
+                outcome.stopped_by = message
         else:
-            timeouts_in_a_row = 0
+            repeats, previous_error = 0, None
         if on_progress is not None:
             on_progress(BatchProgress(done, failed, len(items)))
         if outcome.stopped_by is not None:

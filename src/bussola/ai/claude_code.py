@@ -16,6 +16,7 @@ CLAUDE = "claude"
 CLAUDE_ENV = {"NO_COLOR": "1"}
 PRIVATE_ENV_PREFIX = "BUSSOLA_"
 PIPE_GRACE_SECONDS = 0.5
+READ_CHUNK_BYTES = 64 * 1024
 EXIT_POLL_SECONDS = 0.05
 
 
@@ -78,9 +79,6 @@ class ClaudeCodeProvider:
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
                     env=_claude_environment(),
                     start_new_session=True,
                 )
@@ -99,29 +97,21 @@ def _claude_environment() -> dict[str, str]:
 
 
 class _ClaudeSession:
-    def __init__(self, process: subprocess.Popen[str]) -> None:
+    def __init__(self, process: subprocess.Popen[bytes]) -> None:
         self._process = process
         self._lock = threading.Lock()
 
     def exchange(self, prompt: str) -> tuple[int, str, str]:
-        output: dict[str, str] = {}
-        readers = [
-            threading.Thread(target=_read_into, args=(stream, output, name), daemon=True)
-            for name, stream in (("stdout", self._process.stdout), ("stderr", self._process.stderr))
-        ]
-        for reader in readers:
-            reader.start()
+        stdout, stderr = _Collector(self._process.stdout), _Collector(self._process.stderr)
         self._send(prompt)
         self._wait_for_exit()
         self._stop_group()
         returncode = self._reap()
-        for reader in readers:
-            reader.join(PIPE_GRACE_SECONDS)
-        if any(reader.is_alive() for reader in readers):
+        if not (stdout.wait(PIPE_GRACE_SECONDS) and stderr.wait(PIPE_GRACE_SECONDS)):
             _kill_group(self._process)
-            for reader in readers:
-                reader.join()
-        return returncode, output.get("stdout", ""), output.get("stderr", "")
+            stdout.wait(PIPE_GRACE_SECONDS)
+            stderr.wait(PIPE_GRACE_SECONDS)
+        return returncode, stdout.text(), stderr.text()
 
     def finish(self) -> None:
         self._stop_group()
@@ -131,7 +121,7 @@ class _ClaudeSession:
         stdin = self._process.stdin
         if stdin is not None:
             with contextlib.suppress(BrokenPipeError, ValueError):
-                stdin.write(prompt)
+                stdin.write(prompt.encode())
                 stdin.close()
 
     def _wait_for_exit(self) -> None:
@@ -155,12 +145,32 @@ class _ClaudeSession:
             return self._process.wait()
 
 
-def _read_into(stream: IO[str] | None, output: dict[str, str], name: str) -> None:
-    if stream is not None:
-        output[name] = stream.read()
+class _Collector:
+    def __init__(self, stream: IO[bytes] | None) -> None:
+        self._chunks: list[bytes] = []
+        self._lock = threading.Lock()
+        self._done = threading.Event()
+        if stream is None:
+            self._done.set()
+        else:
+            threading.Thread(target=self._read, args=(stream,), daemon=True).start()
+
+    def wait(self, timeout: float) -> bool:
+        return self._done.wait(timeout)
+
+    def text(self) -> str:
+        with self._lock:
+            return b"".join(self._chunks).decode(errors="replace")
+
+    def _read(self, stream: IO[bytes]) -> None:
+        with contextlib.suppress(OSError, ValueError):
+            while chunk := os.read(stream.fileno(), READ_CHUNK_BYTES):
+                with self._lock:
+                    self._chunks.append(chunk)
+        self._done.set()
 
 
-def _kill_group(process: subprocess.Popen[str]) -> None:
+def _kill_group(process: subprocess.Popen[bytes]) -> None:
     with contextlib.suppress(OSError):
         os.killpg(process.pid, signal.SIGKILL)
 

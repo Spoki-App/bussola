@@ -1,5 +1,6 @@
 import json
 import os
+import signal
 import subprocess
 import threading
 import time
@@ -128,7 +129,14 @@ def test_cancelling_also_stops_the_processes_the_cli_started(fake_claude: FakeCl
     monkeypatch.setenv("FAKE_CLAUDE_CHILD_PID", str(child_pid_file))
     fake_claude.answer({"result": "{}"}, sleep=30)
     cancellation = Cancellation()
-    threading.Timer(0.5, cancellation.cancel).start()
+
+    def cancel_once_the_child_runs() -> None:
+        deadline = time.monotonic() + 10
+        while not child_pid_file.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        cancellation.cancel()
+
+    threading.Thread(target=cancel_once_the_child_runs, daemon=True).start()
 
     with pytest.raises(AiCancelledError):
         provider().complete(REQUEST, cancellation)
@@ -161,6 +169,23 @@ def test_a_detached_process_left_by_the_cli_is_stopped(fake_claude: FakeClaude, 
 
     child_pid = child_pid_file.read_text()
     assert subprocess.run(["ps", "-o", "stat=", "-p", child_pid], capture_output=True, text=True, check=False).stdout.strip() in {"", "Z"}
+
+
+def test_a_process_in_another_session_holding_the_output_does_not_hold_up_the_answer(
+    fake_claude: FakeClaude, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    child_pid_file = tmp_path / "escaped.pid"
+    monkeypatch.setenv("FAKE_CLAUDE_ESCAPED_CHILD_PID", str(child_pid_file))
+    fake_claude.answer({"type": "result", "is_error": False, "result": '{"impact": "high"}'})
+    started = time.monotonic()
+
+    try:
+        answer = provider(timeout=20).complete(REQUEST, Cancellation())
+    finally:
+        os.kill(int(child_pid_file.read_text()), signal.SIGKILL)
+
+    assert answer == '{"impact": "high"}'
+    assert time.monotonic() - started < 5
 
 
 def test_a_claude_command_that_cannot_run_is_reported(tmp_path: Path) -> None:

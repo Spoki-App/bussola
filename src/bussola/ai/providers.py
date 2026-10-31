@@ -14,7 +14,8 @@ def build_provider(settings: AiSettings) -> AiProvider:
             return AnthropicProvider(_required(settings.model, "model"), endpoint, _api_key(settings), settings.timeout, settings.max_tokens)
         case ProviderName.OPENAI_COMPATIBLE:
             endpoint = _required(settings.endpoint, "endpoint")
-            return OpenAiCompatibleProvider(_required(settings.model, "model"), endpoint, settings.api_key(), settings.timeout, settings.max_tokens)
+            key = _api_key(settings) if settings.api_key_env else None
+            return OpenAiCompatibleProvider(_required(settings.model, "model"), endpoint, key, settings.timeout, settings.max_tokens)
         case ProviderName.NONE:
             raise AiNotConfiguredError("No AI provider is configured")
 

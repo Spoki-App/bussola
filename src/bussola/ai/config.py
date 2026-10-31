@@ -1,3 +1,4 @@
+import json
 import os
 import tomllib
 from dataclasses import dataclass, replace
@@ -86,7 +87,7 @@ class AiSettings:
 
     @property
     def target(self) -> str | None:
-        return "|".join((self.provider, self.model or "", self.endpoint or "")) if self.configured else None
+        return json.dumps([self.provider, self.model, self.endpoint]) if self.configured else None
 
     def api_key(self) -> str | None:
         return (os.environ.get(self.api_key_env) or None) if self.api_key_env else None

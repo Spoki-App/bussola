@@ -56,7 +56,7 @@ def test_the_status_names_the_provider_model_and_key_variable(data_dir: Path, co
         "api_key_set": True,
         "problem": None,
         "config_file": str(config_file),
-        "target": "anthropic|claude-opus-5-5|https://api.anthropic.com",
+        "target": '["anthropic", "claude-opus-5-5", "https://api.anthropic.com"]',
     }
 
 

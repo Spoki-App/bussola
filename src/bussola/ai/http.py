@@ -1,4 +1,5 @@
 import contextlib
+import errno
 import functools
 import http.client
 import ipaddress
@@ -17,6 +18,7 @@ SOCKET_GRACE_SECONDS = 5.0
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 MAX_ERROR_BODY_BYTES = 64 * 1024
 REJECTING_STATUSES = frozenset({401, 403, 429})
+UNREACHABLE_ERRNOS = frozenset({errno.ENETUNREACH, errno.EHOSTUNREACH})
 LOOPBACK_NAME = "localhost"
 
 
@@ -94,12 +96,11 @@ class _TrackedHttpHandler(urllib.request.HTTPHandler):
 
 class _TrackedHttpsHandler(urllib.request.HTTPSHandler):
     def __init__(self, connections: _Connections) -> None:
-        super().__init__()
+        super().__init__(context=_ssl_context())
         self._connections = connections
-        self._ssl_context = ssl.create_default_context()
 
     def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
-        return self.do_open(functools.partial(_GuardedHttpsConnection, tracker=self._connections), req, context=self._ssl_context)
+        return self.do_open(functools.partial(_GuardedHttpsConnection, tracker=self._connections), req, context=_ssl_context())
 
 
 def bypasses_proxy(url: str) -> bool:
@@ -137,7 +138,8 @@ def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeou
         failure = AiRejectedError if error.code in REJECTING_STATUSES else AiProviderError
         raise failure(f"{url} answered HTTP {error.code}: {error.detail}") from error
     except urllib.error.URLError as error:
-        raise AiUnreachableError(f"Cannot reach {url}: {error.reason}") from error
+        failure = AiUnreachableError if _unreachable(error.reason) else AiProviderError
+        raise failure(f"Cannot reach {url}: {error.reason}") from error
     except (http.client.HTTPException, OSError) as error:
         raise AiProviderError(f"The connection to {url} failed: {error or type(error).__name__}") from error
     except ValueError as error:
@@ -151,6 +153,15 @@ def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeou
     if decoded is None:
         raise AiProviderError(f"{url} answered with unexpected JSON")
     return decoded
+
+
+def _unreachable(reason: object) -> bool:
+    return isinstance(reason, ConnectionRefusedError | socket.gaierror) or getattr(reason, "errno", None) in UNREACHABLE_ERRNOS
+
+
+@functools.cache
+def _ssl_context() -> ssl.SSLContext:
+    return ssl.create_default_context()
 
 
 def _error_detail(error: urllib.error.HTTPError) -> str:

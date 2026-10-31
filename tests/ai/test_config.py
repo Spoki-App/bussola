@@ -4,6 +4,7 @@ import pytest
 
 from bussola.ai.base import AiNotConfiguredError, AiTargetChangedError
 from bussola.ai.config import CONFIG_DIR_ENV, AiSettings, ProviderName, RepoAiConfig, UserAiConfig, default_config_file, load_user_config, resolve_ai_settings
+from bussola.ai.providers import build_provider
 from bussola.ai.settings import load_ai_settings, require_target
 
 
@@ -22,7 +23,7 @@ def test_the_user_configuration_selects_the_provider(tmp_path: Path) -> None:
 
     assert settings == AiSettings(ProviderName.OPENAI_COMPATIBLE, "qwen2.5-coder", "http://localhost:11434/v1", 30, None, "user")
     assert settings.label == "OpenAI-compatible endpoint"
-    assert settings.target == "openai-compatible|qwen2.5-coder|http://localhost:11434/v1"
+    assert settings.target == '["openai-compatible", "qwen2.5-coder", "http://localhost:11434/v1"]'
 
 
 def test_the_anthropic_api_has_a_default_model_endpoint_and_key_variable() -> None:
@@ -105,7 +106,7 @@ def test_claude_code_has_no_endpoint_even_when_one_is_set() -> None:
     settings = resolve_ai_settings(user)
 
     assert settings.endpoint is None
-    assert settings.target == "claude-code||"
+    assert settings.target == '["claude-code", null, null]'
 
 
 def test_a_repository_can_turn_ai_off() -> None:
@@ -184,11 +185,11 @@ def test_a_repository_switching_provider_gets_no_key() -> None:
 def test_an_action_runs_only_for_the_target_the_user_confirmed() -> None:
     settings = resolve_ai_settings(UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="qwen2.5-coder", endpoint="http://localhost:11434/v1"))
 
-    assert require_target(settings, "openai-compatible|qwen2.5-coder|http://localhost:11434/v1") is settings
+    assert require_target(settings, '["openai-compatible", "qwen2.5-coder", "http://localhost:11434/v1"]') is settings
     with pytest.raises(AiTargetChangedError, match="Confirm again"):
-        require_target(settings, "openai-compatible|qwen2.5-coder|http://other.example/v1")
+        require_target(settings, '["openai-compatible", "qwen2.5-coder", "http://other.example/v1"]')
     with pytest.raises(AiTargetChangedError):
-        require_target(AiSettings(ProviderName.NONE), "none||")
+        require_target(AiSettings(ProviderName.NONE), '["none", null, null]')
 
 
 def test_max_tokens_is_a_user_only_cap() -> None:
@@ -234,3 +235,18 @@ def test_an_unreadable_configuration_directory_is_reported(tmp_path: Path, monke
 
 def test_the_endpoint_scheme_is_not_case_sensitive() -> None:
     assert RepoAiConfig(endpoint="HTTP://localhost:11434/v1").endpoint == "HTTP://localhost:11434/v1"
+
+
+def test_targets_that_join_to_the_same_text_stay_distinct() -> None:
+    def settings(model: str, endpoint: str) -> AiSettings:
+        return AiSettings(ProviderName.OPENAI_COMPATIBLE, model, endpoint)
+
+    assert settings("m|http://a", "http://b").target != settings("m", "http://a|http://b").target
+
+
+def test_a_named_key_variable_that_is_not_set_is_reported_for_openai_compatible(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("WORK_KEY", raising=False)
+    settings = AiSettings(ProviderName.OPENAI_COMPATIBLE, "gpt", "https://api.example.com/v1", api_key_env="WORK_KEY")
+
+    with pytest.raises(AiNotConfiguredError, match="Set the WORK_KEY environment variable"):
+        build_provider(settings)
