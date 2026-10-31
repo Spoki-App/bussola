@@ -138,7 +138,7 @@ bussola install-handler
 If bussola is not running, the link starts `bussola serve --no-open` in the background on `127.0.0.1:8765`, waits for it, then opens the browser. Each running `bussola serve` writes its address and session token to a file in `servers/` in the data folder (readable only by you) once it is listening, so links can find it; a link prefers the server on port 8765. A server started by a link does not add your home folder as a repository. The repository is found as **Open pull request** finds it; if there is no local clone, the home page asks you to clone it and add its folder (**Browse...** starts filtered on its name), and the pull request opens once you add it (or the prompt says the folder is not a clone of it). `bussola open-link '<link>'` does the same from a terminal. A link that cannot be opened (not a valid link, or the server did not start) is recorded in `open-link.log` in the data folder, since the operating system shows no output.
 
 - **macOS:** builds `~/Applications/bussola.app`, a small AppleScript app that declares the scheme, and registers it with Launch Services. It keeps the `PATH` of the shell that ran `install-handler`, so a server it starts finds `gh` and `git`. Opening the app itself opens bussola.
-- **Linux:** writes `bussola-url-handler.desktop` to `~/.local/share/applications` (or `$XDG_DATA_HOME/applications`) and makes it the default for `x-scheme-handler/bussola` with `xdg-mime`.
+- **Linux:** writes `bussola-url-handler.desktop` to `~/.local/share/applications` (or `$XDG_DATA_HOME/applications`) and makes it the default for `x-scheme-handler/bussola` with `xdg-mime`. Like on macOS, it keeps the `PATH` of the shell that ran `install-handler`.
 - **Windows:** writes the `HKCU\Software\Classes\bussola` registry keys for the current user.
 
 The handler runs the Python that ran `install-handler`, and keeps the `BUSSOLA_DATA_DIR` it was run with, so run it again after reinstalling bussola somewhere else or moving your data. `bussola uninstall-handler` removes the registration, and on Linux also the `x-scheme-handler/bussola` default that `xdg-mime` wrote to `mimeapps.list`.
@@ -180,7 +180,7 @@ A registered repository is remembered by its path and its first commit. If you m
 The server is meant for one person on one machine.
 
 - **Network:** it listens on `127.0.0.1` by default and warns if you pass another `--host`.
-- **Session token:** every API call needs the session token cookie (HttpOnly, SameSite=Strict).
+- **Session token:** every API call needs the session token cookie (HttpOnly, SameSite=Strict, one per port, so two servers do not log each other out).
 - **Host check:** requests whose `Host` header is not `127.0.0.1:<port>`, `localhost:<port>`, `[::1]:<port>` or the `--host` you passed are rejected, which blocks DNS rebinding.
 - **Git refs and files:** refs are validated with `git rev-parse --verify --end-of-options` before use. File contents are read only from the git object database.
 - **bussola:// links:** a link only chooses what to open. Its parameters are validated (repository name, numbers, a relative file path, a thread id), anything else in it is ignored, and no link approves, resolves, sends or deletes anything.

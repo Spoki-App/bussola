@@ -51,5 +51,6 @@ describe('add repository request', () => {
     expect(addRepositoryRequestFromSearch('?add_repo=https://evil.example')).toBeNull()
     expect(addRepositoryRequestFromSearch('?add_repo=//evil.example/github.com/a/b/pull/1')).toBeNull()
     expect(addRepositoryRequestFromSearch('?add_repo=/github.com/acme/widgets/issues/7')).toBeNull()
+    expect(addRepositoryRequestFromSearch('?add_repo=http://%5B')).toBeNull()
   })
 })

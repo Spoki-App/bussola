@@ -143,7 +143,7 @@ export function createLinkScroll(): LinkScroll {
         placed = { element, top: element.getBoundingClientRect().top }
       }
     },
-    movedByUser: () => placed !== null && Math.abs(placed.element.getBoundingClientRect().top - placed.top) > MOVE_TOLERANCE_PX,
+    movedByUser: () => placed !== null && placed.element.isConnected && Math.abs(placed.element.getBoundingClientRect().top - placed.top) > MOVE_TOLERANCE_PX,
   }
 }
 

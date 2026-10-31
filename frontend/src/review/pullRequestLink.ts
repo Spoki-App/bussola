@@ -11,7 +11,7 @@ export function pullRequestRepositoryFromPath(pathname: string): string | null {
 }
 
 export function pullRequestUrlFromPath(pathname: string): string | null {
-  return PULL_REQUEST_PATH.test(pathname) ? githubUrl(pathname) : null
+  return pullRequestRepositoryFromPath(pathname) === null ? null : githubUrl(pathname)
 }
 
 function githubUrl(pathname: string): string {
@@ -33,7 +33,16 @@ export function addRepositoryRequestFromSearch(search: string): AddRepositoryReq
   if (then === null) {
     return null
   }
-  const { origin, pathname, search: focus } = new URL(then, window.location.origin)
-  const repository = origin === window.location.origin ? pullRequestRepositoryFromPath(pathname) : null
-  return repository === null ? null : { repository, url: githubUrl(pathname), search: focus }
+  const target = sameOriginUrl(then)
+  const repository = target === null ? null : pullRequestRepositoryFromPath(target.pathname)
+  return target === null || repository === null ? null : { repository, url: githubUrl(target.pathname), search: target.search }
+}
+
+function sameOriginUrl(path: string): URL | null {
+  try {
+    const url = new URL(path, window.location.origin)
+    return url.origin === window.location.origin ? url : null
+  } catch {
+    return null
+  }
 }

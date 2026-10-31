@@ -150,7 +150,9 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     writeStored(FILES_HIDDEN_KEY, String(!filesHidden))
   }
 
-  const linkedTarget = appliedLink === undefined && linkTarget && units.data && !units.isPlaceholderData ? linkTarget(units.data) : undefined
+  const viewChanged = filter !== 'all' || query !== ''
+  const resolveLink = () => (linkTarget && units.data && !units.isPlaceholderData ? linkTarget(units.data) : undefined)
+  const linkedTarget = appliedLink !== undefined ? undefined : viewChanged ? null : resolveLink()
   if (linkedTarget !== undefined) {
     setAppliedLink(linkedTarget)
     if (linkedTarget) {

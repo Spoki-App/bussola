@@ -166,6 +166,23 @@ describe('followLink', () => {
     expect(link.current()).toBeNull()
   })
 
+  it('does not take a target that was removed from the page for a user scroll', () => {
+    const link = createLinkScroll()
+    followLink(link)
+    const target = document.getElementById('unit-2')
+    link.start({ unitId: 2, elementId: 'unit-2' })
+    link.place(target)
+    link.reached()
+    if (target) {
+      target.getBoundingClientRect = () => DOMRect.fromRect({ y: 300 })
+    }
+
+    target?.remove()
+    window.dispatchEvent(new Event('scroll'))
+
+    expect(link.current()?.reached).toBe(true)
+  })
+
   it('ends the link on a key press or a click too, and only listens once', () => {
     for (const event of [new KeyboardEvent('keydown'), new MouseEvent('mousedown')]) {
       const link = createLinkScroll()
