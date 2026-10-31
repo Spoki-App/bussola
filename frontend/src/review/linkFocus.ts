@@ -28,6 +28,8 @@ export interface LinkScroll {
   unitShown: () => void
   reached: () => void
   done: () => void
+  place: (element: Element | null) => void
+  movedByUser: () => boolean
 }
 
 type LinkRole = 'target' | 'approach' | 'holder' | 'settled' | null
@@ -110,16 +112,13 @@ export function resolveLinkFocus(focus: LinkFocus, units: Unit[], threads: Threa
   return unit ? { unitId: unit.id, elementId: unitElementId(unit.id) } : null
 }
 
-function scrollIntoPlace(element: Element | null) {
-  element?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-
 export function scrollToElement(id: string) {
-  scrollIntoPlace(document.getElementById(id))
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 export function createLinkScroll(): LinkScroll {
   let state: LinkState | null = null
+  let placed: { element: Element; top: number } | null = null
   const listeners = new Set<() => void>()
   const change = (next: LinkState | null) => {
     if (next === state) {
@@ -138,6 +137,13 @@ export function createLinkScroll(): LinkScroll {
     unitShown: () => { change(state && { ...state, unitShown: true }) },
     reached: () => { change(state && { ...state, reached: true }) },
     done: () => { change(null) },
+    place: (element) => {
+      if (element) {
+        element.scrollIntoView({ block: 'start' })
+        placed = { element, top: element.getBoundingClientRect().top }
+      }
+    },
+    movedByUser: () => placed !== null && Math.abs(placed.element.getBoundingClientRect().top - placed.top) > MOVE_TOLERANCE_PX,
   }
 }
 
@@ -160,6 +166,7 @@ function linkRole(state: LinkState | null, elementId: string, unitId: number | n
 const noLink = () => () => undefined
 
 const USER_INPUT_EVENTS = ['wheel', 'touchmove', 'keydown', 'mousedown'] as const
+const MOVE_TOLERANCE_PX = 2
 
 function linkAnchor(state: LinkState): Element | null {
   const { elementId, unitId } = state.target
@@ -170,12 +177,13 @@ export function followLink(link: LinkScroll): () => void {
   const keepInView = new ResizeObserver(() => {
     const state = link.current()
     if (state?.reached) {
-      linkAnchor(state)?.scrollIntoView({ block: 'start' })
+      link.place(linkAnchor(state))
     }
   })
   keepInView.observe(document.body)
   const stop = () => {
     keepInView.disconnect()
+    window.removeEventListener('scroll', endIfMoved)
     for (const event of USER_INPUT_EVENTS) {
       window.removeEventListener(event, end)
     }
@@ -184,9 +192,15 @@ export function followLink(link: LinkScroll): () => void {
     stop()
     link.done()
   }
+  const endIfMoved = () => {
+    if (link.movedByUser()) {
+      end()
+    }
+  }
   for (const event of USER_INPUT_EVENTS) {
     window.addEventListener(event, end, { passive: true })
   }
+  window.addEventListener('scroll', endIfMoved, { passive: true })
   return stop
 }
 
@@ -200,7 +214,7 @@ export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId
     }
     const now = linkRole(link.current(), elementId, unitId, settled)
     if (now === 'target' || now === 'approach' || now === 'holder') {
-      scrollIntoPlace(ref.current)
+      link.place(ref.current)
     }
     if (now === 'holder') {
       link.unitShown()

@@ -146,6 +146,26 @@ describe('followLink', () => {
     stop()
   })
 
+  it('ends the link when the user drags the page away from the target, but not on its own scrolls', () => {
+    const link = createLinkScroll()
+    followLink(link)
+    const target = document.getElementById('unit-2')
+    let top = 0
+    if (target) {
+      target.getBoundingClientRect = () => DOMRect.fromRect({ y: top })
+    }
+    link.start({ unitId: 2, elementId: 'unit-2' })
+    link.place(target)
+    link.reached()
+
+    window.dispatchEvent(new Event('scroll'))
+    expect(link.current()?.reached).toBe(true)
+
+    top = 300
+    window.dispatchEvent(new Event('scroll'))
+    expect(link.current()).toBeNull()
+  })
+
   it('ends the link on a key press or a click too, and only listens once', () => {
     for (const event of [new KeyboardEvent('keydown'), new MouseEvent('mousedown')]) {
       const link = createLinkScroll()

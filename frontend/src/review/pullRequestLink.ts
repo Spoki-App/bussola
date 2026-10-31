@@ -11,7 +11,11 @@ export function pullRequestRepositoryFromPath(pathname: string): string | null {
 }
 
 export function pullRequestUrlFromPath(pathname: string): string | null {
-  return PULL_REQUEST_PATH.test(pathname) ? `https:/${pathname}` : null
+  return PULL_REQUEST_PATH.test(pathname) ? githubUrl(pathname) : null
+}
+
+function githubUrl(pathname: string): string {
+  return `https:/${pathname}`
 }
 
 export interface AddRepositoryRequest {
@@ -29,6 +33,5 @@ export function addRepositoryRequestFromSearch(search: string): AddRepositoryReq
   const queryStart = then.includes('?') ? then.indexOf('?') : then.length
   const pathname = then.slice(0, queryStart)
   const repository = pullRequestRepositoryFromPath(pathname)
-  const url = pullRequestUrlFromPath(pathname)
-  return repository !== null && url !== null ? { repository, url, search: then.slice(queryStart) } : null
+  return repository === null ? null : { repository, url: githubUrl(pathname), search: then.slice(queryStart) }
 }
