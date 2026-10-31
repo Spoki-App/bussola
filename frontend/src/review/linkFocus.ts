@@ -74,8 +74,8 @@ function linkedThread(focus: LinkFocus, threads: Thread[]): Thread | undefined {
   if (focus.comment === null) {
     return undefined
   }
-  const anchor = `#discussion_r${focus.comment}`
-  return threads.find((thread) => thread.comments.some((comment) => comment.remote_url?.endsWith(anchor)))
+  const anchors = [`#discussion_r${focus.comment}`, `#issuecomment-${focus.comment}`]
+  return threads.find((thread) => thread.comments.some((comment) => anchors.some((anchor) => comment.remote_url?.endsWith(anchor))))
 }
 
 interface Ranked {

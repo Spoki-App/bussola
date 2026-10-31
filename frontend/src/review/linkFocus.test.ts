@@ -139,6 +139,7 @@ describe('resolveLinkFocus', () => {
     const threads = [thread('a', 1, 'https://github.com/acme/widgets/pull/7#discussion_r5010'), thread('b', 2, 'https://github.com/acme/widgets/pull/7#discussion_r501')]
 
     expect(resolveLinkFocus(focus({ comment: '501' }), units, threads)?.elementId).toBe('thread-b')
+    expect(resolveLinkFocus(focus({ comment: '77' }), units, [thread('c', 1, 'https://github.com/acme/widgets/pull/7#issuecomment-77', 'review')])?.elementId).toBe('thread-c')
   })
 
   it('uses the path when an inline thread belongs to a unit that is not listed', () => {

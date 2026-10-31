@@ -162,7 +162,8 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
 
   const viewChanged = filter !== 'all' || query !== ''
   const resolveLink = () => (link?.ready && units.data && !units.isPlaceholderData ? link.resolve(units.data) : undefined)
-  const linkedTarget = !link || appliedLink !== undefined ? undefined : viewChanged ? null : resolveLink()
+  const unitsUnavailable = units.isError || review.data?.latest_revision === null
+  const linkedTarget = !link || appliedLink !== undefined ? undefined : viewChanged || unitsUnavailable ? null : resolveLink()
   if (linkedTarget !== undefined) {
     setAppliedLink(linkedTarget)
     if (linkedTarget) {

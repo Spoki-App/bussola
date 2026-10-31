@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { addRepositoryPath, addRepositoryRequestFromSearch, isPullRequestUrl, pullRequestRepositoryFromPath, pullRequestUrlFromPath } from './pullRequestLink'
+import {
+  addRepositoryPath,
+  addRepositoryRequestFromSearch,
+  isPullRequestUrl,
+  pullRequestPathFromUrl,
+  pullRequestRepositoryFromPath,
+  pullRequestUrlFromPath,
+} from './pullRequestLink'
 
 describe('isPullRequestUrl', () => {
   it('accepts pull request links with or without scheme and suffix', () => {
@@ -12,6 +19,15 @@ describe('isPullRequestUrl', () => {
   it('rejects other links', () => {
     expect(isPullRequestUrl('https://github.com/acme/widgets/issues/7')).toBe(false)
     expect(isPullRequestUrl('https://gitlab.com/acme/widgets/pull/7')).toBe(false)
+  })
+})
+
+describe('pullRequestPathFromUrl', () => {
+  it('turns a pasted pull request link into the page that opens it, keeping a comment anchor', () => {
+    expect(pullRequestPathFromUrl(' https://github.com/acme/widgets/pull/7/files ')).toBe('/github.com/acme/widgets/pull/7/files')
+    expect(pullRequestPathFromUrl('www.github.com/acme/widgets/pull/7?w=1')).toBe('/github.com/acme/widgets/pull/7')
+    expect(pullRequestPathFromUrl('https://github.com/acme/widgets/pull/7#discussion_r501')).toBe('/github.com/acme/widgets/pull/7?comment=501')
+    expect(pullRequestPathFromUrl('https://github.com/acme/widgets/pull/7/files#r502')).toBe('/github.com/acme/widgets/pull/7/files?comment=502')
   })
 })
 

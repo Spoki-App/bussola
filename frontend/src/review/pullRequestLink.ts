@@ -2,6 +2,16 @@ const PULL_REQUEST_URL = /^(?:https?:\/\/)?(?:www\.)?github\.com\/[\w.-]+\/[\w.-
 const ADD_REPOSITORY_PARAM = 'add_repo'
 const PULL_REQUEST_PATH = /^\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/\d+(?:\/.*)?$/
 
+const GITHUB_PREFIX = /^(?:https?:\/\/)?(?:www\.)?github\.com\//
+const COMMENT_ANCHOR = /#(?:discussion_r|r)(\d+)$/
+
+export function pullRequestPathFromUrl(url: string): string {
+  const trimmed = url.trim()
+  const comment = COMMENT_ANCHOR.exec(trimmed)?.[1]
+  const path = `/github.com/${trimmed.replace(GITHUB_PREFIX, '').replace(/[?#].*$/, '')}`
+  return comment ? `${path}?${new URLSearchParams({ comment }).toString()}` : path
+}
+
 export function isPullRequestUrl(text: string): boolean {
   return PULL_REQUEST_URL.test(text.trim())
 }
