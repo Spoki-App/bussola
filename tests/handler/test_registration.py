@@ -114,6 +114,13 @@ def test_linux_uninstall_without_mimeapps_list_creates_none(tmp_path: Path) -> N
     assert not (tmp_path / ".config").exists()
 
 
+def test_linux_handler_keeps_the_path_of_the_install(tmp_path: Path) -> None:
+    handler = registration_for("linux", tmp_path, {"PATH": "/home/me/.local/bin:/usr/bin"}, PYTHON)
+    install = next(step for step in handler.install if isinstance(step, WriteFile))
+
+    assert f"Exec=env PATH=/home/me/.local/bin:/usr/bin {PYTHON} -m bussola open-link %u\n" in install.content
+
+
 def test_linux_follows_xdg_data_and_config_home(tmp_path: Path) -> None:
     environ = {"XDG_DATA_HOME": str(tmp_path / "data"), "XDG_CONFIG_HOME": str(tmp_path / "config")}
     handler = registration_for("linux", tmp_path / "home", environ, PYTHON)

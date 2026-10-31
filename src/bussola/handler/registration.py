@@ -140,7 +140,9 @@ def registration_for(system: str, home: Path, environ: Mapping[str, str], execut
     command = (*handler_command(system, executable), *(("--data-dir", str(Path(data_dir).resolve())) if data_dir else ()))
     if system.startswith("linux"):
         applications_dir = xdg_applications_dir(home, environ)
-        return linux_registration(command, applications_dir, (xdg_mimeapps_file(home, environ), applications_dir / MIMEAPPS_FILE))
+        search_path = environ.get("PATH", "")
+        with_path = ("env", f"PATH={search_path}", *command) if search_path else command
+        return linux_registration(with_path, applications_dir, (xdg_mimeapps_file(home, environ), applications_dir / MIMEAPPS_FILE))
     if system == "darwin":
         return macos_registration(command, home / "Applications", environ.get("PATH", ""))
     if system == "win32":
