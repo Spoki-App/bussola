@@ -111,6 +111,13 @@ def test_secrets_are_not_accepted_in_the_repository_configuration(tmp_path: Path
         load_ai_settings(None, tmp_path)
 
 
+@pytest.mark.parametrize("user", [UserAiConfig(), UserAiConfig(provider=ProviderName.NONE)])
+def test_a_repository_cannot_turn_ai_on_for_a_user_who_has_not(user: UserAiConfig) -> None:
+    settings = resolve_ai_settings(user, RepoAiConfig(provider=ProviderName.ANTHROPIC, model="claude-opus-5-5"))
+
+    assert settings == AiSettings(ProviderName.NONE)
+
+
 def test_the_configuration_directory_can_be_moved(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(CONFIG_DIR_ENV, str(tmp_path))
 

@@ -1,6 +1,5 @@
 import json
 import threading
-import urllib.request
 from collections.abc import Generator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -10,6 +9,7 @@ import pytest
 from bussola.ai.anthropic_api import API_VERSION, AnthropicProvider
 from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiOutputError, AiProviderError, AiRequest, AiTimeoutError, Cancellation
 from bussola.ai.config import AiSettings, ProviderName
+from bussola.ai.http import OPENER
 from bussola.ai.openai_compatible import OpenAiCompatibleProvider
 from bussola.ai.providers import build_provider
 
@@ -22,6 +22,7 @@ class StubServer:
         self.status = 200
         self.body: dict[str, Any] = {}
         self.delay = 0.0
+        self.headers: dict[str, str] = {}
         self.release = threading.Event()
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
 
@@ -29,8 +30,8 @@ class StubServer:
     def url(self) -> str:
         return f"http://127.0.0.1:{self.server.server_address[1]}"
 
-    def reply(self, body: dict[str, Any], status: int = 200, delay: float = 0.0) -> None:
-        self.body, self.status, self.delay = body, status, delay
+    def reply(self, body: dict[str, Any], status: int = 200, delay: float = 0.0, headers: dict[str, str] | None = None) -> None:
+        self.body, self.status, self.delay, self.headers = body, status, delay, headers or {}
 
     def _handler(self) -> type[BaseHTTPRequestHandler]:
         stub = self
@@ -46,6 +47,8 @@ class StubServer:
                 self.send_response(stub.status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(payload)))
+                for name, value in stub.headers.items():
+                    self.send_header(name, value)
                 self.end_headers()
                 self.wfile.write(payload)
 
@@ -133,6 +136,7 @@ def test_an_openai_compatible_key_is_sent_as_a_bearer_token(stub: StubServer) ->
         ({"choices": []}, "without any choices"),
         ({"choices": [{"finish_reason": "length", "message": {"content": "{"}}]}, "cut off"),
         ({"choices": [{"message": {"content": None}}]}, "without any content"),
+        ({"choices": [{"message": {"content": None, "refusal": "I can't help with that"}}]}, "declined to answer: I can't help with that"),
     ],
 )
 def test_an_unusable_openai_compatible_answer_is_an_error(stub: StubServer, body: dict[str, Any], message: str) -> None:
@@ -178,10 +182,19 @@ def test_an_answer_that_is_not_utf8_is_a_provider_error(monkeypatch: pytest.Monk
     def open_response(*_args: object, **_kwargs: object) -> Response:
         return Response()
 
-    monkeypatch.setattr(urllib.request, "urlopen", open_response)
+    monkeypatch.setattr(OPENER, "open", open_response)
 
     with pytest.raises(AiProviderError, match="did not answer with JSON"):
         OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 5.0).complete(REQUEST, Cancellation())
+
+
+def test_a_redirect_is_refused_so_the_key_does_not_follow_it(stub: StubServer) -> None:
+    stub.reply({}, status=302, headers={"Location": "http://127.0.0.1:9/steal"})
+
+    with pytest.raises(AiProviderError, match="answered HTTP 302"):
+        OpenAiCompatibleProvider("gpt", stub.url, "local-key", 5.0).complete(REQUEST, Cancellation())
+
+    assert len(stub.requests) == 1
 
 
 def test_an_unreachable_endpoint_is_reported() -> None:
@@ -200,7 +213,7 @@ def test_a_socket_timeout_is_reported_as_a_timeout(monkeypatch: pytest.MonkeyPat
     def time_out(*_args: Any, **_kwargs: Any) -> None:
         raise TimeoutError("timed out")
 
-    monkeypatch.setattr(urllib.request, "urlopen", time_out)
+    monkeypatch.setattr(OPENER, "open", time_out)
 
     with pytest.raises(AiTimeoutError, match=r"No answer within 0\.3 seconds"):
         OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 0.3).complete(REQUEST, Cancellation())

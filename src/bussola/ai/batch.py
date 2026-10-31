@@ -1,7 +1,7 @@
 from collections.abc import Callable, Hashable, Sequence
 from dataclasses import dataclass, field
 
-from bussola.ai.base import AiCancelledError, AiError, Cancellation
+from bussola.ai.base import AiCancelledError, Cancellation
 
 
 @dataclass(frozen=True)
@@ -34,8 +34,8 @@ def run_batch[K: Hashable, T](
         except AiCancelledError:
             outcome.cancelled = True
             break
-        except AiError as error:
-            outcome.errors[item] = str(error)
+        except Exception as error:
+            outcome.errors[item] = str(error) or type(error).__name__
         if on_progress is not None:
             on_progress(BatchProgress(len(outcome.results) + len(outcome.errors), len(outcome.errors), len(items)))
     return outcome

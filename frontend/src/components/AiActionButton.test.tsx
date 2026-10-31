@@ -56,6 +56,18 @@ describe('AiActionButton', () => {
     expect(screen.queryByRole('button', { name: 'Describe' })).toBeNull()
   })
 
+  it('is disabled with the reason when the provider cannot be used', async () => {
+    const onRun = renderButton({ ...LOCAL, problem: 'Set model in the [ai] section of the configuration' })
+
+    const button = await screen.findByRole('button', { name: 'Describe' })
+
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('title', 'Set model in the [ai] section of the configuration')
+    fireEvent.click(button)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(onRun).not.toHaveBeenCalled()
+  })
+
   it('names the provider the first time and runs only after Send code', async () => {
     const onRun = renderButton(LOCAL)
 

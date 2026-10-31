@@ -180,7 +180,7 @@ Other options: `timeout` (seconds per request, default 120) and `api_key_env` (t
 
 Keys are read only from environment variables. bussola never writes them to the database or to a configuration file, and `api_key` is not an accepted option.
 
-A repository can override `provider`, `model` and `endpoint` in the `[ai]` section of its `.bussola.toml`, for example to use a local model for a confidential project or to turn AI off with `provider = "none"`. A repository cannot set `timeout` or `api_key_env`. When the repository chooses a different provider, nothing else is taken from your configuration, and API keys are never sent to an endpoint that only the repository's `.bussola.toml` names.
+Once you have chosen a provider, a repository can override `provider`, `model` and `endpoint` in the `[ai]` section of its `.bussola.toml`, for example to use a local model for a confidential project or to turn AI off with `provider = "none"`. A repository cannot turn AI on when you have not chosen a provider, and cannot set `timeout` or `api_key_env`. A mistake in its `[ai]` section turns AI off for that repository and is shown in **Settings**; reviews keep working. When the repository chooses a different provider, nothing else is taken from your configuration, and API keys are never sent to an endpoint that only the repository's `.bussola.toml` names.
 
 ### What leaves your machine
 
@@ -188,7 +188,7 @@ A repository can override `provider`, `model` and `endpoint` in the `[ai]` secti
 - Code is sent only when you start an AI action, and only the code that action works on. The first time an action would send code to a provider, model and endpoint, bussola names them and waits for **Send code**; the choice is kept in that browser.
 - With Claude Code or the Anthropic API, the code goes to Anthropic under the terms of your account. With an OpenAI-compatible endpoint, it goes only to the address you configured, which stays on your machine for a local server.
 - Answers are checked against the format each action expects, and a clear error is shown when the model returns something unusable. Each request has a timeout and can be cancelled.
-- Results are cached in the local database by the content hash of what was sent, the prompt version, the model and the endpoint, so unchanged code is not sent again.
+- Results are cached in the local database by the content hash of what was sent, the prompt version, the model and the endpoint, so unchanged code is not sent again. With Claude Code and no `model` set, the model actually used is not known, so nothing is cached.
 
 ## Data
 

@@ -89,6 +89,14 @@ describe('AiPanel', () => {
     })
   })
 
+  it('says the model is not set for other providers without one', async () => {
+    stubApi({ ...ANTHROPIC, provider: 'openai-compatible', label: 'OpenAI-compatible endpoint', model: null, problem: 'Set model in the [ai] section of the configuration' })
+    renderPanel()
+
+    expect(await screen.findByText('Not set')).toBeInTheDocument()
+    expect(screen.queryByText('Default of the claude command')).toBeNull()
+  })
+
   it('shows the claude command default when no model is set', async () => {
     stubApi({ ...ANTHROPIC, provider: 'claude-code', label: 'Claude Code CLI', model: null, endpoint: null, api_key_env: null })
     renderPanel()

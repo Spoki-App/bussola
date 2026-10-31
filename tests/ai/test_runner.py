@@ -186,3 +186,14 @@ def test_the_same_model_on_another_endpoint_is_asked_again(tmp_path: Path) -> No
         runner.run(RATE, "code", Cancellation(), content_hash="hash")
 
     assert len(provider.requests) == 2
+
+
+def test_without_a_known_model_nothing_is_cached(tmp_path: Path) -> None:
+    provider = FakeProvider(GOOD, model=None)
+    with Database.open(tmp_path).session() as session:
+        runner = AiRunner(provider, SqlAiCache(session))
+
+        runner.run(RATE, "code", Cancellation(), content_hash="hash")
+        runner.run(RATE, "code", Cancellation(), content_hash="hash")
+
+    assert len(provider.requests) == 2

@@ -9,11 +9,19 @@ from bussola.ai.base import MAX_ERROR_LENGTH, AiProviderError, Cancellation, jso
 SOCKET_GRACE_SECONDS = 5.0
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *_args: Any, **_kwargs: Any) -> None:
+        return None
+
+
+OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeout: float, cancellation: Cancellation) -> dict[str, Any]:
     request = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json", **headers}, method="POST")
 
     def send() -> bytes:
-        with urllib.request.urlopen(request, timeout=timeout + SOCKET_GRACE_SECONDS) as response:
+        with OPENER.open(request, timeout=timeout + SOCKET_GRACE_SECONDS) as response:
             return response.read()
 
     try:

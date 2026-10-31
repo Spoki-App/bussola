@@ -34,7 +34,7 @@ function ActiveProvider({ ai }: { ai: AiStatus }) {
         <dt>Provider</dt>
         <dd>{ai.label}</dd>
         <dt>Model</dt>
-        <dd>{ai.model ?? 'Default of the claude command'}</dd>
+        <dd>{ai.model ?? (ai.provider === 'claude-code' ? 'Default of the claude command' : 'Not set')}</dd>
         {ai.endpoint && (
           <>
             <dt>Endpoint</dt>

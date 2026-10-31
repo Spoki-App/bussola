@@ -102,9 +102,11 @@ def load_user_config(path: Path | None) -> UserConfig:
 
 
 def resolve_ai_settings(user: UserAiConfig, repo: RepoAiConfig | None = None) -> AiSettings:
+    if user.provider in (None, ProviderName.NONE):
+        return AiSettings(ProviderName.NONE)
     override = repo or RepoAiConfig()
     source: ConfigSource = "repository" if override != RepoAiConfig() else "user"
-    provider = override.provider or user.provider or ProviderName.NONE
+    provider = override.provider or user.provider
     if provider == ProviderName.NONE:
         return AiSettings(ProviderName.NONE, source=source)
     base = user if provider == user.provider else UserAiConfig(provider=provider)

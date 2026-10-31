@@ -30,7 +30,7 @@ export function AiActionButton({ repoId, label, title, disabled = false, onRun }
   }
   return (
     <>
-      <button type="button" title={title} disabled={disabled} onClick={start}>
+      <button type="button" title={ai.problem ?? title} disabled={disabled || ai.problem !== null} onClick={start}>
         {label}
       </button>
       {asking && (

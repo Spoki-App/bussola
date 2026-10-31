@@ -70,9 +70,9 @@ class AiRunner:
         return result
 
     def _key(self, task: AiTask[Any], content_hash: str | None) -> AiCacheKey | None:
-        if content_hash is None or self._cache is None:
+        if content_hash is None or self._cache is None or self.provider.model is None:
             return None
-        return AiCacheKey(task.name, task.version, self.provider.name, self.provider.model or "", self.provider.endpoint or "", content_hash)
+        return AiCacheKey(task.name, task.version, self.provider.name, self.provider.model, self.provider.endpoint or "", content_hash)
 
     def _cached[T: BaseModel](self, task: AiTask[T], key: AiCacheKey | None) -> T | None:
         stored = self._cache.get(key) if key is not None and self._cache is not None else None

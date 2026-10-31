@@ -1,6 +1,6 @@
 from typing import Any, cast
 
-from bussola.ai.base import AiOutputError, AiRequest, Cancellation, json_object
+from bussola.ai.base import MAX_ERROR_LENGTH, AiOutputError, AiRequest, Cancellation, json_object
 from bussola.ai.config import PROVIDER_LABELS, ProviderName
 from bussola.ai.http import post_json
 
@@ -29,8 +29,10 @@ class OpenAiCompatibleProvider:
         choice = _first_choice(response)
         if choice.get("finish_reason") == "length":
             raise AiOutputError("The answer was cut off before it was complete")
-        message = json_object(choice.get("message"))
-        content = message.get("content") if message else None
+        message = json_object(choice.get("message")) or {}
+        if message.get("refusal"):
+            raise AiOutputError(f"The model declined to answer: {str(message['refusal'])[:MAX_ERROR_LENGTH]}")
+        content = message.get("content")
         if not isinstance(content, str):
             raise AiOutputError("The endpoint answered without any content")
         return content
