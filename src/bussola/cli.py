@@ -71,7 +71,7 @@ def open_link(
     data_dir: Annotated[Path | None, typer.Option("--data-dir", help="Data folder (default: BUSSOLA_DATA_DIR, then the user data folder)")] = None,
 ) -> None:
     """Open a bussola:// link, starting the server if it is not running."""
-    data_dir = data_dir or default_data_dir()
+    data_dir = (data_dir or default_data_dir()).resolve()
     with _cli_errors():
         try:
             Launcher(data_dir).open(link)

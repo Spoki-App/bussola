@@ -19,6 +19,7 @@ BUNDLE_ID = "io.github.spoki-app.bussola"
 URL_NAME = f"{DISPLAY_NAME} link"
 DESKTOP_FILE = "bussola-url-handler.desktop"
 MIME_TYPE = f"x-scheme-handler/{SCHEME}"
+MIMEAPPS_FILE = "mimeapps.list"
 MAC_APP = f"{DISPLAY_NAME}.app"
 MAC_STAGED_APP = f".{DISPLAY_NAME}-new.app"
 LSREGISTER = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
@@ -90,9 +91,10 @@ def current_registration() -> Registration:
 
 def registration_for(system: str, home: Path, environ: Mapping[str, str], executable: str) -> Registration:
     data_dir = environ.get(DATA_DIR_ENV)
-    command = (*handler_command(system, executable), *(("--data-dir", data_dir) if data_dir else ()))
+    command = (*handler_command(system, executable), *(("--data-dir", str(Path(data_dir).resolve())) if data_dir else ()))
     if system.startswith("linux"):
-        return linux_registration(command, xdg_applications_dir(home, environ), xdg_mimeapps_file(home, environ))
+        applications_dir = xdg_applications_dir(home, environ)
+        return linux_registration(command, applications_dir, (xdg_mimeapps_file(home, environ), applications_dir / MIMEAPPS_FILE))
     if system == "darwin":
         return macos_registration(command, home / "Applications", environ.get("PATH", ""))
     if system == "win32":
@@ -113,7 +115,7 @@ def xdg_applications_dir(home: Path, environ: Mapping[str, str]) -> Path:
 
 
 def xdg_mimeapps_file(home: Path, environ: Mapping[str, str]) -> Path:
-    return _xdg_dir(environ, "XDG_CONFIG_HOME", home / ".config") / "mimeapps.list"
+    return _xdg_dir(environ, "XDG_CONFIG_HOME", home / ".config") / MIMEAPPS_FILE
 
 
 def _xdg_dir(environ: Mapping[str, str], variable: str, default: Path) -> Path:
@@ -121,7 +123,7 @@ def _xdg_dir(environ: Mapping[str, str], variable: str, default: Path) -> Path:
     return value if value.is_absolute() else default
 
 
-def linux_registration(command: Sequence[str], applications_dir: Path, mimeapps: Path) -> Registration:
+def linux_registration(command: Sequence[str], applications_dir: Path, mimeapps: Sequence[Path]) -> Registration:
     desktop = applications_dir / DESKTOP_FILE
     refresh = RunCommand(("update-desktop-database", str(applications_dir)), required=False)
     return Registration(
@@ -132,7 +134,7 @@ def linux_registration(command: Sequence[str], applications_dir: Path, mimeapps:
             RunCommand(("xdg-mime", "default", DESKTOP_FILE, MIME_TYPE)),
             refresh,
         ),
-        uninstall=(RemovePath(desktop), ForgetMimeDefault(mimeapps), refresh),
+        uninstall=(RemovePath(desktop), *(ForgetMimeDefault(path) for path in mimeapps), refresh),
     )
 
 

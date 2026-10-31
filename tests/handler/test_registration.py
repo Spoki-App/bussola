@@ -87,6 +87,24 @@ def test_linux_uninstall_keeps_line_endings_of_mimeapps_list(tmp_path: Path) -> 
     assert mimeapps.read_bytes() == b"[Default Applications]\r\nx-scheme-handler/bussola=other.desktop;"
 
 
+def test_linux_uninstall_also_cleans_the_older_mimeapps_list_location(tmp_path: Path) -> None:
+    legacy = tmp_path / ".local/share/applications/mimeapps.list"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text("[Default Applications]\nx-scheme-handler/bussola=bussola-url-handler.desktop\n")
+
+    apply(registration_for("linux", tmp_path, {}, PYTHON).uninstall, Recorder())
+
+    assert legacy.read_text() == "[Default Applications]\n"
+
+
+def test_relative_data_dir_is_recorded_as_an_absolute_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    handler = registration_for("linux", tmp_path, {"BUSSOLA_DATA_DIR": "data"}, PYTHON)
+    install = next(step for step in handler.install if isinstance(step, WriteFile))
+
+    assert f"--data-dir {tmp_path.resolve() / 'data'} %u" in install.content
+
+
 def test_linux_uninstall_without_mimeapps_list_creates_none(tmp_path: Path) -> None:
     apply(registration_for("linux", tmp_path, {}, PYTHON).uninstall, Recorder())
 

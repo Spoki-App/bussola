@@ -77,7 +77,7 @@ def test_bussola_toml_file_level_and_ignore_globs(git_repo: GitFixture) -> None:
 
 def test_install_and_uninstall_handler_apply_the_platform_registration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     commands: list[tuple[str, ...]] = []
-    handler = registration.linux_registration(("/usr/bin/python3", "-m", "bussola", "open-link"), tmp_path / "applications", tmp_path / "mimeapps.list")
+    handler = registration.linux_registration(("/usr/bin/python3", "-m", "bussola", "open-link"), tmp_path / "applications", (tmp_path / "mimeapps.list",))
 
     def record(argv: Sequence[str]) -> None:
         commands.append(tuple(argv))
@@ -99,7 +99,7 @@ def test_install_and_uninstall_handler_apply_the_platform_registration(tmp_path:
 
 
 def test_a_failed_install_says_how_to_clean_up(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    handler = registration.linux_registration(("/usr/bin/python3", "-m", "bussola", "open-link"), tmp_path / "applications", tmp_path / "mimeapps.list")
+    handler = registration.linux_registration(("/usr/bin/python3", "-m", "bussola", "open-link"), tmp_path / "applications", (tmp_path / "mimeapps.list",))
 
     def fail_default(argv: Sequence[str]) -> None:
         if "default" in argv:
@@ -133,13 +133,20 @@ def test_open_link_refuses_invalid_links_before_looking_for_the_server_and_logs_
     assert "'bussola://review?repo=acme/widgets': The pr parameter must be a positive number" in log
 
 
-def test_open_link_uses_the_data_dir_it_is_given(tmp_path: Path) -> None:
-    other = tmp_path / "other"
+def test_open_link_uses_the_data_dir_it_is_given_as_an_absolute_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    used: list[Path] = []
 
-    result = runner.invoke(app, ["open-link", "--data-dir", str(other), "bussola://review?repo=acme/widgets"])
+    def record(launcher: server.Launcher, _link: str) -> str:
+        used.append(launcher.data_dir)
+        return ""
 
-    assert result.exit_code == 2
-    assert (other / "open-link.log").is_file()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(server.Launcher, "open", record)
+
+    result = runner.invoke(app, ["open-link", "--data-dir", "other", "bussola://"])
+
+    assert result.exit_code == 0, result.output
+    assert used == [tmp_path.resolve() / "other"]
 
 
 @pytest.mark.usefixtures("data_dir")
