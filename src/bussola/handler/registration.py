@@ -125,6 +125,7 @@ def linux_registration(command: Sequence[str], applications_dir: Path, mimeapps:
     return Registration(
         location=str(desktop),
         install=(
+            RunCommand(("xdg-mime", "--version")),
             WriteFile(desktop, desktop_entry(command)),
             RunCommand(("xdg-mime", "default", DESKTOP_FILE, MIME_TYPE)),
             refresh,

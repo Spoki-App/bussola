@@ -13,11 +13,11 @@ ROOT_PATHS = ("", "/")
 MAX_FIELDS = 16
 MAX_PATH_LENGTH = 1024
 NAME = r"[A-Za-z0-9_.-]{1,100}"
-NUMBER = re.compile(r"^[1-9][0-9]{0,8}$")
+DIGITS = re.compile(r"[0-9]{1,18}")
 MAX_NUMBER = 999_999_999
-REPOSITORY = re.compile(rf"^(?P<owner>{NAME})/(?P<name>{NAME})$")
-THREAD_ID = re.compile(r"^[0-9a-f]{32}$")
-DISCUSSION_ANCHOR = re.compile(r"^(?:discussion_)?r(?P<comment>[1-9][0-9]{0,19})$")
+REPOSITORY = re.compile(rf"(?P<owner>{NAME})/(?P<name>{NAME})")
+THREAD_ID = re.compile(r"[0-9a-f]{32}")
+DISCUSSION_ANCHOR = re.compile(r"(?:discussion_)?r(?P<comment>[1-9][0-9]{0,19})")
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 
 
@@ -91,27 +91,31 @@ def _github_link(path: str, fragment: str) -> ReviewLink:
         address = parse_pull_request_url(f"github.com{path}")
     except InvalidRequestError as error:
         raise InvalidLinkError(f"Not a GitHub pull request link. Expected {SCHEME}://github.com/<owner>/<name>/pull/<number>.") from error
-    if not 0 < address.number <= MAX_NUMBER:
-        raise InvalidLinkError("The pull request number must be a positive number")
-    anchor = DISCUSSION_ANCHOR.match(fragment)
+    anchor = DISCUSSION_ANCHOR.fullmatch(fragment)
     return ReviewLink(
         repository=_repository(address.repository),
-        number=address.number,
+        number=_in_range("pr", address.number),
         comment=int(anchor["comment"]) if anchor else None,
     )
 
 
 def _repository(value: str | None) -> str:
-    match = REPOSITORY.match(value or "")
+    match = REPOSITORY.fullmatch(value or "")
     if match is None or _only_dots(match["owner"]) or _only_dots(match["name"]):
         raise InvalidLinkError("The repo parameter must be <owner>/<name>")
     return match.group(0)
 
 
 def _number(name: str, value: str | None) -> int:
-    if value is None or NUMBER.match(value) is None:
+    if value is None or DIGITS.fullmatch(value) is None:
         raise InvalidLinkError(f"The {name} parameter must be a positive number")
-    return int(value)
+    return _in_range(name, int(value))
+
+
+def _in_range(name: str, number: int) -> int:
+    if not 0 < number <= MAX_NUMBER:
+        raise InvalidLinkError(f"The {name} parameter must be a positive number up to {MAX_NUMBER}")
+    return number
 
 
 def _file_path(value: str | None) -> str | None:
@@ -124,7 +128,7 @@ def _file_path(value: str | None) -> str | None:
 
 
 def _thread_id(value: str | None) -> str | None:
-    if value is not None and THREAD_ID.match(value) is None:
+    if value is not None and THREAD_ID.fullmatch(value) is None:
         raise InvalidLinkError("The thread parameter must be a thread id")
     return value
 

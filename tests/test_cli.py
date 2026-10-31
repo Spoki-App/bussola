@@ -89,7 +89,7 @@ def test_install_and_uninstall_handler_apply_the_platform_registration(tmp_path:
 
     assert installed.exit_code == 0, installed.output
     assert desktop.is_file()
-    assert commands[0] == ("xdg-mime", "default", "bussola-url-handler.desktop", "x-scheme-handler/bussola")
+    assert commands[1] == ("xdg-mime", "default", "bussola-url-handler.desktop", "x-scheme-handler/bussola")
 
     removed = runner.invoke(app, ["uninstall-handler"])
 

@@ -50,6 +50,7 @@ def test_linux_registers_a_desktop_file_as_default_for_the_scheme(tmp_path: Path
     assert "MimeType=x-scheme-handler/bussola;\n" in desktop.read_text()
     assert f"Exec={PYTHON} -m bussola open-link %u\n" in desktop.read_text()
     assert recorder.commands == [
+        ("xdg-mime", "--version"),
         ("xdg-mime", "default", "bussola-url-handler.desktop", "x-scheme-handler/bussola"),
         ("update-desktop-database", str(desktop.parent)),
     ]
@@ -225,6 +226,8 @@ def test_a_failing_required_command_stops_the_install_with_its_error(tmp_path: P
 
     with pytest.raises(HandlerError, match="xdg-mime failed: no such scheme"):
         apply(handler.install, Recorder(failing=("xdg-mime",)))
+
+    assert not (tmp_path / ".local/share/applications/bussola-url-handler.desktop").exists()
 
 
 def test_optional_commands_may_fail_or_be_missing(tmp_path: Path) -> None:
