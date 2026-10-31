@@ -1,9 +1,10 @@
+from dataclasses import asdict
 from typing import Annotated
 from urllib.parse import quote
 
 from fastapi import APIRouter, Query, Request
 
-from bussola.api.deps import ContextDep, repo_of, resolve_revision
+from bussola.api.deps import ContextDep, repo_of, resolve_revision, side_commit, side_path
 from bussola.api.schemas import NavigationIn, NavigationIndexOut, NavigationOut, NavigationTargetOut, RevisionSideIn, ServerHintOut, SourceFileIn, SourceFileOut
 from bussola.api.state import app_state
 from bussola.config import load_repo_config
@@ -29,7 +30,7 @@ def navigator(request: Request) -> Navigator:
 def prepare_index(context: ContextDep, request: Request, query: Annotated[RevisionSideIn, Query()]) -> NavigationIndexOut:
     revision = resolve_revision(context, query.revision_id)
     git_repo = open_repo(repo_of(context))
-    ready = navigator(request).prepare(git_repo, _commit(revision, query.side), load_repo_config(git_repo.root).ignore)
+    ready = navigator(request).prepare(git_repo, side_commit(revision, query.side), load_repo_config(git_repo.root).ignore)
     return NavigationIndexOut(ready=ready)
 
 
@@ -38,15 +39,15 @@ def navigate(context: ContextDep, request: Request, query: Annotated[NavigationI
     revision = resolve_revision(context, query.revision_id)
     git_repo = open_repo(repo_of(context))
     click = Click(query.path, query.line, query.column)
-    found = navigator(request).navigate(git_repo, _commit(revision, query.side), load_repo_config(git_repo.root).ignore, click)
-    return _navigation_out(found, query.side, _units_by_path(context, revision, query.side))
+    found = navigator(request).navigate(git_repo, side_commit(revision, query.side), load_repo_config(git_repo.root).ignore, click)
+    return _navigation_out(found, context, revision, query.side)
 
 
 @router.get("/reviews/{review_id}/source")
 def source_file(context: ContextDep, request: Request, query: Annotated[SourceFileIn, Query()]) -> SourceFileOut:
     revision = resolve_revision(context, query.revision_id)
     git_repo = open_repo(repo_of(context))
-    commit = _commit(revision, query.side)
+    commit = side_commit(revision, query.side)
     data = git_repo.file_at(commit, query.path)
     if data is None:
         raise NotFoundError(f"{query.path} does not exist on the {query.side.value} side")
@@ -57,15 +58,10 @@ def source_file(context: ContextDep, request: Request, query: Annotated[SourceFi
     return SourceFileOut(path=query.path, side=query.side, commit=commit, text=data.decode(errors="replace"), url=url)
 
 
-def _commit(revision: Revision, side: Side) -> str:
-    return revision.head_sha if side == Side.HEAD else revision.merge_base_sha
-
-
 def _units_by_path(context: ReviewContext, revision: Revision, side: Side) -> dict[str, list[UnitSnapshot]]:
     units: dict[str, list[UnitSnapshot]] = {}
-    for snapshot in context.store.reviews.snapshots(revision.id, texts=False):
-        path = snapshot.path if side == Side.HEAD else snapshot.old_path or snapshot.path
-        units.setdefault(path, []).append(snapshot)
+    for snapshot in context.store.reviews.snapshot_lines(revision.id):
+        units.setdefault(side_path(snapshot, side), []).append(snapshot)
     return units
 
 
@@ -77,22 +73,8 @@ def _unit_at(units: dict[str, list[UnitSnapshot]], side: Side, target: Target) -
     return None
 
 
-def _navigation_out(found: Navigation, side: Side, units: dict[str, list[UnitSnapshot]]) -> NavigationOut:
-    hint = (
-        ServerHintOut(family=found.missing_server.family, language=found.missing_server.language, install=found.missing_server.install)
-        if found.missing_server
-        else None
-    )
-    targets = [
-        NavigationTargetOut(
-            role=target.role,
-            path=target.path,
-            line=target.line,
-            column=target.column,
-            preview=target.preview,
-            side=side,
-            unit_id=_unit_at(units, side, target),
-        )
-        for target in found.targets
-    ]
+def _navigation_out(found: Navigation, context: ReviewContext, revision: Revision, side: Side) -> NavigationOut:
+    units = _units_by_path(context, revision, side) if found.targets else {}
+    hint = ServerHintOut.model_validate(found.missing_server, from_attributes=True) if found.missing_server else None
+    targets = [NavigationTargetOut(**asdict(target), side=side, unit_id=_unit_at(units, side, target)) for target in found.targets]
     return NavigationOut(ready=found.ready, symbol=found.symbol, origin=found.origin, resolver=found.resolver, targets=targets, server_hint=hint)

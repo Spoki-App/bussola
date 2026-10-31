@@ -31,7 +31,7 @@ interface Props {
   onLineSelectEnd?: () => void
   highlighted?: ReadonlySet<string>
   widgets?: (rowFor: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
-  onNavigate?: (row: DiffRow, side: GutterSide | undefined, column: number, point: ScreenPoint) => void
+  onNavigate?: (row: DiffRow, side: GutterSide, column: number, point: ScreenPoint) => void
   target?: TargetLine
 }
 
@@ -245,7 +245,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
           if (onNavigate && isNavigationClick(event)) {
             const column = columnAt(event.currentTarget, event.clientX, event.clientY)
             if (row && column !== null) {
-              onNavigate(row, side, column, { x: event.clientX, y: event.clientY })
+              onNavigate(row, side ?? gutterSide(row), column, { x: event.clientX, y: event.clientY })
             }
             return
           }

@@ -1,4 +1,4 @@
-import type { Root, RootContent } from 'hast'
+import type { ElementContent } from 'hast'
 
 import { highlightCode, languageFor } from './highlight'
 
@@ -11,7 +11,7 @@ export type SourceLine = SourceToken[]
 
 const MAX_HIGHLIGHTED_CHARS = 400_000
 
-function classesOf(node: RootContent): string[] {
+function classesOf(node: ElementContent): string[] {
   if (node.type !== 'element') {
     return []
   }
@@ -30,7 +30,7 @@ function appendText(lines: SourceLine[], text: string, className: string) {
   })
 }
 
-function collect(nodes: RootContent[], classes: string[], lines: SourceLine[]) {
+function collect(nodes: ElementContent[], classes: string[], lines: SourceLine[]) {
   for (const node of nodes) {
     if (node.type === 'text') {
       appendText(lines, node.value, classes.join(' '))
@@ -40,7 +40,7 @@ function collect(nodes: RootContent[], classes: string[], lines: SourceLine[]) {
   }
 }
 
-function highlighted(text: string, path: string): Root | null {
+function highlighted(text: string, path: string): ElementContent[] | null {
   const language = languageFor(path)
   if (language === null || text.length > MAX_HIGHLIGHTED_CHARS) {
     return null
@@ -55,9 +55,9 @@ function highlighted(text: string, path: string): Root | null {
 export function sourceLines(text: string, path: string): SourceLine[] {
   const body = text.endsWith('\n') ? text.slice(0, -1) : text
   const lines: SourceLine[] = [[]]
-  const tree = highlighted(body, path)
-  if (tree) {
-    collect(tree.children, [], lines)
+  const nodes = highlighted(body, path)
+  if (nodes) {
+    collect(nodes, [], lines)
   } else {
     appendText(lines, body, '')
   }

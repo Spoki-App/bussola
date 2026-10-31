@@ -14,7 +14,6 @@ export interface UnitTarget {
   unitId: number
   line: number
   side: Side
-  seq: number
 }
 
 interface ModifierClick {
@@ -41,7 +40,6 @@ export interface TargetFile {
 export interface TargetGroups {
   definitions: NavigationTarget[]
   files: TargetFile[]
-  ordered: NavigationTarget[]
 }
 
 export function isNavigationClick(event: ModifierClick): boolean {
@@ -87,7 +85,7 @@ export function groupTargets(targets: NavigationTarget[]): TargetGroups {
       files.push({ path: target.path, targets: [target] })
     }
   }
-  return { definitions, files, ordered: [...definitions, ...files.flatMap((file) => file.targets)] }
+  return { definitions, files }
 }
 
 export function directTarget(result: NavigationResult): NavigationTarget | null {
@@ -95,10 +93,17 @@ export function directTarget(result: NavigationResult): NavigationTarget | null 
   return result.targets.length === 1 && only.unit_id !== null ? only : null
 }
 
+function wording(result: NavigationResult): { title: string; empty: string } {
+  const symbol = result.symbol ?? ''
+  return result.origin === 'definition'
+    ? { title: `Usages of ${symbol}`, empty: `No usages of ${symbol} found.` }
+    : { title: `Definitions of ${symbol}`, empty: `No definition of ${symbol} found.` }
+}
+
 export function emptyMessage(result: NavigationResult): string {
-  return result.origin === 'definition' ? `No usages of ${result.symbol ?? ''} found.` : `No definition of ${result.symbol ?? ''} found.`
+  return wording(result).empty
 }
 
 export function titleOf(result: NavigationResult): string {
-  return result.origin === 'definition' ? `Usages of ${result.symbol ?? ''}` : `Definitions of ${result.symbol ?? ''}`
+  return wording(result).title
 }

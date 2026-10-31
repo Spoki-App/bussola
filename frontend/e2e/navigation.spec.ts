@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -83,6 +84,11 @@ test('Cmd/Ctrl+click jumps to code in the review and opens the rest in a modal',
 
   await navigateFrom(page, total.locator('td.diff-code', { hasText: 'sum(tidy' }), 'tidy')
   const popup = page.getByRole('dialog', { name: 'Definitions of tidy' })
+  await expect(popup).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(popup).toBeHidden()
+
+  await navigateFrom(page, total.locator('td.diff-code', { hasText: 'sum(tidy' }), 'tidy')
   await expect(popup.getByRole('button', { name: /helpers\.py:1/ })).toBeFocused()
   await page.keyboard.press('Enter')
 

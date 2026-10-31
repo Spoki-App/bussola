@@ -3,6 +3,7 @@ import tarfile
 import tempfile
 import threading
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -42,23 +43,14 @@ class LanguageServers:
         self._slots: OrderedDict[SessionKey, _Slot] = OrderedDict()
         self._cleaned = False
 
-    def definitions(self, repo: GitRepo, commit: str, spec: ServerSpec, position: ServerLocation) -> list[ServerLocation] | None:
+    def locate(self, repo: GitRepo, commit: str, spec: ServerSpec, ask: Callable[[LanguageServerSession], list[ServerLocation]]) -> list[ServerLocation]:
         session = self._session(repo, commit, spec)
         if session is None:
-            return None
+            return []
         try:
-            return session.definitions(position.path, position.row, position.character)
+            return ask(session)
         except (LanguageServerError, OSError):
-            return None
-
-    def references(self, repo: GitRepo, commit: str, spec: ServerSpec, position: ServerLocation) -> list[ServerLocation] | None:
-        session = self._session(repo, commit, spec)
-        if session is None:
-            return None
-        try:
-            return session.references(position.path, position.row, position.character)
-        except (LanguageServerError, OSError):
-            return None
+            return []
 
     def checkout(self, commit: str) -> Path:
         return (self._checkouts / commit).resolve()

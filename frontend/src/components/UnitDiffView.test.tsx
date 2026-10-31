@@ -54,7 +54,7 @@ interface Options {
   highlighted?: ReadonlySet<string>
   onRowClick?: (row: DiffRow, extend: boolean) => void
   onLineNumberClick?: (row: DiffRow, side: 'old' | 'new', extend: boolean) => void
-  onNavigate?: (row: DiffRow, side: 'old' | 'new' | undefined, column: number, point: { x: number; y: number }) => void
+  onNavigate?: (row: DiffRow, side: 'old' | 'new', column: number, point: { x: number; y: number }) => void
   target?: TargetLine
 }
 
@@ -276,7 +276,7 @@ describe('UnitDiffView navigation', () => {
     fireEvent.click(cell, { button: 0, [modifier]: true, clientX: 30, clientY: 40 })
 
     expect(onRowClick).not.toHaveBeenCalled()
-    expect(onNavigate).toHaveBeenCalledWith(added, layout === 'split' ? 'new' : undefined, 12, { x: 30, y: 40 })
+    expect(onNavigate).toHaveBeenCalledWith(added, 'new', 12, { x: 30, y: 40 })
   })
 
   it('reports the old side of a removed line', () => {

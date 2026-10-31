@@ -1,12 +1,14 @@
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from pathlib import PurePosixPath
 
-import tree_sitter_go
-import tree_sitter_javascript
-import tree_sitter_python
-import tree_sitter_typescript
 from tree_sitter import Language, Node, Parser, Tree
+
+from bussola.units.extractors import ecmascript, go, python
+from bussola.units.extractors.javascript import JAVASCRIPT as JAVASCRIPT_EXTRACTOR
+from bussola.units.extractors.treesitter import node_text
+from bussola.units.extractors.typescript import TSX as TSX_EXTRACTOR
+from bussola.units.extractors.typescript import TYPESCRIPT as TYPESCRIPT_EXTRACTOR
+from bussola.units.registry import extractor_for
 
 
 @dataclass(frozen=True)
@@ -14,7 +16,6 @@ class Symbol:
     name: str
     row: int
     start: int
-    end: int
     definition: bool
 
 
@@ -32,23 +33,14 @@ class FileSymbols:
     used_names: tuple[str, ...]
 
 
-PYTHON_DEFINITIONS = frozenset({"function_definition", "class_definition"})
-ECMASCRIPT_DEFINITIONS = frozenset(
-    {
-        "function_declaration",
-        "generator_function_declaration",
-        "function_signature",
-        "class_declaration",
-        "abstract_class_declaration",
-        "method_definition",
-        "method_signature",
-        "abstract_method_signature",
-        "interface_declaration",
-        "type_alias_declaration",
-        "enum_declaration",
-    }
+PYTHON_DEFINITIONS = frozenset({python.FUNCTION_DEFINITION, python.CLASS_DEFINITION})
+ECMASCRIPT_DEFINITIONS = (
+    ecmascript.FUNCTION_DECLARATIONS
+    | ecmascript.CLASS_DECLARATIONS
+    | ecmascript.TYPE_DECLARATIONS
+    | {ecmascript.METHOD_DEFINITION, "method_signature", "abstract_method_signature"}
 )
-GO_DEFINITIONS = frozenset({"function_declaration", "method_declaration", "type_spec", "type_alias"})
+GO_DEFINITIONS = frozenset({go.FUNCTION_DECLARATION, go.METHOD_DECLARATION}) | go.TYPE_SPECS
 GO_VARIABLES = frozenset({"var_spec", "const_spec"})
 ECMASCRIPT_IDENTIFIERS = frozenset(
     {"identifier", "property_identifier", "type_identifier", "shorthand_property_identifier", "shorthand_property_identifier_pattern"}
@@ -102,27 +94,18 @@ def _parent_type(node: Node) -> str | None:
     return node.parent.type if node.parent else None
 
 
-PYTHON = SourceLanguage("python", Language(tree_sitter_python.language()), frozenset({"identifier"}), _python_definition)
-TYPESCRIPT = SourceLanguage("ecmascript", Language(tree_sitter_typescript.language_typescript()), ECMASCRIPT_IDENTIFIERS, _ecmascript_definition)
-TSX = SourceLanguage("ecmascript", Language(tree_sitter_typescript.language_tsx()), ECMASCRIPT_IDENTIFIERS, _ecmascript_definition)
-JAVASCRIPT = SourceLanguage("ecmascript", Language(tree_sitter_javascript.language()), ECMASCRIPT_IDENTIFIERS, _ecmascript_definition)
-GO = SourceLanguage("go", Language(tree_sitter_go.language()), frozenset({"identifier", "field_identifier", "type_identifier"}), _go_definition)
+PYTHON = SourceLanguage("python", python.PYTHON, frozenset({"identifier"}), _python_definition)
+TYPESCRIPT = SourceLanguage("ecmascript", TYPESCRIPT_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition)
+TSX = SourceLanguage("ecmascript", TSX_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition)
+JAVASCRIPT = SourceLanguage("ecmascript", JAVASCRIPT_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition)
+GO = SourceLanguage("go", go.GO, frozenset({"identifier", "field_identifier", "type_identifier"}), _go_definition)
 
-LANGUAGES_BY_SUFFIX: dict[str, SourceLanguage] = {
-    ".py": PYTHON,
-    ".pyi": PYTHON,
-    ".ts": TYPESCRIPT,
-    ".tsx": TSX,
-    ".js": JAVASCRIPT,
-    ".jsx": JAVASCRIPT,
-    ".mjs": JAVASCRIPT,
-    ".cjs": JAVASCRIPT,
-    ".go": GO,
-}
+LANGUAGES_BY_EXTRACTOR: dict[str, SourceLanguage] = {"python": PYTHON, "typescript": TYPESCRIPT, "tsx": TSX, "javascript": JAVASCRIPT, "go": GO}
 
 
 def language_for(path: str) -> SourceLanguage | None:
-    return LANGUAGES_BY_SUFFIX.get(PurePosixPath(path).suffix.lower())
+    extractor = extractor_for(path)
+    return LANGUAGES_BY_EXTRACTOR.get(extractor.name) if extractor else None
 
 
 def file_symbols(language: SourceLanguage, source: bytes) -> FileSymbols:
@@ -137,7 +120,8 @@ def file_symbols(language: SourceLanguage, source: bytes) -> FileSymbols:
 
 
 def references(language: SourceLanguage, source: bytes, name: str) -> list[Symbol]:
-    return [symbol for symbol in _symbols(language, _parse(language, source)) if symbol.name == name and not symbol.definition]
+    wanted = name.encode()
+    return [_symbol(language, node) for node in _identifiers(language, _parse(language, source)) if node.text == wanted and not language.is_definition(node)]
 
 
 def symbol_at(language: SourceLanguage, source: bytes, row: int, column: int) -> Symbol | None:
@@ -156,15 +140,16 @@ def _parse(language: SourceLanguage, source: bytes) -> Tree:
 
 
 def _symbols(language: SourceLanguage, tree: Tree) -> Iterator[Symbol]:
-    for node in _nodes(tree):
-        if node.type in language.identifiers and node.start_point[0] == node.end_point[0]:
-            yield _symbol(language, node)
+    return (_symbol(language, node) for node in _identifiers(language, tree))
+
+
+def _identifiers(language: SourceLanguage, tree: Tree) -> Iterator[Node]:
+    return (node for node in _nodes(tree) if node.type in language.identifiers and node.start_point[0] == node.end_point[0])
 
 
 def _symbol(language: SourceLanguage, node: Node) -> Symbol:
-    (row, start), (_, end) = node.start_point, node.end_point
-    name = node.text.decode(errors="replace") if node.text else ""
-    return Symbol(name, row, start, end, language.is_definition(node))
+    row, start = node.start_point
+    return Symbol(node_text(node), row, start, language.is_definition(node))
 
 
 def _nodes(tree: Tree) -> Iterator[Node]:

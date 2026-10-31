@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
-import { fetchNavigation, usePrepareNavigation, type CodeLocation, type NavigationRequest, type NavigationResult, type NavigationTarget, type ServerHint } from '../api/navigation'
+import { fetchNavigation, prepareNavigation, usePrepareNavigation, type CodeLocation, type NavigationRequest, type NavigationResult, type NavigationTarget, type ServerHint } from '../api/navigation'
 import { directTarget, type NavigationClick, type ScreenPoint, type UnitTarget } from '../review/codeNavigation'
 import { readStored, writeStored } from '../settings/storage'
 import { NavigationPopup, type PopupState } from '../components/NavigationPopup'
@@ -29,19 +29,19 @@ function delay(ms: number): Promise<void> {
 }
 
 async function resolveNavigation(reviewId: number, revisionId: number | undefined, request: NavigationRequest, current: () => boolean, onBuilding: () => void): Promise<NavigationResult | null> {
-  while (current()) {
-    const result = await fetchNavigation(reviewId, revisionId, request)
-    if (result.ready || !current()) {
-      return current() ? result : null
+  const first = await fetchNavigation(reviewId, revisionId, request)
+  if (first.ready || !current()) {
+    return current() ? first : null
+  }
+  onBuilding()
+  while (!(await prepareNavigation(reviewId, revisionId, request.side)).ready) {
+    if (!current()) {
+      return null
     }
-    onBuilding()
     await delay(BUILDING_POLL_MS)
   }
-  return null
-}
-
-function unitInPage(target: NavigationTarget): boolean {
-  return target.unit_id !== null && document.getElementById(`unit-${String(target.unit_id)}`) !== null
+  const result = await fetchNavigation(reviewId, revisionId, request)
+  return current() ? result : null
 }
 
 function takeHint(hint: ServerHint | null): ServerHint | null {
@@ -74,25 +74,31 @@ function useModifierCursor() {
   }, [])
 }
 
-export function useCodeNavigation(reviewId: number, revisionId: number | undefined): CodeNavigation {
+export function useCodeNavigation(reviewId: number, revisionId: number | undefined, hasUnit: (unitId: number) => boolean): CodeNavigation {
   usePrepareNavigation(reviewId, revisionId)
+  const unitShown = useRef(hasUnit)
+  useEffect(() => {
+    unitShown.current = hasUnit
+  })
   useModifierCursor()
   const [popup, setPopup] = useState<Popup | null>(null)
   const [stack, setStack] = useState<CodeLocation[]>([])
   const [target, setTarget] = useState<UnitTarget | null>(null)
   const [hint, setHint] = useState<ServerHint | null>(null)
   const latest = useRef(0)
-  const jumps = useRef(0)
+  const inPage = useCallback((found: NavigationTarget): found is NavigationTarget & { unit_id: number } => found.unit_id !== null && unitShown.current(found.unit_id), [])
 
-  const reveal = useCallback((found: NavigationTarget) => {
-    if (found.unit_id !== null && unitInPage(found)) {
-      jumps.current += 1
-      setStack([])
-      setTarget({ unitId: found.unit_id, line: found.line, side: found.side, seq: jumps.current })
-      return
-    }
-    setStack((current) => [...current, { path: found.path, line: found.line, side: found.side }])
-  }, [])
+  const reveal = useCallback(
+    (found: NavigationTarget) => {
+      if (inPage(found)) {
+        setStack([])
+        setTarget({ unitId: found.unit_id, line: found.line, side: found.side })
+        return
+      }
+      setStack((current) => [...current, { path: found.path, line: found.line, side: found.side }])
+    },
+    [inPage],
+  )
 
   const closePopup = useCallback(() => {
     latest.current += 1
@@ -118,7 +124,7 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
             setHint(newHint)
           }
           const direct = directTarget(result)
-          if (result.symbol === null || (direct && unitInPage(direct))) {
+          if (result.symbol === null || (direct && inPage(direct))) {
             setPopup(null)
             if (direct) {
               reveal(direct)
@@ -133,7 +139,7 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
           }
         })
     },
-    [reviewId, revisionId, reveal],
+    [reviewId, revisionId, reveal, inPage],
   )
 
   const element = (

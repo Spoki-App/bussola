@@ -10,7 +10,6 @@ from bussola.globs import matches_any
 from bussola.navigation.symbols import Symbol, file_symbols, language_for
 
 MAX_FILE_BYTES = 1_000_000
-SYMLINK_MODE = "120000"
 CACHED_INDEXES = 4
 
 type Starter = Callable[[Callable[[], None]], None]
@@ -28,8 +27,7 @@ class IndexedFile:
 
 
 class SymbolIndex:
-    def __init__(self, commit: str, files: list[IndexedFile]) -> None:
-        self.commit = commit
+    def __init__(self, files: list[IndexedFile]) -> None:
         self.files = {file.path: file for file in files}
         self._definitions: dict[NameKey, list[tuple[IndexedFile, Symbol]]] = defaultdict(list)
         self._users: dict[NameKey, list[IndexedFile]] = defaultdict(list)
@@ -47,7 +45,7 @@ class SymbolIndex:
 
 
 def build_index(repo: GitRepo, commit: str, ignore: tuple[str, ...], reuse: Mapping[tuple[str, str], IndexedFile]) -> SymbolIndex:
-    blobs = [blob for blob in repo.tree_blobs(commit) if blob.mode != SYMLINK_MODE and not blob.is_submodule and not matches_any(blob.path, ignore)]
+    blobs = [blob for blob in repo.tree_blobs(commit) if not blob.is_symlink and not matches_any(blob.path, ignore)]
     files: list[IndexedFile] = []
     with repo.blob_reader() as reader:
         for blob in blobs:
@@ -63,7 +61,7 @@ def build_index(repo: GitRepo, commit: str, ignore: tuple[str, ...], reuse: Mapp
                 continue
             symbols = file_symbols(language, source)
             files.append(IndexedFile(blob.path, blob.object_id, language.family, symbols.definitions, symbols.used_names))
-    return SymbolIndex(commit, files)
+    return SymbolIndex(files)
 
 
 def start_daemon(task: Callable[[], None]) -> None:

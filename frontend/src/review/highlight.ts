@@ -1,4 +1,4 @@
-import type { Element, ElementContent, Root, Text } from 'hast'
+import type { Element, ElementContent, Text } from 'hast'
 import { common, createLowlight } from 'lowlight'
 import { tokenize, type HunkData, type HunkTokens } from 'react-diff-view'
 
@@ -93,8 +93,8 @@ function splitFormatSpec(body: ElementContent[]): ElementContent[] {
   return body
 }
 
-export function highlightCode(value: string, language: string): Root {
-  return lowlight.highlight(language, value)
+export function highlightCode(value: string, language: string): ElementContent[] {
+  return refractor.highlight(value, language)
 }
 
 export function languageFor(path: string): string | null {

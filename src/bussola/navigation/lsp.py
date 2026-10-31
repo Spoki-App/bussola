@@ -11,6 +11,7 @@ from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
 
 from bussola.navigation.specs import ServerSpec
+from bussola.units.registry import extractor_for
 
 INITIALIZE_TIMEOUT_SECONDS = 30.0
 REQUEST_TIMEOUT_SECONDS = 5.0
@@ -187,7 +188,8 @@ class LanguageServerSession:
                 return
             self._opened.add(path)
         text = (self._root / path).read_text(errors="replace")
-        language_id = self._language_ids.get(Path(path).suffix.lower(), "")
+        extractor = extractor_for(path)
+        language_id = self._language_ids.get(extractor.name, "") if extractor else ""
         self._client.notify("textDocument/didOpen", {"textDocument": {"uri": self._uri(path), "languageId": language_id, "version": 1, "text": text}})
 
     def _uri(self, path: str) -> str:

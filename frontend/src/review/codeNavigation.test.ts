@@ -60,7 +60,6 @@ describe('code navigation helpers', () => {
       ['b.py', [3, 9]],
       ['a.py', [7]],
     ])
-    expect(groups.ordered.map((item) => `${item.path}:${String(item.line)}`)).toEqual(['lib.py:1', 'b.py:3', 'b.py:9', 'a.py:7'])
   })
 
   it('jumps directly only to a single target that is part of the review', () => {

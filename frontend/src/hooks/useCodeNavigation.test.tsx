@@ -24,14 +24,14 @@ function json(body: unknown): Promise<Response> {
   return Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }))
 }
 
-function serve(reply: NavigationReply) {
+function serve(reply: NavigationReply, prepared: () => boolean = () => true) {
   const requests: URLSearchParams[] = []
   vi.stubGlobal(
     'fetch',
     vi.fn((input: string) => {
       const url = new URL(input, 'http://localhost')
       if (url.pathname.endsWith('/navigation/index')) {
-        return json({ ready: true })
+        return json({ ready: prepared() })
       }
       if (url.pathname.endsWith('/navigation')) {
         requests.push(url.searchParams)
@@ -46,10 +46,9 @@ function serve(reply: NavigationReply) {
 }
 
 function Harness() {
-  const navigation = useCodeNavigation(1, 9)
+  const navigation = useCodeNavigation(1, 9, (unitId) => unitId === 4)
   return (
     <>
-      <article id="unit-4">price unit</article>
       <button type="button" onClick={() => { navigation.navigate({ path: 'cart.py', side: 'head', line: 5, column: 12, point: { x: 40, y: 60 } }) }}>
         Cmd+click price
       </button>
@@ -135,18 +134,9 @@ describe('useCodeNavigation', () => {
     expect(entries[4]).toHaveFocus()
 
     fireEvent.keyDown(popup, { key: 'ArrowDown' })
-    fireEvent.keyDown(popup, { key: 'Enter' })
+    expect(entries[0]).toHaveFocus()
+    fireEvent.click(entries[0])
     expect(screen.getByLabelText('target')).toHaveTextContent('4:1')
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  })
-
-  it('closes the list with Esc', async () => {
-    serve(() => found([target('lib.py', 1, null), target('lib.py', 5, null)]))
-    renderHarness()
-
-    const popup = await screen.findByRole('dialog', { name: 'Definitions of price' })
-    fireEvent.keyDown(popup, { key: 'Escape' })
-
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
@@ -190,11 +180,16 @@ describe('useCodeNavigation', () => {
   })
 
   it('shows a loading state while the index builds', async () => {
-    let calls = 0
-    serve(() => {
-      calls += 1
-      return calls === 1 ? found([], { ready: false }) : found([target('lib.py', 1, null), target('lib.py', 5, null)])
-    })
+    let indexed = false
+    let polls = 0
+    serve(
+      () => (indexed ? found([target('lib.py', 1, null), target('lib.py', 5, null)]) : found([], { ready: false })),
+      () => {
+        polls += 1
+        indexed = polls > 2
+        return indexed
+      },
+    )
     renderHarness()
 
     expect(await screen.findByText(/Indexing the repository/)).toBeInTheDocument()

@@ -10,6 +10,7 @@ from bussola.git.errors import GitError, InvalidRefError
 
 GIT = "git"
 SUBMODULE_MODE = "160000"
+SYMLINK_MODE = "120000"
 BLOB_TYPE = "blob"
 RAW_RECORD_PREFIX = ":"
 DEFAULT_REMOTE = "origin"
@@ -37,6 +38,10 @@ class BlobRef:
     @property
     def is_submodule(self) -> bool:
         return self.mode == SUBMODULE_MODE
+
+    @property
+    def is_symlink(self) -> bool:
+        return self.mode == SYMLINK_MODE
 
 
 @dataclass(frozen=True)
@@ -149,7 +154,7 @@ class GitRepo:
         if not OBJECT_ID.fullmatch(commit):
             raise InvalidRefError(commit)
         entries = self.run("ls-tree", "-r", "-z", "--full-tree", commit).decode(errors="surrogateescape").split("\0")
-        return [_tree_entry(entry) for entry in entries if entry and _is_blob_entry(entry)]
+        return [blob for object_type, blob in map(_tree_entry, filter(None, entries)) if object_type == BLOB_TYPE]
 
     def archive(self, commit: str, output: Path) -> None:
         if not OBJECT_ID.fullmatch(commit):
@@ -178,14 +183,10 @@ def parse_raw_diff(output: str) -> list[FileChange]:
     return changes
 
 
-def _is_blob_entry(entry: str) -> bool:
-    return entry.split(" ", 2)[1] == BLOB_TYPE
-
-
-def _tree_entry(entry: str) -> BlobRef:
+def _tree_entry(entry: str) -> tuple[str, BlobRef]:
     meta, _, path = entry.partition("\t")
-    mode, _, object_id = meta.split(" ")
-    return BlobRef(path, object_id, mode)
+    mode, object_type, object_id = meta.split(" ")
+    return object_type, BlobRef(path, object_id, mode)
 
 
 def read_git_config(cwd: Path, key: str) -> str | None:

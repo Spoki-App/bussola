@@ -70,7 +70,6 @@ def test_index_builds_in_the_background_and_is_cached_per_commit(git_repo: GitFi
     index = cache.get(git_repo.repo, commit, ())
 
     assert index is not None
-    assert index.commit == commit
     assert cache.get(git_repo.repo, commit, ()) is index
     assert starter.tasks == []
 

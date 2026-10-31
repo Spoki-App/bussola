@@ -101,12 +101,6 @@ export function NavigationPopup({ state, point, onChoose, onClose }: Props) {
     if (step !== undefined && ref.current) {
       event.preventDefault()
       moveFocus(ref.current, step)
-    } else if (event.key === 'Escape') {
-      event.preventDefault()
-      close()
-    } else if (event.key === 'Enter' && document.activeElement instanceof HTMLButtonElement && ref.current?.contains(document.activeElement)) {
-      event.preventDefault()
-      document.activeElement.click()
     }
   }
 

@@ -131,8 +131,8 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
     element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [navigationTarget, diffLoaded, onFocus, unit.id])
 
-  const navigateFrom = (row: DiffRow, side: GutterSide | undefined, column: number, point: ScreenPoint) => {
-    const base = side === 'old' || row.change === 'removed'
+  const navigateFrom = (row: DiffRow, side: GutterSide, column: number, point: ScreenPoint) => {
+    const base = side === 'old'
     const line = base ? row.old_line : row.new_line
     if (!onNavigate || line === null || (base && diff.data?.mode !== 'base')) {
       return

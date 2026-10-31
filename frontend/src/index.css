@@ -1195,7 +1195,8 @@ button.toggle[aria-pressed='true'] {
 
 .diff .row-target td,
 .diff .row-target-old :is(.diff-gutter-delete, .diff-code-delete, .diff-gutter-normal, .diff-code-normal),
-.diff .row-target-new :is(.diff-gutter-insert, .diff-code-insert, .diff-gutter-normal, .diff-code-normal) {
+.diff .row-target-new :is(.diff-gutter-insert, .diff-code-insert, .diff-gutter-normal, .diff-code-normal),
+.source-line.target {
   background-color: var(--amber-bg);
   box-shadow: inset 3px 0 0 var(--amber);
 }
@@ -1325,11 +1326,6 @@ button.toggle[aria-pressed='true'] {
 .source-line {
   display: flex;
   min-width: max-content;
-}
-
-.source-line.target {
-  background: var(--amber-bg);
-  box-shadow: inset 3px 0 0 var(--amber);
 }
 
 .source-number {
