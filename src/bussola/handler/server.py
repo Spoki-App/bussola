@@ -102,13 +102,19 @@ def withdraw_server(data_dir: Path, address: ServerAddress) -> None:
         path.rename(claimed)
     except FileNotFoundError:
         return
+    if _read_address(claimed) != address:
+        _restore(claimed, path)
+    claimed.unlink(missing_ok=True)
+
+
+def _restore(claimed: Path, path: Path) -> None:
     try:
-        if _read_address(claimed) != address:
-            os.link(claimed, path)
+        os.link(claimed, path)
+    except FileExistsError:
+        return
     except OSError:
-        pass
-    finally:
-        claimed.unlink(missing_ok=True)
+        if not path.exists():
+            claimed.replace(path)
 
 
 def published_servers(data_dir: Path) -> list[ServerAddress]:
@@ -307,8 +313,6 @@ class Launcher:
                 if states[address] != Probe.SILENT:
                     self._forget(address)
             silent = [address for address in silent if states[address] == Probe.SILENT]
-        for address in silent:
-            self._forget(address)
         return None
 
     def _forget(self, address: ServerAddress) -> None:

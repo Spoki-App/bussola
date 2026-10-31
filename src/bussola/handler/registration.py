@@ -221,7 +221,7 @@ def macos_registration(command: Sequence[str], applications_dir: Path) -> Regist
             MovePath(staged, app),
             RunCommand((LSREGISTER, "-f", str(app))),
         ),
-        uninstall=(RunCommand((LSREGISTER, "-u", str(app)), required=False), RemovePath(app)),
+        uninstall=(RunCommand((LSREGISTER, "-u", str(app)), required=False), RemovePath(app), RemovePath(staged)),
     )
 
 

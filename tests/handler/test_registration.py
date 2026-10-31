@@ -157,7 +157,7 @@ def test_macos_builds_an_app_bundle_declaring_the_scheme(tmp_path: Path) -> None
         MovePath(staged, app),
         RunCommand((LSREGISTER, "-f", str(app))),
     )
-    assert handler.uninstall == (RunCommand((LSREGISTER, "-u", str(app)), required=False), RemovePath(app))
+    assert handler.uninstall == (RunCommand((LSREGISTER, "-u", str(app)), required=False), RemovePath(app), RemovePath(staged))
 
 
 def test_macos_app_bundle_info_plist_after_install(tmp_path: Path) -> None:

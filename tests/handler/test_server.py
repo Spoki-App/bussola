@@ -116,6 +116,20 @@ def test_published_server_is_private_and_withdrawn_only_by_its_owner(tmp_path: P
     assert published_servers(tmp_path) == []
 
 
+def test_withdrawing_keeps_another_servers_file_without_hard_links(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    running = ServerAddress("127.0.0.1", 8765, "running")
+    publish_server(tmp_path, running)
+
+    def no_hard_links(_source: object, _target: object) -> None:
+        raise PermissionError("hard links are not supported here")
+
+    monkeypatch.setattr("os.link", no_hard_links)
+    withdraw_server(tmp_path, ServerAddress("127.0.0.1", 8765, "gone"))
+
+    assert published_servers(tmp_path) == [running]
+    assert [path.name for path in (tmp_path / "servers").iterdir()] == ["127.0.0.1-8765.json"]
+
+
 def test_servers_on_different_ports_are_all_published_default_port_first(tmp_path: Path) -> None:
     other = ServerAddress("127.0.0.1", 9000, "other")
     default = ServerAddress("127.0.0.1", 8765, TOKEN)
@@ -346,7 +360,13 @@ def test_open_gives_up_on_a_local_server_that_never_answers_and_starts_its_own(t
     [started] = servers.started
     assert started.port != 8765
     assert url == f"http://127.0.0.1:{started.port}/?token={started.token}"
-    assert hung not in published_servers(tmp_path)
+    assert hung in published_servers(tmp_path)
+
+    servers.busy[hung] = 0
+    servers.healthy.add(hung)
+    publish_server(tmp_path, started)
+
+    assert servers.launcher(tmp_path, timeout=0).open("bussola://") == "http://127.0.0.1:8765/?token=hung"
 
 
 def test_open_probes_again_a_new_server_that_was_slow_to_answer_once(tmp_path: Path) -> None:
