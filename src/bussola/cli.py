@@ -83,7 +83,7 @@ def open_link(
 @app.command("install-handler")
 def install_handler() -> None:
     """Register bussola:// links with the operating system."""
-    _apply_registration(lambda handler: handler.install, "bussola:// links now open bussola")
+    _apply_registration(lambda handler: handler.install, "bussola:// links now open bussola", "Run `bussola uninstall-handler` to remove what was written.")
 
 
 @app.command("uninstall-handler")
@@ -92,10 +92,13 @@ def uninstall_handler() -> None:
     _apply_registration(lambda handler: handler.uninstall, "bussola:// links are no longer registered")
 
 
-def _apply_registration(steps: Callable[[registration.Registration], Sequence[registration.Step]], done: str) -> None:
+def _apply_registration(steps: Callable[[registration.Registration], Sequence[registration.Step]], done: str, on_failure: str = "") -> None:
     with _cli_errors():
         handler = registration.current_registration()
-        registration.apply(steps(handler))
+        try:
+            registration.apply(steps(handler))
+        except registration.HandlerError as error:
+            raise registration.HandlerError(f"{error} {on_failure}".strip()) from error
     typer.echo(f"{done} ({handler.location})")
 
 

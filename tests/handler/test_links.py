@@ -58,6 +58,7 @@ def test_supported_links(url: str, expected: ReviewLink) -> None:
         "bussola://review?repo=acme/widgets%0A&pr=7",
         "bussola://review?repo=acme/widgets&pr=7%0A",
         "bussola://review?repo=acme/widgets&pr=1000000000",
+        "bussola://review?repo=acme/widgets&pr=0000000001",
         "bussola://review?repo=acme/widgets&pr=" + "9" * 5000,
         "bussola://review?" + "&".join(f"x{index}=1" for index in range(40)),
         "bussola://github.com/acme/widgets/issues/7",

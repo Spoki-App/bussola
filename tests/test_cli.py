@@ -1,4 +1,5 @@
 import os
+import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -95,6 +96,22 @@ def test_install_and_uninstall_handler_apply_the_platform_registration(tmp_path:
 
     assert removed.exit_code == 0, removed.output
     assert not desktop.exists()
+
+
+def test_a_failed_install_says_how_to_clean_up(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    handler = registration.linux_registration(("/usr/bin/python3", "-m", "bussola", "open-link"), tmp_path / "applications", tmp_path / "mimeapps.list")
+
+    def fail_default(argv: Sequence[str]) -> None:
+        if "default" in argv:
+            raise subprocess.CalledProcessError(1, list(argv), stderr="mimeapps.list is read-only")
+
+    monkeypatch.setattr(registration, "current_registration", lambda: handler)
+    monkeypatch.setattr(registration, "run_command", fail_default)
+
+    result = runner.invoke(app, ["install-handler"])
+
+    assert result.exit_code == 2
+    assert "mimeapps.list is read-only Run `bussola uninstall-handler` to remove what was written." in result.output
 
 
 def test_install_handler_reports_unsupported_platforms(monkeypatch: pytest.MonkeyPatch) -> None:
