@@ -111,7 +111,7 @@ def test_open_link_refuses_invalid_links_before_looking_for_the_server_and_logs_
 
     assert result.exit_code == 2
     assert "pr parameter" in result.output
-    assert not (data_dir / "server.json").exists()
+    assert not (data_dir / "servers").exists()
     log = (data_dir / "open-link.log").read_text()
     assert "'bussola://review?repo=acme/widgets': The pr parameter must be a positive number" in log
 
