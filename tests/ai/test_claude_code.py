@@ -76,6 +76,8 @@ def test_the_cli_runs_without_tools_with_the_schema_and_the_prompt_on_stdin(fake
 def test_bussola_settings_such_as_the_session_token_are_not_passed_to_the_cli(fake_claude: FakeClaude, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BUSSOLA_TOKEN", "session-secret")
     monkeypatch.setenv("CLAUDECODE", "1")
+    monkeypatch.setenv("CLAUDE_CODE_SSE_PORT", "4242")
+    monkeypatch.setenv("CLAUDE_CODE_USE_BEDROCK", "1")
     monkeypatch.setenv("HOME_TOOL_SETTING", "kept")
     fake_claude.answer({"type": "result", "is_error": False, "result": "{}"})
 
@@ -84,6 +86,8 @@ def test_bussola_settings_such_as_the_session_token_are_not_passed_to_the_cli(fa
     environment = fake_claude.call()["env"]
     assert "BUSSOLA_TOKEN" not in environment
     assert "CLAUDECODE" not in environment
+    assert "CLAUDE_CODE_SSE_PORT" not in environment
+    assert environment["CLAUDE_CODE_USE_BEDROCK"] == "1"
     assert environment["HOME_TOOL_SETTING"] == "kept"
     assert environment["NO_COLOR"] == "1"
 
@@ -158,14 +162,10 @@ def test_processes_left_behind_by_the_cli_do_not_hold_up_its_answer(fake_claude:
 
     assert answer == '{"impact": "low"}'
     assert time.monotonic() - started < 5
-    child_pid = int(child_pid_file.read_text())
-    if hasattr(os, "waitid"):
-        assert subprocess.run(["ps", "-o", "stat=", "-p", str(child_pid)], capture_output=True, text=True, check=False).stdout.strip() in {"", "Z"}
-    else:
-        os.kill(child_pid, signal.SIGKILL)
+    child_pid = child_pid_file.read_text()
+    assert subprocess.run(["ps", "-o", "stat=", "-p", child_pid], capture_output=True, text=True, check=False).stdout.strip() in {"", "Z"}
 
 
-@pytest.mark.skipif(not hasattr(os, "waitid"), reason="needs os.waitid to wait for claude without reaping it")
 def test_a_detached_process_left_by_the_cli_is_stopped(fake_claude: FakeClaude, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     child_pid_file = tmp_path / "detached.pid"
     monkeypatch.setenv("FAKE_CLAUDE_DETACHED_CHILD_PID", str(child_pid_file))

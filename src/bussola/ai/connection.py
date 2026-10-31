@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel
 
-from bussola.ai.base import AiError, AiProvider, Cancellation
+from bussola.ai.base import AiProvider, Cancellation
 from bussola.ai.runner import AiRunner, AiTask
 
 MILLISECONDS = 1000
@@ -36,8 +36,8 @@ def check_connection(connect: Callable[[], AiProvider], cancellation: Cancellati
     try:
         provider = connect()
         check = AiRunner(provider).run(CONNECTION_CHECK, CONNECTION_PROMPT, cancellation)
-    except AiError as error:
-        return ConnectionResult(False, str(error), _elapsed(started))
+    except Exception as error:
+        return ConnectionResult(False, str(error) or type(error).__name__, _elapsed(started))
     if not check.ok:
         return ConnectionResult(False, f"{provider.label} answered, but not with the expected result", _elapsed(started))
     model = f" ({provider.model})" if provider.model else ""

@@ -1,10 +1,12 @@
 import contextlib
 import json
 import os
+import select
 import selectors
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -34,7 +36,7 @@ READER_NAME = "bussola-claude-output"
 HELP_TIMEOUT_SECONDS = 15.0
 FAILED_CHECK_SECONDS = 60.0
 FINISH_WAIT_SECONDS = 5.0
-NESTED_SESSION_ENV = "CLAUDECODE"
+NESTED_SESSION_ENV = frozenset({"CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SSE_PORT"})
 READ_CHUNK_BYTES = 64 * 1024
 EXIT_POLL_SECONDS = 0.05
 
@@ -170,7 +172,7 @@ class ClaudeCodeProvider:
 
 
 def _claude_environment() -> dict[str, str]:
-    inherited = {name: value for name, value in os.environ.items() if not name.startswith(PRIVATE_ENV_PREFIX) and name != NESTED_SESSION_ENV}
+    inherited = {name: value for name, value in os.environ.items() if not name.startswith(PRIVATE_ENV_PREFIX) and name not in NESTED_SESSION_ENV}
     return {**inherited, **CLAUDE_ENV}
 
 
@@ -218,15 +220,7 @@ class _ClaudeSession:
                 stdin.close()
 
     def _wait_for_exit(self) -> None:
-        if hasattr(os, "waitid"):
-            with contextlib.suppress(ChildProcessError):
-                os.waitid(os.P_PID, self._process.pid, os.WEXITED | os.WNOWAIT)
-            return
-        while True:
-            with self._lock:
-                if self._process.poll() is not None:
-                    return
-            time.sleep(EXIT_POLL_SECONDS)
+        _wait_without_reaping(self._process.pid)
 
     def _stop_group(self) -> None:
         with self._lock:
@@ -270,6 +264,24 @@ class _Collector:
         with contextlib.suppress(OSError):
             stream.close()
         self._done.set()
+
+
+if sys.platform == "darwin":
+
+    def _wait_without_reaping(pid: int) -> None:
+        queue = select.kqueue()
+        try:
+            event = select.kevent(pid, filter=select.KQ_FILTER_PROC, flags=select.KQ_EV_ADD | select.KQ_EV_ONESHOT, fflags=select.KQ_NOTE_EXIT)
+            with contextlib.suppress(OSError):
+                queue.control([event], 1, None)
+        finally:
+            queue.close()
+
+else:
+
+    def _wait_without_reaping(pid: int) -> None:
+        with contextlib.suppress(ChildProcessError):
+            os.waitid(os.P_PID, pid, os.WEXITED | os.WNOWAIT)
 
 
 def _kill_group(process: subprocess.Popen[bytes]) -> None:

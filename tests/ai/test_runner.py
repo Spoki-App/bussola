@@ -268,3 +268,12 @@ def test_a_replaced_cache_entry_is_read_back_in_the_same_session(tmp_path: Path)
         runner.run(RATE, "code", Cancellation(), content_hash="hash")
 
     assert len(provider.requests) == 1
+
+
+def test_the_provider_max_tokens_can_also_raise_the_budget() -> None:
+    provider = FakeProvider(GOOD)
+    provider.max_tokens = 32000
+
+    AiRunner(provider).run(RATE, "code", Cancellation())
+
+    assert provider.requests[0].max_tokens == 32000

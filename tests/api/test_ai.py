@@ -178,3 +178,11 @@ def test_the_key_never_reaches_the_database_or_the_api(data_dir: Path, config_fi
 
     assert not any("sk-very-secret" in text for text in responses)
     assert b"sk-very-secret" not in (data_dir / "bussola.db").read_bytes()
+
+
+def test_test_connection_reports_an_unexpected_error(data_dir: Path, config_file: Path) -> None:
+    write(config_file, ANTHROPIC)
+
+    result = client(data_dir, config_file, FakeProvider(OSError("No space left on device"))).post("/api/ai/test").json()
+
+    assert (result["ok"], result["message"]) == (False, "No space left on device")

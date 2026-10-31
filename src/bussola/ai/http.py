@@ -171,7 +171,8 @@ def _send(request: urllib.request.Request, timeout: float, cancellation: Cancell
             with opener.open(request, timeout=timeout + SOCKET_GRACE_SECONDS) as response:
                 return response.read(MAX_RESPONSE_BYTES + 1)
         except urllib.error.HTTPError as error:
-            raise _HttpStatusError(error.code, _error_detail(error), _retry_after(error)) from error
+            with error:
+                raise _HttpStatusError(error.code, _error_detail(error), _retry_after(error)) from error
 
     try:
         return run_cancellable(send, cancellation, timeout, abort=connections.close)

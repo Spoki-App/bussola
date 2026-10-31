@@ -176,7 +176,7 @@ endpoint = "http://localhost:11434/v1"  # Ollama; LM Studio uses http://localhos
 model = "qwen2.5-coder"
 ```
 
-Other options: `timeout` (seconds per request, default 600, at most 3600) and `api_key_env` (the name of the environment variable that holds the key, for example `api_key_env = "WORK_ANTHROPIC_KEY"`; the Anthropic API defaults to `ANTHROPIC_API_KEY`). Claude Code ignores `endpoint`. `max_tokens` caps the length of each answer for the Anthropic API and OpenAI-compatible endpoints, for example `max_tokens = 4000` for a local model with a small context window. Busy answers (HTTP 429 and 5xx) are retried twice, after the delay the server asks for, as long as that fits in the timeout. Requests to `localhost` and other loopback addresses never go through an HTTP proxy, and **Test connection** waits at most two minutes.
+Other options: `timeout` (seconds per request, default 600, at most 3600) and `api_key_env` (the name of the environment variable that holds the key, for example `api_key_env = "WORK_ANTHROPIC_KEY"`; the Anthropic API defaults to `ANTHROPIC_API_KEY`). Claude Code ignores `endpoint`. `max_tokens` sets the answer budget for the Anthropic API and OpenAI-compatible endpoints (default 16000), for example `max_tokens = 4000` for a local model with a small context window or more for long answers. Busy answers (HTTP 429 and 5xx) are retried twice, after the delay the server asks for, as long as that fits in the timeout. Requests to `localhost` and other loopback addresses never go through an HTTP proxy, and **Test connection** waits at most two minutes.
 
 Keys are read only from environment variables. bussola never writes them to the database or to a configuration file, and `api_key` is not an accepted option.
 
