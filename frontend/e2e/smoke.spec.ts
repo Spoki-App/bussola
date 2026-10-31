@@ -77,6 +77,11 @@ test('a link to the review already open is applied too', async ({ page }) => {
   await expect(card).toHaveClass(/focused/)
   await expect(card.getByRole('button', { name: 'Collapse unit' })).toBeVisible()
   await expect(page).toHaveURL(/\/reviews\/\d+$/)
+
+  for (const query of ['?path=missing.py', '?path=missing.py', '?path=app.py&line=2']) {
+    await page.evaluate(`history.pushState(null, '', location.pathname + '${query}'); dispatchEvent(new Event('bussola:navigate'))`)
+    await expect(page).toHaveURL(/\/reviews\/\d+$/)
+  }
 })
 
 test('a pull request link of an unknown repository opens the add repository flow prefilled', async ({ page }) => {

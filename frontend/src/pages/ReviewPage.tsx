@@ -153,7 +153,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const actions = useRef(new Map<number, UnitActions>())
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= WIDE_LAYOUT_PX)
   const [filesHidden, setFilesHidden] = useState(() => readStored(FILES_HIDDEN_KEY) === 'true')
-  const [appliedLink, setAppliedLink] = useState<FocusTarget | null | undefined>(undefined)
+  const [appliedLink, setAppliedLink] = useState<{ key: string; target: FocusTarget | null } | null>(null)
   const { link } = extensions
   const toggleFiles = () => {
     setFilesHidden(!filesHidden)
@@ -167,16 +167,17 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const linkIsNew = link !== undefined && link.key !== seenLinkKey
   if (linkIsNew) {
     setSeenLinkKey(link.key)
-    setAppliedLink(undefined)
+    setAppliedLink(null)
     setFilter('all')
     setQuery('')
   }
+  const linkPending = link !== undefined && !linkIsNew && appliedLink === null
   const viewChanged = filter !== 'all' || query !== ''
-  const resolveLink = () => (link?.ready && units.data && !units.isPlaceholderData ? link.resolve(units.data) : undefined)
   const unitsUnavailable = review.isError || units.isError || review.data?.latest_revision === null
-  const linkedTarget = !link || linkIsNew || appliedLink !== undefined ? undefined : viewChanged || unitsUnavailable ? null : resolveLink()
-  if (linkedTarget !== undefined) {
-    setAppliedLink(linkedTarget)
+  const resolveLink = () => (link?.ready && units.data && !units.isPlaceholderData ? link.resolve(units.data) : undefined)
+  const linkedTarget = !linkPending ? undefined : viewChanged || unitsUnavailable ? null : resolveLink()
+  if (link && linkedTarget !== undefined) {
+    setAppliedLink({ key: link.key, target: linkedTarget })
     if (linkedTarget) {
       setFocusedId(linkedTarget.unitId)
       setPanelOpen(panelOpen || linkedTarget.unitId === null)
@@ -184,15 +185,15 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   }
   const [linkScroll] = useState(createLinkScroll)
   useEffect(() => {
-    if (appliedLink === undefined) {
+    if (appliedLink === null) {
       return undefined
     }
     const { pathname, search, hash } = window.location
     navigate(`${pathname}${withoutLinkFocus(search)}${hash}`, { replace: true })
-    if (appliedLink === null) {
+    if (appliedLink.target === null) {
       return undefined
     }
-    linkScroll.start(appliedLink)
+    linkScroll.start(appliedLink.target)
     const stop = followLink(linkScroll)
     return () => {
       stop()
