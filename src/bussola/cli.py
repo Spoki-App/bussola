@@ -55,7 +55,9 @@ def serve(
         typer.secho(f"warning: listening on {host} exposes your repositories to other machines on the network", fg=typer.colors.YELLOW, err=True)
     identity_dir = repo or Path.cwd()
     token = os.environ.pop(TOKEN_ENV, None) or new_token()
-    settings = AppSettings(data_dir=default_data_dir().resolve(), identity_dir=identity_dir, token=token, allowed_hosts=allowed_hosts_for(host, port))
+    settings = AppSettings(
+        data_dir=default_data_dir().resolve(), identity_dir=identity_dir, token=token, allowed_hosts=allowed_hosts_for(host, port), port=port
+    )
     if register:
         _register_if_repo(settings.data_dir, identity_dir)
     address = ServerAddress(host, port, token)

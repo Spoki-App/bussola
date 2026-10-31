@@ -16,7 +16,7 @@ TOKEN_COOKIE = token_cookie(PORT)
 
 @pytest.fixture
 def client(tmp_path: Path) -> TestClient:
-    settings = AppSettings(data_dir=tmp_path / "data", static_dir=tmp_path, token=TOKEN, allowed_hosts=allowed_hosts_for("127.0.0.1", PORT))
+    settings = AppSettings(data_dir=tmp_path / "data", static_dir=tmp_path, token=TOKEN, allowed_hosts=allowed_hosts_for("127.0.0.1", PORT), port=PORT)
     return TestClient(create_app(settings), base_url=BASE_URL)
 
 

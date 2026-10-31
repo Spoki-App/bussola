@@ -26,6 +26,7 @@ from bussola.handler.server import (
     probe_server,
     publish_server,
     published_servers,
+    server_file,
     start_server,
     withdraw_server,
 )
@@ -111,23 +112,21 @@ def test_published_server_is_private_and_withdrawn_only_by_its_owner(tmp_path: P
 
     assert published_servers(tmp_path) == [address]
     if sys.platform != "win32":
-        assert stat.S_IMODE((tmp_path / "servers/127.0.0.1-8765.json").stat().st_mode) == 0o600
+        assert stat.S_IMODE(server_file(tmp_path, address).stat().st_mode) == 0o600
     withdraw_server(tmp_path, address)
     assert published_servers(tmp_path) == []
 
 
-def test_withdrawing_keeps_another_servers_file_without_hard_links(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_each_server_on_a_port_has_its_own_file_and_withdraws_only_that(tmp_path: Path) -> None:
     running = ServerAddress("127.0.0.1", 8765, "running")
+    stale = ServerAddress("127.0.0.1", 8765, "stale")
+    publish_server(tmp_path, stale)
     publish_server(tmp_path, running)
 
-    def no_hard_links(_source: object, _target: object) -> None:
-        raise PermissionError("hard links are not supported here")
-
-    monkeypatch.setattr("os.link", no_hard_links)
-    withdraw_server(tmp_path, ServerAddress("127.0.0.1", 8765, "gone"))
+    withdraw_server(tmp_path, stale)
 
     assert published_servers(tmp_path) == [running]
-    assert [path.name for path in (tmp_path / "servers").iterdir()] == ["127.0.0.1-8765.json"]
+    assert [path.name for path in (tmp_path / "servers").iterdir()] == [server_file(tmp_path, running).name]
 
 
 def test_servers_on_different_ports_are_all_published_default_port_first(tmp_path: Path) -> None:
@@ -152,12 +151,13 @@ def test_servers_on_the_same_port_but_other_hosts_keep_their_own_files(tmp_path:
     withdraw_server(tmp_path, lan)
 
     assert sorted(published_servers(tmp_path), key=lambda address: address.host) == [local, ipv6]
-    assert sorted(path.name for path in (tmp_path / "servers").iterdir()) == ["127.0.0.1-8765.json", "__1-8765.json"]
+    assert sorted(path.name for path in (tmp_path / "servers").iterdir()) == sorted(server_file(tmp_path, address).name for address in (local, ipv6))
+    assert server_file(tmp_path, ipv6).name.startswith("__1-8765-")
 
 
 def test_unreadable_server_files_are_skipped(tmp_path: Path) -> None:
     (tmp_path / "servers").mkdir()
-    (tmp_path / "servers/127.0.0.1-8765.json").write_text('{"host": "127.0.0.1"}')
+    (tmp_path / "servers/127.0.0.1-8765-0000.json").write_text('{"host": "127.0.0.1"}')
 
     assert published_servers(tmp_path) == []
 

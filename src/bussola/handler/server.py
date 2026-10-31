@@ -1,10 +1,10 @@
 import contextlib
+import hashlib
 import http.client
 import ipaddress
 import logging
 import os
 import re
-import secrets
 import socket
 import subprocess
 import sys
@@ -27,7 +27,7 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 from bussola.config import DEFAULT_HOST, DEFAULT_PORT
 from bussola.errors import DomainError
 from bussola.handler.links import BUSSOLA_MODULE, browser_path, parse_link
-from bussola.security import INVALID_TOKEN_CODE, TOKEN_ENV, TOKEN_QUERY, host_port, is_local_host, new_token, token_cookie
+from bussola.security import INVALID_TOKEN_CODE, TOKEN_ENV, TOKEN_QUERY, host_port, is_ipv6_host, is_local_host, new_token, token_cookie
 from bussola.storage.database import APP_NAME, DATA_DIR_ENV
 
 SERVERS_DIR = "servers"
@@ -43,6 +43,7 @@ MAX_PROBE_BODY = 512
 MAX_LINK_LOG_BYTES = 1_000_000
 MAX_LOGGED_LINK = 500
 IPV6_LOOPBACK = "::1"
+TOKEN_FINGERPRINT_LENGTH = 16
 UNSAFE_FILE_CHARACTERS = re.compile(r"[^A-Za-z0-9.-]")
 POLL_INTERVAL_SECONDS = 0.25
 
@@ -64,7 +65,7 @@ class ServerAddress:
     def reachable(self) -> "ServerAddress":
         if not _listens_everywhere(self.host):
             return self
-        return ServerAddress(IPV6_LOOPBACK if ":" in self.host else DEFAULT_HOST, self.port, self.token)
+        return ServerAddress(IPV6_LOOPBACK if is_ipv6_host(self.host) else DEFAULT_HOST, self.port, self.token)
 
 
 SERVER_ADDRESS = TypeAdapter(ServerAddress)
@@ -79,7 +80,8 @@ def _listens_everywhere(host: str) -> bool:
 
 
 def server_file(data_dir: Path, address: ServerAddress) -> Path:
-    return data_dir / SERVERS_DIR / f"{UNSAFE_FILE_CHARACTERS.sub('_', address.host)}-{address.port}.json"
+    fingerprint = hashlib.sha256(address.token.encode()).hexdigest()[:TOKEN_FINGERPRINT_LENGTH]
+    return data_dir / SERVERS_DIR / f"{UNSAFE_FILE_CHARACTERS.sub('_', address.host)}-{address.port}-{fingerprint}.json"
 
 
 def publish_server(data_dir: Path, address: ServerAddress) -> None:
@@ -96,25 +98,7 @@ def publish_server(data_dir: Path, address: ServerAddress) -> None:
 
 
 def withdraw_server(data_dir: Path, address: ServerAddress) -> None:
-    path = server_file(data_dir, address)
-    claimed = path.with_name(f"{path.name}.{secrets.token_hex(8)}.withdrawn")
-    try:
-        path.rename(claimed)
-    except FileNotFoundError:
-        return
-    if _read_address(claimed) != address:
-        _restore(claimed, path)
-    claimed.unlink(missing_ok=True)
-
-
-def _restore(claimed: Path, path: Path) -> None:
-    try:
-        os.link(claimed, path)
-    except FileExistsError:
-        return
-    except OSError:
-        if not path.exists():
-            claimed.replace(path)
+    server_file(data_dir, address).unlink(missing_ok=True)
 
 
 def published_servers(data_dir: Path) -> list[ServerAddress]:
@@ -172,7 +156,7 @@ def _answer(body: bytes) -> Answer:
 
 
 def _socket_for(host: str) -> socket.socket:
-    return socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET)
+    return socket.socket(socket.AF_INET6 if is_ipv6_host(host) else socket.AF_INET)
 
 
 def free_port(host: str) -> int:

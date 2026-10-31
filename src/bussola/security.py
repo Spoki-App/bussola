@@ -36,8 +36,12 @@ def is_local_host(host: str) -> bool:
         return False
 
 
+def is_ipv6_host(host: str) -> bool:
+    return ":" in host
+
+
 def host_port(host: str, port: int) -> str:
-    return f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+    return f"[{host}]:{port}" if is_ipv6_host(host) else f"{host}:{port}"
 
 
 def allowed_hosts_for(host: str, port: int) -> frozenset[str]:
@@ -53,16 +57,16 @@ def install_security(app: FastAPI, settings: AppSettings) -> None:
             return await call_next(request)
         query_token = request.query_params.get(TOKEN_QUERY)
         if query_token is not None and secrets.compare_digest(query_token, settings.token):
-            return _store_token_and_redirect(request, settings.token)
-        cookie = request.cookies.get(token_cookie(request.url.port), "")
+            return _store_token_and_redirect(request, settings.token, token_cookie(settings.port))
+        cookie = request.cookies.get(token_cookie(settings.port), "")
         if request.url.path.startswith(API_PATH_PREFIX) and not secrets.compare_digest(cookie, settings.token):
             return JSONResponse({"detail": INVALID_TOKEN_DETAIL, "code": INVALID_TOKEN_CODE}, status_code=status.HTTP_403_FORBIDDEN)
         return await call_next(request)
 
 
-def _store_token_and_redirect(request: Request, token: str) -> Response:
+def _store_token_and_redirect(request: Request, token: str, cookie: str) -> Response:
     remaining = [(key, value) for key, value in request.query_params.multi_items() if key != TOKEN_QUERY]
     target = request.url.path + (f"?{urlencode(remaining)}" if remaining else "")
     response = RedirectResponse(target, status_code=status.HTTP_303_SEE_OTHER)
-    response.set_cookie(token_cookie(request.url.port), token, httponly=True, samesite="strict", path="/")
+    response.set_cookie(cookie, token, httponly=True, samesite="strict", path="/")
     return response

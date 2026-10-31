@@ -34,3 +34,4 @@ class AppSettings:
     identity_dir: Path | None = None
     token: str | None = None
     allowed_hosts: frozenset[str] = field(default_factory=frozenset)
+    port: int | None = None
