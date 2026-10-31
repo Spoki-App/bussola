@@ -6,7 +6,8 @@ import signal
 import subprocess
 import tempfile
 import threading
-from typing import Any
+import time
+from typing import IO, Any
 
 from bussola.ai.base import MAX_ERROR_LENGTH, AiNotConfiguredError, AiOutputError, AiProviderError, AiRequest, Cancellation, json_object, run_cancellable
 from bussola.ai.config import PROVIDER_LABELS, ProviderName
@@ -14,8 +15,8 @@ from bussola.ai.config import PROVIDER_LABELS, ProviderName
 CLAUDE = "claude"
 CLAUDE_ENV = {"NO_COLOR": "1"}
 PRIVATE_ENV_PREFIX = "BUSSOLA_"
-EXIT_POLL_SECONDS = 0.1
 PIPE_GRACE_SECONDS = 0.5
+EXIT_POLL_SECONDS = 0.05
 
 
 def find_claude() -> str:
@@ -85,15 +86,11 @@ class ClaudeCodeProvider:
                 )
             except OSError as error:
                 raise AiProviderError(f"Cannot run claude: {error}") from error
-            finished = threading.Event()
-            threading.Thread(target=_stop_leftovers, args=(process, finished), daemon=True).start()
+            session = _ClaudeSession(process)
             try:
-                stdout, stderr = run_cancellable(lambda: process.communicate(prompt), cancellation, self._timeout)
+                return run_cancellable(lambda: session.exchange(prompt), cancellation, self._timeout)
             finally:
-                finished.set()
-                _kill_group(process)
-                process.wait()
-        return process.returncode, stdout, stderr
+                session.finish()
 
 
 def _claude_environment() -> dict[str, str]:
@@ -101,11 +98,66 @@ def _claude_environment() -> dict[str, str]:
     return {**inherited, **CLAUDE_ENV}
 
 
-def _stop_leftovers(process: subprocess.Popen[str], finished: threading.Event) -> None:
-    while process.poll() is None and not finished.is_set():
-        finished.wait(EXIT_POLL_SECONDS)
-    if not finished.wait(PIPE_GRACE_SECONDS):
-        _kill_group(process)
+class _ClaudeSession:
+    def __init__(self, process: subprocess.Popen[str]) -> None:
+        self._process = process
+        self._lock = threading.Lock()
+
+    def exchange(self, prompt: str) -> tuple[int, str, str]:
+        output: dict[str, str] = {}
+        readers = [
+            threading.Thread(target=_read_into, args=(stream, output, name), daemon=True)
+            for name, stream in (("stdout", self._process.stdout), ("stderr", self._process.stderr))
+        ]
+        for reader in readers:
+            reader.start()
+        self._send(prompt)
+        self._wait_for_exit()
+        self._stop_group()
+        returncode = self._reap()
+        for reader in readers:
+            reader.join(PIPE_GRACE_SECONDS)
+        if any(reader.is_alive() for reader in readers):
+            _kill_group(self._process)
+            for reader in readers:
+                reader.join()
+        return returncode, output.get("stdout", ""), output.get("stderr", "")
+
+    def finish(self) -> None:
+        self._stop_group()
+        self._reap()
+
+    def _send(self, prompt: str) -> None:
+        stdin = self._process.stdin
+        if stdin is not None:
+            with contextlib.suppress(BrokenPipeError, ValueError):
+                stdin.write(prompt)
+                stdin.close()
+
+    def _wait_for_exit(self) -> None:
+        if hasattr(os, "waitid"):
+            with contextlib.suppress(ChildProcessError):
+                os.waitid(os.P_PID, self._process.pid, os.WEXITED | os.WNOWAIT)
+            return
+        while True:
+            with self._lock:
+                if self._process.poll() is not None:
+                    return
+            time.sleep(EXIT_POLL_SECONDS)
+
+    def _stop_group(self) -> None:
+        with self._lock:
+            if self._process.returncode is None:
+                _kill_group(self._process)
+
+    def _reap(self) -> int:
+        with self._lock:
+            return self._process.wait()
+
+
+def _read_into(stream: IO[str] | None, output: dict[str, str], name: str) -> None:
+    if stream is not None:
+        output[name] = stream.read()
 
 
 def _kill_group(process: subprocess.Popen[str]) -> None:

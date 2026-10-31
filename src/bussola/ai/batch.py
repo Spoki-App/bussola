@@ -1,7 +1,16 @@
 from collections.abc import Callable, Hashable, Sequence
 from dataclasses import dataclass, field
 
-from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiRejectedError, AiTargetChangedError, AiTimeoutError, AiUnreachableError, Cancellation
+from bussola.ai.base import (
+    AiCancelledError,
+    AiError,
+    AiNotConfiguredError,
+    AiRejectedError,
+    AiTargetChangedError,
+    AiTimeoutError,
+    AiUnreachableError,
+    Cancellation,
+)
 
 TIMEOUTS_IN_A_ROW_TO_STOP = 2
 STOPPING_ERRORS = (AiNotConfiguredError, AiTargetChangedError, AiUnreachableError, AiRejectedError)
@@ -43,7 +52,7 @@ def run_batch[K: Hashable, T](
             outcome.errors[item] = str(error) or type(error).__name__
             failed += 1
             timeouts_in_a_row = timeouts_in_a_row + 1 if isinstance(error, AiTimeoutError) else 0
-            if isinstance(error, STOPPING_ERRORS) or timeouts_in_a_row >= TIMEOUTS_IN_A_ROW_TO_STOP:
+            if not isinstance(error, AiError) or isinstance(error, STOPPING_ERRORS) or timeouts_in_a_row >= TIMEOUTS_IN_A_ROW_TO_STOP:
                 outcome.stopped_by = outcome.errors[item]
         else:
             timeouts_in_a_row = 0

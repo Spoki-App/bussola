@@ -34,6 +34,7 @@ DEFAULT_MODELS = {ProviderName.ANTHROPIC: "claude-opus-5-5"}
 DEFAULT_ENDPOINTS = {ProviderName.ANTHROPIC: "https://api.anthropic.com"}
 DEFAULT_KEY_ENV = {ProviderName.ANTHROPIC: "ANTHROPIC_API_KEY"}
 REPOSITORY_PROVIDERS = frozenset({ProviderName.NONE, ProviderName.OPENAI_COMPATIBLE})
+ACCOUNT_PROVIDERS = frozenset({ProviderName.CLAUDE_CODE, ProviderName.ANTHROPIC})
 
 type ConfigSource = Literal["user", "repository"]
 
@@ -48,7 +49,7 @@ class RepoAiConfig(BaseModel):
     @field_validator("endpoint")
     @classmethod
     def _http_endpoint(cls, endpoint: str | None) -> str | None:
-        if endpoint is not None and not endpoint.startswith(HTTP_SCHEMES):
+        if endpoint is not None and not endpoint.lower().startswith(HTTP_SCHEMES):
             raise ValueError("endpoint must start with http:// or https://")
         return endpoint.rstrip("/") if endpoint else endpoint
 
@@ -129,6 +130,9 @@ def _merge(user: UserAiConfig, override: RepoAiConfig) -> AiSettings:
         raise AiNotConfiguredError(
             f"A repository cannot switch AI to {label}, which uses your own account; it can only choose an OpenAI-compatible endpoint or none"
         )
+    if provider in ACCOUNT_PROVIDERS and (override.model or override.endpoint):
+        label = PROVIDER_LABELS[provider]
+        raise AiNotConfiguredError(f"A repository cannot change the model or endpoint of {label}, which uses your own account")
     base = user if own_provider else UserAiConfig(provider=provider)
     base_endpoint = base.endpoint or DEFAULT_ENDPOINTS.get(provider)
     endpoint = None if provider == ProviderName.CLAUDE_CODE else override.endpoint or base_endpoint

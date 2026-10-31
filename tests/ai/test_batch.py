@@ -28,7 +28,7 @@ def test_a_batch_reports_progress_and_keeps_errors_per_item() -> None:
     assert progress == [BatchProgress(1, 0, 3), BatchProgress(2, 1, 3), BatchProgress(3, 1, 3)]
 
 
-def test_an_unexpected_error_is_recorded_for_its_item_and_the_batch_goes_on() -> None:
+def test_an_unexpected_error_stops_the_batch_and_keeps_earlier_results() -> None:
     def work(item: int) -> int:
         if item == 2:
             raise KeyError("missing")
@@ -36,8 +36,9 @@ def test_an_unexpected_error_is_recorded_for_its_item_and_the_batch_goes_on() ->
 
     outcome = run_batch([1, 2, 3], work, Cancellation())
 
-    assert outcome.results == {1: 1, 3: 3}
+    assert outcome.results == {1: 1}
     assert outcome.errors == {2: "'missing'"}
+    assert outcome.stopped_by == "'missing'"
     assert not outcome.cancelled
 
 

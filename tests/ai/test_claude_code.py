@@ -151,6 +151,7 @@ def test_processes_left_behind_by_the_cli_do_not_hold_up_its_answer(fake_claude:
     assert subprocess.run(["ps", "-o", "stat=", "-p", child_pid], capture_output=True, text=True, check=False).stdout.strip() in {"", "Z"}
 
 
+@pytest.mark.skipif(not hasattr(os, "waitid"), reason="needs os.waitid to wait for claude without reaping it")
 def test_a_detached_process_left_by_the_cli_is_stopped(fake_claude: FakeClaude, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     child_pid_file = tmp_path / "detached.pid"
     monkeypatch.setenv("FAKE_CLAUDE_DETACHED_CHILD_PID", str(child_pid_file))

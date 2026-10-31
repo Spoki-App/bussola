@@ -21,7 +21,7 @@ def build_provider(settings: AiSettings) -> AiProvider:
 
 def _required(value: str | None, name: str) -> str:
     if not value:
-        raise AiNotConfiguredError(f"Set {name} in the [ai] section of the configuration")
+        raise AiNotConfiguredError(f"Set {name} in the [ai] section of your configuration or of the repository's .bussola.toml")
     return value
 
 

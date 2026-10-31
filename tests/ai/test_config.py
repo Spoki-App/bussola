@@ -61,12 +61,19 @@ def test_an_invalid_user_configuration_is_reported(tmp_path: Path, content: str,
     assert detail in str(raised.value)
 
 
-def test_the_repository_overrides_the_model_of_the_same_provider() -> None:
-    user = UserAiConfig(provider=ProviderName.ANTHROPIC, model="claude-opus-5-5", api_key_env="WORK_KEY")
+def test_the_repository_overrides_the_model_of_an_openai_compatible_endpoint() -> None:
+    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="qwen2.5-coder", endpoint="http://localhost:11434/v1", api_key_env="LOCAL_KEY")
 
-    settings = resolve_ai_settings(user, RepoAiConfig(model="claude-haiku-5-5"))
+    settings = resolve_ai_settings(user, RepoAiConfig(model="llama3"))
 
-    assert settings == AiSettings(ProviderName.ANTHROPIC, "claude-haiku-5-5", "https://api.anthropic.com", api_key_env="WORK_KEY", source="repository")
+    assert settings == AiSettings(ProviderName.OPENAI_COMPATIBLE, "llama3", "http://localhost:11434/v1", api_key_env="LOCAL_KEY", source="repository")
+
+
+@pytest.mark.parametrize("provider", [ProviderName.ANTHROPIC, ProviderName.CLAUDE_CODE])
+@pytest.mark.parametrize("override", [RepoAiConfig(model="claude-fable-5-1"), RepoAiConfig(endpoint="https://proxy.example.com")])
+def test_a_repository_cannot_change_the_model_or_endpoint_of_your_own_account(provider: ProviderName, override: RepoAiConfig) -> None:
+    with pytest.raises(AiNotConfiguredError, match="cannot change the model or endpoint"):
+        resolve_ai_settings(UserAiConfig(provider=provider), override)
 
 
 def test_a_repository_switching_provider_does_not_inherit_the_user_model() -> None:
@@ -95,7 +102,7 @@ def test_an_openai_compatible_key_is_sent_only_when_its_variable_is_named() -> N
 def test_claude_code_has_no_endpoint_even_when_one_is_set() -> None:
     user = UserAiConfig(provider=ProviderName.CLAUDE_CODE, endpoint="https://ignored.example.com")
 
-    settings = resolve_ai_settings(user, RepoAiConfig(endpoint="https://collector.example.com"))
+    settings = resolve_ai_settings(user)
 
     assert settings.endpoint is None
     assert settings.target == "claude-code||"
@@ -121,13 +128,13 @@ def test_no_key_is_sent_to_an_endpoint_set_by_the_repository() -> None:
 
 def test_the_repository_override_is_read_from_bussola_toml(tmp_path: Path) -> None:
     user = tmp_path / "config.toml"
-    user.write_text('[ai]\nprovider = "anthropic"\n')
+    user.write_text('[ai]\nprovider = "openai-compatible"\nendpoint = "http://localhost:11434/v1"\nmodel = "qwen2.5-coder"\n')
     repo = tmp_path / "repo"
     repo.mkdir()
-    (repo / ".bussola.toml").write_text('base_branch = "develop"\n\n[ai]\nmodel = "claude-sonnet-5-5"\n')
+    (repo / ".bussola.toml").write_text('base_branch = "develop"\n\n[ai]\nmodel = "llama3"\n')
 
-    assert load_ai_settings(user, repo).model == "claude-sonnet-5-5"
-    assert load_ai_settings(user).model == "claude-opus-5-5"
+    assert load_ai_settings(user, repo).model == "llama3"
+    assert load_ai_settings(user).model == "qwen2.5-coder"
 
 
 def test_secrets_are_not_accepted_in_the_repository_configuration(tmp_path: Path) -> None:
@@ -158,10 +165,12 @@ def test_the_configuration_directory_can_be_moved(tmp_path: Path, monkeypatch: p
     assert default_config_file() == tmp_path / "config.toml"
 
 
-def test_a_repository_naming_the_default_endpoint_keeps_the_key() -> None:
-    settings = resolve_ai_settings(UserAiConfig(provider=ProviderName.ANTHROPIC), RepoAiConfig(endpoint="https://api.anthropic.com"))
+def test_a_repository_naming_your_own_endpoint_keeps_the_key() -> None:
+    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="gpt", endpoint="https://models.example.com/v1", api_key_env="MODELS_KEY")
 
-    assert settings.api_key_env == "ANTHROPIC_API_KEY"
+    settings = resolve_ai_settings(user, RepoAiConfig(endpoint="https://models.example.com/v1/"))
+
+    assert settings.api_key_env == "MODELS_KEY"
 
 
 def test_a_repository_switching_provider_gets_no_key() -> None:
@@ -191,7 +200,6 @@ def test_max_tokens_is_a_user_only_cap() -> None:
 def test_a_repository_that_changes_nothing_is_not_named_as_the_source() -> None:
     user = UserAiConfig(provider=ProviderName.CLAUDE_CODE)
 
-    assert resolve_ai_settings(user, RepoAiConfig(endpoint="http://ignored.example.com")).source == "user"
     assert resolve_ai_settings(user, RepoAiConfig(provider=ProviderName.CLAUDE_CODE)).source == "user"
 
 
@@ -200,7 +208,7 @@ def test_a_repository_switching_provider_does_not_inherit_max_tokens() -> None:
     local = RepoAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="small", endpoint="http://localhost:11434/v1")
 
     assert resolve_ai_settings(user, local).max_tokens is None
-    assert resolve_ai_settings(user, RepoAiConfig(model="claude-sonnet-5-5")).max_tokens == 512
+    assert resolve_ai_settings(user, RepoAiConfig(provider=ProviderName.ANTHROPIC)).max_tokens == 512
 
 
 def test_a_secret_written_in_the_config_is_not_repeated_in_the_error(tmp_path: Path) -> None:
@@ -222,3 +230,7 @@ def test_an_unreadable_configuration_directory_is_reported(tmp_path: Path, monke
 
     with pytest.raises(AiNotConfiguredError, match="Permission denied"):
         load_user_config(tmp_path / "config.toml")
+
+
+def test_the_endpoint_scheme_is_not_case_sensitive() -> None:
+    assert RepoAiConfig(endpoint="HTTP://localhost:11434/v1").endpoint == "HTTP://localhost:11434/v1"
