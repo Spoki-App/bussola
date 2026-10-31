@@ -156,17 +156,19 @@ Every AI feature goes through one interface, `AiProvider.complete(request, cance
 
 | Provider | Call | Structured output |
 |---|---|---|
-| `claude-code` | `claude -p --output-format json --no-session-persistence --tools "" --system-prompt ... --json-schema ...`, prompt on stdin, in an empty temporary folder | `structured_output` of the result, or its `result` text |
+| `claude-code` | `claude -p --output-format json --no-session-persistence --safe-mode --strict-mcp-config --tools "" --system-prompt ... --json-schema ...`, prompt on stdin, in an empty temporary folder and its own process group | `structured_output` of the result, or its `result` text |
 | `anthropic` | `POST {endpoint}/v1/messages` with `x-api-key` | `output_config.format` with the JSON schema |
-| `openai-compatible` | `POST {endpoint}/chat/completions` with an optional `Authorization: Bearer` key | `response_format` of type `json_schema` |
+| `openai-compatible` | `POST {endpoint}/chat/completions` with an optional `Authorization: Bearer` key and `max_completion_tokens` | `response_format` of type `json_schema`, strict |
 
-`AiRunner.run(task, prompt, cancellation, content_hash)` builds the request from an `AiTask` (name, prompt version, system prompt and a Pydantic output model). Every object in the schema gets `additionalProperties: false`. The answer, with an optional code fence removed, is validated against the model; an answer that is not JSON or does not match raises `AiOutputError` naming the first fields that failed. Each call runs in a worker thread and is abandoned on timeout (`timeout` seconds from the configuration) or cancellation, and the `claude` process is killed. `run_batch` runs a task over many items in order, reports progress after each item, records per-item errors without stopping, and on cancel stops and keeps the results already produced.
+`AiRunner.run(task, prompt, cancellation, content_hash)` builds the request from an `AiTask` (name, prompt version, system prompt and a Pydantic output model). The schema is made portable across providers: objects without a value schema get `additionalProperties: false`, every property is listed in `required`, and keywords that structured outputs reject (`minimum`, `maxLength`, `minItems`, `default` and similar) are left out. They still apply when the answer is validated. The answer, with an optional code fence removed, is validated against the model; an answer that is not JSON or does not match raises `AiOutputError` naming the first fields that failed. Each call runs in a worker thread and is abandoned on timeout (`timeout` seconds from the configuration) or cancellation, and the `claude` process group is killed. Transport failures (dropped connections, unreadable answers) become `AiProviderError`, so a batch records them per item. `run_batch` runs a task over many items in order, reports progress after each item, records per-item errors without stopping, and on cancel stops and keeps the results already produced.
 
-Results are cached in `ai_results`, keyed by task, prompt version, provider, model and the content hash given by the caller (the hash of what was sent). Changing the prompt, the model or the code therefore asks again; nothing else expires.
+Results are cached in `ai_results`, keyed by task, prompt version, provider, model, endpoint and the content hash given by the caller (the hash of what was sent). Changing the prompt, the model, the endpoint or the code therefore asks again; nothing else expires.
 
 ### Configuration
 
 The user configuration (`config.toml`, `[ai]`) sets `provider`, `model`, `endpoint`, `timeout` and `api_key_env`. `.bussola.toml` may set `provider`, `model` and `endpoint`; anything else in its `[ai]` section is rejected. The two are merged field by field when the repository keeps the user's provider. When it picks another provider, only the repository's fields and the provider defaults apply. `provider = "none"` turns AI off.
+
+`.bussola.toml` keeps its `[ai]` section as raw data and it is validated only when AI settings are loaded, so a mistake there turns AI off for the repository with the reason shown in Settings, and reviews keep working.
 
 Keys are read from the environment at each call: `ANTHROPIC_API_KEY` for `anthropic`, `OPENAI_API_KEY` for `openai-compatible`, or the variable named by `api_key_env`. No key is sent to an endpoint that only `.bussola.toml` names, so a cloned repository cannot redirect a key.
 

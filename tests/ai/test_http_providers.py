@@ -113,7 +113,7 @@ def test_an_openai_compatible_endpoint_gets_a_json_schema_response_format(stub: 
     assert "authorization" not in request["headers"]
     assert request["json"] == {
         "model": "qwen2.5-coder",
-        "max_tokens": 512,
+        "max_completion_tokens": 512,
         "messages": [{"role": "system", "content": "Rate the change."}, {"role": "user", "content": "def pay(): ..."}],
         "response_format": {"type": "json_schema", "json_schema": {"name": "rate", "schema": {"type": "object"}, "strict": True}},
     }
@@ -140,6 +140,48 @@ def test_an_unusable_openai_compatible_answer_is_an_error(stub: StubServer, body
 
     with pytest.raises(AiOutputError, match=message):
         OpenAiCompatibleProvider("gpt", stub.url, None, 5.0).complete(REQUEST, Cancellation())
+
+
+class DroppingHandler(BaseHTTPRequestHandler):
+    def do_POST(self) -> None:
+        self.rfile.read(int(self.headers["Content-Length"]))
+        self.connection.close()
+
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+        return
+
+
+def test_a_connection_dropped_before_the_answer_is_a_provider_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1")
+    monkeypatch.setenv("no_proxy", "127.0.0.1")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), DroppingHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pytest.raises(AiProviderError, match=r"The connection to .* failed"):
+            OpenAiCompatibleProvider("gpt", f"http://127.0.0.1:{server.server_address[1]}", None, 5.0).complete(REQUEST, Cancellation())
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_an_answer_that_is_not_utf8_is_a_provider_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Response:
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return
+
+        def read(self) -> bytes:
+            return b"\xff\xfe{"
+
+    def open_response(*_args: object, **_kwargs: object) -> Response:
+        return Response()
+
+    monkeypatch.setattr(urllib.request, "urlopen", open_response)
+
+    with pytest.raises(AiProviderError, match="did not answer with JSON"):
+        OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 5.0).complete(REQUEST, Cancellation())
 
 
 def test_an_unreachable_endpoint_is_reported() -> None:

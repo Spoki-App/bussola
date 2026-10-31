@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from bussola.ai.base import AiProviderError
+from bussola.ai.runner import DEFAULT_MAX_TOKENS
 from bussola.app import create_app
 from bussola.config import AppSettings
 from tests.ai.fakes import FakeProvider, fake_factory
@@ -90,6 +91,34 @@ def test_the_repository_status_applies_the_bussola_toml_override(git_repo: GitFi
     assert api.get("/api/ai").json()["configured"] is True
 
 
+def test_an_invalid_ai_section_in_a_repository_does_not_break_its_reviews(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
+    git_repo.commit({"app.py": "def total():\n    return 0\n"}, "base")
+    git_repo.git("checkout", "-q", "-b", "feature")
+    git_repo.commit({".bussola.toml": '[ai]\nprovider = "ollama"\n', "app.py": "def total():\n    return 1\n"}, "change")
+    git_repo.git("checkout", "-q", "main")
+    git_repo.write({".bussola.toml": '[ai]\nprovider = "ollama"\n'})
+    api = client(data_dir, config_file)
+    repo = api.post("/api/repos", json={"path": str(git_repo.root)}).json()
+
+    review = api.post(f"/api/repos/{repo['id']}/reviews", json={"head_ref": "feature", "base_ref": "main"})
+    status = api.get(f"/api/repos/{repo['id']}/ai").json()
+
+    assert review.status_code == 201
+    assert api.get(f"/api/repos/{repo['id']}/refs").status_code == 200
+    assert status["configured"] is False
+    assert "Invalid configuration" in status["problem"]
+
+
+def test_a_config_file_that_is_not_utf8_is_reported(data_dir: Path, config_file: Path) -> None:
+    config_file.parent.mkdir(parents=True)
+    config_file.write_bytes(b'[ai]\nprovider = "anthropic"\nmodel = "caf\xe9"\n')
+
+    status = client(data_dir, config_file).get("/api/ai").json()
+
+    assert status["configured"] is False
+    assert "Invalid configuration" in status["problem"]
+
+
 def test_test_connection_asks_the_provider_for_a_tiny_structured_answer(data_dir: Path, config_file: Path) -> None:
     write(config_file, ANTHROPIC)
     provider = FakeProvider({"ok": True})
@@ -100,6 +129,7 @@ def test_test_connection_asks_the_provider_for_a_tiny_structured_answer(data_dir
     assert result["message"] == "Fake provider (claude-opus-5-5) answered"
     assert len(provider.requests) == 1
     assert provider.requests[0].name == "connection_check"
+    assert provider.requests[0].max_tokens == DEFAULT_MAX_TOKENS
 
 
 def test_test_connection_reports_a_failure(data_dir: Path, config_file: Path) -> None:

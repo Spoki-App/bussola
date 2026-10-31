@@ -46,6 +46,7 @@ class AiProvider(Protocol):
     name: str
     label: str
     model: str | None
+    endpoint: str | None
 
     def complete(self, request: AiRequest, cancellation: "Cancellation") -> str: ...
 

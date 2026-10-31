@@ -1,6 +1,8 @@
+import contextlib
 import json
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
 from typing import Any
@@ -22,6 +24,7 @@ def find_claude() -> str:
 class ClaudeCodeProvider:
     name: str = ProviderName.CLAUDE_CODE
     label = PROVIDER_LABELS[ProviderName.CLAUDE_CODE]
+    endpoint: str | None = None
 
     def __init__(self, executable: str, model: str | None, timeout: float) -> None:
         self.model = model
@@ -45,29 +48,49 @@ class ClaudeCodeProvider:
         return result
 
     def _arguments(self, request: AiRequest) -> list[str]:
-        arguments = ["-p", "--output-format", "json", "--no-session-persistence", "--tools", "", "--system-prompt", request.system]
+        arguments = [
+            "-p",
+            "--output-format",
+            "json",
+            "--no-session-persistence",
+            "--safe-mode",
+            "--strict-mcp-config",
+            "--tools",
+            "",
+            "--system-prompt",
+            request.system,
+        ]
         arguments += ["--json-schema", json.dumps(request.schema)]
         return [*arguments, "--model", self.model] if self.model else arguments
 
     def _run(self, command: list[str], prompt: str, cancellation: Cancellation) -> tuple[int, str, str]:
         with tempfile.TemporaryDirectory(prefix="bussola-ai-") as workdir:
-            process = subprocess.Popen(
-                command,
-                cwd=workdir,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding="utf-8",
-                env={**os.environ, **CLAUDE_ENV},
-            )
+            try:
+                process = subprocess.Popen(
+                    command,
+                    cwd=workdir,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    env={**os.environ, **CLAUDE_ENV},
+                    start_new_session=True,
+                )
+            except OSError as error:
+                raise AiProviderError(f"Cannot run claude: {error}") from error
             try:
                 stdout, stderr = run_cancellable(lambda: process.communicate(prompt), cancellation, self._timeout)
             finally:
-                if process.poll() is None:
-                    process.kill()
-                    process.wait()
+                _kill_group(process)
         return process.returncode, stdout, stderr
+
+
+def _kill_group(process: subprocess.Popen[str]) -> None:
+    with contextlib.suppress(OSError):
+        os.killpg(process.pid, signal.SIGKILL)
+    process.wait()
 
 
 def _envelope(stdout: str) -> dict[str, Any] | None:

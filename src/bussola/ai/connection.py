@@ -19,7 +19,6 @@ CONNECTION_CHECK = AiTask(
     version=1,
     system="You check that bussola can reach a language model. Answer only with JSON that matches the given schema.",
     output=ConnectionCheck,
-    max_tokens=1024,
 )
 CONNECTION_PROMPT = 'Answer with {"ok": true}.'
 

@@ -235,6 +235,7 @@ class AiResult(Base):
     prompt_version: Mapped[int] = mapped_column(primary_key=True)
     provider: Mapped[str] = mapped_column(primary_key=True)
     model: Mapped[str] = mapped_column(primary_key=True)
+    endpoint: Mapped[str] = mapped_column(primary_key=True)
     content_hash: Mapped[str] = mapped_column(primary_key=True)
     result: Mapped[dict[str, Any]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)

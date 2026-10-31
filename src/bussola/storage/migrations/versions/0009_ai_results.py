@@ -16,10 +16,11 @@ def upgrade() -> None:
         sa.Column("prompt_version", sa.Integer(), nullable=False),
         sa.Column("provider", sa.Text(), nullable=False),
         sa.Column("model", sa.Text(), nullable=False),
+        sa.Column("endpoint", sa.Text(), nullable=False),
         sa.Column("content_hash", sa.Text(), nullable=False),
         sa.Column("result", sa.JSON(), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
-        sa.PrimaryKeyConstraint("task", "prompt_version", "provider", "model", "content_hash"),
+        sa.PrimaryKeyConstraint("task", "prompt_version", "provider", "model", "endpoint", "content_hash"),
     )
 
 

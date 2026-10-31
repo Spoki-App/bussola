@@ -6,7 +6,25 @@ from pydantic import BaseModel, ValidationError
 
 from bussola.ai.base import AiOutputError, AiProvider, AiRequest, Cancellation
 
-DEFAULT_MAX_TOKENS = 4096
+DEFAULT_MAX_TOKENS = 16000
+NAME_MAPS = frozenset({"properties", "$defs"})
+UNSUPPORTED_KEYWORDS = frozenset(
+    {
+        "default",
+        "exclusiveMaximum",
+        "exclusiveMinimum",
+        "maxItems",
+        "maxLength",
+        "maxProperties",
+        "maximum",
+        "minItems",
+        "minLength",
+        "minProperties",
+        "minimum",
+        "multipleOf",
+        "uniqueItems",
+    }
+)
 CODE_FENCE = re.compile(r"^```(?:json)?\s*(?P<body>.*?)\s*```$", re.DOTALL)
 REPORTED_ERRORS = 3
 
@@ -26,6 +44,7 @@ class AiCacheKey:
     prompt_version: int
     provider: str
     model: str
+    endpoint: str
     content_hash: str
 
 
@@ -53,7 +72,7 @@ class AiRunner:
     def _key(self, task: AiTask[Any], content_hash: str | None) -> AiCacheKey | None:
         if content_hash is None or self._cache is None:
             return None
-        return AiCacheKey(task.name, task.version, self.provider.name, self.provider.model or "", content_hash)
+        return AiCacheKey(task.name, task.version, self.provider.name, self.provider.model or "", self.provider.endpoint or "", content_hash)
 
     def _cached[T: BaseModel](self, task: AiTask[T], key: AiCacheKey | None) -> T | None:
         stored = self._cache.get(key) if key is not None and self._cache is not None else None
@@ -66,7 +85,7 @@ class AiRunner:
 
 
 def output_schema(output: type[BaseModel]) -> dict[str, Any]:
-    return _closed(output.model_json_schema())
+    return _portable(output.model_json_schema())
 
 
 def parse_output[T: BaseModel](text: str, output: type[T]) -> T:
@@ -78,15 +97,22 @@ def parse_output[T: BaseModel](text: str, output: type[T]) -> T:
         raise AiOutputError(f"The model's answer does not match the expected format: {_summary(error)}") from error
 
 
-def _closed(schema: Any) -> Any:
+def _portable(schema: Any) -> Any:
     if isinstance(schema, list):
-        return [_closed(item) for item in cast(list[Any], schema)]
+        return [_portable(item) for item in cast(list[Any], schema)]
     if not isinstance(schema, dict):
         return schema
-    closed: dict[str, Any] = {key: _closed(value) for key, value in cast(dict[str, Any], schema).items()}
-    if closed.get("type") == "object":
-        closed["additionalProperties"] = False
-    return closed
+    node: dict[str, Any] = {}
+    for key, value in cast(dict[str, Any], schema).items():
+        if key in NAME_MAPS:
+            node[key] = {name: _portable(item) for name, item in cast(dict[str, Any], value).items()}
+        elif key not in UNSUPPORTED_KEYWORDS:
+            node[key] = _portable(value)
+    if node.get("type") == "object" and "additionalProperties" not in node:
+        node["additionalProperties"] = False
+    if "properties" in node:
+        node["required"] = list(node["properties"])
+    return node
 
 
 def _summary(error: ValidationError) -> str:

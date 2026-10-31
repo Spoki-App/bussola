@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 import threading
 from pathlib import Path
 from typing import Any
@@ -54,6 +55,8 @@ def test_the_cli_runs_without_tools_with_the_schema_and_the_prompt_on_stdin(fake
         "--output-format",
         "json",
         "--no-session-persistence",
+        "--safe-mode",
+        "--strict-mcp-config",
         "--tools",
         "",
         "--system-prompt",
@@ -104,6 +107,28 @@ def test_a_running_cli_can_be_cancelled(fake_claude: FakeClaude) -> None:
 
     with pytest.raises(AiCancelledError):
         provider().complete(REQUEST, cancellation)
+
+
+def test_cancelling_also_stops_the_processes_the_cli_started(fake_claude: FakeClaude, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    child_pid_file = tmp_path / "child.pid"
+    monkeypatch.setenv("FAKE_CLAUDE_CHILD_PID", str(child_pid_file))
+    fake_claude.answer({"result": "{}"}, sleep=30)
+    cancellation = Cancellation()
+    threading.Timer(0.5, cancellation.cancel).start()
+
+    with pytest.raises(AiCancelledError):
+        provider().complete(REQUEST, cancellation)
+
+    child_pid = child_pid_file.read_text()
+    assert subprocess.run(["ps", "-o", "stat=", "-p", child_pid], capture_output=True, text=True, check=False).stdout.strip() in {"", "Z"}
+
+
+def test_a_claude_command_that_cannot_run_is_reported(tmp_path: Path) -> None:
+    broken = tmp_path / "claude"
+    broken.write_text("not a program")
+
+    with pytest.raises(AiProviderError, match="Cannot run claude"):
+        ClaudeCodeProvider(str(broken), None, 5.0).complete(REQUEST, Cancellation())
 
 
 def test_the_provider_needs_the_claude_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

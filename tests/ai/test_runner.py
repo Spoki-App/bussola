@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from bussola.ai.base import AiCancelledError, AiOutputError, AiTimeoutError, Cancellation, run_cancellable
 from bussola.ai.runner import AiCacheKey, AiRunner, AiTask, output_schema, parse_output
@@ -67,6 +67,39 @@ def test_nested_objects_in_the_schema_are_closed() -> None:
     assert schema["$defs"]["Finding"]["additionalProperties"] is False
 
 
+def test_constraints_providers_reject_are_left_out_and_checked_on_the_answer() -> None:
+    class Summary(BaseModel):
+        score: int = Field(ge=0, le=10)
+        title: str = Field(max_length=20)
+        tags: list[str] = Field(min_length=1)
+        notes: str | None = None
+
+    schema = output_schema(Summary)
+
+    assert schema["required"] == ["score", "title", "tags", "notes"]
+    assert "default" not in schema["properties"]["notes"]
+    assert schema["properties"]["score"] == {"title": "Score", "type": "integer"}
+    assert schema["properties"]["title"] == {"title": "Title", "type": "string"}
+    assert "minItems" not in schema["properties"]["tags"]
+    with pytest.raises(AiOutputError, match="score"):
+        parse_output('{"score": 11, "title": "x", "tags": ["a"], "notes": null}', Summary)
+
+
+def test_field_names_that_look_like_keywords_are_kept() -> None:
+    class Range(BaseModel):
+        minimum: int
+        default: str
+
+    assert output_schema(Range)["required"] == ["minimum", "default"]
+
+
+def test_a_mapping_field_keeps_its_value_schema() -> None:
+    class Counts(BaseModel):
+        counts: dict[str, int]
+
+    assert output_schema(Counts)["properties"]["counts"]["additionalProperties"] == {"type": "integer"}
+
+
 def test_results_are_cached_by_content_hash_prompt_version_and_model(tmp_path: Path) -> None:
     database = Database.open(tmp_path)
     provider = FakeProvider(GOOD, model="model-a")
@@ -88,7 +121,7 @@ def test_results_are_cached_by_content_hash_prompt_version_and_model(tmp_path: P
         session.commit()
 
     with database.session() as session:
-        stored = SqlAiCache(session).get(AiCacheKey("rate", 1, "fake", "model-a", "hash-1"))
+        stored = SqlAiCache(session).get(AiCacheKey("rate", 1, "fake", "model-a", "", "hash-1"))
     assert stored == GOOD
 
 
@@ -96,7 +129,7 @@ def test_an_unusable_cached_result_is_asked_again(tmp_path: Path) -> None:
     provider = FakeProvider(GOOD)
     with Database.open(tmp_path).session() as session:
         cache = SqlAiCache(session)
-        cache.put(AiCacheKey("rate", 1, "fake", "fake-model", "hash"), {"impact": "unknown"})
+        cache.put(AiCacheKey("rate", 1, "fake", "fake-model", "", "hash"), {"impact": "unknown"})
 
         rating = AiRunner(provider, cache).run(RATE, "code", Cancellation(), content_hash="hash")
 
@@ -139,3 +172,17 @@ def test_errors_of_the_work_are_raised_as_they_are() -> None:
 
     with pytest.raises(ValueError, match="boom"):
         run_cancellable(fail, Cancellation(), 1.0)
+
+
+def test_the_same_model_on_another_endpoint_is_asked_again(tmp_path: Path) -> None:
+    provider = FakeProvider(GOOD, model="qwen2.5-coder")
+    with Database.open(tmp_path).session() as session:
+        runner = AiRunner(provider, SqlAiCache(session))
+
+        provider.endpoint = "https://models.example.com/v1"
+        runner.run(RATE, "code", Cancellation(), content_hash="hash")
+        provider.endpoint = "http://localhost:11434/v1"
+        runner.run(RATE, "code", Cancellation(), content_hash="hash")
+        runner.run(RATE, "code", Cancellation(), content_hash="hash")
+
+    assert len(provider.requests) == 2

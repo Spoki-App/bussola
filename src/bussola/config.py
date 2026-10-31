@@ -1,10 +1,9 @@
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
-
-from bussola.ai.config import RepoAiConfig
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -20,7 +19,7 @@ class RepoConfig(BaseModel):
     base_branch: str | None = None
     file_level: tuple[str, ...] = DEFAULT_FILE_LEVEL
     ignore: tuple[str, ...] = ()
-    ai: RepoAiConfig | None = None
+    ai: Any = None
 
 
 def load_repo_config(root: Path) -> RepoConfig:

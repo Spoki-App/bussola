@@ -157,7 +157,7 @@ provider = "claude-code"
 model = "claude-opus-5-5"  # optional, the command's default otherwise
 ```
 
-bussola runs `claude -p` with JSON output, no tools and no saved session, in an empty temporary folder, so it cannot read or change your files.
+bussola runs `claude -p` with JSON output, no tools, no saved session, safe mode (no hooks, plugins, skills or MCP servers from your Claude Code setup) and an empty temporary folder, so it cannot read or change your files. It needs a version of Claude Code that has `--safe-mode`.
 
 **Anthropic API** reads the key from the `ANTHROPIC_API_KEY` environment variable:
 
@@ -167,7 +167,7 @@ provider = "anthropic"
 model = "claude-opus-5-5"  # the default
 ```
 
-**OpenAI-compatible endpoint** covers Ollama, LM Studio, vLLM and similar local servers, and hosted services with the same API. The key is optional and read from `OPENAI_API_KEY`:
+**OpenAI-compatible endpoint** covers Ollama, LM Studio, vLLM and similar local servers, and hosted services with the same API. The key is optional and read from `OPENAI_API_KEY`. The answer length is capped with `max_completion_tokens`; servers that do not know it ignore it:
 
 ```toml
 [ai]
@@ -188,7 +188,7 @@ A repository can override `provider`, `model` and `endpoint` in the `[ai]` secti
 - Code is sent only when you start an AI action, and only the code that action works on. The first time an action would send code to a provider, model and endpoint, bussola names them and waits for **Send code**; the choice is kept in that browser.
 - With Claude Code or the Anthropic API, the code goes to Anthropic under the terms of your account. With an OpenAI-compatible endpoint, it goes only to the address you configured, which stays on your machine for a local server.
 - Answers are checked against the format each action expects, and a clear error is shown when the model returns something unusable. Each request has a timeout and can be cancelled.
-- Results are cached in the local database by the content hash of what was sent, the prompt version and the model, so unchanged code is not sent again.
+- Results are cached in the local database by the content hash of what was sent, the prompt version, the model and the endpoint, so unchanged code is not sent again.
 
 ## Data
 

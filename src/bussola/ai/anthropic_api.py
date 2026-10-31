@@ -18,7 +18,7 @@ class AnthropicProvider:
 
     def __init__(self, model: str, endpoint: str, api_key: str, timeout: float) -> None:
         self.model: str | None = model
-        self._endpoint = endpoint
+        self.endpoint: str | None = endpoint
         self._api_key = api_key
         self._timeout = timeout
 
@@ -31,7 +31,7 @@ class AnthropicProvider:
             "output_config": {"format": {"type": "json_schema", "schema": request.schema}},
         }
         headers = {"x-api-key": self._api_key, "anthropic-version": API_VERSION}
-        response = post_json(f"{self._endpoint}{MESSAGES_PATH}", headers, payload, self._timeout, cancellation)
+        response = post_json(f"{self.endpoint}{MESSAGES_PATH}", headers, payload, self._timeout, cancellation)
         stop_message = STOP_MESSAGES.get(str(response.get("stop_reason")))
         if stop_message:
             raise AiOutputError(stop_message)
