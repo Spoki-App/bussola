@@ -263,6 +263,20 @@ def test_port_is_free_sees_a_server_listening_on_every_interface() -> None:
         assert not port_is_free("127.0.0.1", everywhere.getsockname()[1])
 
 
+def test_probe_and_open_survive_a_server_file_with_an_invalid_host(tmp_path: Path) -> None:
+    broken = ServerAddress("bad host\n", 8765, "broken")
+    publish_server(tmp_path, broken)
+
+    servers = FakeServers()
+
+    def probe(address: ServerAddress) -> Probe:
+        return probe_server(address) if address == broken else servers.probe(address)
+
+    assert probe_server(broken) == Probe.WRONG
+    Launcher(tmp_path, start=servers.start, probe=probe, open_browser=servers.open_browser, port_free=servers.port_free, timeout=0).open("bussola://")
+    assert broken not in published_servers(tmp_path)
+
+
 def test_probe_counts_a_connection_that_never_opens_as_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     def time_out(_connection: object) -> None:
         raise TimeoutError

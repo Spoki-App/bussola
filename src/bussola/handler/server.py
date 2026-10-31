@@ -122,12 +122,9 @@ class Probe(StrEnum):
 
 
 def probe_server(address: ServerAddress) -> Probe:
-    connection = http.client.HTTPConnection(address.host, address.port, timeout=HEALTH_TIMEOUT_SECONDS)
-    try:
-        connection.connect()
-    except OSError:
-        connection.close()
-        return Probe.CLOSED
+    connection = _connect(address)
+    if isinstance(connection, Probe):
+        return connection
     try:
         connection.request("GET", HEALTH_PATH, headers={"Cookie": f"{token_cookie(address.port)}={address.token}"})
         response = connection.getresponse()
@@ -138,6 +135,23 @@ def probe_server(address: ServerAddress) -> Probe:
         return Probe.WRONG
     finally:
         connection.close()
+    return _classify(status, body)
+
+
+def _connect(address: ServerAddress) -> http.client.HTTPConnection | Probe:
+    try:
+        connection = http.client.HTTPConnection(address.host, address.port, timeout=HEALTH_TIMEOUT_SECONDS)
+    except (ValueError, http.client.InvalidURL):
+        return Probe.WRONG
+    try:
+        connection.connect()
+    except OSError:
+        connection.close()
+        return Probe.CLOSED
+    return connection
+
+
+def _classify(status: int, body: bytes) -> Probe:
     if status == HTTPStatus.OK:
         return Probe.READY if _answer(body).app == APP_NAME else Probe.WRONG
     return Probe.OTHER_BUSSOLA if status == HTTPStatus.FORBIDDEN and _answer(body).code == INVALID_TOKEN_CODE else Probe.WRONG
