@@ -165,7 +165,7 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
           }}
         />
       )}
-      {hint && <ServerHintNote hint={hint} onDismiss={() => { setHint(null) }} />}
+      {hint && !popup && stack.length === 0 && <ServerHintNote hint={hint} onDismiss={() => { setHint(null) }} />}
     </>
   )
 

@@ -27,6 +27,17 @@ def server_command(spec: ServerSpec) -> list[str] | None:
     return None
 
 
+def _safe_members(tar: tarfile.TarFile, destination: Path) -> list[tarfile.TarInfo]:
+    safe: list[tarfile.TarInfo] = []
+    for member in tar.getmembers():
+        try:
+            tarfile.data_filter(member, str(destination))
+        except tarfile.FilterError:
+            continue
+        safe.append(member)
+    return safe
+
+
 @dataclass
 class _Slot:
     session: LanguageServerSession | None = None
@@ -42,6 +53,7 @@ class LanguageServers:
         self._checkout_lock = threading.Lock()
         self._slots: OrderedDict[SessionKey, _Slot] = OrderedDict()
         self._cleaned = False
+        self._closed = False
 
     def locate(self, repo: GitRepo, commit: str, spec: ServerSpec, ask: Callable[[LanguageServerSession], list[ServerLocation]]) -> list[ServerLocation]:
         session = self._session(repo, commit, spec)
@@ -57,6 +69,7 @@ class LanguageServers:
 
     def close(self) -> None:
         with self._lock:
+            self._closed = True
             slots = list(self._slots.values())
             self._slots.clear()
         for slot in slots:
@@ -70,6 +83,8 @@ class LanguageServers:
             return None
         key = (repo.root, commit, spec.family)
         with self._lock:
+            if self._closed:
+                return None
             slot = self._slots.get(key)
             if slot is not None:
                 self._slots.move_to_end(key)
@@ -81,10 +96,20 @@ class LanguageServers:
 
     def _open(self, slot: _Slot, repo: GitRepo, commit: str, spec: ServerSpec, command: list[str]) -> None:
         try:
-            slot.session = LanguageServerSession.open(command, self._prepare_checkout(repo, commit), spec)
+            session = None if self._is_closed() else LanguageServerSession.open(command, self._prepare_checkout(repo, commit), spec)
         except (LanguageServerError, GitError, OSError, tarfile.TarError):
-            slot.failed = True
+            session = None
+        if session is not None and self._is_closed():
+            session.close()
+            shutil.rmtree(self._checkouts, ignore_errors=True)
+            session = None
+        slot.session = session
+        slot.failed = session is None
         self._evict()
+
+    def _is_closed(self) -> bool:
+        with self._lock:
+            return self._closed
 
     def _evict(self) -> None:
         with self._lock:
@@ -116,7 +141,7 @@ class LanguageServers:
             try:
                 repo.archive(commit, archive)
                 with tarfile.open(archive) as tar:
-                    tar.extractall(staging, filter="data")
+                    tar.extractall(staging, members=_safe_members(tar, staging), filter="data")
                 staging.rename(target)
             finally:
                 archive.unlink(missing_ok=True)

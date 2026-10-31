@@ -55,15 +55,18 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
     setWasTodo(todo)
     setExpanded(todo)
   }
+  const [mode, setMode] = useState<DiffMode | undefined>(undefined)
   const [seenTarget, setSeenTarget] = useState<UnitTarget | undefined>(undefined)
   if (navigationTarget !== seenTarget) {
     setSeenTarget(navigationTarget)
     if (navigationTarget) {
       setExpanded(true)
     }
+    if (navigationTarget?.side === 'base') {
+      setMode('base')
+    }
   }
   const card = useRef<HTMLElement>(null)
-  const [mode, setMode] = useState<DiffMode | undefined>(undefined)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [anchor, setAnchor] = useState<string | null>(null)
   const diff = useUnitDiff(reviewId, unit, mode, expanded)

@@ -7,7 +7,7 @@ from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Any, Self, cast
-from urllib.parse import unquote, urlparse
+from urllib.parse import urlparse
 from urllib.request import url2pathname
 
 from bussola.navigation.specs import ServerSpec
@@ -208,7 +208,7 @@ class LanguageServerSession:
         parsed = urlparse(uri)
         if parsed.scheme != FILE_SCHEME:
             return None
-        resolved = Path(url2pathname(unquote(parsed.path))).resolve()
+        resolved = Path(url2pathname(parsed.path)).resolve()
         if not resolved.is_relative_to(self._root):
             return None
         return resolved.relative_to(self._root).as_posix()

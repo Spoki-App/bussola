@@ -9,6 +9,7 @@ from bussola.navigation.servers import LanguageServers, server_command
 from bussola.navigation.specs import SERVER_SPECS
 from tests.gitrepo import GitFixture
 from tests.navigation.conftest import LanguageServerPath
+from tests.navigation.test_index import ManualStarter
 
 PYTHON = SERVER_SPECS["python"]
 SOURCE = {"app/main.py": "from app.lib import helper\n\nhelper()\n", "app/lib.py": "def helper():\n    pass\n"}
@@ -124,3 +125,45 @@ def test_servers_start_without_network_downloads(servers: LanguageServerPath, po
     assert servers.environment()["GOPROXY"] == "off"
     assert initialize["params"]["initializationOptions"] == {}
     assert SERVER_SPECS["ecmascript"].initialization_options == {"disableAutomaticTypingAcquisition": True}
+
+
+def test_a_checkout_skips_links_that_point_outside_it(servers: LanguageServerPath, pool: LanguageServers, git_repo: GitFixture) -> None:
+    servers.install("pyright-langserver", definition=[{"path": "app/lib.py", "line": 0, "character": 4}])
+    git_repo.write(SOURCE)
+    (git_repo.root / "absolute").symlink_to("/etc/hosts")
+    (git_repo.root / "outside").symlink_to("../../elsewhere")
+    (git_repo.root / "inside").symlink_to("app/lib.py")
+    git_repo.git("add", "-A")
+    git_repo.git("commit", "-q", "-m", "links")
+    commit = git_repo.git("rev-parse", "HEAD")
+
+    found = pool.locate(git_repo.repo, commit, PYTHON, definitions(ServerLocation("app/main.py", 2, 0)))
+
+    checkout = pool.checkout(commit)
+    assert found == [ServerLocation("app/lib.py", 0, 4)]
+    assert sorted(path.name for path in checkout.iterdir()) == ["app", "inside"]
+
+
+def test_a_server_still_starting_when_the_pool_closes_is_not_left_running(servers: LanguageServerPath, git_repo: GitFixture, tmp_path: Path) -> None:
+    servers.install("pyright-langserver", definition=[{"path": "app/lib.py", "line": 0, "character": 4}])
+    commit = git_repo.commit(SOURCE)
+    starter = ManualStarter()
+    pool = LanguageServers(tmp_path / "data" / "checkouts", starter)
+
+    assert pool.locate(git_repo.repo, commit, PYTHON, definitions(ServerLocation("app/main.py", 2, 0))) == []
+    pool.close()
+    starter.run()
+
+    assert servers.methods() == []
+    assert not pool.checkout(commit).exists()
+    assert pool.locate(git_repo.repo, commit, PYTHON, definitions(ServerLocation("app/main.py", 2, 0))) == []
+    assert starter.tasks == []
+
+
+def test_locations_with_percent_signs_in_their_path_are_kept(servers: LanguageServerPath, pool: LanguageServers, git_repo: GitFixture) -> None:
+    servers.install("pyright-langserver", definition=[{"path": "app/rate%2541.py", "line": 0, "character": 4}])
+    commit = git_repo.commit({**SOURCE, "app/rate%41.py": "def helper():\n    pass\n"})
+
+    found = pool.locate(git_repo.repo, commit, PYTHON, definitions(ServerLocation("app/main.py", 2, 0)))
+
+    assert found == [ServerLocation("app/rate%41.py", 0, 4)]

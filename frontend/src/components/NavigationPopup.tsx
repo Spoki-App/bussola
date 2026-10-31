@@ -16,6 +16,7 @@ interface Props {
 }
 
 const POPUP_WIDTH = 560
+const POPUP_MAX_HEIGHT = 420
 const VIEWPORT_MARGIN = 8
 const CURSOR_GAP = 14
 const ENTRY_SELECTOR = 'button.navigation-entry'
@@ -105,13 +106,15 @@ export function NavigationPopup({ state, point, onChoose, onClose }: Props) {
   }
 
   const left = Math.max(VIEWPORT_MARGIN, Math.min(point.x, window.innerWidth - POPUP_WIDTH - VIEWPORT_MARGIN))
+  const fitsBelow = point.y + CURSOR_GAP + POPUP_MAX_HEIGHT + VIEWPORT_MARGIN <= window.innerHeight
+  const vertical = fitsBelow ? { top: point.y + CURSOR_GAP } : { top: 'auto', bottom: Math.max(VIEWPORT_MARGIN, window.innerHeight - point.y + CURSOR_GAP) }
   const title = heading(state)
 
   return (
     <dialog
       ref={ref}
       className="navigation-popup"
-      style={{ left, top: point.y + CURSOR_GAP }}
+      style={{ left, ...vertical }}
       aria-label={title}
       onClose={onClose}
       onKeyDown={onKeyDown}

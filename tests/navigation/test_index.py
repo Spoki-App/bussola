@@ -1,6 +1,9 @@
 from collections.abc import Callable
 
-from bussola.navigation.index import IndexCache, build_index
+import pytest
+
+from bussola.git import GitError
+from bussola.navigation.index import IndexCache, SymbolIndex, build_index
 from tests.gitrepo import GitFixture
 
 FILES = {
@@ -91,3 +94,32 @@ def test_a_new_commit_reuses_the_symbols_of_unchanged_files(git_repo: GitFixture
     assert second_index is not None
     assert second_index.files["shop/cart.py"].definitions is first_index.files["shop/cart.py"].definitions
     assert "shop/extra.py" in second_index.files
+
+
+def test_a_build_finished_first_by_a_concurrent_request_is_still_returned(git_repo: GitFixture) -> None:
+    commit = git_repo.commit(FILES)
+    seen: list[SymbolIndex | None] = []
+
+    def build_then_race(task: Callable[[], None]) -> None:
+        task()
+        seen.append(cache.get(git_repo.repo, commit, ()))
+
+    cache = IndexCache(build_then_race)
+    index = cache.get(git_repo.repo, commit, ())
+
+    assert index is not None
+    assert seen == [index]
+
+
+def test_a_failed_build_is_reported_to_every_caller_and_retried(git_repo: GitFixture) -> None:
+    commit = git_repo.commit(FILES)
+    starter = ManualStarter()
+    cache = IndexCache(starter)
+    cache.get(git_repo.repo, "0" * 40, ())
+    starter.run()
+
+    with pytest.raises(GitError):
+        cache.get(git_repo.repo, "0" * 40, ())
+    assert cache.get(git_repo.repo, "0" * 40, ()) is None
+    assert len(starter.tasks) == 1
+    assert cache.get(git_repo.repo, commit, ()) is None

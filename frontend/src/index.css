@@ -1211,7 +1211,7 @@ button.toggle[aria-pressed='true'] {
   right: auto;
   bottom: auto;
   width: min(560px, calc(100vw - 16px));
-  max-height: min(420px, calc(100vh - 32px));
+  max-height: min(420px, calc(100vh - 16px));
   margin: 0;
   padding: 12px;
   overflow-y: auto;

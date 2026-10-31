@@ -102,7 +102,8 @@ class IndexCache:
     def _finished(self, key: IndexKey, future: Future[SymbolIndex]) -> SymbolIndex | None:
         if not future.done():
             return None
-        del self._building[key]
+        if self._building.get(key) is future:
+            del self._building[key]
         index = future.result()
         self._ready[key] = index
         while len(self._ready) > self._capacity:

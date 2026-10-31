@@ -217,4 +217,27 @@ describe('useCodeNavigation', () => {
     await screen.findByLabelText('target')
     expect(screen.queryByRole('complementary', { name: 'Language server hint' })).not.toBeInTheDocument()
   })
+
+  it('keeps the install hint out from under the list until the list closes', async () => {
+    const hint = { family: 'go', language: 'Go', install: 'go install golang.org/x/tools/gopls@latest' }
+    serve(() => found([target('lib.go', 1, null), target('lib.go', 5, null)], { server_hint: hint }))
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'Definitions of price' })
+    expect(screen.queryByRole('complementary', { name: 'Language server hint' })).not.toBeInTheDocument()
+    ;(popup as HTMLDialogElement).close()
+
+    expect(await screen.findByRole('complementary', { name: 'Language server hint' })).toHaveTextContent('gopls')
+  })
+
+  it('opens the list above the pointer when there is no room below it', async () => {
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 300 })
+    serve(() => found([target('lib.py', 1, null), target('lib.py', 5, null)]))
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'Definitions of price' })
+    expect(popup.style.top).toBe('auto')
+    expect(popup.style.bottom).toBe('254px')
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 })
+  })
 })
