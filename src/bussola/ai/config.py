@@ -82,7 +82,6 @@ class AiSettings:
     api_key_env: str | None = None
     source: ConfigSource = "user"
     max_tokens: int | None = None
-    key_withheld: bool = False
 
     @property
     def configured(self) -> bool:
@@ -151,6 +150,8 @@ def _merge(user: UserAiConfig, override: RepoAiConfig) -> AiSettings:
     base_model = base.model or DEFAULT_MODELS.get(provider)
     model = override.model or base_model
     user_key = user.api_key_env or DEFAULT_KEY_ENV.get(provider)
+    if own_provider and user_key is not None and endpoint == base_endpoint and model != base_model:
+        raise AiNotConfiguredError("A repository cannot change the model of your own endpoint while it needs your API key")
     keeps_key = own_provider and endpoint == base_endpoint and model == base_model
     return AiSettings(
         provider=provider,
@@ -159,5 +160,4 @@ def _merge(user: UserAiConfig, override: RepoAiConfig) -> AiSettings:
         timeout=user.timeout,
         api_key_env=user_key if keeps_key else None,
         max_tokens=user.max_tokens if own_provider else None,
-        key_withheld=own_provider and user_key is not None and endpoint == base_endpoint and model != base_model,
     )

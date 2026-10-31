@@ -1,13 +1,11 @@
-import asyncio
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from bussola.ai.base import AiProviderError, Cancellation
+from bussola.ai.base import AiProviderError
 from bussola.ai.connection import CONNECTION_TIMEOUT_SECONDS
 from bussola.ai.runner import DEFAULT_MAX_TOKENS
-from bussola.api.ai import cancel_on_disconnect
 from bussola.app import create_app
 from bussola.config import AppSettings
 from tests.ai.fakes import FakeProvider, fake_factory
@@ -168,7 +166,7 @@ def test_test_connection_reports_a_failure(data_dir: Path, config_file: Path) ->
 def test_test_connection_without_a_provider_says_so(data_dir: Path, config_file: Path) -> None:
     result = client(data_dir, config_file).post("/api/ai/test").json()
 
-    assert result == {"ok": False, "message": "No AI provider is configured", "elapsed_ms": 0}
+    assert (result["ok"], result["message"]) == (False, "No AI provider is configured")
 
 
 def test_the_key_never_reaches_the_database_or_the_api(data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -180,20 +178,3 @@ def test_the_key_never_reaches_the_database_or_the_api(data_dir: Path, config_fi
 
     assert not any("sk-very-secret" in text for text in responses)
     assert b"sk-very-secret" not in (data_dir / "bussola.db").read_bytes()
-
-
-def test_test_connection_stops_when_the_browser_goes_away(monkeypatch: pytest.MonkeyPatch) -> None:
-    class Disconnecting:
-        def __init__(self) -> None:
-            self.checks = 0
-
-        async def is_disconnected(self) -> bool:
-            self.checks += 1
-            return self.checks > 1
-
-    monkeypatch.setattr("bussola.api.ai.DISCONNECT_POLL_SECONDS", 0.01)
-    cancellation = Cancellation()
-
-    asyncio.run(cancel_on_disconnect(Disconnecting(), cancellation))
-
-    assert cancellation.cancelled

@@ -1,10 +1,7 @@
-import asyncio
 from dataclasses import asdict, replace
 from pathlib import Path
-from typing import Protocol
 
 from fastapi import APIRouter, Request
-from fastapi.concurrency import run_in_threadpool
 
 from bussola.ai.base import AiError, AiProvider, Cancellation
 from bussola.ai.config import AiSettings
@@ -15,7 +12,6 @@ from bussola.api.schemas import AiStatusOut, AiTestOut
 from bussola.api.state import AppState, app_state
 
 router = APIRouter(tags=["ai"])
-DISCONNECT_POLL_SECONDS = 0.5
 
 
 @router.get("/ai")
@@ -29,30 +25,14 @@ def get_repo_ai(repo: RepoDep, request: Request) -> AiStatusOut:
 
 
 @router.post("/ai/test")
-async def test_ai(request: Request) -> AiTestOut:
+def test_ai(request: Request) -> AiTestOut:
     state = app_state(request)
-    cancellation = Cancellation()
 
     def connect() -> AiProvider:
         settings = load_ai_settings(state.settings.config_file)
         return state.ai_factory(replace(settings, timeout=min(settings.timeout, CONNECTION_TIMEOUT_SECONDS)))
 
-    watcher = asyncio.create_task(cancel_on_disconnect(request, cancellation))
-    try:
-        result = await run_in_threadpool(check_connection, connect, cancellation)
-    finally:
-        watcher.cancel()
-    return AiTestOut(**asdict(result))
-
-
-class ClientConnection(Protocol):
-    async def is_disconnected(self) -> bool: ...
-
-
-async def cancel_on_disconnect(request: ClientConnection, cancellation: Cancellation) -> None:
-    while not await request.is_disconnected():
-        await asyncio.sleep(DISCONNECT_POLL_SECONDS)
-    cancellation.cancel()
+    return AiTestOut(**asdict(check_connection(connect, Cancellation())))
 
 
 def _status(state: AppState, repo_root: Path | None) -> AiStatusOut:

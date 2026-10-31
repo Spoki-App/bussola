@@ -1,7 +1,7 @@
 import threading
 import time
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import pytest
 from pydantic import BaseModel, Field
@@ -228,3 +228,16 @@ def test_two_sessions_caching_the_same_result_do_not_conflict(tmp_path: Path) ->
 
     with database.session() as session:
         assert SqlAiCache(session).get(key) == {"impact": "high", "reason": "second"}
+
+
+def test_an_answer_is_kept_when_caching_it_fails() -> None:
+    class BrokenCache:
+        def get(self, _key: AiCacheKey) -> dict[str, Any] | None:
+            return None
+
+        def put(self, _key: AiCacheKey, _result: dict[str, Any]) -> None:
+            raise RuntimeError("database is locked")
+
+    rating = AiRunner(FakeProvider(GOOD), BrokenCache()).run(RATE, "code", Cancellation(), content_hash="hash")
+
+    assert rating.impact == "high"

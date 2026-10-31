@@ -1,3 +1,4 @@
+import contextlib
 import re
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
@@ -49,8 +50,8 @@ class AiCacheKey:
 
 
 class AiCache(Protocol):
-    def get(self, key: AiCacheKey) -> dict[str, Any] | None: ...
-    def put(self, key: AiCacheKey, result: dict[str, Any]) -> None: ...
+    def get(self, key: AiCacheKey, /) -> dict[str, Any] | None: ...
+    def put(self, key: AiCacheKey, result: dict[str, Any], /) -> None: ...
 
 
 class AiRunner:
@@ -66,7 +67,8 @@ class AiRunner:
         request = AiRequest(task.name, task.system, prompt, output_schema(task.output), min(task.max_tokens, self.provider.max_tokens or task.max_tokens))
         result = parse_output(self.provider.complete(request, cancellation), task.output)
         if key is not None and self._cache is not None:
-            self._cache.put(key, result.model_dump(mode="json"))
+            with contextlib.suppress(Exception):
+                self._cache.put(key, result.model_dump(mode="json"))
         return result
 
     def _key(self, task: AiTask[Any], content_hash: str | None) -> AiCacheKey | None:

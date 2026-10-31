@@ -62,12 +62,11 @@ def test_an_invalid_user_configuration_is_reported(tmp_path: Path, content: str,
     assert detail in str(raised.value)
 
 
-def test_the_repository_overrides_the_model_of_an_openai_compatible_endpoint_without_your_key() -> None:
-    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="qwen2.5-coder", endpoint="http://localhost:11434/v1", api_key_env="LOCAL_KEY")
+def test_a_repository_cannot_change_the_model_of_your_keyed_endpoint() -> None:
+    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="gpt", endpoint="https://api.example.com/v1", api_key_env="WORK_KEY")
 
-    settings = resolve_ai_settings(user, RepoAiConfig(model="llama3"))
-
-    assert settings == AiSettings(ProviderName.OPENAI_COMPATIBLE, "llama3", "http://localhost:11434/v1", source="repository", key_withheld=True)
+    with pytest.raises(AiNotConfiguredError, match="cannot change the model of your own endpoint while it needs your API key"):
+        resolve_ai_settings(user, RepoAiConfig(model="other"))
 
 
 @pytest.mark.parametrize(
@@ -274,22 +273,12 @@ def test_a_repository_repeating_your_own_model_is_accepted() -> None:
     assert settings.api_key_env == "ANTHROPIC_API_KEY"
 
 
-def test_a_withheld_key_is_reported_instead_of_sending_no_key() -> None:
-    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="gpt", endpoint="https://api.example.com/v1", api_key_env="WORK_KEY")
-
-    settings = resolve_ai_settings(user, RepoAiConfig(model="other"))
-
-    assert settings.key_withheld
-    with pytest.raises(AiNotConfiguredError, match="Your API key is not used"):
-        build_provider(settings)
-
-
 def test_a_keyless_endpoint_can_take_a_model_from_the_repository() -> None:
     user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="qwen2.5-coder", endpoint="http://localhost:11434/v1")
 
     settings = resolve_ai_settings(user, RepoAiConfig(model="llama3"))
 
-    assert not settings.key_withheld
+    assert settings == AiSettings(ProviderName.OPENAI_COMPATIBLE, "llama3", "http://localhost:11434/v1", source="repository")
     assert build_provider(settings).model == "llama3"
 
 
@@ -306,7 +295,6 @@ def test_a_repository_can_send_code_to_a_local_keyless_server_instead_of_your_ke
     settings = resolve_ai_settings(user, RepoAiConfig(endpoint="http://localhost:11434/v1", model="qwen2.5-coder"))
 
     assert settings.api_key_env is None
-    assert not settings.key_withheld
     assert build_provider(settings).endpoint == "http://localhost:11434/v1"
 
 

@@ -18,4 +18,5 @@ class SqlAiCache:
     def put(self, key: AiCacheKey, result: dict[str, Any]) -> None:
         values = {"task": key.task, "prompt_version": key.prompt_version, "provider": key.provider, "model": key.model, "endpoint": key.endpoint}
         statement = insert(AiResult).values(**values, content_hash=key.content_hash, result=result, created_at=utcnow())
-        self._session.execute(statement.on_conflict_do_update(index_elements=[*values, "content_hash"], set_={"result": result, "created_at": utcnow()}))
+        with self._session.begin_nested():
+            self._session.execute(statement.on_conflict_do_update(index_elements=[*values, "content_hash"], set_={"result": result, "created_at": utcnow()}))
