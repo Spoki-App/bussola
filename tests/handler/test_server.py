@@ -48,14 +48,14 @@ class FakeServers:
         self.healthy = healthy or set()
         self.comes_up = comes_up
         self.exit_code = exit_code
-        self.taken_port = taken_port
+        self.taken_ports = {taken_port}
         self.started: list[ServerAddress] = []
         self.opened: list[str] = []
         self.busy: dict[ServerAddress, int] = {}
 
     def start(self, address: ServerAddress, _environment: Mapping[str, str]) -> FakeProcess:
         self.started.append(address)
-        if address.port == self.taken_port:
+        if address.port in self.taken_ports:
             return FakeProcess(1)
         if self.comes_up:
             self.healthy.add(address)
@@ -75,7 +75,7 @@ class FakeServers:
         return Probe.OTHER_BUSSOLA if (address.host, address.port) in listening else Probe.CLOSED
 
     def port_free(self, host: str, port: int) -> bool:
-        return port != self.taken_port and all((running.host, running.port) != (host, port) for running in self.healthy)
+        return port not in self.taken_ports and all((running.host, running.port) != (host, port) for running in self.healthy)
 
     def launcher(self, data_dir: Path, *, sleep: Callable[[float], object] = lambda _seconds: None, timeout: float = 0, exit_grace: float = 0) -> Launcher:
         return Launcher(
@@ -228,6 +228,7 @@ def test_open_tries_another_free_port_if_the_first_one_is_taken_meanwhile(tmp_pa
     def start(address: ServerAddress, environment: Mapping[str, str]) -> FakeProcess:
         if address.port == 20001:
             servers.started.append(address)
+            servers.taken_ports.add(20001)
             return FakeProcess(1)
         return servers.start(address, environment)
 
@@ -471,7 +472,7 @@ def test_open_stops_waiting_as_soon_as_the_started_server_exits(tmp_path: Path) 
         launcher.open("bussola://")
 
     assert naps == []
-    assert len(servers.started) == 4
+    assert len(servers.started) == 1
 
 
 def test_invalid_links_neither_start_the_server_nor_open_the_browser(tmp_path: Path) -> None:
@@ -505,6 +506,22 @@ def test_published_server_announces_itself_only_while_it_listens(tmp_path: Path)
     instance.should_exit = True
     thread.join(10)
     assert published_servers(tmp_path) == []
+
+
+def test_a_server_asked_to_stop_while_starting_does_not_publish(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    published: list[ServerAddress] = []
+
+    def record(_data_dir: Path, address: ServerAddress) -> None:
+        published.append(address)
+
+    monkeypatch.setattr("bussola.handler.server.publish_server", record)
+    address = ServerAddress("127.0.0.1", free_port(), TOKEN)
+    instance = PublishedServer(uvicorn.Config(FastAPI(), host=address.host, port=address.port, log_level="critical"), tmp_path, address)
+    instance.should_exit = True
+
+    instance.run()
+
+    assert published == []
 
 
 def test_a_server_that_cannot_listen_leaves_the_published_one_alone(tmp_path: Path) -> None:

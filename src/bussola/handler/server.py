@@ -197,6 +197,8 @@ class PublishedServer(uvicorn.Server):
 
     async def startup(self, sockets: list[socket.socket] | None = None) -> None:
         await super().startup(sockets)
+        if self.should_exit:
+            return
         try:
             publish_server(self.data_dir, self.address)
         except OSError as error:
@@ -270,6 +272,8 @@ class Launcher:
                 found = self._wait_for_server(pool, address, process, set(silent))
                 if found is not None:
                     return found
+                if process is not None and self.port_free(address.host, address.port):
+                    break
         raise ServerStartError("bussola did not start. Run `bussola serve` to see why.")
 
     def _server_environment(self) -> dict[str, str]:
