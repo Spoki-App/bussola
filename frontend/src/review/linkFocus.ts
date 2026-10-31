@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, type RefObject } from 'react'
+import { createContext, useContext, useEffect, useRef, useSyncExternalStore, type RefObject } from 'react'
 
 import type { Thread, Unit } from '../api/types'
 import { pullRequestUrlFromPath } from './pullRequestLink'
@@ -17,9 +17,14 @@ export interface FocusTarget {
 }
 
 export interface LinkScroll {
-  target: FocusTarget
+  current: () => FocusTarget | null
+  subscribe: (listener: () => void) => () => void
+  start: (target: FocusTarget) => void
+  unitShown: () => void
   done: () => void
 }
+
+type LinkRole = 'target' | 'holder' | null
 
 export interface AddRepositoryRequest {
   repository: string
@@ -83,8 +88,12 @@ export function resolveLinkFocus(focus: LinkFocus, units: Unit[], threads: Threa
   const thread = linkedThread(focus, threads)
   if (thread) {
     const unitId = isInline(thread) ? thread.anchor?.unit_id ?? null : null
-    const shown = unitId !== null && units.some((unit) => unit.id === unitId)
-    return { unitId: shown ? unitId : null, elementId: threadElementId(thread.id) }
+    if (unitId === null) {
+      return { unitId: null, elementId: threadElementId(thread.id) }
+    }
+    if (units.some((unit) => unit.id === unitId)) {
+      return { unitId, elementId: threadElementId(thread.id) }
+    }
   }
   const unit = focus.path === null ? undefined : unitAt(units, focus.path, focus.line)
   return unit ? { unitId: unit.id, elementId: unitElementId(unit.id) } : null
@@ -94,20 +103,49 @@ export function scrollToElement(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+export function createLinkScroll(): LinkScroll {
+  let target: FocusTarget | null = null
+  const listeners = new Set<() => void>()
+  const change = (next: FocusTarget | null) => {
+    target = next
+    listeners.forEach((listener) => { listener() })
+  }
+  return {
+    current: () => target,
+    subscribe: (listener) => {
+      listeners.add(listener)
+      return () => { listeners.delete(listener) }
+    },
+    start: change,
+    unitShown: () => { change(target && { ...target, unitId: null }) },
+    done: () => { change(null) },
+  }
+}
+
+function linkRole(target: FocusTarget | null, elementId: string, unitId: number | null): LinkRole {
+  if (target?.elementId === elementId) {
+    return 'target'
+  }
+  return unitId !== null && target?.unitId === unitId ? 'holder' : null
+}
+
+const noLink = () => () => undefined
+
 export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId: number | null = null): RefObject<T | null> {
   const link = useContext(LinkScrollContext)
   const ref = useRef<T>(null)
-  const isTarget = link?.target.elementId === elementId
-  const holdsTarget = unitId !== null && link?.target.unitId === unitId
+  const role = useSyncExternalStore(link?.subscribe ?? noLink, () => linkRole(link?.current() ?? null, elementId, unitId))
   useEffect(() => {
-    if (!link || !(isTarget || holdsTarget)) {
+    if (!link || role === null) {
       return
     }
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    if (isTarget) {
+    if (role === 'target') {
       link.done()
+    } else {
+      link.unitShown()
     }
-  }, [link, isTarget, holdsTarget])
+  }, [link, role])
   return ref
 }
 

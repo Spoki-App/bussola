@@ -19,7 +19,7 @@ import { UnitTree } from '../components/UnitTree'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
-import { LinkScrollContext, scrollToElement, unitElementId, type FocusTarget } from '../review/linkFocus'
+import { LinkScrollContext, createLinkScroll, scrollToElement, unitElementId, type FocusTarget } from '../review/linkFocus'
 import { buildUnitTree } from '../review/unitTree'
 import { searchGroups } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
@@ -158,14 +158,16 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
       setPanelOpen(panelOpen || linkedTarget.unitId === null)
     }
   }
+  const [linkScroll] = useState(createLinkScroll)
   useEffect(() => {
-    if (appliedLink?.unitId != null) {
+    if (!appliedLink) {
+      return
+    }
+    if (appliedLink.unitId !== null) {
       actions.current.get(appliedLink.unitId)?.reveal()
     }
-  }, [appliedLink])
-  const [linkScrolled, setLinkScrolled] = useState(false)
-  const finishLinkScroll = useCallback(() => { setLinkScrolled(true) }, [])
-  const linkScroll = useMemo(() => (appliedLink && !linkScrolled ? { target: appliedLink, done: finishLinkScroll } : null), [appliedLink, linkScrolled, finishLinkScroll])
+    linkScroll.start(appliedLink)
+  }, [appliedLink, linkScroll])
 
   const focusUnit = useCallback((unitId: number) => {
     setFocusedId(unitId)

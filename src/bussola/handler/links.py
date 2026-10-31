@@ -14,9 +14,10 @@ MAX_FIELDS = 16
 MAX_PATH_LENGTH = 1024
 NAME = r"[A-Za-z0-9_.-]{1,100}"
 NUMBER = re.compile(r"^[1-9][0-9]{0,8}$")
+MAX_NUMBER = 999_999_999
 REPOSITORY = re.compile(rf"^(?P<owner>{NAME})/(?P<name>{NAME})$")
 THREAD_ID = re.compile(r"^[0-9a-f]{32}$")
-DISCUSSION_ANCHOR = re.compile(r"^discussion_r(?P<comment>[1-9][0-9]{0,19})$")
+DISCUSSION_ANCHOR = re.compile(r"^(?:discussion_)?r(?P<comment>[1-9][0-9]{0,19})$")
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 
 
@@ -90,10 +91,12 @@ def _github_link(path: str, fragment: str) -> ReviewLink:
         address = parse_pull_request_url(f"github.com{path}")
     except InvalidRequestError as error:
         raise InvalidLinkError(f"Not a GitHub pull request link. Expected {SCHEME}://github.com/<owner>/<name>/pull/<number>.") from error
+    if address.number > MAX_NUMBER:
+        raise InvalidLinkError("The pull request number is too large")
     anchor = DISCUSSION_ANCHOR.match(fragment)
     return ReviewLink(
         repository=_repository(address.repository),
-        number=_number("pr", str(address.number)),
+        number=address.number,
         comment=int(anchor["comment"]) if anchor else None,
     )
 

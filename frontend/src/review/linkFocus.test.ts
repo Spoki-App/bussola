@@ -128,6 +128,11 @@ describe('resolveLinkFocus', () => {
     expect(resolveLinkFocus(focus({ comment: '501' }), units, threads)?.elementId).toBe('thread-b')
   })
 
+  it('uses the path when an inline thread belongs to a unit that is not listed', () => {
+    expect(resolveLinkFocus(focus({ thread: THREAD_ID, path: 'README.md' }), units, [thread(THREAD_ID, 99)])?.unitId).toBe(3)
+    expect(resolveLinkFocus(focus({ thread: THREAD_ID }), units, [thread(THREAD_ID, 99)])).toBeNull()
+  })
+
   it('uses the path when the thread is unknown', () => {
     expect(resolveLinkFocus(focus({ comment: '9', path: 'README.md' }), units, [])?.unitId).toBe(3)
     expect(resolveLinkFocus(focus({ comment: '9' }), units, [])).toBeNull()

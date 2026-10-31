@@ -133,7 +133,7 @@ bussola install-handler
 | `bussola://review?repo=<owner>/<name>&pr=<number>` | the review of that pull request, started if there is none yet |
 | `bussola://review?repo=<owner>/<name>&pr=<number>&path=src/app.py&line=42` | the same review, scrolled to the unit containing that line |
 | `bussola://review?repo=<owner>/<name>&pr=<number>&thread=<id>` | the same review, scrolled to that thread |
-| `bussola://github.com/<owner>/<name>/pull/<number>` | a GitHub pull request link with `https` replaced by `bussola`; `/files` and other pages of the pull request work too, and a `#discussion_r<id>` anchor scrolls to the imported thread |
+| `bussola://github.com/<owner>/<name>/pull/<number>` | a GitHub pull request link with `https` replaced by `bussola`; `/files` and other pages of the pull request work too, and a comment anchor (`#discussion_r<id>` or `#r<id>`) scrolls to the imported thread |
 
 If bussola is not running, the link starts `bussola serve --no-open` in the background on `127.0.0.1:8765`, waits for it, then opens the browser. A running `bussola serve` writes its address and session token to `server.json` in the data folder (readable only by you) once it is listening, so links can find it. A server started by a link does not add your home folder as a repository. The repository is found as **Open pull request** finds it; if there is no local clone, the home page opens with **Add a repository** filtered on its name, and the pull request opens once you add it. `bussola open-link '<link>'` does the same from a terminal. A link that cannot be opened (not a valid link, or the server did not start) is recorded in `open-link.log` in the data folder, since the operating system shows no output.
 
