@@ -5,7 +5,7 @@ import pytest
 
 from bussola.forge.base import Conversation, ForgeError
 from bussola.forge.github import GitHubAdapter
-from bussola.git import GitError
+from bussola.git import GitError, GitRepo
 from tests.apiclient import ApiClient
 from tests.forge.conftest import FIRST, SECOND, GitHubSandbox
 from tests.gitrepo import GitFixture
@@ -156,6 +156,19 @@ def test_a_pull_request_link_to_a_review_opens_it_even_when_github_cannot_be_rea
 
     assert open_link(api, "https://github.com/Acme/Widgets/pull/7")["id"] == review["id"]
     open_link(api, "https://github.com/acme/widgets/pull/8", 502)
+
+
+def test_a_pull_request_link_to_a_review_opens_it_when_git_fetch_fails(api: ApiClient, github: GitHubSandbox, monkeypatch: pytest.MonkeyPatch) -> None:
+    github.open_pull_request({"app.py": FIRST})
+    register(api)
+    review = open_link(api, "https://github.com/acme/widgets/pull/7")
+
+    def fetch_fails(_repo: GitRepo, _remote: str, _refspecs: list[str]) -> None:
+        raise GitError(["fetch"], "Could not resolve host: github.com")
+
+    monkeypatch.setattr(GitRepo, "fetch_refspecs", fetch_fails)
+
+    assert open_link(api, "https://github.com/acme/widgets/pull/7")["id"] == review["id"]
 
 
 def test_a_failed_first_open_leaves_no_half_made_review(api: ApiClient, github: GitHubSandbox, monkeypatch: pytest.MonkeyPatch) -> None:

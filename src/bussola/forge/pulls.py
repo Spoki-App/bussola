@@ -19,6 +19,10 @@ OPEN_STATE = "OPEN"
 PULL_URL = re.compile(r"^(?:https?://)?(?:www\.)?github\.com/(?P<repository>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(?P<number>\d{1,18})(?:[/?#].*)?$")
 
 
+class PullRequestFetchError(GitError):
+    pass
+
+
 class NoLocalCloneError(NotFoundError):
     code = "no_local_clone"
 
@@ -157,7 +161,10 @@ def fetch_pull_request(git_repo: GitRepo, remote: GitHubRemote, pull: PullReques
         raise InvalidRequestError(f"Unexpected base branch name {pull.base_ref!r}")
     head_ref = pull_ref(pull.number)
     base_ref = f"{remote.remote}/{pull.base_ref}"
-    git_repo.fetch_refspecs(remote.remote, [f"+refs/pull/{pull.number}/head:{head_ref}", f"+refs/heads/{pull.base_ref}:refs/remotes/{base_ref}"])
+    try:
+        git_repo.fetch_refspecs(remote.remote, [f"+refs/pull/{pull.number}/head:{head_ref}", f"+refs/heads/{pull.base_ref}:refs/remotes/{base_ref}"])
+    except GitError as error:
+        raise PullRequestFetchError(error.command, error.stderr) from error
     return head_ref, base_ref
 
 
