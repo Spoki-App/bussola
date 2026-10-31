@@ -72,18 +72,17 @@ def test_the_repository_overrides_the_model_of_the_same_provider() -> None:
 def test_a_repository_switching_provider_does_not_inherit_the_user_model() -> None:
     user = UserAiConfig(provider=ProviderName.ANTHROPIC, model="claude-opus-5-5")
 
-    settings = resolve_ai_settings(user, RepoAiConfig(provider=ProviderName.CLAUDE_CODE))
+    settings = resolve_ai_settings(user, RepoAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, endpoint="http://localhost:11434/v1"))
 
-    assert settings == AiSettings(ProviderName.CLAUDE_CODE, source="repository")
+    assert settings == AiSettings(ProviderName.OPENAI_COMPATIBLE, endpoint="http://localhost:11434/v1", source="repository")
 
 
-def test_a_repository_switching_to_a_cloud_provider_gets_no_key() -> None:
+@pytest.mark.parametrize("provider", [ProviderName.ANTHROPIC, ProviderName.CLAUDE_CODE])
+def test_a_repository_cannot_switch_to_a_provider_that_uses_your_account(provider: ProviderName) -> None:
     user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="qwen2.5-coder", endpoint="http://localhost:11434/v1")
 
-    settings = resolve_ai_settings(user, RepoAiConfig(provider=ProviderName.ANTHROPIC))
-
-    assert settings.endpoint == "https://api.anthropic.com"
-    assert settings.api_key_env is None
+    with pytest.raises(AiNotConfiguredError, match="A repository cannot switch AI to"):
+        resolve_ai_settings(user, RepoAiConfig(provider=provider))
 
 
 def test_an_openai_compatible_key_is_sent_only_when_its_variable_is_named() -> None:
@@ -133,9 +132,17 @@ def test_the_repository_override_is_read_from_bussola_toml(tmp_path: Path) -> No
 
 def test_secrets_are_not_accepted_in_the_repository_configuration(tmp_path: Path) -> None:
     (tmp_path / ".bussola.toml").write_text('[ai]\napi_key_env = "AWS_SECRET_ACCESS_KEY"\n')
+    user = tmp_path / "config.toml"
+    user.write_text('[ai]\nprovider = "anthropic"\n')
 
     with pytest.raises(AiNotConfiguredError, match=r"Invalid configuration in .*\.bussola\.toml"):
-        load_ai_settings(None, tmp_path)
+        load_ai_settings(user, tmp_path)
+
+
+def test_a_broken_repository_configuration_is_ignored_while_ai_is_off(tmp_path: Path) -> None:
+    (tmp_path / ".bussola.toml").write_text('[ai]\nprovider = "ollama"\n')
+
+    assert load_ai_settings(None, tmp_path) == AiSettings(ProviderName.NONE)
 
 
 @pytest.mark.parametrize("user", [UserAiConfig(), UserAiConfig(provider=ProviderName.NONE)])
@@ -157,10 +164,10 @@ def test_a_repository_naming_the_default_endpoint_keeps_the_key() -> None:
     assert settings.api_key_env == "ANTHROPIC_API_KEY"
 
 
-def test_a_repository_switching_provider_gets_no_key_for_the_user_endpoint() -> None:
-    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="gpt", endpoint="http://localhost:11434/v1")
+def test_a_repository_switching_provider_gets_no_key() -> None:
+    user = UserAiConfig(provider=ProviderName.ANTHROPIC, api_key_env="WORK_KEY")
 
-    settings = resolve_ai_settings(user, RepoAiConfig(provider=ProviderName.ANTHROPIC, endpoint="http://localhost:11434/v1"))
+    settings = resolve_ai_settings(user, RepoAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="gpt", endpoint="http://localhost:11434/v1"))
 
     assert settings.api_key_env is None
 
@@ -189,7 +196,8 @@ def test_a_repository_that_changes_nothing_is_not_named_as_the_source() -> None:
 
 
 def test_a_repository_switching_provider_does_not_inherit_max_tokens() -> None:
-    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="small", endpoint="http://localhost:11434/v1", max_tokens=512)
+    user = UserAiConfig(provider=ProviderName.ANTHROPIC, max_tokens=512)
+    local = RepoAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="small", endpoint="http://localhost:11434/v1")
 
-    assert resolve_ai_settings(user, RepoAiConfig(provider=ProviderName.ANTHROPIC)).max_tokens is None
-    assert resolve_ai_settings(user, RepoAiConfig(model="bigger")).max_tokens == 512
+    assert resolve_ai_settings(user, local).max_tokens is None
+    assert resolve_ai_settings(user, RepoAiConfig(model="claude-sonnet-5-5")).max_tokens == 512

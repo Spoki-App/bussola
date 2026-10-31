@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import http.client
 import ipaddress
 import json
@@ -8,40 +9,72 @@ import threading
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Callable
 from typing import Any
 
-from bussola.ai.base import MAX_ERROR_LENGTH, AiProviderError, Cancellation, json_object, run_cancellable
+from bussola.ai.base import MAX_ERROR_LENGTH, AiProviderError, AiUnreachableError, Cancellation, json_object, run_cancellable
 
 SOCKET_GRACE_SECONDS = 5.0
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
+MAX_ERROR_BODY_BYTES = 64 * 1024
 LOOPBACK_NAME = "localhost"
-
-type ConnectionClass = Callable[..., http.client.HTTPConnection]
 
 
 class _Connections:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._open: list[http.client.HTTPConnection] = []
+        self._closed = False
 
-    def tracked(self, connection_class: ConnectionClass) -> ConnectionClass:
-        def build(*args: Any, **kwargs: Any) -> http.client.HTTPConnection:
-            connection = connection_class(*args, **kwargs)
-            with self._lock:
+    def check_open(self) -> None:
+        if self._closed:
+            raise ConnectionAbortedError("The request was stopped")
+
+    def register(self, connection: http.client.HTTPConnection) -> None:
+        with self._lock:
+            if not self._closed:
                 self._open.append(connection)
-            return connection
-
-        return build
+                return
+        connection.close()
+        raise ConnectionAbortedError("The request was stopped")
 
     def close(self) -> None:
         with self._lock:
+            self._closed = True
             connections = list(self._open)
         for connection in connections:
             with contextlib.suppress(OSError):
                 if connection.sock is not None:
                     connection.sock.shutdown(socket.SHUT_RDWR)
             connection.close()
+
+
+class _GuardedHttpConnection(http.client.HTTPConnection):
+    def __init__(self, *args: Any, tracker: _Connections, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._tracker = tracker
+
+    def connect(self) -> None:
+        self._tracker.check_open()
+        super().connect()
+        self._tracker.register(self)
+
+
+class _GuardedHttpsConnection(http.client.HTTPSConnection):
+    def __init__(self, *args: Any, tracker: _Connections, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._tracker = tracker
+
+    def connect(self) -> None:
+        self._tracker.check_open()
+        super().connect()
+        self._tracker.register(self)
+
+
+class _HttpStatusError(Exception):
+    def __init__(self, code: int, detail: str) -> None:
+        super().__init__(code, detail)
+        self.code = code
+        self.detail = detail
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -55,7 +88,7 @@ class _TrackedHttpHandler(urllib.request.HTTPHandler):
         self._connections = connections
 
     def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
-        return self.do_open(self._connections.tracked(http.client.HTTPConnection), req)
+        return self.do_open(functools.partial(_GuardedHttpConnection, tracker=self._connections), req)
 
 
 class _TrackedHttpsHandler(urllib.request.HTTPSHandler):
@@ -65,7 +98,7 @@ class _TrackedHttpsHandler(urllib.request.HTTPSHandler):
         self._ssl_context = ssl.create_default_context()
 
     def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
-        return self.do_open(self._connections.tracked(http.client.HTTPSConnection), req, context=self._ssl_context)
+        return self.do_open(functools.partial(_GuardedHttpsConnection, tracker=self._connections), req, context=self._ssl_context)
 
 
 def bypasses_proxy(url: str) -> bool:
@@ -91,17 +124,20 @@ def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeou
     opener = _opener(url, connections)
 
     def send() -> bytes:
-        with opener.open(request, timeout=timeout + SOCKET_GRACE_SECONDS) as response:
-            return response.read(MAX_RESPONSE_BYTES + 1)
+        try:
+            with opener.open(request, timeout=timeout + SOCKET_GRACE_SECONDS) as response:
+                return response.read(MAX_RESPONSE_BYTES + 1)
+        except urllib.error.HTTPError as error:
+            raise _HttpStatusError(error.code, _error_detail(error)) from error
 
     try:
         body = run_cancellable(send, cancellation, timeout, abort=connections.close)
-    except urllib.error.HTTPError as error:
-        raise AiProviderError(f"{url} answered HTTP {error.code}: {_error_detail(error)}") from error
+    except _HttpStatusError as error:
+        raise AiProviderError(f"{url} answered HTTP {error.code}: {error.detail}") from error
     except urllib.error.URLError as error:
-        raise AiProviderError(f"Cannot reach {url}: {error.reason}") from error
+        raise AiUnreachableError(f"Cannot reach {url}: {error.reason}") from error
     except (http.client.HTTPException, OSError) as error:
-        raise AiProviderError(f"The connection to {url} failed: {error or type(error).__name__}") from error
+        raise AiUnreachableError(f"The connection to {url} failed: {error or type(error).__name__}") from error
     except ValueError as error:
         raise AiProviderError(f"The request to {url} could not be sent: {error}") from error
     if len(body) > MAX_RESPONSE_BYTES:
@@ -117,7 +153,7 @@ def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeou
 
 def _error_detail(error: urllib.error.HTTPError) -> str:
     try:
-        text = error.read().decode(errors="replace")
+        text = error.read(MAX_ERROR_BODY_BYTES).decode(errors="replace")
     except (http.client.HTTPException, OSError):
         text = ""
     try:

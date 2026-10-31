@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react'
 
 import { useAiStatus } from '../api/ai'
+import { describeError } from '../api/client'
 import type { AiStatus } from '../api/types'
 import { useModalDialog } from '../hooks/useModalDialog'
 import { hasAiConsent, rememberAiConsent } from '../settings/aiConsent'
+import { ErrorNote } from './Badges'
 
 interface AiActionButtonProps {
   repoId: number
@@ -17,6 +19,7 @@ export function AiActionButton({ repoId, label, title, disabled = false, onRun }
   const status = useAiStatus(repoId)
   const [asking, setAsking] = useState<AiStatus | null>(null)
   const starting = useRef(false)
+  const [notice, setNotice] = useState<string | null>(null)
   const ai = status.data
   if (ai === undefined || (!ai.configured && ai.problem === null)) {
     return null
@@ -26,10 +29,16 @@ export function AiActionButton({ repoId, label, title, disabled = false, onRun }
       return
     }
     starting.current = true
+    setNotice(null)
     try {
       const result = await status.refetch()
-      const fresh = result.isError ? undefined : result.data
+      if (result.isError) {
+        setNotice(`Could not check the AI provider: ${describeError(result.error)}`)
+        return
+      }
+      const fresh = result.data
       if (!fresh?.configured || fresh.problem !== null || fresh.target === null) {
+        setNotice(fresh?.problem ?? 'AI is turned off for this repository')
         return
       }
       if (hasAiConsent(fresh.target)) {
@@ -46,6 +55,7 @@ export function AiActionButton({ repoId, label, title, disabled = false, onRun }
       <button type="button" title={ai.problem ?? title} disabled={disabled || ai.problem !== null || ai.target === null} onClick={() => { void start() }}>
         {label}
       </button>
+      {notice && <ErrorNote message={notice} />}
       {asking?.target && (
         <AiNoticeDialog
           ai={asking}

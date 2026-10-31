@@ -16,12 +16,12 @@ class OpenAiCompatibleProvider:
         self.endpoint: str | None = endpoint
         self._api_key = api_key
         self._timeout = timeout
-        self._max_tokens = max_tokens
+        self.max_tokens = max_tokens
 
     def complete(self, request: AiRequest, cancellation: Cancellation) -> str:
         payload = {
             "model": self.model,
-            "max_completion_tokens": min(request.max_tokens, self._max_tokens or request.max_tokens),
+            "max_completion_tokens": request.max_tokens,
             "messages": [{"role": "system", "content": request.system}, {"role": "user", "content": request.prompt}],
             "response_format": {"type": "json_schema", "json_schema": {"name": request.name, "schema": request.schema, "strict": True}},
         }

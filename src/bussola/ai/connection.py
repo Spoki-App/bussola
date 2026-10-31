@@ -9,6 +9,7 @@ from bussola.ai.runner import AiRunner, AiTask
 
 MILLISECONDS = 1000
 CONNECTION_TIMEOUT_SECONDS = 120.0
+CONNECTION_MAX_TOKENS = 2048
 
 
 class ConnectionCheck(BaseModel):
@@ -20,6 +21,7 @@ CONNECTION_CHECK = AiTask(
     version=1,
     system="You check that bussola can reach a language model. Answer only with JSON that matches the given schema.",
     output=ConnectionCheck,
+    max_tokens=CONNECTION_MAX_TOKENS,
 )
 CONNECTION_PROMPT = 'Answer with {"ok": true}.'
 

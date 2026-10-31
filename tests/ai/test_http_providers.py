@@ -1,4 +1,5 @@
 import json
+import socket
 import threading
 import time
 import urllib.request
@@ -122,16 +123,6 @@ def test_an_openai_compatible_endpoint_gets_a_json_schema_response_format(stub: 
         "messages": [{"role": "system", "content": "Rate the change."}, {"role": "user", "content": "def pay(): ..."}],
         "response_format": {"type": "json_schema", "json_schema": {"name": "rate", "schema": {"type": "object"}, "strict": True}},
     }
-
-
-def test_a_configured_max_tokens_caps_the_request(stub: StubServer) -> None:
-    stub.reply({"choices": [{"message": {"content": "{}"}}]})
-
-    OpenAiCompatibleProvider("gpt", stub.url, None, 5.0, max_tokens=256).complete(REQUEST, Cancellation())
-    AnthropicProvider("claude-opus-5-5", stub.url, "sk-test", 5.0, max_tokens=8000).complete(REQUEST, Cancellation())
-
-    assert stub.requests[0]["json"]["max_completion_tokens"] == 256
-    assert stub.requests[1]["json"]["max_tokens"] == 512
 
 
 def test_an_openai_compatible_key_is_sent_as_a_bearer_token(stub: StubServer) -> None:
@@ -279,6 +270,32 @@ def test_cancelling_closes_the_connection_instead_of_waiting_for_the_answer(stub
     while any(thread.name == WORKER_NAME for thread in threading.enumerate()) and time.monotonic() < deadline:
         time.sleep(0.05)
     assert not any(thread.name == WORKER_NAME for thread in threading.enumerate())
+
+
+def test_a_request_cancelled_while_connecting_is_never_sent(stub: StubServer, monkeypatch: pytest.MonkeyPatch) -> None:
+    stub.reply({"choices": []})
+    connect = socket.create_connection
+
+    def slow_connect(*args: Any, **kwargs: Any) -> socket.socket:
+        time.sleep(0.5)
+        return connect(*args, **kwargs)
+
+    monkeypatch.setattr(socket, "create_connection", slow_connect)
+    cancellation = Cancellation()
+    threading.Timer(0.1, cancellation.cancel).start()
+
+    with pytest.raises(AiCancelledError):
+        OpenAiCompatibleProvider("gpt", stub.url, None, 10.0).complete(REQUEST, cancellation)
+
+    time.sleep(1)
+    assert stub.requests == []
+
+
+def test_an_error_body_is_read_only_up_to_a_limit(stub: StubServer) -> None:
+    stub.reply({"error": {"message": "x" * 100_000}}, status=500)
+
+    with pytest.raises(AiProviderError, match="answered HTTP 500"):
+        OpenAiCompatibleProvider("gpt", stub.url, None, 5.0).complete(REQUEST, Cancellation())
 
 
 def test_a_key_that_cannot_be_sent_in_a_header_is_a_provider_error(stub: StubServer) -> None:

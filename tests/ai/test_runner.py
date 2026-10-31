@@ -198,3 +198,33 @@ def test_without_a_known_model_nothing_is_cached(tmp_path: Path) -> None:
         runner.run(RATE, "code", Cancellation(), content_hash="hash")
 
     assert len(provider.requests) == 2
+
+
+def test_the_provider_max_tokens_caps_the_request() -> None:
+    provider = FakeProvider(GOOD)
+    provider.max_tokens = 256
+
+    AiRunner(provider).run(RATE, "code", Cancellation())
+
+    assert provider.requests[0].max_tokens == 256
+
+
+def test_two_sessions_caching_the_same_result_do_not_conflict(tmp_path: Path) -> None:
+    database = Database.open(tmp_path)
+    key = AiCacheKey("rate", 1, "fake", "fake-model", "", "hash")
+
+    def cache_second() -> None:
+        with database.session() as second:
+            SqlAiCache(second).put(key, {"impact": "high", "reason": "second"})
+            second.commit()
+
+    with database.session() as first:
+        SqlAiCache(first).put(key, {"impact": "low", "reason": "first"})
+        other = threading.Thread(target=cache_second)
+        other.start()
+        time.sleep(0.2)
+        first.commit()
+    other.join()
+
+    with database.session() as session:
+        assert SqlAiCache(session).get(key) == {"impact": "high", "reason": "second"}

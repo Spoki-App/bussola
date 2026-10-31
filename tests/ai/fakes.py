@@ -13,6 +13,7 @@ class FakeProvider:
     name = "fake"
     label = "Fake provider"
     endpoint: str | None = None
+    max_tokens: int | None = None
 
     def __init__(self, *answers: Answer, model: str | None = "fake-model", delay: float = 0.0, timeout: float = 5.0) -> None:
         self.model = model

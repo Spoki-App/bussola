@@ -8,6 +8,9 @@ from pathlib import Path
 
 prompt = sys.stdin.read()
 Path(os.environ["FAKE_CLAUDE_LOG"]).write_text(json.dumps({"args": sys.argv[1:], "prompt": prompt, "cwd": os.getcwd()}))
+if os.environ.get("FAKE_CLAUDE_DETACHED_CHILD_PID"):
+    detached = subprocess.Popen(["sleep", "60"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    Path(os.environ["FAKE_CLAUDE_DETACHED_CHILD_PID"]).write_text(str(detached.pid))
 if os.environ.get("FAKE_CLAUDE_CHILD_PID"):
     child = subprocess.Popen(["sleep", "60"])
     Path(os.environ["FAKE_CLAUDE_CHILD_PID"]).write_text(str(child.pid))

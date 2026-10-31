@@ -4,8 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from bussola.ai.base import AiProviderError
-from bussola.ai.connection import CONNECTION_TIMEOUT_SECONDS
-from bussola.ai.runner import DEFAULT_MAX_TOKENS
+from bussola.ai.connection import CONNECTION_MAX_TOKENS, CONNECTION_TIMEOUT_SECONDS
 from bussola.app import create_app
 from bussola.config import AppSettings
 from tests.ai.fakes import FakeProvider, fake_factory
@@ -98,6 +97,7 @@ def test_an_invalid_ai_section_in_a_repository_does_not_break_its_reviews(git_re
     git_repo.commit({".bussola.toml": '[ai]\nprovider = "ollama"\n', "app.py": "def total():\n    return 1\n"}, "change")
     git_repo.git("checkout", "-q", "main")
     git_repo.write({".bussola.toml": '[ai]\nprovider = "ollama"\n'})
+    write(config_file, ANTHROPIC)
     api = client(data_dir, config_file)
     repo = api.post("/api/repos", json={"path": str(git_repo.root)}).json()
 
@@ -130,7 +130,7 @@ def test_test_connection_asks_the_provider_for_a_tiny_structured_answer(data_dir
     assert result["message"] == "Fake provider (claude-opus-5-5) answered"
     assert len(provider.requests) == 1
     assert provider.requests[0].name == "connection_check"
-    assert provider.requests[0].max_tokens == DEFAULT_MAX_TOKENS
+    assert provider.requests[0].max_tokens == CONNECTION_MAX_TOKENS
 
 
 def test_test_connection_fails_when_the_model_does_not_answer_ok(data_dir: Path, config_file: Path) -> None:

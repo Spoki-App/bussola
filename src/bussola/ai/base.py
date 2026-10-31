@@ -22,6 +22,10 @@ class AiProviderError(AiError):
     pass
 
 
+class AiUnreachableError(AiProviderError):
+    pass
+
+
 class AiOutputError(AiError):
     pass
 
@@ -52,6 +56,7 @@ class AiProvider(Protocol):
     label: str
     model: str | None
     endpoint: str | None
+    max_tokens: int | None
 
     def complete(self, request: AiRequest, cancellation: "Cancellation") -> str: ...
 

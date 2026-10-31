@@ -63,7 +63,7 @@ class AiRunner:
         cached = self._cached(task, key)
         if cached is not None:
             return cached
-        request = AiRequest(task.name, task.system, prompt, output_schema(task.output), task.max_tokens)
+        request = AiRequest(task.name, task.system, prompt, output_schema(task.output), min(task.max_tokens, self.provider.max_tokens or task.max_tokens))
         result = parse_output(self.provider.complete(request, cancellation), task.output)
         if key is not None and self._cache is not None:
             self._cache.put(key, result.model_dump(mode="json"))

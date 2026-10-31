@@ -148,9 +148,19 @@ describe('AiActionButton', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Describe' }))
 
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not check the AI provider: Server error')
     expect(onRun).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('says why nothing happens when the provider broke after the page loaded', async () => {
+    const broken = { ...LOCAL, problem: 'Set the ANTHROPIC_API_KEY environment variable' }
+    const onRun = renderButton(LOCAL, vi.fn(), broken)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Describe' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Set the ANTHROPIC_API_KEY environment variable')
+    expect(onRun).not.toHaveBeenCalled()
   })
 
   it('runs once for a double click', async () => {

@@ -1,4 +1,4 @@
-from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiOutputError, AiTargetChangedError, Cancellation
+from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiOutputError, AiTargetChangedError, AiTimeoutError, AiUnreachableError, Cancellation
 from bussola.ai.batch import BatchProgress, run_batch
 
 
@@ -88,3 +88,29 @@ def test_a_changed_target_stops_the_batch() -> None:
 
     assert outcome.stopped_by == "Confirm again"
     assert outcome.results == {}
+
+
+def test_an_unreachable_provider_stops_the_batch() -> None:
+    calls: list[int] = []
+
+    def work(item: int) -> int:
+        calls.append(item)
+        raise AiUnreachableError("Cannot reach http://localhost:11434/v1/chat/completions")
+
+    outcome = run_batch([1, 2, 3], work, Cancellation())
+
+    assert calls == [1]
+    assert outcome.stopped_by == "Cannot reach http://localhost:11434/v1/chat/completions"
+
+
+def test_two_timeouts_in_a_row_stop_the_batch_but_one_does_not() -> None:
+    def work(item: int) -> int:
+        if item in {1, 3, 4}:
+            raise AiTimeoutError("No answer within 600 seconds")
+        return item
+
+    outcome = run_batch([1, 2, 3, 4, 5], work, Cancellation())
+
+    assert outcome.results == {2: 2}
+    assert set(outcome.errors) == {1, 3, 4}
+    assert outcome.stopped_by == "No answer within 600 seconds"

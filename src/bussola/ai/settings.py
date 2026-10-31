@@ -7,7 +7,7 @@ from bussola.config import REPO_CONFIG_FILE, load_repo_config
 
 def load_ai_settings(config_file: Path | None, repo_root: Path | None = None) -> AiSettings:
     user = load_user_config(config_file).ai
-    if repo_root is None:
+    if repo_root is None or not resolve_ai_settings(user).configured:
         return resolve_ai_settings(user)
     try:
         section = load_repo_config(repo_root).ai

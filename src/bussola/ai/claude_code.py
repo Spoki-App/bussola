@@ -28,6 +28,7 @@ class ClaudeCodeProvider:
     name: str = ProviderName.CLAUDE_CODE
     label = PROVIDER_LABELS[ProviderName.CLAUDE_CODE]
     endpoint: str | None = None
+    max_tokens: int | None = None
 
     def __init__(self, executable: str, model: str | None, timeout: float) -> None:
         self.model = model
@@ -89,8 +90,7 @@ class ClaudeCodeProvider:
                 stdout, stderr = run_cancellable(lambda: process.communicate(prompt), cancellation, self._timeout)
             finally:
                 finished.set()
-                if process.poll() is None:
-                    _kill_group(process)
+                _kill_group(process)
                 process.wait()
         return process.returncode, stdout, stderr
 

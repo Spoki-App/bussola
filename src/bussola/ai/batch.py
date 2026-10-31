@@ -1,7 +1,9 @@
 from collections.abc import Callable, Hashable, Sequence
 from dataclasses import dataclass, field
 
-from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiTargetChangedError, Cancellation
+from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiTargetChangedError, AiTimeoutError, AiUnreachableError, Cancellation
+
+TIMEOUTS_IN_A_ROW_TO_STOP = 2
 
 
 @dataclass(frozen=True)
@@ -26,19 +28,27 @@ def run_batch[K: Hashable, T](
     on_progress: Callable[[BatchProgress], None] | None = None,
 ) -> BatchResult[K, T]:
     outcome: BatchResult[K, T] = BatchResult()
-    failed = 0
+    failed = timeouts_in_a_row = 0
     for done, item in enumerate(items, start=1):
         if cancellation.cancelled:
             outcome.cancelled = True
             break
         try:
             outcome.results[item] = work(item)
+            timeouts_in_a_row = 0
         except AiCancelledError:
             outcome.cancelled = True
             break
-        except (AiNotConfiguredError, AiTargetChangedError) as error:
+        except (AiNotConfiguredError, AiTargetChangedError, AiUnreachableError) as error:
             outcome.stopped_by = str(error)
             break
+        except AiTimeoutError as error:
+            outcome.errors[item] = str(error)
+            failed += 1
+            timeouts_in_a_row += 1
+            if timeouts_in_a_row >= TIMEOUTS_IN_A_ROW_TO_STOP:
+                outcome.stopped_by = str(error)
+                break
         except Exception as error:
             outcome.errors[item] = str(error) or type(error).__name__
             failed += 1
