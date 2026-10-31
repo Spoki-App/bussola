@@ -183,9 +183,9 @@ The server is meant for one person on one machine.
 - **Session token:** every API call needs the session token cookie (HttpOnly, SameSite=Strict, one per port, so two servers do not log each other out).
 - **Host check:** requests whose `Host` header is not `127.0.0.1:<port>`, `localhost:<port>`, `[::1]:<port>` or the `--host` you passed are rejected, which blocks DNS rebinding.
 - **Git refs and files:** refs are validated with `git rev-parse --verify --end-of-options` before use. File contents are read only from the git object database.
-- **bussola:// links:** a link only chooses what to open. Its parameters are validated (repository name, numbers, a relative file path, a thread id), anything else in it is ignored, and no link approves, resolves, sends or deletes anything.
+- **bussola:// links:** a link chooses what to open. Like **Open pull request**, opening a pull request link fetches it with `git fetch` into `refs/bussola/pull/<number>` and starts its review if there is none. Its parameters are validated (repository name, numbers, a relative file path, a thread or comment id), anything else in it is ignored, and no link approves, resolves, sends or deletes anything.
 - **Opening links:** GitHub links are opened by the server in your default browser, as a new tab, so they work even when the bussola page runs in an app-style window. The server only opens `https://github.com` addresses.
-- **Outbound traffic:** the only network access is `git fetch` when you ask for it, `gh` when you sync or have a pull request review open, and downloads of images attached on GitHub shown in comments and descriptions.
+- **Outbound traffic:** the only network access is `git fetch` when you ask for it (including by opening a pull request link), `gh` when you sync or have a pull request review open, and downloads of images attached on GitHub shown in comments and descriptions.
 - **Rendered Markdown:** HTML in comments and descriptions is sanitized with GitHub's rules before it is shown. Attached images are served from `/api/forge/asset` only for `https://github.com/.../assets/...` links and only when they are images, with a sandboxing Content-Security-Policy.
 
 ## Status

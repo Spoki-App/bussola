@@ -31,5 +31,6 @@ export function useOpenReview() {
     },
     [mutate],
   )
-  return { open, start }
+  const visibleError = open.error && !isMissingClone(open.error) ? open.error : null
+  return { open, start, visibleError }
 }

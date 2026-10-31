@@ -1,14 +1,13 @@
 import { useState, type SubmitEvent } from 'react'
 
 import { describeError } from '../api/client'
-import { isMissingClone } from '../api/pulls'
 import { useOpenReview } from '../openReview'
 import { isPullRequestUrl, pullRequestTargetFromUrl } from '../review/pullRequestLink'
 import { ErrorNote } from './Badges'
 
 export function OpenPullRequestForm({ onOpened }: { onOpened: () => void }) {
   const [url, setUrl] = useState('')
-  const { open, start } = useOpenReview()
+  const { open, start, visibleError } = useOpenReview()
   const submit = (event: SubmitEvent) => {
     event.preventDefault()
     const target = pullRequestTargetFromUrl(url)
@@ -27,7 +26,7 @@ export function OpenPullRequestForm({ onOpened }: { onOpened: () => void }) {
       <button type="submit" className="primary" disabled={!isPullRequestUrl(url) || open.isPending}>
         {open.isPending ? 'Opening...' : 'Open'}
       </button>
-      {open.error && !isMissingClone(open.error) && <ErrorNote message={describeError(open.error)} />}
+      {visibleError && <ErrorNote message={describeError(visibleError)} />}
     </form>
   )
 }

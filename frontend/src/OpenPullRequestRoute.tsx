@@ -1,14 +1,13 @@
 import { useEffect, useRef } from 'react'
 
 import { describeError } from './api/client'
-import { isMissingClone } from './api/pulls'
 import { ErrorNote } from './components/Badges'
 import { ExternalLink } from './components/ExternalLink'
 import { Link } from './Link'
 import { useOpenReview } from './openReview'
 
 export function OpenPullRequestRoute({ url }: { url: string }) {
-  const { open, start } = useOpenReview()
+  const { start, visibleError } = useOpenReview()
   const started = useRef(false)
 
   useEffect(() => {
@@ -25,9 +24,9 @@ export function OpenPullRequestRoute({ url }: { url: string }) {
       <p>
         <ExternalLink href={url}>{url}</ExternalLink>
       </p>
-      {open.error && !isMissingClone(open.error) ? (
+      {visibleError ? (
         <>
-          <ErrorNote message={describeError(open.error)} />
+          <ErrorNote message={describeError(visibleError)} />
           <Link to="/">Back to repositories</Link>
         </>
       ) : (
