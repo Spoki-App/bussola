@@ -14,7 +14,7 @@ def test_health_endpoint_reports_ok(tmp_path: Path) -> None:
     response = client_for(tmp_path, tmp_path).get("/api/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {"status": "ok", "app": "bussola"}
 
 
 def test_frontend_routes_fall_back_to_index(tmp_path: Path) -> None:

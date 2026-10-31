@@ -23,6 +23,10 @@ def new_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+def token_cookie(port: int | None) -> str:
+    return f"{TOKEN_COOKIE}_{port}" if port else TOKEN_COOKIE
+
+
 def is_local_host(host: str) -> bool:
     if host in LOCAL_HOSTS:
         return True
@@ -50,7 +54,8 @@ def install_security(app: FastAPI, settings: AppSettings) -> None:
         query_token = request.query_params.get(TOKEN_QUERY)
         if query_token is not None and secrets.compare_digest(query_token, settings.token):
             return _store_token_and_redirect(request, settings.token)
-        if request.url.path.startswith(API_PATH_PREFIX) and not secrets.compare_digest(request.cookies.get(TOKEN_COOKIE, ""), settings.token):
+        cookie = request.cookies.get(token_cookie(request.url.port), "")
+        if request.url.path.startswith(API_PATH_PREFIX) and not secrets.compare_digest(cookie, settings.token):
             return JSONResponse({"detail": INVALID_TOKEN_DETAIL, "code": INVALID_TOKEN_CODE}, status_code=status.HTTP_403_FORBIDDEN)
         return await call_next(request)
 
@@ -59,5 +64,5 @@ def _store_token_and_redirect(request: Request, token: str) -> Response:
     remaining = [(key, value) for key, value in request.query_params.multi_items() if key != TOKEN_QUERY]
     target = request.url.path + (f"?{urlencode(remaining)}" if remaining else "")
     response = RedirectResponse(target, status_code=status.HTTP_303_SEE_OTHER)
-    response.set_cookie(TOKEN_COOKIE, token, httponly=True, samesite="strict", path="/")
+    response.set_cookie(token_cookie(request.url.port), token, httponly=True, samesite="strict", path="/")
     return response

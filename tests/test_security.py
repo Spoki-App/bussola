@@ -5,12 +5,13 @@ from fastapi.testclient import TestClient
 
 from bussola.app import create_app
 from bussola.config import AppSettings
-from bussola.security import TOKEN_COOKIE, allowed_hosts_for, is_local_host
+from bussola.security import allowed_hosts_for, is_local_host, token_cookie
 from tests.gitrepo import GitFixture
 
 TOKEN = "secret-token"
 PORT = 8765
 BASE_URL = f"http://127.0.0.1:{PORT}"
+TOKEN_COOKIE = token_cookie(PORT)
 
 
 @pytest.fixture
@@ -35,6 +36,13 @@ def test_foreign_host_header_is_forbidden_even_with_token(client: TestClient) ->
     response = client.get("/api/health", headers={"host": f"evil.example:{PORT}"})
 
     assert response.status_code == 403
+
+
+def test_the_session_cookie_belongs_to_one_port(client: TestClient) -> None:
+    client.cookies.set("bussola_token_9000", TOKEN)
+
+    assert client.get("/api/health").status_code == 403
+    assert TOKEN_COOKIE == "bussola_token_8765"
 
 
 def test_loopback_hosts_are_local() -> None:

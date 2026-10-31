@@ -26,8 +26,8 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 from bussola.config import DEFAULT_HOST, DEFAULT_PORT
 from bussola.errors import DomainError
 from bussola.handler.links import browser_path, parse_link
-from bussola.security import INVALID_TOKEN_CODE, TOKEN_COOKIE, TOKEN_ENV, TOKEN_QUERY, host_port, is_local_host, new_token
-from bussola.storage.database import DATA_DIR_ENV
+from bussola.security import INVALID_TOKEN_CODE, TOKEN_ENV, TOKEN_QUERY, host_port, is_local_host, new_token, token_cookie
+from bussola.storage.database import APP_NAME, DATA_DIR_ENV
 
 SERVERS_DIR = "servers"
 LINK_LOG_FILE = "open-link.log"
@@ -119,7 +119,7 @@ class Probe(StrEnum):
 def probe_server(address: ServerAddress) -> Probe:
     connection = http.client.HTTPConnection(address.host, address.port, timeout=HEALTH_TIMEOUT_SECONDS)
     try:
-        connection.request("GET", HEALTH_PATH, headers={"Cookie": f"{TOKEN_COOKIE}={address.token}"})
+        connection.request("GET", HEALTH_PATH, headers={"Cookie": f"{token_cookie(address.port)}={address.token}"})
         response = connection.getresponse()
         status, body = response.status, response.read(MAX_PROBE_BODY)
     except ConnectionRefusedError:
@@ -129,25 +129,35 @@ def probe_server(address: ServerAddress) -> Probe:
     finally:
         connection.close()
     if status == HTTPStatus.OK:
-        return Probe.READY
-    return Probe.OTHER_BUSSOLA if status == HTTPStatus.FORBIDDEN and _error_code(body) == INVALID_TOKEN_CODE else Probe.WRONG
+        return Probe.READY if _answer(body).app == APP_NAME else Probe.WRONG
+    return Probe.OTHER_BUSSOLA if status == HTTPStatus.FORBIDDEN and _answer(body).code == INVALID_TOKEN_CODE else Probe.WRONG
 
 
-class ErrorBody(BaseModel):
+class Answer(BaseModel):
+    app: str | None = None
     code: str | None = None
 
 
-def _error_code(body: bytes) -> str | None:
+def _answer(body: bytes) -> Answer:
     try:
-        return ErrorBody.model_validate_json(body).code
+        return Answer.model_validate_json(body)
     except ValidationError:
-        return None
+        return Answer()
 
 
 def free_port(host: str) -> int:
     with socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET) as probe:
         probe.bind((host, 0))
         return probe.getsockname()[1]
+
+
+def port_is_free(host: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET) as probe:
+        try:
+            probe.bind((host, port))
+        except OSError:
+            return False
+    return True
 
 
 def record_link_error(data_dir: Path, link: str, error: Exception) -> None:
@@ -186,6 +196,14 @@ class Process(Protocol):
     def poll(self) -> int | None: ...
 
 
+class NotStarted:
+    def poll(self) -> int:
+        return 1
+
+
+NOT_STARTED = NotStarted()
+
+
 def start_server(address: ServerAddress, data_dir: Path) -> Process:
     command = [sys.executable, "-m", "bussola", "serve", "--no-open", "--no-register", "--host", address.host, "--port", str(address.port)]
     return subprocess.Popen(
@@ -214,6 +232,7 @@ class Launcher:
     sleep: Callable[[float], object] = time.sleep
     timeout: float = START_TIMEOUT_SECONDS
     exit_grace: float = EXIT_GRACE_SECONDS
+    port_free: Callable[[str, int], bool] = port_is_free
 
     def open(self, link: str) -> str:
         path = browser_path(parse_link(link))
@@ -225,13 +244,14 @@ class Launcher:
     def ensure_server(self) -> ServerAddress:
         with ThreadPoolExecutor() as pool:
             states = self._probe_all(pool)
-            silent = [address for address, state in states.items() if state == Probe.SILENT]
+            silent = [address for address, state in states.items() if state == Probe.SILENT and is_local_host(address.host)]
             found = self._first_ready(states) or (self._wait_for_silent(pool, silent) if silent else None)
             if found is not None:
                 return found
             for port in (DEFAULT_PORT, *[None] * FREE_PORT_ATTEMPTS):
                 address = ServerAddress(DEFAULT_HOST, port or free_port(DEFAULT_HOST), new_token())
-                found = self._wait_for_server(pool, address, self.start(address, self.data_dir))
+                process = self.start(address, self.data_dir) if self.port_free(address.host, address.port) else NOT_STARTED
+                found = self._wait_for_server(pool, address, process)
                 if found is not None:
                     return found
         raise ServerStartError("bussola did not start. Run `bussola serve` to see why.")

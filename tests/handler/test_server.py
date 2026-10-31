@@ -22,6 +22,7 @@ from bussola.handler.server import (
     PublishedServer,
     ServerAddress,
     ServerStartError,
+    port_is_free,
     probe_server,
     publish_server,
     published_servers,
@@ -72,8 +73,20 @@ class FakeServers:
         listening = {(running.host, running.port) for running in self.healthy}
         return Probe.OTHER_BUSSOLA if (address.host, address.port) in listening else Probe.CLOSED
 
+    def port_free(self, host: str, port: int) -> bool:
+        return port != self.taken_port and all((running.host, running.port) != (host, port) for running in self.healthy)
+
     def launcher(self, data_dir: Path, *, sleep: Callable[[float], object] = lambda _seconds: None, timeout: float = 0, exit_grace: float = 0) -> Launcher:
-        return Launcher(data_dir, start=self.start, probe=self.probe, open_browser=self.open_browser, sleep=sleep, timeout=timeout, exit_grace=exit_grace)
+        return Launcher(
+            data_dir,
+            start=self.start,
+            probe=self.probe,
+            open_browser=self.open_browser,
+            sleep=sleep,
+            timeout=timeout,
+            exit_grace=exit_grace,
+            port_free=self.port_free,
+        )
 
 
 def test_address_url_carries_the_token_after_the_link_query() -> None:
@@ -204,10 +217,23 @@ def test_open_tries_another_free_port_if_the_first_one_is_taken_meanwhile(tmp_pa
             return FakeProcess(1)
         return servers.start(address, data_dir)
 
-    launcher = Launcher(tmp_path, start=start, probe=servers.probe, open_browser=servers.open_browser, sleep=lambda _seconds: None, timeout=60)
+    launcher = Launcher(
+        tmp_path, start=start, probe=servers.probe, open_browser=servers.open_browser, sleep=lambda _seconds: None, timeout=60, port_free=servers.port_free
+    )
 
     assert launcher.open("bussola://").startswith("http://127.0.0.1:20002/")
-    assert [address.port for address in servers.started] == [8765, 20001, 20002]
+    assert [address.port for address in servers.started] == [20001, 20002]
+
+
+def test_port_is_free_tells_a_taken_port_apart() -> None:
+    with socket.socket() as taken:
+        taken.bind(("127.0.0.1", 0))
+        taken.listen()
+        port = taken.getsockname()[1]
+
+        assert not port_is_free("127.0.0.1", port)
+
+    assert port_is_free("127.0.0.1", port)
 
 
 def test_open_starts_on_a_free_port_at_once_when_another_program_holds_8765(tmp_path: Path) -> None:
@@ -218,10 +244,9 @@ def test_open_starts_on_a_free_port_at_once_when_another_program_holds_8765(tmp_
 
     assert naps == []
 
-    first, second = servers.started
-    assert first.port == 8765
-    assert second.port != 8765
-    assert url == f"http://127.0.0.1:{second.port}/?token={second.token}"
+    [started] = servers.started
+    assert started.port != 8765
+    assert url == f"http://127.0.0.1:{started.port}/?token={started.token}"
 
 
 def test_open_does_not_start_a_second_server_while_the_first_is_still_starting(tmp_path: Path) -> None:
@@ -253,7 +278,8 @@ def test_open_gives_up_on_a_local_server_that_never_answers_and_starts_its_own(t
 
     url = servers.launcher(tmp_path, timeout=0).open("bussola://")
 
-    [_, started] = servers.started
+    [started] = servers.started
+    assert started.port != 8765
     assert url == f"http://127.0.0.1:{started.port}/?token={started.token}"
     assert hung not in published_servers(tmp_path)
 
@@ -431,8 +457,9 @@ def serve_http(answer: Callable[[BaseHTTPRequestHandler], None]) -> ThreadingHTT
 
 
 def answer_like_bussola(request: BaseHTTPRequestHandler) -> None:
-    ok = request.path == "/api/health" and request.headers.get("Cookie") == f"bussola_token={TOKEN}"
-    body = b'{"status":"ok"}' if ok else json.dumps({"detail": "Missing or invalid session token", "code": INVALID_TOKEN_CODE}).encode()
+    port = request.headers.get("Host", "").rsplit(":", 1)[-1]
+    ok = request.path == "/api/health" and request.headers.get("Cookie") == f"bussola_token_{port}={TOKEN}"
+    body = b'{"status":"ok","app":"bussola"}' if ok else json.dumps({"detail": "Missing or invalid session token", "code": INVALID_TOKEN_CODE}).encode()
     request.send_response(200 if ok else 403)
     request.send_header("Content-Length", str(len(body)))
     request.end_headers()
@@ -459,6 +486,25 @@ def health_server() -> Generator[ServerAddress]:
 def test_probe_needs_the_server_token_to_call_it_ready(health_server: ServerAddress) -> None:
     assert probe_server(health_server) == Probe.READY
     assert probe_server(ServerAddress(health_server.host, health_server.port, "wrong")) == Probe.OTHER_BUSSOLA
+
+
+def answer_ok_to_everything(request: BaseHTTPRequestHandler) -> None:
+    request.send_response(200)
+    request.send_header("Content-Length", "15")
+    request.end_headers()
+    request.wfile.write(b"<html>hi</html>")
+
+
+def test_probe_does_not_take_any_200_for_bussola() -> None:
+    httpd = serve_http(answer_ok_to_everything)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+
+    state = probe_server(ServerAddress("127.0.0.1", httpd.server_address[1], TOKEN))
+
+    httpd.shutdown()
+    httpd.server_close()
+    assert state == Probe.WRONG
 
 
 def test_probe_does_not_take_any_403_for_bussola() -> None:
