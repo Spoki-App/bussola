@@ -10,6 +10,7 @@ from bussola.git.errors import GitError, InvalidRefError
 
 GIT = "git"
 SUBMODULE_MODE = "160000"
+BLOB_TYPE = "blob"
 RAW_RECORD_PREFIX = ":"
 DEFAULT_REMOTE = "origin"
 LOCAL_PREFIX = "refs/heads/"
@@ -144,6 +145,17 @@ class GitRepo:
             raise InvalidRefError(commit)
         return [path for path in self.run("ls-tree", "-r", "--name-only", "-z", commit).decode(errors="replace").split("\0") if path]
 
+    def tree_blobs(self, commit: str) -> list[BlobRef]:
+        if not OBJECT_ID.fullmatch(commit):
+            raise InvalidRefError(commit)
+        entries = self.run("ls-tree", "-r", "-z", "--full-tree", commit).decode(errors="surrogateescape").split("\0")
+        return [_tree_entry(entry) for entry in entries if entry and _is_blob_entry(entry)]
+
+    def archive(self, commit: str, output: Path) -> None:
+        if not OBJECT_ID.fullmatch(commit):
+            raise InvalidRefError(commit)
+        self.run("archive", "--format=tar", f"--output={output}", commit)
+
     def blob_reader(self) -> BlobReader:
         process = subprocess.Popen([GIT, "cat-file", "--batch"], cwd=self.root, env=_git_env(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         return BlobReader(process)
@@ -164,6 +176,16 @@ def parse_raw_diff(output: str) -> list[FileChange]:
         new = None if status == ChangeStatus.DELETED else BlobRef(new_path, new_id, new_mode)
         changes.append(FileChange(status, old, new))
     return changes
+
+
+def _is_blob_entry(entry: str) -> bool:
+    return entry.split(" ", 2)[1] == BLOB_TYPE
+
+
+def _tree_entry(entry: str) -> BlobRef:
+    meta, _, path = entry.partition("\t")
+    mode, _, object_id = meta.split(" ")
+    return BlobRef(path, object_id, mode)
 
 
 def read_git_config(cwd: Path, key: str) -> str | None:

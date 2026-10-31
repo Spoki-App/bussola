@@ -97,11 +97,22 @@ A unit's own name does not count towards its content, so renaming a function wit
 
 To approve part of a module or file, click changed lines in its diff (shift-click extends the selection) and press "Approve selection". An approved line needs review again if it or the line next to it changes.
 
-Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve or revoke (or approve the selected lines), `c` comment, `r` check for new commits.
+Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve or revoke (or approve the selected lines), `c` comment, `r` check for new commits. Cmd/Ctrl+click a name to go to its definition or usages.
 
 ### Comments
 
 Click a line number to start a thread on that line. To comment on several lines, drag over their line numbers or shift-click another line number; the thread is sent to GitHub as a multi-line comment. Use "Comment on file" in a file header, or the conversation panel for comments on the whole review. Comments and pull request descriptions are rendered like on GitHub: GitHub Flavored Markdown (tables, task lists, line breaks), `> [!NOTE]` style alerts, safe HTML, highlighted code, mermaid diagrams, `owner/repo#123` links, and images attached on GitHub (downloaded through bussola with your `gh` login, since GitHub only serves them to signed-in users). You can edit or delete your own comments, and delete a thread you started as long as nobody else replied to it (otherwise resolve it). As on GitHub, only line and file threads can be resolved and count as open; comments on the whole review are part of the conversation. Deleted threads disappear from bussola but stay on GitHub if they were already sent. When the code changes, a thread moves with its line. It follows a renamed unit, and becomes outdated, showing the original snippet, when its line is gone.
+
+### Code navigation
+
+Cmd+click (Ctrl+click on Linux and Windows) a name in a diff to navigate, as in IntelliJ, in Python, TypeScript/TSX, JavaScript and Go files:
+
+- On a call or any other use of a name, bussola looks for its definition. On the name of a function, method, class or module level variable where it is defined, it lists its usages.
+- When there is exactly one result and it is part of the review, the page scrolls to that unit and highlights the line.
+- Otherwise a list opens next to the pointer: definitions first, then usages grouped by file, each with its line and a preview, and results inside the review marked **in review**. Use the arrow keys, Enter and Esc.
+- A result outside the review opens the file at the reviewed commit in a window, highlighted and scrolled to the line, with a link to the file on GitHub when the branch has a GitHub remote. Cmd/Ctrl+click works there too, and **Back** returns along the chain.
+
+Results come from an index of the repository at the reviewed commit, built with tree-sitter in the background when the review opens and kept per commit. It matches names, so it needs nothing installed but can list unrelated functions with the same name. When a language server is on your `PATH`, its precise answers are used instead: `basedpyright-langserver` or `pyright-langserver` for Python, `typescript-language-server` for TypeScript and JavaScript, `gopls` for Go. It runs on a copy of the reviewed commit, never on your working tree. If the server finds nothing, fails or takes more than five seconds, the index answers instead. The first time you navigate in a language without a server, a note shows the command that installs one; it is shown once.
 
 ### Reviewing GitHub pull requests
 
@@ -147,7 +158,7 @@ ignore = ["vendor/**", "docs/**"]
 
 ## Data
 
-Reviews, approvals and comments are stored in SQLite at `platformdirs.user_data_dir("bussola")/bussola.db` (on macOS `~/Library/Application Support/bussola`). Set `BUSSOLA_DATA_DIR` to use another directory.
+Reviews, approvals and comments are stored in SQLite at `platformdirs.user_data_dir("bussola")/bussola.db` (on macOS `~/Library/Application Support/bussola`). Set `BUSSOLA_DATA_DIR` to use another directory. Language servers run on copies of reviewed commits in its `checkouts` folder, which is removed when bussola stops.
 
 A registered repository is remembered by its path and its first commit. If you move it, add it again from the new location and its reviews follow.
 
@@ -160,7 +171,7 @@ The server is meant for one person on one machine.
 - **Host check:** requests whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` are rejected, which blocks DNS rebinding.
 - **Git refs and files:** refs are validated with `git rev-parse --verify --end-of-options` before use. File contents are read only from the git object database.
 - **Opening links:** GitHub links are opened by the server in your default browser, as a new tab, so they work even when the bussola page runs in an app-style window. The server only opens `https://github.com` addresses.
-- **Outbound traffic:** the only network access is `git fetch` when you ask for it, `gh` when you sync or have a pull request review open, and downloads of images attached on GitHub shown in comments and descriptions.
+- **Outbound traffic:** the only network access is `git fetch` when you ask for it, `gh` when you sync or have a pull request review open, and downloads of images attached on GitHub shown in comments and descriptions. Language servers are started with downloads turned off (`GOPROXY=off` for gopls, no automatic type acquisition for TypeScript).
 - **Rendered Markdown:** HTML in comments and descriptions is sanitized with GitHub's rules before it is shown. Attached images are served from `/api/forge/asset` only for `https://github.com/.../assets/...` links and only when they are images, with a sandboxing Content-Security-Policy.
 
 ## Status

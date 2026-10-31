@@ -20,12 +20,13 @@ If a change trades one of these for something else, say so in the pull request.
 | `src/bussola/cli.py`, `app.py` | Command line and the FastAPI app |
 | `src/bussola/units/` | Splitting files into units: tree-sitter extractors, normalization, hashing |
 | `src/bussola/review/` | Revisions, unit states, approvals, threads and their anchoring |
+| `src/bussola/navigation/` | Go to definition and usages: the tree-sitter symbol index and the optional language servers |
 | `src/bussola/forge/` | GitHub through `gh`: pull requests, importing and sending comments |
 | `src/bussola/git/` | Running `git` safely |
 | `src/bussola/storage/` | SQLAlchemy models, repositories and Alembic migrations |
 | `src/bussola/api/` | HTTP routes and schemas |
 | `frontend/` | React UI, built into `src/bussola/static/` |
-| `tests/` | Backend tests; `tests/fakegh` is the fake `gh` used by the GitHub tests |
+| `tests/` | Backend tests; `tests/fakegh` is the fake `gh` used by the GitHub tests, `tests/fakelsp` the fake language server |
 | `docs/design.md` | The rules behind units, approvals, threads and GitHub sync |
 
 ## Setup

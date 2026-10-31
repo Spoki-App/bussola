@@ -16,6 +16,7 @@ import { ReviewTitle } from '../components/ReviewTitle'
 import { SyncSummary } from '../components/SyncSummary'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
 import { UnitTree } from '../components/UnitTree'
+import { useCodeNavigation } from '../hooks/useCodeNavigation'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
@@ -135,6 +136,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const [filter, setFilter] = useState<UnitFilter>('all')
   const revisionId = review.data?.latest_revision?.id
   const units = useUnits(reviewId, revisionId, filter)
+  const navigation = useCodeNavigation(reviewId, revisionId)
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query)
   const fileGroups = useMemo(() => groupByFile(units.data ?? []), [units.data])
@@ -229,7 +231,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
             <DiffLayoutSwitch />
           </div>
           <div className="summary-row">
-            <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>
+            <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines. Cmd or Ctrl+click a name to go to its definition or list its usages.</p>
             <div className="summary-actions">
               <DiffWrapButton />
               {extensions.sidePanel && (
@@ -274,6 +276,8 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                     onCommentSelectEnd={extensions.onCommentSelectEnd}
                     renderWidgets={extensions.renderWidgets}
                     highlightRows={extensions.highlightRows}
+                    onNavigate={navigation.navigate}
+                    navigationTarget={navigation.target?.unitId === unit.id ? navigation.target : undefined}
                   />
                 )}
               />
@@ -282,6 +286,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
         </main>
         {panelOpen && extensions.sidePanel && <aside className="side-panel">{extensions.sidePanel.content}</aside>}
       </div>
+      {navigation.element}
     </div>
   )
 }
