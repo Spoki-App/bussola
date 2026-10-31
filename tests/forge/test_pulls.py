@@ -159,8 +159,9 @@ def test_a_pull_request_link_without_a_local_clone_is_reported(api: ApiClient, g
     assert error["code"] == "no_local_clone"
 
 
-def test_a_link_that_is_not_a_pull_request_is_rejected(api: ApiClient) -> None:
-    error = open_link(api, "https://github.com/acme/widgets/issues/7", 400)
+@pytest.mark.parametrize("url", ["https://github.com/acme/widgets/issues/7", "https://github.com/acme/widgets/pull/" + "9" * 1000])
+def test_a_link_that_is_not_a_pull_request_is_rejected(api: ApiClient, url: str) -> None:
+    error = open_link(api, url, 400)
 
     assert "Not a GitHub pull request link" in error["detail"]
 

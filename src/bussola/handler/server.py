@@ -4,6 +4,7 @@ import ipaddress
 import logging
 import os
 import re
+import secrets
 import socket
 import subprocess
 import sys
@@ -95,8 +96,15 @@ def publish_server(data_dir: Path, address: ServerAddress) -> None:
 
 def withdraw_server(data_dir: Path, address: ServerAddress) -> None:
     path = server_file(data_dir, address)
-    if _read_address(path) == address:
-        path.unlink(missing_ok=True)
+    claimed = path.with_name(f"{path.name}.{secrets.token_hex(8)}.withdrawn")
+    try:
+        path.rename(claimed)
+    except FileNotFoundError:
+        return
+    if _read_address(claimed) == address or path.exists():
+        claimed.unlink(missing_ok=True)
+    else:
+        claimed.rename(path)
 
 
 def published_servers(data_dir: Path) -> list[ServerAddress]:

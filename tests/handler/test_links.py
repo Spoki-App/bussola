@@ -24,7 +24,8 @@ def test_bare_scheme_opens_the_home_page(url: str) -> None:
         ("bussola://www.github.com/acme/my.widgets/pull/7/files?diff=split", ReviewLink("acme/my.widgets", 7)),
         ("bussola://github.com/acme/widgets/pull/7/files#discussion_r501", ReviewLink("acme/widgets", 7, comment=501)),
         ("bussola://github.com/acme/widgets/pull/7/files#r502", ReviewLink("acme/widgets", 7, comment=502)),
-        ("bussola://github.com/acme/widgets/pull/7#issuecomment-9", ReviewLink("acme/widgets", 7)),
+        ("bussola://github.com/acme/widgets/pull/7#issuecomment-503", ReviewLink("acme/widgets", 7, comment=503)),
+        ("bussola://github.com/acme/widgets/pull/7#pullrequestreview-9", ReviewLink("acme/widgets", 7)),
     ],
 )
 def test_supported_links(url: str, expected: ReviewLink) -> None:
@@ -69,6 +70,7 @@ def test_supported_links(url: str, expected: ReviewLink) -> None:
         "bussola://github.com/acme/widgets/pull/7abc",
         "bussola://github.com/acme/widgets/pull/1234567890",
         "bussola://github.com/acme/widgets/pull/0",
+        "bussola://github.com/acme/widgets/pull/" + "9" * 5000,
     ],
 )
 def test_invalid_links_are_refused(url: str) -> None:

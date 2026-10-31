@@ -16,7 +16,7 @@ from bussola.storage.repositories import Store
 
 PULL_REF_PREFIX = "refs/bussola/pull/"
 OPEN_STATE = "OPEN"
-PULL_URL = re.compile(r"^(?:https?://)?(?:www\.)?github\.com/(?P<repository>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(?P<number>\d+)(?:[/?#].*)?$")
+PULL_URL = re.compile(r"^(?:https?://)?(?:www\.)?github\.com/(?P<repository>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(?P<number>\d{1,18})(?:[/?#].*)?$")
 
 
 class NoLocalCloneError(NotFoundError):

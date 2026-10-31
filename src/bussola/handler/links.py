@@ -18,7 +18,7 @@ DIGITS = re.compile(rf"[0-9]{{1,{len(str(MAX_NUMBER))}}}")
 REPOSITORY = re.compile(rf"(?P<owner>{NAME})/(?P<name>{NAME})")
 THREAD_ID = re.compile(r"[0-9a-f]{32}")
 COMMENT_ID = re.compile(r"[1-9][0-9]{0,19}")
-DISCUSSION_ANCHOR = re.compile(rf"(?:discussion_)?r(?P<comment>{COMMENT_ID.pattern})")
+COMMENT_ANCHOR = re.compile(rf"(?:discussion_r|r|issuecomment-)(?P<comment>{COMMENT_ID.pattern})")
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 
 
@@ -93,7 +93,7 @@ def _github_link(path: str, fragment: str) -> ReviewLink:
         address = parse_pull_request_url(f"github.com{path}")
     except InvalidRequestError as error:
         raise InvalidLinkError(f"Not a GitHub pull request link. Expected {SCHEME}://github.com/<owner>/<name>/pull/<number>.") from error
-    anchor = DISCUSSION_ANCHOR.fullmatch(fragment)
+    anchor = COMMENT_ANCHOR.fullmatch(fragment)
     return ReviewLink(
         repository=_repository(address.repository),
         number=_in_range("pr", address.number),
@@ -130,14 +130,17 @@ def _file_path(value: str | None) -> str | None:
 
 
 def _optional_comment(value: str | None) -> int | None:
-    if value is not None and COMMENT_ID.fullmatch(value) is None:
-        raise InvalidLinkError("The comment parameter must be a GitHub comment id")
-    return None if value is None else int(value)
+    comment = _optional_match("comment", COMMENT_ID, value, "a GitHub comment id")
+    return None if comment is None else int(comment)
 
 
 def _thread_id(value: str | None) -> str | None:
-    if value is not None and THREAD_ID.fullmatch(value) is None:
-        raise InvalidLinkError("The thread parameter must be a thread id")
+    return _optional_match("thread", THREAD_ID, value, "a thread id")
+
+
+def _optional_match(name: str, pattern: re.Pattern[str], value: str | None, expected: str) -> str | None:
+    if value is not None and pattern.fullmatch(value) is None:
+        raise InvalidLinkError(f"The {name} parameter must be {expected}")
     return value
 
 
