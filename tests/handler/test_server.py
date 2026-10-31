@@ -1,5 +1,6 @@
 import ipaddress
 import json
+import re
 import socket
 import stat
 import subprocess
@@ -162,7 +163,7 @@ def test_open_finds_a_server_published_while_it_waits(tmp_path: Path) -> None:
     assert launcher.open("bussola://") == f"http://127.0.0.1:9000/?token={TOKEN}"
 
 
-def test_open_keeps_waiting_while_another_bussola_holds_the_port_and_starts(tmp_path: Path) -> None:
+def test_open_finds_the_server_another_link_started_once_it_publishes(tmp_path: Path) -> None:
     winner = ServerAddress("127.0.0.1", 8765, "winner")
     servers = FakeServers({winner}, comes_up=False, exit_code=1)
     naps: list[float] = []
@@ -172,10 +173,34 @@ def test_open_keeps_waiting_while_another_bussola_holds_the_port_and_starts(tmp_
         if len(naps) == 3:
             publish_server(tmp_path, winner)
 
-    launcher = servers.launcher(tmp_path, sleep=winner_publishes_late, timeout=60, exit_grace=0)
+    launcher = servers.launcher(tmp_path, sleep=winner_publishes_late, timeout=60, exit_grace=60)
 
     assert launcher.open("bussola://") == "http://127.0.0.1:8765/?token=winner"
     assert len(naps) == 3
+
+
+def test_open_explains_a_bussola_it_cannot_use(tmp_path: Path) -> None:
+    unpublished = ServerAddress("127.0.0.1", 8765, "elsewhere")
+    servers = FakeServers({unpublished}, comes_up=False, exit_code=1)
+    naps: list[float] = []
+
+    with pytest.raises(ServerStartError, match=re.escape("Another bussola is running on 127.0.0.1:8765")):
+        servers.launcher(tmp_path, sleep=naps.append, timeout=60).open("bussola://")
+
+    assert naps == []
+
+
+def test_open_works_when_a_stale_server_file_cannot_be_removed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    running = ServerAddress("127.0.0.1", 8765, TOKEN)
+    publish_server(tmp_path, ServerAddress("127.0.0.1", 9000, "gone"))
+    publish_server(tmp_path, running)
+
+    def locked(_path: Path, missing_ok: bool = False) -> None:
+        raise PermissionError(missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", locked)
+
+    assert FakeServers({running}).launcher(tmp_path).open("bussola://") == f"http://127.0.0.1:8765/?token={TOKEN}"
 
 
 def test_open_forgets_server_files_whose_port_is_closed(tmp_path: Path) -> None:

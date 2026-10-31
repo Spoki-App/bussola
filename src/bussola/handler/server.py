@@ -27,7 +27,7 @@ from pydantic import TypeAdapter, ValidationError
 from bussola.config import DEFAULT_HOST, DEFAULT_PORT
 from bussola.errors import DomainError
 from bussola.handler.links import browser_path, parse_link
-from bussola.security import INVALID_TOKEN_DETAIL, TOKEN_COOKIE, TOKEN_ENV, TOKEN_QUERY, new_token
+from bussola.security import INVALID_TOKEN_DETAIL, TOKEN_COOKIE, TOKEN_ENV, TOKEN_QUERY, host_port, new_token
 from bussola.storage.database import DATA_DIR_ENV
 
 SERVERS_DIR = "servers"
@@ -53,9 +53,8 @@ class ServerAddress:
     token: str
 
     def url(self, path: str) -> str:
-        host = f"[{self.host}]" if ":" in self.host else self.host
         separator = "&" if "?" in path else "?"
-        return f"http://{host}:{self.port}{path}{separator}{urlencode({TOKEN_QUERY: self.token})}"
+        return f"http://{host_port(self.host, self.port)}{path}{separator}{urlencode({TOKEN_QUERY: self.token})}"
 
     def reachable(self) -> "ServerAddress":
         if not _listens_everywhere(self.host):
@@ -212,42 +211,43 @@ class Launcher:
         return url
 
     def ensure_server(self) -> ServerAddress:
-        running = self._first_healthy()
-        if running is not None:
-            return running
-        address = ServerAddress(DEFAULT_HOST, DEFAULT_PORT, new_token())
-        found = self._wait_for_server(address, self.start(address, self.data_dir))
-        if found is None:
-            raise ServerStartError(
-                f"bussola did not start on {address.host}:{address.port}. Another program may be using that port. Run `bussola serve` to see why."
-            )
-        return found
+        with ThreadPoolExecutor() as pool:
+            running = self._first_ready(self._probe_all(pool))
+            if running is not None:
+                return running
+            address = ServerAddress(DEFAULT_HOST, DEFAULT_PORT, new_token())
+            return self._wait_for_server(pool, address, self.start(address, self.data_dir))
 
-    def _first_healthy(self, *extra: ServerAddress) -> ServerAddress | None:
-        return self._first_ready(self._probe_all(extra))
-
-    def _probe_all(self, extra: tuple[ServerAddress, ...]) -> dict[ServerAddress, Probe]:
+    def _probe_all(self, pool: ThreadPoolExecutor, *extra: ServerAddress) -> dict[ServerAddress, Probe]:
         published = published_servers(self.data_dir)
         candidates = list(dict.fromkeys([*extra, *published]))
-        with ThreadPoolExecutor(max_workers=max(len(candidates), 1)) as pool:
-            states = dict(zip(candidates, pool.map(self.probe, candidates), strict=True))
+        states = dict(zip(candidates, pool.map(self.probe, candidates), strict=True))
         for candidate in published:
             if states[candidate] == Probe.CLOSED:
-                withdraw_server(self.data_dir, candidate)
+                with contextlib.suppress(OSError):
+                    withdraw_server(self.data_dir, candidate)
         return states
 
     def _first_ready(self, states: dict[ServerAddress, Probe]) -> ServerAddress | None:
         return next((candidate for candidate, state in states.items() if state == Probe.READY), None)
 
-    def _wait_for_server(self, started: ServerAddress, process: Process) -> ServerAddress | None:
+    def _wait_for_server(self, pool: ThreadPoolExecutor, started: ServerAddress, process: Process) -> ServerAddress:
         deadline = time.monotonic() + self.timeout
         while True:
-            states = self._probe_all((started,))
+            states = self._probe_all(pool, started)
             found = self._first_ready(states)
             if found is not None:
                 return found
-            if process.poll() is not None and states[started] != Probe.OTHER_BUSSOLA:
+            if process.poll() is not None:
                 deadline = min(deadline, time.monotonic() + self.exit_grace)
             if time.monotonic() >= deadline:
-                return None
+                raise _start_error(started, states[started])
             self.sleep(POLL_INTERVAL_SECONDS)
+
+
+def _start_error(address: ServerAddress, state: Probe) -> ServerStartError:
+    where = host_port(address.host, address.port)
+    if state == Probe.OTHER_BUSSOLA:
+        reason = "it was started with another BUSSOLA_DATA_DIR or by an older version. Stop it, or open the link it printed."
+        return ServerStartError(f"Another bussola is running on {where} but this link cannot use it: {reason}")
+    return ServerStartError(f"bussola did not start on {where}. Another program may be using that port. Run `bussola serve` to see why.")

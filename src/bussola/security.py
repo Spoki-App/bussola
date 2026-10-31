@@ -21,8 +21,12 @@ def new_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+def host_port(host: str, port: int) -> str:
+    return f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+
+
 def allowed_hosts_for(host: str, port: int) -> frozenset[str]:
-    return frozenset(f"[{name}]:{port}" if ":" in name else f"{name}:{port}" for name in {*LOCAL_HOSTS, host})
+    return frozenset(host_port(name, port) for name in {*LOCAL_HOSTS, host})
 
 
 def install_security(app: FastAPI, settings: AppSettings) -> None:
