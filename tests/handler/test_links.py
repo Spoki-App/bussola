@@ -60,6 +60,7 @@ def test_supported_links(url: str, expected: ReviewLink) -> None:
         "bussola://github.com.evil.example/acme/widgets/pull/7",
         "bussola://github.com/acme/widgets/pull/7abc",
         "bussola://github.com/acme/widgets/pull/1234567890",
+        "bussola://github.com/acme/widgets/pull/0",
     ],
 )
 def test_invalid_links_are_refused(url: str) -> None:

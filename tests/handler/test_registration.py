@@ -76,6 +76,16 @@ def test_linux_uninstall_forgets_the_default_xdg_mime_wrote(tmp_path: Path) -> N
     assert mimeapps.read_text() == "[Default Applications]\ntext/html=firefox.desktop\n[Added Associations]\nx-scheme-handler/bussola=other.desktop;\n"
 
 
+def test_linux_uninstall_keeps_line_endings_of_mimeapps_list(tmp_path: Path) -> None:
+    mimeapps = tmp_path / ".config/mimeapps.list"
+    mimeapps.parent.mkdir(parents=True)
+    mimeapps.write_bytes(b"[Default Applications]\r\nx-scheme-handler/bussola=other.desktop;bussola-url-handler.desktop;")
+
+    apply(registration_for("linux", tmp_path, {}, PYTHON).uninstall, Recorder())
+
+    assert mimeapps.read_bytes() == b"[Default Applications]\r\nx-scheme-handler/bussola=other.desktop;"
+
+
 def test_linux_uninstall_without_mimeapps_list_creates_none(tmp_path: Path) -> None:
     apply(registration_for("linux", tmp_path, {}, PYTHON).uninstall, Recorder())
 

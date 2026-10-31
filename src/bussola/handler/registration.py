@@ -263,20 +263,22 @@ def _update_plist(path: Path, values: Mapping[str, Any]) -> None:
 def _forget_mime_default(path: Path) -> None:
     if not path.is_file():
         return
-    text = path.read_text(encoding="utf-8")
-    kept = [line for line in (_without_handler(line) for line in text.splitlines(keepends=True)) if line is not None]
-    if "".join(kept) != text:
-        path.write_text("".join(kept), encoding="utf-8")
+    text = path.read_bytes().decode("utf-8")
+    kept = "".join(line for line in (_without_handler(line) for line in text.splitlines(keepends=True)) if line is not None)
+    if kept != text:
+        path.write_bytes(kept.encode("utf-8"))
 
 
 def _without_handler(line: str) -> str | None:
-    key, separator, value = line.rstrip("\r\n").partition("=")
+    content = line.rstrip("\r\n")
+    ending = line[len(content) :]
+    key, separator, value = content.partition("=")
     if not separator or key.strip() != MIME_TYPE:
         return line
     handlers = [handler for handler in value.split(";") if handler.strip() and handler.strip() != DESKTOP_FILE]
     if not handlers:
         return None
-    return f"{key}={';'.join(handlers)}{';' if value.endswith(';') else ''}\n"
+    return f"{key}={';'.join(handlers)}{';' if value.endswith(';') else ''}{ending}"
 
 
 def _desktop_argument(argument: str) -> str:

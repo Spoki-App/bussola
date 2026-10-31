@@ -91,8 +91,8 @@ def _github_link(path: str, fragment: str) -> ReviewLink:
         address = parse_pull_request_url(f"github.com{path}")
     except InvalidRequestError as error:
         raise InvalidLinkError(f"Not a GitHub pull request link. Expected {SCHEME}://github.com/<owner>/<name>/pull/<number>.") from error
-    if address.number > MAX_NUMBER:
-        raise InvalidLinkError("The pull request number is too large")
+    if not 0 < address.number <= MAX_NUMBER:
+        raise InvalidLinkError("The pull request number must be a positive number")
     anchor = DISCUSSION_ANCHOR.match(fragment)
     return ReviewLink(
         repository=_repository(address.repository),
