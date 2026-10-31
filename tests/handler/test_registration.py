@@ -1,5 +1,6 @@
 import plistlib
 import subprocess
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -8,11 +9,13 @@ import pytest
 from bussola.handler.registration import (
     LSREGISTER,
     CreateDirectory,
+    DeleteRegistryTree,
     ForgetMimeDefault,
     HandlerError,
     MovePath,
     RemovePath,
     RunCommand,
+    SetRegistryValue,
     UpdatePlist,
     WriteFile,
     app_properties,
@@ -222,11 +225,51 @@ def test_windows_writes_the_url_protocol_keys_under_hkcu(tmp_path: Path) -> None
 
     assert handler.location == "HKCU\\Software\\Classes\\bussola"
     assert handler.install == (
-        RunCommand(("reg", "add", "HKCU\\Software\\Classes\\bussola", "/ve", "/d", "URL:bussola link", "/f")),
-        RunCommand(("reg", "add", "HKCU\\Software\\Classes\\bussola", "/v", "URL Protocol", "/d", "", "/f")),
-        RunCommand(("reg", "add", "HKCU\\Software\\Classes\\bussola\\shell\\open\\command", "/ve", "/d", f'"{windowless}" -m bussola open-link "%1"', "/f")),
+        SetRegistryValue("Software\\Classes\\bussola", "", "URL:bussola link"),
+        SetRegistryValue("Software\\Classes\\bussola", "URL Protocol", ""),
+        SetRegistryValue("Software\\Classes\\bussola\\shell\\open\\command", "", f'"{windowless}" -m bussola open-link "%1"'),
     )
-    assert handler.uninstall == (RunCommand(("reg", "delete", "HKCU\\Software\\Classes\\bussola", "/f"), required=False),)
+    assert handler.uninstall == (DeleteRegistryTree("Software\\Classes\\bussola"),)
+
+
+class FakeRegistry:
+    def __init__(self, denied: bool = False) -> None:
+        self.values: dict[tuple[str, str], str] = {}
+        self.denied = denied
+
+    def set_value(self, key: str, name: str, value: str) -> None:
+        self.values[key, name] = value
+
+    def delete_tree(self, key: str) -> None:
+        if self.denied:
+            raise PermissionError("Access is denied")
+        self.values = {entry: value for entry, value in self.values.items() if not (entry[0] == key or entry[0].startswith(f"{key}\\"))}
+
+
+def test_windows_install_and_uninstall_through_the_registry(tmp_path: Path) -> None:
+    handler = registration_for("win32", tmp_path, {}, "C:/Python/python.exe")
+    registry = FakeRegistry()
+
+    apply(handler.install, Recorder(), registry)
+    assert registry.values[("Software\\Classes\\bussola\\shell\\open\\command", "")] == 'C:/Python/python.exe -m bussola open-link "%1"'
+
+    apply(handler.uninstall, Recorder(), registry)
+    assert registry.values == {}
+
+
+def test_windows_uninstall_reports_a_key_it_cannot_delete(tmp_path: Path) -> None:
+    handler = registration_for("win32", tmp_path, {}, "C:/Python/python.exe")
+
+    with pytest.raises(HandlerError, match="Access is denied"):
+        apply(handler.uninstall, Recorder(), FakeRegistry(denied=True))
+
+
+def test_registry_steps_refuse_to_run_outside_windows(tmp_path: Path) -> None:
+    handler = registration_for("win32", tmp_path, {}, "C:/Python/python.exe")
+
+    if sys.platform != "win32":
+        with pytest.raises(HandlerError, match="only on Windows"):
+            apply(handler.install, Recorder())
 
 
 def test_handler_keeps_the_data_dir_it_was_installed_with(tmp_path: Path) -> None:

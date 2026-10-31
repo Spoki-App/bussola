@@ -1,3 +1,4 @@
+import importlib
 import os
 import plistlib
 import re
@@ -8,11 +9,14 @@ import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from types import ModuleType
+from typing import Any, Protocol
 
 from bussola.errors import DomainError
 from bussola.handler.links import SCHEME
 from bussola.storage.database import DATA_DIR_ENV
+
+WINREG: ModuleType | None = importlib.import_module("winreg") if sys.platform == "win32" else None
 
 DISPLAY_NAME = "bussola"
 BUNDLE_ID = "io.github.spoki-app.bussola"
@@ -23,8 +27,8 @@ MIMEAPPS_FILE = "mimeapps.list"
 MAC_APP = f"{DISPLAY_NAME}.app"
 MAC_STAGED_APP = f".{DISPLAY_NAME}-new.app"
 LSREGISTER = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
-WINDOWS_KEY = rf"HKCU\Software\Classes\{SCHEME}"
-WINDOWS_COMMAND_KEY = rf"{WINDOWS_KEY}\shell\open\command"
+WINDOWS_CLASSES_KEY = rf"Software\Classes\{SCHEME}"
+WINDOWS_COMMAND_KEY = rf"{WINDOWS_CLASSES_KEY}\shell\open\command"
 WINDOWS_GUI_PYTHON = "pythonw.exe"
 DESKTOP_RESERVED = re.compile(r"[\s\"'\\><~|&;$*?#()`]")
 DESKTOP_ESCAPED = re.compile(r"([\"`$\\])")
@@ -69,13 +73,55 @@ class ForgetMimeDefault:
 
 
 @dataclass(frozen=True)
+class SetRegistryValue:
+    key: str
+    name: str
+    value: str
+
+
+@dataclass(frozen=True)
+class DeleteRegistryTree:
+    key: str
+
+
+@dataclass(frozen=True)
 class RunCommand:
     argv: tuple[str, ...]
     required: bool = True
 
 
-type Step = CreateDirectory | WriteFile | RemovePath | MovePath | UpdatePlist | ForgetMimeDefault | RunCommand
+type Step = CreateDirectory | WriteFile | RemovePath | MovePath | UpdatePlist | ForgetMimeDefault | SetRegistryValue | DeleteRegistryTree | RunCommand
 type Runner = Callable[[Sequence[str]], object]
+
+
+class Registry(Protocol):
+    def set_value(self, key: str, name: str, value: str) -> None: ...
+
+    def delete_tree(self, key: str) -> None: ...
+
+
+class CurrentUserRegistry:
+    def set_value(self, key: str, name: str, value: str) -> None:
+        registry = _windows_registry()
+        with registry.CreateKey(registry.HKEY_CURRENT_USER, key) as handle:
+            registry.SetValueEx(handle, name, 0, registry.REG_SZ, value)
+
+    def delete_tree(self, key: str) -> None:
+        registry = _windows_registry()
+        try:
+            with registry.OpenKey(registry.HKEY_CURRENT_USER, key) as handle:
+                children = [registry.EnumKey(handle, index) for index in range(registry.QueryInfoKey(handle)[0])]
+        except FileNotFoundError:
+            return
+        for child in children:
+            self.delete_tree(rf"{key}\{child}")
+        registry.DeleteKey(registry.HKEY_CURRENT_USER, key)
+
+
+def _windows_registry() -> ModuleType:
+    if WINREG is None:
+        raise HandlerError("The registry exists only on Windows")
+    return WINREG
 
 
 @dataclass(frozen=True)
@@ -199,13 +245,13 @@ def app_properties() -> dict[str, Any]:
 def windows_registration(command: Sequence[str]) -> Registration:
     command_line = f'{subprocess.list2cmdline(command)} "%1"'
     return Registration(
-        location=WINDOWS_KEY,
+        location=rf"HKCU\{WINDOWS_CLASSES_KEY}",
         install=(
-            RunCommand(("reg", "add", WINDOWS_KEY, "/ve", "/d", f"URL:{URL_NAME}", "/f")),
-            RunCommand(("reg", "add", WINDOWS_KEY, "/v", "URL Protocol", "/d", "", "/f")),
-            RunCommand(("reg", "add", WINDOWS_COMMAND_KEY, "/ve", "/d", command_line, "/f")),
+            SetRegistryValue(WINDOWS_CLASSES_KEY, "", f"URL:{URL_NAME}"),
+            SetRegistryValue(WINDOWS_CLASSES_KEY, "URL Protocol", ""),
+            SetRegistryValue(WINDOWS_COMMAND_KEY, "", command_line),
         ),
-        uninstall=(RunCommand(("reg", "delete", WINDOWS_KEY, "/f"), required=False),),
+        uninstall=(DeleteRegistryTree(WINDOWS_CLASSES_KEY),),
     )
 
 
@@ -213,15 +259,15 @@ def run_command(argv: Sequence[str]) -> None:
     subprocess.run(argv, check=True, capture_output=True, text=True)
 
 
-def apply(steps: Sequence[Step], run: Runner | None = None) -> None:
+def apply(steps: Sequence[Step], run: Runner | None = None, registry: Registry | None = None) -> None:
     for step in steps:
         try:
-            _apply_step(step, run or run_command)
+            _apply_step(step, run or run_command, registry or CurrentUserRegistry())
         except (OSError, ValueError) as error:
             raise HandlerError(f"Could not update the registration: {error}") from error
 
 
-def _apply_step(step: Step, run: Runner) -> None:
+def _apply_step(step: Step, run: Runner, registry: Registry) -> None:
     match step:
         case CreateDirectory(path):
             path.mkdir(parents=True, exist_ok=True)
@@ -236,6 +282,10 @@ def _apply_step(step: Step, run: Runner) -> None:
             _update_plist(path, values)
         case ForgetMimeDefault(path):
             _forget_mime_default(path)
+        case SetRegistryValue(key, name, value):
+            registry.set_value(key, name, value)
+        case DeleteRegistryTree(key):
+            registry.delete_tree(key)
         case RunCommand(argv, required):
             _run(run, argv, required=required)
 
