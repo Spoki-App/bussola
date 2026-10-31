@@ -83,6 +83,15 @@ describe('AiPanel', () => {
     expect(screen.queryByRole('button', { name: 'Test connection' })).toBeNull()
   })
 
+  it('asks to fix the configuration instead of adding one when it has a problem', async () => {
+    stubApi({ ...OFF, problem: 'Invalid configuration in config.toml: ai.timout: Extra inputs are not permitted' })
+    renderPanel()
+
+    expect(await screen.findByText(/the AI configuration has a problem/)).toBeInTheDocument()
+    expect(screen.queryByText(/To turn them on/)).toBeNull()
+    expect(screen.getByRole('alert')).toHaveTextContent('ai.timout: Extra inputs are not permitted')
+  })
+
   it('shows the active provider and model and tests the connection', async () => {
     const fetchMock = stubApi(ANTHROPIC, { ok: true, message: 'Anthropic API (claude-opus-5-5) answered', elapsed_ms: 420 })
     renderPanel()

@@ -305,3 +305,12 @@ def test_a_repository_can_send_code_to_a_local_keyless_server_instead_of_your_ke
 def test_an_endpoint_with_query_fragment_or_login_is_rejected(endpoint: str) -> None:
     with pytest.raises(ValueError, match="plain http"):
         RepoAiConfig(endpoint=endpoint)
+
+
+def test_a_config_path_that_is_not_a_file_is_reported(tmp_path: Path) -> None:
+    (tmp_path / "config.toml").mkdir()
+    (tmp_path / "linked.toml").symlink_to(tmp_path / "missing.toml")
+
+    for name in ("config.toml", "linked.toml"):
+        with pytest.raises(AiNotConfiguredError, match="Invalid configuration"):
+            load_user_config(tmp_path / name)

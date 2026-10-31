@@ -204,6 +204,8 @@ class _ClaudeSession:
             stderr.wait(PIPE_GRACE_SECONDS)
         stdout.stop()
         stderr.stop()
+        stdout.wait(PIPE_GRACE_SECONDS)
+        stderr.wait(PIPE_GRACE_SECONDS)
         return returncode, stdout.text(), stderr.text()
 
     def finish(self) -> None:

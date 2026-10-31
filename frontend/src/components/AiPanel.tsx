@@ -17,13 +17,22 @@ export function AiPanel() {
 }
 
 function NoProvider({ ai }: { ai: AiStatus }) {
+  if (ai.problem) {
+    return (
+      <div className="stack">
+        <p className="muted">
+          AI features are off because the AI configuration has a problem. Fix it in <code>{ai.config_file ?? 'config.toml'}</code>.
+        </p>
+        <ErrorNote message={ai.problem} />
+      </div>
+    )
+  }
   return (
     <div className="stack">
       <p className="muted">
         AI features are off. To turn them on, add an <code>[ai]</code> section to <code>{ai.config_file ?? 'config.toml'}</code> choosing Claude Code, the Anthropic API or an
         OpenAI-compatible endpoint (see the README).
       </p>
-      {ai.problem && <ErrorNote message={ai.problem} />}
     </div>
   )
 }

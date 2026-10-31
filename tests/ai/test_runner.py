@@ -241,3 +241,17 @@ def test_an_answer_is_kept_when_caching_it_fails() -> None:
     rating = AiRunner(FakeProvider(GOOD), BrokenCache()).run(RATE, "code", Cancellation(), content_hash="hash")
 
     assert rating.impact == "high"
+
+
+def test_a_cache_that_cannot_be_read_falls_back_to_the_provider() -> None:
+    class UnreadableCache:
+        def get(self, _key: AiCacheKey) -> dict[str, Any] | None:
+            raise RuntimeError("database is locked")
+
+        def put(self, _key: AiCacheKey, _result: dict[str, Any]) -> None:
+            return
+
+    provider = FakeProvider(GOOD)
+
+    assert AiRunner(provider, UnreadableCache()).run(RATE, "code", Cancellation(), content_hash="hash").impact == "high"
+    assert len(provider.requests) == 1
