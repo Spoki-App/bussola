@@ -17,11 +17,12 @@ def approve_unit(context: ReviewContext, snapshot: UnitSnapshot) -> Approval:
 
 
 def approve_file(context: ReviewContext, revision: Revision, path: str) -> list[Approval]:
-    snapshots = [snapshot for snapshot in context.store.reviews.snapshots(revision.id) if snapshot.path == path]
-    if not snapshots:
+    snapshots = context.store.reviews.snapshots(revision.id, texts=False)
+    in_file = [snapshot for snapshot in snapshots if snapshot.path == path]
+    if not in_file:
         raise NotFoundError(f"No changed units in {path}")
     statuses = compute_statuses(snapshots, approval_set(context))
-    pending = [snapshot for snapshot in snapshots if statuses[snapshot.id].state not in DONE_STATES]
+    pending = [snapshot for snapshot in in_file if statuses[snapshot.id].state not in DONE_STATES]
     return context.store.approvals.add_approvals([_approval_for(context, snapshot) for snapshot in pending])
 
 

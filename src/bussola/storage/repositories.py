@@ -96,6 +96,10 @@ class SqlReviewRepository(_SqlRepository):
             query = query.options(*(defer(column) for column in SNAPSHOT_TEXT_COLUMNS))
         return list(self._session.scalars(query))
 
+    def snapshot_lines(self, revision_id: int) -> list[UnitSnapshot]:
+        query = select(UnitSnapshot).where(UnitSnapshot.revision_id == revision_id).options(defer(UnitSnapshot.base_text), defer(UnitSnapshot.head_text))
+        return list(self._session.scalars(query))
+
     def get_snapshot(self, snapshot_id: int) -> UnitSnapshot | None:
         return self._session.get(UnitSnapshot, snapshot_id)
 

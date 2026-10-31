@@ -3,13 +3,14 @@ import { memo, useEffect, useState, type ReactNode } from 'react'
 import { describeError } from '../api/client'
 import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/hooks'
 import type { DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
+import type { NavigationClick, ScreenPoint, UnitTarget } from '../review/codeNavigation'
 import { unitElementId, useLinkedScroll } from '../review/linkFocus'
 import { unitTitle } from '../review/logic'
 import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
 import { ErrorNote, KindBadge, StateBadge } from './Badges'
 import { ImagePreview } from './ImagePreview'
 import { QualifiedName } from './QualifiedName'
-import { UnitDiffView, type GutterSide } from './UnitDiffView'
+import { UnitDiffView, type GutterSide, type TargetLine } from './UnitDiffView'
 
 export interface UnitActions {
   toggleApproval: () => void
@@ -35,13 +36,19 @@ interface Props {
   onCommentSelectEnd?: () => void
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
+  onNavigate?: (click: NavigationClick) => void
+  navigationTarget?: UnitTarget
 }
 
 const APPROVE_LABELS = { approve: 'Approve', approve_under_name: 'Approve under this name', confirm_removal: 'Confirm removal' } as const
 
 const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', base: 'Base → head' }
 
-export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows }: Props) {
+function targetLine(target: UnitTarget | undefined): TargetLine | undefined {
+  return target ? { side: target.side === 'base' ? 'old' : 'new', line: target.line } : undefined
+}
+
+export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, onNavigate, navigationTarget }: Props) {
   const todo = unit.todo
   const [expanded, setExpanded] = useState(todo)
   const [wasTodo, setWasTodo] = useState(todo)
@@ -50,6 +57,16 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
     setExpanded(todo)
   }
   const [mode, setMode] = useState<DiffMode | undefined>(undefined)
+  const [seenTarget, setSeenTarget] = useState<UnitTarget | undefined>(undefined)
+  if (navigationTarget !== seenTarget) {
+    setSeenTarget(navigationTarget)
+    if (navigationTarget) {
+      setExpanded(true)
+    }
+    if (navigationTarget?.side === 'base') {
+      setMode('base')
+    }
+  }
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [anchor, setAnchor] = useState<string | null>(null)
   const diff = useUnitDiff(reviewId, unit, mode, expanded)
@@ -110,6 +127,25 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
       register(unit.id, null)
     }
   })
+
+  const diffLoaded = diff.data !== undefined
+  useEffect(() => {
+    if (!navigationTarget) {
+      return
+    }
+    onFocus(unit.id)
+    const element = linkedRef.current?.querySelector('.row-target, .row-target-old, .row-target-new') ?? linkedRef.current
+    element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [navigationTarget, diffLoaded, onFocus, unit.id, linkedRef])
+
+  const navigateFrom = (row: DiffRow, side: GutterSide, column: number, point: ScreenPoint) => {
+    const base = side === 'old'
+    const line = base ? row.old_line : row.new_line
+    if (!onNavigate || line === null || (base && diff.data?.mode !== 'base')) {
+      return
+    }
+    onNavigate({ path: base ? (unit.old_path ?? unit.path) : unit.path, side: base ? 'base' : 'head', line, column, point })
+  }
 
   const onRowClick = (row: DiffRow, extend: boolean) => {
     const key = rowKey(row)
@@ -191,6 +227,8 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
               onLineNumberClick={onComment ? (row, side, extend) => { onComment({ unit, row, side, mode: diff.data.mode, extend, selecting: true }) } : undefined}
               onLineSelectEnd={onCommentSelectEnd}
               highlighted={highlightRows?.(unit, diff.data)}
+              onNavigate={onNavigate ? navigateFrom : undefined}
+              target={targetLine(navigationTarget)}
               widgets={renderWidgets ? (changeKeyOf) => renderWidgets(unit, diff.data, changeKeyOf) : undefined}
             />
           )}

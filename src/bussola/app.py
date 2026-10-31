@@ -1,5 +1,6 @@
 import webbrowser
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, status
@@ -14,6 +15,7 @@ from bussola.forge.base import ForgeAdapter, ForgeError
 from bussola.forge.github import GitHubAdapter
 from bussola.git import GitError, InvalidRefError
 from bussola.identity import GitConfigIdentity
+from bussola.navigation.navigator import Navigator
 from bussola.review.refs import NoBaseBranchError
 from bussola.security import install_security
 from bussola.storage.database import Database
@@ -34,9 +36,16 @@ ERROR_STATUS: dict[type[Exception], int] = {
 
 
 def create_app(settings: AppSettings, forge: ForgeAdapter | None = None, url_opener: Callable[[str], object] | None = None) -> FastAPI:
-    app = FastAPI(title="bussola", docs_url=None, redoc_url=None, openapi_url=None)
+    navigator = Navigator(settings.data_dir)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
+        yield
+        navigator.close()
+
+    app = FastAPI(title="bussola", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     database = Database.open(settings.data_dir)
-    state = AppState(settings, database, GitConfigIdentity(settings.identity_dir), forge or GitHubAdapter(), url_opener or webbrowser.open_new_tab)
+    state = AppState(settings, database, GitConfigIdentity(settings.identity_dir), forge or GitHubAdapter(), url_opener or webbrowser.open_new_tab, navigator)
     attach_state(app, state)
     for error_type in ERROR_STATUS:
         app.add_exception_handler(error_type, _handle_error)

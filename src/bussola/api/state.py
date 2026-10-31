@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from bussola.config import AppSettings
 from bussola.forge.base import ForgeAdapter
 from bussola.identity import GitConfigIdentity
+from bussola.navigation.navigator import Navigator
 from bussola.storage.database import Database
 
 
@@ -17,6 +18,7 @@ class AppState:
     identity: GitConfigIdentity
     forge: ForgeAdapter
     url_opener: Callable[[str], object]
+    navigator: Navigator
 
 
 def attach_state(app: FastAPI, state: AppState) -> None:

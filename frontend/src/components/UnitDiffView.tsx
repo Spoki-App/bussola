@@ -4,6 +4,7 @@ import 'react-diff-view/style/index.css'
 
 import type { DiffRow, UnitDiff } from '../api/types'
 import { useViewType } from '../hooks/useDiffLayout'
+import { columnAt, isNavigationClick, type ScreenPoint } from '../review/codeNavigation'
 import { collapsedUnified, segmentRows, type Segment } from '../review/collapse'
 import { diffTokens, languageFor } from '../review/highlight'
 import { isSelectable, rowKey } from '../review/selection'
@@ -15,6 +16,11 @@ const FILE_HEADER_LINES = 3
 
 export type GutterSide = 'old' | 'new'
 
+export interface TargetLine {
+  side: GutterSide
+  line: number
+}
+
 interface Props {
   diff: UnitDiff
   path: string
@@ -25,6 +31,8 @@ interface Props {
   onLineSelectEnd?: () => void
   highlighted?: ReadonlySet<string>
   widgets?: (rowFor: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
+  onNavigate?: (row: DiffRow, side: GutterSide, column: number, point: ScreenPoint) => void
+  target?: TargetLine
 }
 
 interface RowIndex {
@@ -86,7 +94,7 @@ function gutterSide(row: DiffRow): GutterSide {
   return row.change === 'removed' ? 'old' : 'new'
 }
 
-function rowClasses(row: DiffRow | undefined, highlighted: ReadonlySet<string> | undefined): string[] {
+function rowClasses(row: DiffRow | undefined, highlighted: ReadonlySet<string> | undefined, targetRow: DiffRow | undefined): string[] {
   if (!row) {
     return []
   }
@@ -94,15 +102,23 @@ function rowClasses(row: DiffRow | undefined, highlighted: ReadonlySet<string> |
     ...(row.approved ? ['row-approved'] : []),
     ...(row.placeholder ? ['row-placeholder'] : []),
     ...(highlighted?.has(rowKey(row)) ? ['row-commented'] : []),
+    ...(row === targetRow ? ['row-target'] : []),
   ]
 }
 
-function lineClasses(rows: (DiffRow | undefined)[], highlighted: ReadonlySet<string> | undefined): string[] {
+function lineClasses(rows: (DiffRow | undefined)[], highlighted: ReadonlySet<string> | undefined, targetRow: DiffRow | undefined): string[] {
   const [oldRow, newRow] = rows
   if (rows.length === 2 && oldRow !== newRow) {
-    return [...rowClasses(oldRow, highlighted).map((name) => `${name}-old`), ...rowClasses(newRow, highlighted).map((name) => `${name}-new`)]
+    return [...rowClasses(oldRow, highlighted, targetRow).map((name) => `${name}-old`), ...rowClasses(newRow, highlighted, targetRow).map((name) => `${name}-new`)]
   }
-  return rowClasses(oldRow, highlighted)
+  return rowClasses(oldRow, highlighted, targetRow)
+}
+
+function targetPosition(rows: DiffRow[], target: TargetLine | undefined): number {
+  if (!target) {
+    return -1
+  }
+  return rows.findIndex((row) => (target.side === 'new' ? row.change !== 'removed' && row.new_line === target.line : row.change !== 'added' && row.old_line === target.line))
 }
 
 function hiddenLabel(segment: Segment): string {
@@ -128,7 +144,7 @@ function renderSegments(segments: Segment[], hunks: HunkData[], expand: (id: str
   })
 }
 
-export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted }: Props) {
+export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted, onNavigate, target }: Props) {
   const modified = useMemo(() => hasModification(diff.rows), [diff.rows])
   const viewType = useViewType(modified)
   const dragging = useRef(false)
@@ -155,11 +171,13 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
   const index = useMemo(() => buildIndex(diff.rows), [diff.rows])
   const widgetMap = widgets ? widgets(index.changeKeyOf) : undefined
   const pinnedKeys = Object.keys(widgetMap ?? {}).join(',')
+  const targetIndex = targetPosition(diff.rows, target)
   const segments = useMemo(() => {
     const keys = new Set(pinnedKeys.split(','))
-    const pinned = new Set(diff.rows.flatMap((row, position) => (keys.has(index.changeKeyOf(row) ?? '') ? [position] : [])))
+    const pinned = new Set(diff.rows.flatMap((row, position) => (keys.has(index.changeKeyOf(row) ?? '') || position === targetIndex ? [position] : [])))
     return segmentRows(diff.rows, expanded, pinned)
-  }, [diff.rows, expanded, index, pinnedKeys])
+  }, [diff.rows, expanded, index, pinnedKeys, targetIndex])
+  const targetRow = targetIndex < 0 ? undefined : diff.rows[targetIndex]
   const header = diff.unified.split('\n').slice(0, FILE_HEADER_LINES).join('\n')
   const file = useMemo(
     () => parseDiff(collapsedUnified(header, diff.rows, segments), viewType === 'split' ? { nearbySequences: 'zip' } : {})[0],
@@ -196,7 +214,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       className={selectable ? 'diff selectable' : 'diff'}
       generateLineClassName={({ changes, defaultGenerate }) => {
         const rows = (changes as (ChangeData | null)[]).map(index.rowOf)
-        return [defaultGenerate(), ...lineClasses(rows, highlighted)].join(' ')
+        return [defaultGenerate(), ...lineClasses(rows, highlighted, targetRow)].join(' ')
       }}
       renderGutter={({ change, side }) => gutterNumber(index.rowOf(change), side)}
       gutterEvents={{
@@ -217,8 +235,20 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
         },
       }}
       codeEvents={{
-        onClick: ({ change }, event: MouseEvent<HTMLElement>) => {
+        onMouseDown: (_, event: MouseEvent<HTMLElement>) => {
+          if (onNavigate && isNavigationClick(event)) {
+            event.preventDefault()
+          }
+        },
+        onClick: ({ change, side }, event: MouseEvent<HTMLElement>) => {
           const row = index.rowOf(change)
+          if (onNavigate && isNavigationClick(event)) {
+            const column = columnAt(event.currentTarget, event.clientX, event.clientY)
+            if (row && column !== null) {
+              onNavigate(row, side ?? gutterSide(row), column, { x: event.clientX, y: event.clientY })
+            }
+            return
+          }
           if (selectable && row && isSelectable(row)) {
             onRowClick(row, event.shiftKey)
           }

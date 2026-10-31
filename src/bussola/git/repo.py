@@ -10,6 +10,8 @@ from bussola.git.errors import GitError, InvalidRefError
 
 GIT = "git"
 SUBMODULE_MODE = "160000"
+SYMLINK_MODE = "120000"
+BLOB_TYPE = "blob"
 RAW_RECORD_PREFIX = ":"
 DEFAULT_REMOTE = "origin"
 LOCAL_PREFIX = "refs/heads/"
@@ -36,6 +38,10 @@ class BlobRef:
     @property
     def is_submodule(self) -> bool:
         return self.mode == SUBMODULE_MODE
+
+    @property
+    def is_symlink(self) -> bool:
+        return self.mode == SYMLINK_MODE
 
 
 @dataclass(frozen=True)
@@ -144,6 +150,17 @@ class GitRepo:
             raise InvalidRefError(commit)
         return [path for path in self.run("ls-tree", "-r", "--name-only", "-z", commit).decode(errors="replace").split("\0") if path]
 
+    def tree_blobs(self, commit: str) -> list[BlobRef]:
+        if not OBJECT_ID.fullmatch(commit):
+            raise InvalidRefError(commit)
+        entries = self.run("ls-tree", "-r", "-z", "--full-tree", commit).decode(errors="surrogateescape").split("\0")
+        return [blob for object_type, blob in map(_tree_entry, filter(None, entries)) if object_type == BLOB_TYPE]
+
+    def archive(self, commit: str, output: Path) -> None:
+        if not OBJECT_ID.fullmatch(commit):
+            raise InvalidRefError(commit)
+        self.run("archive", "--format=tar", f"--output={output}", commit)
+
     def blob_reader(self) -> BlobReader:
         process = subprocess.Popen([GIT, "cat-file", "--batch"], cwd=self.root, env=_git_env(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         return BlobReader(process)
@@ -164,6 +181,12 @@ def parse_raw_diff(output: str) -> list[FileChange]:
         new = None if status == ChangeStatus.DELETED else BlobRef(new_path, new_id, new_mode)
         changes.append(FileChange(status, old, new))
     return changes
+
+
+def _tree_entry(entry: str) -> tuple[str, BlobRef]:
+    meta, _, path = entry.partition("\t")
+    mode, object_type, object_id = meta.split(" ")
+    return object_type, BlobRef(path, object_id, mode)
 
 
 def read_git_config(cwd: Path, key: str) -> str | None:
