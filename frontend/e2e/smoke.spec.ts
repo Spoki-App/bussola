@@ -52,6 +52,20 @@ test('a review link with a path and line expands and focuses the unit containing
   await expect(card.getByRole('button', { name: 'Collapse unit' })).toBeVisible()
 })
 
+test('a review link with a thread opens its collapsed unit and shows the thread', async ({ page }) => {
+  await page.goto(`/?token=${E2E_TOKEN}`)
+  const href = (await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().getAttribute('href')) ?? ''
+  await page.goto(href)
+  const card = page.locator('article.unit-card', { hasText: 'total' })
+  await card.getByRole('button', { name: 'Expand unit' }).click()
+  const threadId = (await card.getByTestId('thread').getAttribute('id')) ?? ''
+
+  await page.goto(`${href}?thread=${threadId.replace(/^thread-/, '')}`)
+
+  await expect(card.getByRole('button', { name: 'Collapse unit' })).toBeVisible()
+  await expect(page.locator(`#${threadId}`)).toBeInViewport()
+})
+
 test('a pull request link of an unknown repository opens the add repository flow prefilled', async ({ page }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
 

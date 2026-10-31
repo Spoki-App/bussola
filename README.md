@@ -135,13 +135,13 @@ bussola install-handler
 | `bussola://review?repo=<owner>/<name>&pr=<number>&thread=<id>` | the same review, scrolled to that thread |
 | `bussola://github.com/<owner>/<name>/pull/<number>` | a GitHub pull request link with `https` replaced by `bussola`; `/files` and other pages of the pull request work too, and a `#discussion_r<id>` anchor scrolls to the imported thread |
 
-If bussola is not running, the link starts `bussola serve --no-open` in the background on `127.0.0.1:8765`, waits for it, then opens the browser. A running `bussola serve` writes its address and session token to `server.json` in the data folder (readable only by you) so links can find it. The repository is found as **Open pull request** finds it; if there is no local clone, the home page opens with **Add a repository** filtered on its name, and the pull request opens once you add it. `bussola open-link '<link>'` does the same from a terminal.
+If bussola is not running, the link starts `bussola serve --no-open` in the background on `127.0.0.1:8765`, waits for it, then opens the browser. A running `bussola serve` writes its address and session token to `server.json` in the data folder (readable only by you) once it is listening, so links can find it. A server started by a link does not add your home folder as a repository. The repository is found as **Open pull request** finds it; if there is no local clone, the home page opens with **Add a repository** filtered on its name, and the pull request opens once you add it. `bussola open-link '<link>'` does the same from a terminal. A link that cannot be opened (not a valid link, or the server did not start) is recorded in `open-link.log` in the data folder, since the operating system shows no output.
 
 - **macOS:** builds `~/Applications/bussola.app`, a small AppleScript app that declares the scheme, and registers it with Launch Services. Opening the app itself opens bussola.
 - **Linux:** writes `bussola-url-handler.desktop` to `~/.local/share/applications` (or `$XDG_DATA_HOME/applications`) and makes it the default for `x-scheme-handler/bussola` with `xdg-mime`.
 - **Windows:** writes the `HKCU\Software\Classes\bussola` registry keys for the current user.
 
-The handler runs the Python that ran `install-handler`, so run it again after reinstalling bussola somewhere else. `bussola uninstall-handler` removes the registration.
+The handler runs the Python that ran `install-handler`, so run it again after reinstalling bussola somewhere else. `bussola uninstall-handler` removes the registration, and on Linux also the `x-scheme-handler/bussola` default that `xdg-mime` wrote to `mimeapps.list`.
 
 ### Sending comments to GitHub
 

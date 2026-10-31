@@ -19,7 +19,7 @@ import { UnitTree } from '../components/UnitTree'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
-import { scrollToElement, scrollWhenPresent, unitElementId, type FocusTarget } from '../review/linkFocus'
+import { LinkScrollContext, scrollToElement, unitElementId, type FocusTarget } from '../review/linkFocus'
 import { buildUnitTree } from '../review/unitTree'
 import { searchGroups } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
@@ -159,14 +159,13 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     }
   }
   useEffect(() => {
-    if (!appliedLink) {
-      return undefined
-    }
-    if (appliedLink.unitId !== null) {
+    if (appliedLink?.unitId != null) {
       actions.current.get(appliedLink.unitId)?.reveal()
     }
-    return scrollWhenPresent(appliedLink)
   }, [appliedLink])
+  const [linkScrolled, setLinkScrolled] = useState(false)
+  const finishLinkScroll = useCallback(() => { setLinkScrolled(true) }, [])
+  const linkScroll = useMemo(() => (appliedLink && !linkScrolled ? { target: appliedLink, done: finishLinkScroll } : null), [appliedLink, linkScrolled, finishLinkScroll])
 
   const focusUnit = useCallback((unitId: number) => {
     setFocusedId(unitId)
@@ -259,47 +258,49 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           </div>
         </section>
       </div>
-      <div className={`review-layout${panelOpen && extensions.sidePanel ? ' with-panel' : ''}${filesHidden ? ' files-hidden' : ''}`}>
-        <aside className="sidebar" aria-label="Files">
-          <button type="button" className="sidebar-toggle" aria-expanded={!filesHidden} aria-controls={filesHidden ? undefined : 'file-tree'} title={filesHidden ? 'Show files' : 'Hide files'} onClick={toggleFiles}>
-            <SidebarIcon />
-            {!filesHidden && <span>Files</span>}
-          </button>
-          {!filesHidden && (
-            <div id="file-tree">
-              <FileTree nodes={fileTree} activePath={focusedUnit?.path} onSelect={(path) => { scrollToElement(`file-${path}`) }} />
-            </div>
-          )}
-        </aside>
-        <main className="units">
-          {units.error && <ErrorNote message={describeError(units.error)} />}
-          {units.data && unitList.length === 0 && <p className="muted">{emptyMessage(filter, deferredQuery, units.data.length)}</p>}
-          {groups.map((group) => (
-            <section key={group.path} id={`file-${group.path}`} className="file-section">
-              <FileHeader reviewId={reviewId} path={group.path} oldPath={group.oldPath} complete={group.complete} actions={extensions.fileActions?.(group.path)} />
-              <UnitTree
-                nodes={group.tree}
-                module={group.units.at(0)?.module ?? null}
-                renderUnit={(unit) => (
-                  <UnitCard
-                    key={unit.id}
-                    reviewId={reviewId}
-                    unit={unit}
-                    focused={focusedUnit?.id === unit.id}
-                    onFocus={focusUnit}
-                    register={register}
-                    onComment={extensions.onComment}
-                    onCommentSelectEnd={extensions.onCommentSelectEnd}
-                    renderWidgets={extensions.renderWidgets}
-                    highlightRows={extensions.highlightRows}
-                  />
-                )}
-              />
-            </section>
-          ))}
-        </main>
-        {panelOpen && extensions.sidePanel && <aside className="side-panel">{extensions.sidePanel.content}</aside>}
-      </div>
+      <LinkScrollContext value={linkScroll}>
+        <div className={`review-layout${panelOpen && extensions.sidePanel ? ' with-panel' : ''}${filesHidden ? ' files-hidden' : ''}`}>
+          <aside className="sidebar" aria-label="Files">
+            <button type="button" className="sidebar-toggle" aria-expanded={!filesHidden} aria-controls={filesHidden ? undefined : 'file-tree'} title={filesHidden ? 'Show files' : 'Hide files'} onClick={toggleFiles}>
+              <SidebarIcon />
+              {!filesHidden && <span>Files</span>}
+            </button>
+            {!filesHidden && (
+              <div id="file-tree">
+                <FileTree nodes={fileTree} activePath={focusedUnit?.path} onSelect={(path) => { scrollToElement(`file-${path}`) }} />
+              </div>
+            )}
+          </aside>
+          <main className="units">
+            {units.error && <ErrorNote message={describeError(units.error)} />}
+            {units.data && unitList.length === 0 && <p className="muted">{emptyMessage(filter, deferredQuery, units.data.length)}</p>}
+            {groups.map((group) => (
+              <section key={group.path} id={`file-${group.path}`} className="file-section">
+                <FileHeader reviewId={reviewId} path={group.path} oldPath={group.oldPath} complete={group.complete} actions={extensions.fileActions?.(group.path)} />
+                <UnitTree
+                  nodes={group.tree}
+                  module={group.units.at(0)?.module ?? null}
+                  renderUnit={(unit) => (
+                    <UnitCard
+                      key={unit.id}
+                      reviewId={reviewId}
+                      unit={unit}
+                      focused={focusedUnit?.id === unit.id}
+                      onFocus={focusUnit}
+                      register={register}
+                      onComment={extensions.onComment}
+                      onCommentSelectEnd={extensions.onCommentSelectEnd}
+                      renderWidgets={extensions.renderWidgets}
+                      highlightRows={extensions.highlightRows}
+                    />
+                  )}
+                />
+              </section>
+            ))}
+          </main>
+          {panelOpen && extensions.sidePanel && <aside className="side-panel">{extensions.sidePanel.content}</aside>}
+        </div>
+      </LinkScrollContext>
     </div>
   )
 }

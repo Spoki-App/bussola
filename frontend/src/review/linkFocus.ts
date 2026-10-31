@@ -1,3 +1,5 @@
+import { createContext, useContext, useEffect, useRef, type RefObject } from 'react'
+
 import type { Thread, Unit } from '../api/types'
 import { pullRequestUrlFromPath } from './pullRequestLink'
 import { isInline } from './threadPlacement'
@@ -14,6 +16,11 @@ export interface FocusTarget {
   elementId: string
 }
 
+export interface LinkScroll {
+  target: FocusTarget
+  done: () => void
+}
+
 export interface AddRepositoryRequest {
   repository: string
   then: string
@@ -23,8 +30,8 @@ const POSITIVE_NUMBER = /^[1-9]\d*$/
 const REPOSITORY = /^[\w.-]{1,100}\/[\w.-]{1,100}$/
 const ADD_REPOSITORY_PARAM = 'add_repo'
 const THEN_PARAM = 'then'
-const SCROLL_POLL_MS = 100
-const SCROLL_TIMEOUT_MS = 5000
+
+export const LinkScrollContext = createContext<LinkScroll | null>(null)
 
 export function linkFocusFromSearch(search: string): LinkFocus | null {
   const params = new URLSearchParams(search)
@@ -50,10 +57,18 @@ function linkedThread(focus: LinkFocus, threads: Thread[]): Thread | undefined {
   return threads.find((thread) => thread.comments.some((comment) => comment.remote_url?.endsWith(anchor)))
 }
 
+function headSpan(unit: Unit, line: number): number | null {
+  return unit.head_start !== null && unit.head_end !== null && unit.head_start <= line && line <= unit.head_end ? unit.head_end - unit.head_start : null
+}
+
 function unitAt(units: Unit[], path: string, line: number | null): Unit | undefined {
   const inFile = units.filter((unit) => unit.path === path)
-  const containing = line === null ? undefined : inFile.find((unit) => unit.head_start !== null && unit.head_end !== null && unit.head_start <= line && line <= unit.head_end)
-  return containing ?? inFile.at(0)
+  const containing = line === null ? [] : inFile.flatMap((unit) => {
+    const span = headSpan(unit, line)
+    return span === null ? [] : [{ unit, span }]
+  })
+  const narrowest = containing.reduce<{ unit: Unit; span: number } | undefined>((best, candidate) => (best && best.span <= candidate.span ? best : candidate), undefined)
+  return narrowest?.unit ?? inFile.at(0)
 }
 
 export function unitElementId(unitId: number): string {
@@ -75,28 +90,25 @@ export function resolveLinkFocus(focus: LinkFocus, units: Unit[], threads: Threa
   return unit ? { unitId: unit.id, elementId: unitElementId(unit.id) } : null
 }
 
-export function scrollToElement(id: string): boolean {
-  const element = document.getElementById(id)
-  element?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  return element !== null
+export function scrollToElement(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-export function scrollWhenPresent(target: FocusTarget, timeoutMs = SCROLL_TIMEOUT_MS): () => void {
-  const deadline = Date.now() + timeoutMs
-  let unitShown = false
-  const timer = window.setInterval(() => {
-    if (scrollToElement(target.elementId)) {
-      window.clearInterval(timer)
+export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId: number | null = null): RefObject<T | null> {
+  const link = useContext(LinkScrollContext)
+  const ref = useRef<T>(null)
+  const isTarget = link?.target.elementId === elementId
+  const holdsTarget = unitId !== null && link?.target.unitId === unitId
+  useEffect(() => {
+    if (!link || !(isTarget || holdsTarget)) {
       return
     }
-    if (!unitShown && target.unitId !== null) {
-      unitShown = scrollToElement(unitElementId(target.unitId))
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (isTarget) {
+      link.done()
     }
-    if (Date.now() >= deadline) {
-      window.clearInterval(timer)
-    }
-  }, SCROLL_POLL_MS)
-  return () => { window.clearInterval(timer) }
+  }, [link, isTarget, holdsTarget])
+  return ref
 }
 
 export function addRepositoryPath(repository: string, then: string): string {

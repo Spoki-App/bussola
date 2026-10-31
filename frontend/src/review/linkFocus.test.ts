@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import type { Comment, Thread, Unit } from '../api/types'
 import {
@@ -6,7 +6,6 @@ import {
   addRepositoryRequestFromSearch,
   linkFocusFromSearch,
   resolveLinkFocus,
-  scrollWhenPresent,
   type LinkFocus,
 } from './linkFocus'
 
@@ -98,6 +97,14 @@ describe('resolveLinkFocus', () => {
     expect(resolveLinkFocus(focus({ path: 'src/app.py', line: 20 }), units, [])).toEqual({ unitId: 2, elementId: 'unit-2' })
   })
 
+  it('picks the narrowest unit when a module or class contains the unit of the line', () => {
+    const nested = [unit(4, 'app.py', 1, 40), unit(5, 'app.py', 5, 35), unit(6, 'app.py', 20, 30)]
+
+    expect(resolveLinkFocus(focus({ path: 'app.py', line: 25 }), nested, [])?.unitId).toBe(6)
+    expect(resolveLinkFocus(focus({ path: 'app.py', line: 10 }), nested, [])?.unitId).toBe(5)
+    expect(resolveLinkFocus(focus({ path: 'app.py', line: 38 }), nested, [])?.unitId).toBe(4)
+  })
+
   it('falls back to the first unit of the file', () => {
     expect(resolveLinkFocus(focus({ path: 'src/app.py', line: 11 }), units, [])?.unitId).toBe(1)
     expect(resolveLinkFocus(focus({ path: 'README.md', line: 3 }), units, [])?.unitId).toBe(3)
@@ -124,47 +131,6 @@ describe('resolveLinkFocus', () => {
   it('uses the path when the thread is unknown', () => {
     expect(resolveLinkFocus(focus({ comment: '9', path: 'README.md' }), units, [])?.unitId).toBe(3)
     expect(resolveLinkFocus(focus({ comment: '9' }), units, [])).toBeNull()
-  })
-})
-
-function recordScrolls(): string[] {
-  const scrolled: string[] = []
-  Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
-    scrolled.push(this.id)
-  }
-  return scrolled
-}
-
-describe('scrollWhenPresent', () => {
-  afterEach(() => {
-    vi.useRealTimers()
-    Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
-    document.body.innerHTML = ''
-  })
-
-  it('scrolls to the unit first, then to the thread once it is rendered', () => {
-    vi.useFakeTimers()
-    const scrolled = recordScrolls()
-    document.body.innerHTML = '<article id="unit-2"></article>'
-
-    scrollWhenPresent({ unitId: 2, elementId: 'thread-t' })
-    vi.advanceTimersByTime(300)
-    document.body.insertAdjacentHTML('beforeend', '<div id="thread-t"></div>')
-    vi.advanceTimersByTime(1000)
-
-    expect(scrolled).toEqual(['unit-2', 'thread-t'])
-  })
-
-  it('gives up after the timeout', () => {
-    vi.useFakeTimers()
-    const scrolled = recordScrolls()
-
-    scrollWhenPresent({ unitId: null, elementId: 'thread-t' }, 500)
-    vi.advanceTimersByTime(1000)
-    document.body.innerHTML = '<div id="thread-t"></div>'
-    vi.advanceTimersByTime(1000)
-
-    expect(scrolled).toEqual([])
   })
 })
 

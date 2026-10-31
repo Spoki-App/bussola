@@ -1,4 +1,4 @@
-import { useState, type SubmitEvent } from 'react'
+import { useId, useState, type SubmitEvent } from 'react'
 
 import { describeError } from '../api/client'
 import { useAddRepo } from '../api/hooks'
@@ -6,6 +6,7 @@ import { ErrorNote } from './Badges'
 import { DirectoryPicker } from './DirectoryPicker'
 
 export function AddRepoForm({ onAdded, filter }: { onAdded: () => void; filter?: string }) {
+  const pathId = useId()
   const [path, setPath] = useState('')
   const [browsing, setBrowsing] = useState(filter !== undefined)
   const addRepo = useAddRepo()
@@ -27,8 +28,8 @@ export function AddRepoForm({ onAdded, filter }: { onAdded: () => void; filter?:
   }
   return (
     <form className="inline-form" onSubmit={submit}>
-      <label htmlFor="repo-path">Path</label>
-      <input id="repo-path" value={path} onChange={(event) => { setPath(event.target.value) }} placeholder="/path/to/repository" />
+      <label htmlFor={pathId}>Path</label>
+      <input id={pathId} value={path} onChange={(event) => { setPath(event.target.value) }} placeholder="/path/to/repository" />
       <button type="submit" disabled={!path.trim() || addRepo.isPending}>
         Add
       </button>

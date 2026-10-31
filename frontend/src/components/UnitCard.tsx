@@ -3,7 +3,7 @@ import { memo, useEffect, useState, type ReactNode } from 'react'
 import { describeError } from '../api/client'
 import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/hooks'
 import type { DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
-import { unitElementId } from '../review/linkFocus'
+import { unitElementId, useLinkedScroll } from '../review/linkFocus'
 import { unitTitle } from '../review/logic'
 import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
 import { ErrorNote, KindBadge, StateBadge } from './Badges'
@@ -54,6 +54,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [anchor, setAnchor] = useState<string | null>(null)
   const diff = useUnitDiff(reviewId, unit, mode, expanded)
+  const linkedRef = useLinkedScroll<HTMLElement>(unitElementId(unit.id), unit.id)
   const approve = useApprove(reviewId)
   const revoke = useRevoke(reviewId)
   const revokeSelections = useRevokeSelections(reviewId)
@@ -127,7 +128,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
   const canSwitchMode = diff.data?.available_modes.includes('approved') ?? false
 
   return (
-    <article id={unitElementId(unit.id)} className={`unit-card state-${unit.state}${focused ? ' focused' : ''}`} onClick={() => { onFocus(unit.id) }}>
+    <article id={unitElementId(unit.id)} ref={linkedRef} className={`unit-card state-${unit.state}${focused ? ' focused' : ''}`} onClick={() => { onFocus(unit.id) }}>
       <header className="unit-header">
         <button type="button" className="disclosure" aria-expanded={expanded} aria-label={expanded ? 'Collapse unit' : 'Expand unit'} onClick={() => { setExpanded(!expanded) }}>
           {expanded ? '▾' : '▸'}
