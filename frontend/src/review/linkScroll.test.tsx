@@ -146,6 +146,24 @@ describe('followLink', () => {
     stop()
   })
 
+  it('stops following the target ten seconds after reaching it', () => {
+    vi.useFakeTimers()
+    const link = createLinkScroll()
+    followLink(link)
+    link.start({ unitId: 2, elementId: 'unit-2' })
+    link.reached()
+
+    vi.advanceTimersByTime(9_000)
+    resized()
+    expect(scrolled).toEqual(['unit-2'])
+
+    vi.advanceTimersByTime(1_000)
+    resized()
+    expect(scrolled).toEqual(['unit-2'])
+    expect(link.current()).toBeNull()
+    vi.useRealTimers()
+  })
+
   it('ends the link when the user drags the page away from the target, but not on its own scrolls', () => {
     const link = createLinkScroll()
     followLink(link)

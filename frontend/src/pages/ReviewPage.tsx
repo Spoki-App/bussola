@@ -18,6 +18,7 @@ import { UnitCard, type CommentTarget, type UnitActions } from '../components/Un
 import { UnitTree } from '../components/UnitTree'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
+import { navigate } from '../navigation'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
 import { LinkScrollContext, createLinkScroll, followLink, scrollToElement, unitElementId, type FocusTarget } from '../review/linkFocus'
 import { buildUnitTree } from '../review/unitTree'
@@ -165,7 +166,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     if (appliedLink === undefined) {
       return undefined
     }
-    window.history.replaceState(window.history.state, '', window.location.pathname)
+    navigate(window.location.pathname, { replace: true })
     if (appliedLink === null) {
       return undefined
     }

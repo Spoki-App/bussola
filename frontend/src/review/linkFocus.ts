@@ -167,6 +167,7 @@ const noLink = () => () => undefined
 
 const USER_INPUT_EVENTS = ['wheel', 'touchmove', 'keydown', 'mousedown'] as const
 const MOVE_TOLERANCE_PX = 2
+const FOLLOW_AFTER_REACHED_MS = 10_000
 
 function linkAnchor(state: LinkState): Element | null {
   const { elementId, unitId } = state.target
@@ -181,7 +182,15 @@ export function followLink(link: LinkScroll): () => void {
     }
   })
   keepInView.observe(document.body)
+  let deadline: number | undefined
+  const unsubscribe = link.subscribe(() => {
+    if (link.current()?.reached && deadline === undefined) {
+      deadline = window.setTimeout(end, FOLLOW_AFTER_REACHED_MS)
+    }
+  })
   const stop = () => {
+    unsubscribe()
+    window.clearTimeout(deadline)
     keepInView.disconnect()
     window.removeEventListener('scroll', endIfMoved)
     for (const event of USER_INPUT_EVENTS) {
