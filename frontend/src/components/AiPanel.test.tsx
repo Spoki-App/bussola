@@ -39,7 +39,7 @@ function stubApi(status: AiStatus, test?: AiTestResult) {
 }
 
 function renderPanel() {
-  return render(
+  render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <AiPanel />
     </QueryClientProvider>,
@@ -49,29 +49,6 @@ function renderPanel() {
 describe('AiPanel', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
-  })
-
-  it('stops a running connection test when the panel closes', async () => {
-    let signal: AbortSignal | undefined
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: string, init?: RequestInit) => {
-        if (input.endsWith('/ai/test')) {
-          signal = init?.signal ?? undefined
-          return new Promise(() => undefined)
-        }
-        return Promise.resolve(Response.json(ANTHROPIC))
-      }),
-    )
-    const view = renderPanel()
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Test connection' }))
-    await waitFor(() => {
-      expect(signal).toBeDefined()
-    })
-    view.unmount()
-
-    expect(signal?.aborted).toBe(true)
   })
 
   it('says AI is off and where to configure it when no provider is set', async () => {

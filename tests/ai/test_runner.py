@@ -255,3 +255,16 @@ def test_a_cache_that_cannot_be_read_falls_back_to_the_provider() -> None:
 
     assert AiRunner(provider, UnreadableCache()).run(RATE, "code", Cancellation(), content_hash="hash").impact == "high"
     assert len(provider.requests) == 1
+
+
+def test_a_replaced_cache_entry_is_read_back_in_the_same_session(tmp_path: Path) -> None:
+    provider = FakeProvider(GOOD)
+    with Database.open(tmp_path).session() as session:
+        cache = SqlAiCache(session)
+        cache.put(AiCacheKey("rate", 1, "fake", "fake-model", "", "hash"), {"impact": "unknown"})
+        runner = AiRunner(provider, cache)
+
+        runner.run(RATE, "code", Cancellation(), content_hash="hash")
+        runner.run(RATE, "code", Cancellation(), content_hash="hash")
+
+    assert len(provider.requests) == 1

@@ -14,5 +14,5 @@ export function useAiStatus(repoId?: number) {
 }
 
 export function useTestAiConnection() {
-  return useMutation({ mutationFn: (signal: AbortSignal) => postJson<AiTestResult>('/ai/test', {}, signal) })
+  return useMutation({ mutationFn: () => postJson<AiTestResult>('/ai/test') })
 }

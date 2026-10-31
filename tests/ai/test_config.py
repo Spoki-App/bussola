@@ -232,7 +232,7 @@ def test_an_unreadable_configuration_directory_is_reported(tmp_path: Path, monke
     def denied(_path: Path) -> bool:
         raise PermissionError("Permission denied")
 
-    monkeypatch.setattr(Path, "is_file", denied)
+    monkeypatch.setattr(Path, "exists", denied)
 
     with pytest.raises(AiNotConfiguredError, match="Permission denied"):
         load_user_config(tmp_path / "config.toml")

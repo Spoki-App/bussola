@@ -1,5 +1,7 @@
 import datetime
+import email.message
 import email.utils
+import io
 import json
 import socket
 import threading
@@ -194,6 +196,33 @@ def test_a_retry_after_date_is_honoured(stub: StubServer) -> None:
         OpenAiCompatibleProvider("gpt", stub.url, None, 5.0).complete(REQUEST, Cancellation())
 
     assert len(stub.requests) == 1
+
+
+def test_each_attempt_sends_a_fresh_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    sent: list[urllib.request.Request] = []
+
+    class Response:
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return
+
+        def read(self, _size: int = -1) -> bytes:
+            return json.dumps({"choices": [{"message": {"content": "{}"}}]}).encode()
+
+    def open_request(_opener: object, request: urllib.request.Request, **_kwargs: object) -> Response:
+        sent.append(request)
+        if len(sent) == 1:
+            raise urllib.error.HTTPError(request.full_url, 503, "busy", email.message.Message(), io.BytesIO(b"{}"))
+        return Response()
+
+    monkeypatch.setattr(urllib.request.OpenerDirector, "open", open_request)
+
+    OpenAiCompatibleProvider("gpt", "https://api.example.com/v1", None, 5.0).complete(REQUEST, Cancellation())
+
+    assert len(sent) == 2
+    assert sent[0] is not sent[1]
 
 
 def test_a_client_error_is_not_asked_again(stub: StubServer) -> None:

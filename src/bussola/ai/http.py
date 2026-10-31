@@ -140,12 +140,13 @@ def _opener(url: str, connections: _Connections) -> urllib.request.OpenerDirecto
 
 
 def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeout: float, cancellation: Cancellation) -> dict[str, Any]:
-    request = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json", **headers}, method="POST")
+    data = json.dumps(payload).encode()
     deadline = time.monotonic() + timeout
     attempt = 0
     while True:
         attempt += 1
         try:
+            request = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json", **headers}, method="POST")
             body = _send(request, max(deadline - time.monotonic(), 0.0), cancellation)
         except AiTimeoutError as error:
             raise timed_out(timeout) from error

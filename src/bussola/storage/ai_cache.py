@@ -1,5 +1,6 @@
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
@@ -12,8 +13,15 @@ class SqlAiCache:
         self._session = session
 
     def get(self, key: AiCacheKey) -> dict[str, Any] | None:
-        row = self._session.get(AiResult, (key.task, key.prompt_version, key.provider, key.model, key.endpoint, key.content_hash))
-        return None if row is None else row.result
+        statement = select(AiResult.result).where(
+            AiResult.task == key.task,
+            AiResult.prompt_version == key.prompt_version,
+            AiResult.provider == key.provider,
+            AiResult.model == key.model,
+            AiResult.endpoint == key.endpoint,
+            AiResult.content_hash == key.content_hash,
+        )
+        return self._session.execute(statement).scalar_one_or_none()
 
     def put(self, key: AiCacheKey, result: dict[str, Any]) -> None:
         values = {"task": key.task, "prompt_version": key.prompt_version, "provider": key.provider, "model": key.model, "endpoint": key.endpoint}

@@ -106,7 +106,7 @@ def default_config_file() -> Path:
 
 def load_user_config(path: Path | None) -> UserConfig:
     try:
-        if path is None or not (path.is_file() or path.is_symlink() or path.exists()):
+        if path is None or not (path.exists() or path.is_symlink()):
             return UserConfig()
         return UserConfig.model_validate(tomllib.loads(path.read_text(encoding="utf-8")))
     except (OSError, ValueError) as error:

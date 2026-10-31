@@ -1,5 +1,3 @@
-import { useEffect, useRef } from 'react'
-
 import { useAiStatus, useTestAiConnection } from '../api/ai'
 import { describeError } from '../api/client'
 import type { AiStatus } from '../api/types'
@@ -39,13 +37,6 @@ function NoProvider({ ai }: { ai: AiStatus }) {
 
 function ActiveProvider({ ai }: { ai: AiStatus }) {
   const test = useTestAiConnection()
-  const running = useRef<AbortController | null>(null)
-  useEffect(() => () => running.current?.abort(), [])
-  const startTest = () => {
-    running.current?.abort()
-    running.current = new AbortController()
-    test.mutate(running.current.signal)
-  }
   return (
     <div className="stack">
       <dl className="ai-details">
@@ -73,7 +64,7 @@ function ActiveProvider({ ai }: { ai: AiStatus }) {
         <dd>{ai.config_file ? <code>{ai.config_file}</code> : 'Not set'}</dd>
       </dl>
       {ai.problem && <ErrorNote message={ai.problem} />}
-      <button type="button" disabled={test.isPending} onClick={startTest}>
+      <button type="button" disabled={test.isPending} onClick={() => { test.mutate() }}>
         {test.isPending ? 'Testing...' : 'Test connection'}
       </button>
       {test.data?.ok && <p role="status">{`${test.data.message} in ${String(test.data.elapsed_ms)} ms.`}</p>}
