@@ -2,9 +2,8 @@ import { useState, type SubmitEvent } from 'react'
 
 import { describeError } from '../api/client'
 import { isMissingClone } from '../api/pulls'
-import { navigate } from '../navigation'
 import { useOpenReview } from '../openReview'
-import { addRepositoryPath, isPullRequestUrl, pullRequestTargetFromUrl } from '../review/pullRequestLink'
+import { isPullRequestUrl, pullRequestTargetFromUrl } from '../review/pullRequestLink'
 import { ErrorNote } from './Badges'
 
 export function OpenPullRequestForm({ onOpened }: { onOpened: () => void }) {
@@ -13,15 +12,7 @@ export function OpenPullRequestForm({ onOpened }: { onOpened: () => void }) {
   const submit = (event: SubmitEvent) => {
     event.preventDefault()
     const target = pullRequestTargetFromUrl(url)
-    start(target.url, {
-      search: target.search,
-      replace: false,
-      onOpened,
-      onMissingClone: () => {
-        onOpened()
-        navigate(addRepositoryPath(`${target.pathname}${target.search}`))
-      },
-    })
+    start(target.url, { search: target.search, replace: false, askToAddRepository: true, onOpened })
   }
   return (
     <form className="inline-form" onSubmit={submit}>

@@ -147,6 +147,12 @@ describe('resolveLinkFocus', () => {
     expect(resolveLinkFocus(focus({ thread: THREAD_ID }), units, [thread(THREAD_ID, 99)])).toBeNull()
   })
 
+  it('falls back to the comment when the thread id is unknown', () => {
+    const threads = [thread('b', 2, 'https://github.com/acme/widgets/pull/7#discussion_r501')]
+
+    expect(resolveLinkFocus(focus({ thread: THREAD_ID, comment: '501' }), units, threads)?.elementId).toBe('thread-b')
+  })
+
   it('uses the path when the thread is unknown', () => {
     expect(resolveLinkFocus(focus({ comment: '9', path: 'README.md' }), units, [])?.unitId).toBe(3)
     expect(resolveLinkFocus(focus({ comment: '9' }), units, [])).toBeNull()

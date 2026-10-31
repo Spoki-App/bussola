@@ -4,9 +4,7 @@ import { describeError } from './api/client'
 import { ErrorNote } from './components/Badges'
 import { ExternalLink } from './components/ExternalLink'
 import { Link } from './Link'
-import { navigate } from './navigation'
 import { useOpenReview } from './openReview'
-import { addRepositoryPath } from './review/pullRequestLink'
 
 export function OpenPullRequestRoute({ url }: { url: string }) {
   const { open, start } = useOpenReview()
@@ -17,8 +15,7 @@ export function OpenPullRequestRoute({ url }: { url: string }) {
       return
     }
     started.current = true
-    const { pathname, search } = window.location
-    start(url, { search, onMissingClone: () => { navigate(addRepositoryPath(`${pathname}${search}`), { replace: true }) } })
+    start(url, { search: window.location.search, askToAddRepository: true })
   }, [start, url])
 
   return (

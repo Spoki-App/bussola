@@ -71,11 +71,9 @@ export function linkFocusFromSearch(search: string): LinkFocus | null {
 }
 
 function linkedThread(focus: LinkFocus, threads: Thread[]): Thread | undefined {
-  if (focus.thread !== null) {
-    return threads.find((thread) => thread.id === focus.thread)
-  }
-  if (focus.comment === null) {
-    return undefined
+  const byId = focus.thread === null ? undefined : threads.find((thread) => thread.id === focus.thread)
+  if (byId || focus.comment === null) {
+    return byId
   }
   const anchors = commentAnchors(focus.comment)
   return threads.find((thread) => thread.comments.some((comment) => anchors.some((anchor) => comment.remote_url?.endsWith(anchor))))
