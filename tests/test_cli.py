@@ -111,7 +111,7 @@ def test_a_failed_install_says_how_to_clean_up(tmp_path: Path, monkeypatch: pyte
     result = runner.invoke(app, ["install-handler"])
 
     assert result.exit_code == 2
-    assert "mimeapps.list is read-only Run `bussola uninstall-handler` to remove what was written." in result.output
+    assert "mimeapps.list is read-only\nIf anything was written, run `bussola uninstall-handler` to remove it." in result.output
 
 
 def test_install_handler_reports_unsupported_platforms(monkeypatch: pytest.MonkeyPatch) -> None:

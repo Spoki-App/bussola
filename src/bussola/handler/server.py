@@ -1,6 +1,7 @@
 import contextlib
 import http.client
 import ipaddress
+import json
 import logging
 import os
 import re
@@ -26,7 +27,7 @@ from pydantic import TypeAdapter, ValidationError
 from bussola.config import DEFAULT_HOST, DEFAULT_PORT
 from bussola.errors import DomainError
 from bussola.handler.links import browser_path, parse_link
-from bussola.security import TOKEN_COOKIE, TOKEN_ENV, TOKEN_QUERY, host_port, new_token
+from bussola.security import INVALID_TOKEN_DETAIL, TOKEN_COOKIE, TOKEN_ENV, TOKEN_QUERY, host_port, new_token
 from bussola.storage.database import DATA_DIR_ENV
 
 SERVERS_DIR = "servers"
@@ -35,6 +36,7 @@ HEALTH_PATH = "/api/health"
 HEALTH_TIMEOUT_SECONDS = 2.0
 START_TIMEOUT_SECONDS = 30.0
 EXIT_GRACE_SECONDS = 5.0
+MAX_PROBE_BODY = 512
 IPV6_LOOPBACK = "::1"
 UNSAFE_FILE_CHARACTERS = re.compile(r"[^A-Za-z0-9.-]")
 POLL_INTERVAL_SECONDS = 0.25
@@ -108,6 +110,7 @@ def _read_address(path: Path) -> ServerAddress | None:
 
 class Probe(StrEnum):
     READY = "ready"
+    OTHER_BUSSOLA = "other_bussola"
     CLOSED = "closed"
     UNKNOWN = "unknown"
 
@@ -116,14 +119,24 @@ def probe_server(address: ServerAddress) -> Probe:
     connection = http.client.HTTPConnection(address.host, address.port, timeout=HEALTH_TIMEOUT_SECONDS)
     try:
         connection.request("GET", HEALTH_PATH, headers={"Cookie": f"{TOKEN_COOKIE}={address.token}"})
-        status = connection.getresponse().status
+        response = connection.getresponse()
+        status, body = response.status, response.read(MAX_PROBE_BODY)
     except ConnectionRefusedError:
         return Probe.CLOSED
     except (OSError, http.client.HTTPException):
         return Probe.UNKNOWN
     finally:
         connection.close()
-    return Probe.READY if status == HTTPStatus.OK else Probe.UNKNOWN
+    if status == HTTPStatus.OK:
+        return Probe.READY
+    return Probe.OTHER_BUSSOLA if status == HTTPStatus.FORBIDDEN and _refuses_the_token(body) else Probe.UNKNOWN
+
+
+def _refuses_the_token(body: bytes) -> bool:
+    try:
+        return json.loads(body) == {"detail": INVALID_TOKEN_DETAIL}
+    except ValueError:
+        return False
 
 
 def free_port(host: str) -> int:
@@ -231,11 +244,17 @@ class Launcher:
     def _wait_for_server(self, pool: ThreadPoolExecutor, started: ServerAddress, process: Process) -> ServerAddress | None:
         deadline = time.monotonic() + self.timeout
         while True:
-            found = self._first_ready(self._probe_all(pool, started))
+            states = self._probe_all(pool, started)
+            found = self._first_ready(states)
             if found is not None:
                 return found
-            if process.poll() is not None:
+            exited = process.poll() is not None
+            if exited and states[started] != Probe.OTHER_BUSSOLA:
+                return None
+            if exited:
                 deadline = min(deadline, time.monotonic() + self.exit_grace)
             if time.monotonic() >= deadline:
+                if not exited:
+                    raise ServerStartError(f"bussola is still starting on {host_port(started.host, started.port)}. Open the link again in a moment.")
                 return None
             self.sleep(POLL_INTERVAL_SECONDS)
