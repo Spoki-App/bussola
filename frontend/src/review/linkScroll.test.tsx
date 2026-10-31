@@ -159,20 +159,16 @@ describe('followLink', () => {
     expect(observed.map((element) => element.id || element.tagName)).toEqual(['BODY', 'thread-t', 'panel', 'BODY', 'HTML'])
   })
 
-  it('stops following the target ten seconds after reaching it', () => {
+  it('ends the link fifteen seconds after it starts, reached or not', () => {
     vi.useFakeTimers()
     const link = createLinkScroll()
     followLink(link)
-    link.start({ unitId: 2, elementId: 'unit-2' })
-    link.reached()
+    link.start({ unitId: 2, elementId: 'thread-never-shown' })
 
-    vi.advanceTimersByTime(9_000)
-    resized()
-    expect(scrolled).toEqual(['unit-2'])
+    vi.advanceTimersByTime(14_000)
+    expect(link.current()).not.toBeNull()
 
     vi.advanceTimersByTime(1_000)
-    resized()
-    expect(scrolled).toEqual(['unit-2'])
     expect(link.current()).toBeNull()
     vi.useRealTimers()
   })
