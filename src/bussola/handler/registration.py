@@ -33,6 +33,7 @@ WINDOWS_GUI_PYTHON = "pythonw.exe"
 DESKTOP_RESERVED = re.compile(r"[\s\"'\\><~|&;$*?#()`]")
 DESKTOP_ESCAPED = re.compile(r"([\"`$\\])")
 HANDLER_ARGUMENTS = ("-m", "bussola", "open-link")
+END_OF_OPTIONS = "--"
 
 
 class HandlerError(DomainError):
@@ -137,7 +138,8 @@ def current_registration() -> Registration:
 
 def registration_for(system: str, home: Path, environ: Mapping[str, str], executable: str) -> Registration:
     data_dir = environ.get(DATA_DIR_ENV)
-    command = (*handler_command(system, executable), *(("--data-dir", str(Path(data_dir).resolve())) if data_dir else ()))
+    options = ("--data-dir", str(Path(data_dir).resolve())) if data_dir else ()
+    command = (*handler_command(system, executable), *options, END_OF_OPTIONS)
     if system.startswith("linux"):
         applications_dir = xdg_applications_dir(home, environ)
         search_path = environ.get("PATH", "")
