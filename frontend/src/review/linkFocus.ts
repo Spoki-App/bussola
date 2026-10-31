@@ -152,7 +152,10 @@ export function createLinkScroll(): LinkScroll {
       listeners.add(listener)
       return () => { listeners.delete(listener) }
     },
-    start: (target) => { change({ target, unitShown: false, reached: false }) },
+    start: (target) => {
+      placed = null
+      change({ target, unitShown: false, reached: false })
+    },
     unitShown: () => { change(state && { ...state, unitShown: true }) },
     reached: () => { change(state && { ...state, reached: true }) },
     done: () => { change(null) },

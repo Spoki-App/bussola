@@ -214,6 +214,24 @@ describe('followLink', () => {
     expect(link.current()?.reached).toBe(true)
   })
 
+  it('forgets where the previous link was placed when a new one starts', () => {
+    const link = createLinkScroll()
+    followLink(link)
+    const target = document.getElementById('unit-2')
+    let top = 0
+    if (target) {
+      target.getBoundingClientRect = () => DOMRect.fromRect({ y: top })
+    }
+    link.start({ unitId: 2, elementId: 'unit-2' })
+    link.place(target)
+    top = 400
+
+    link.start({ unitId: 3, elementId: 'unit-3' })
+    window.dispatchEvent(new Event('scroll'))
+
+    expect(link.current()?.target.elementId).toBe('unit-3')
+  })
+
   it('ends the link on a key press or a click too, and only listens once', () => {
     for (const event of [new KeyboardEvent('keydown'), new MouseEvent('mousedown')]) {
       const link = createLinkScroll()

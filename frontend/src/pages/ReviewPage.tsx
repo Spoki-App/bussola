@@ -153,7 +153,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const actions = useRef(new Map<number, UnitActions>())
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= WIDE_LAYOUT_PX)
   const [filesHidden, setFilesHidden] = useState(() => readStored(FILES_HIDDEN_KEY) === 'true')
-  const [appliedLink, setAppliedLink] = useState<{ key: string; target: FocusTarget | null } | null>(null)
+  const [appliedLink, setAppliedLink] = useState<{ target: FocusTarget | null } | null>(null)
   const { link } = extensions
   const toggleFiles = () => {
     setFilesHidden(!filesHidden)
@@ -176,12 +176,12 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const unitsUnavailable = review.isError || units.isError || review.data?.latest_revision === null
   const resolveLink = () => (link?.ready && units.data && !units.isPlaceholderData ? link.resolve(units.data) : undefined)
   const linkedTarget = !linkPending ? undefined : viewChanged || unitsUnavailable ? null : resolveLink()
-  if (link && linkedTarget !== undefined) {
-    setAppliedLink({ key: link.key, target: linkedTarget })
-    if (linkedTarget) {
+  if (linkedTarget !== undefined) {
+    setAppliedLink({ target: linkedTarget })
+    if (linkedTarget?.unitId != null) {
       setFocusedId(linkedTarget.unitId)
-      setPanelOpen(panelOpen || linkedTarget.unitId === null)
     }
+    setPanelOpen(panelOpen || linkedTarget?.unitId === null)
   }
   const [linkScroll] = useState(createLinkScroll)
   useEffect(() => {
