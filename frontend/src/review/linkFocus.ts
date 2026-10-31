@@ -18,6 +18,7 @@ export interface FocusTarget {
 export interface LinkState {
   target: FocusTarget
   unitShown: boolean
+  reached: boolean
 }
 
 export interface LinkScroll {
@@ -25,6 +26,7 @@ export interface LinkScroll {
   subscribe: (listener: () => void) => () => void
   start: (target: FocusTarget) => void
   unitShown: () => void
+  reached: () => void
   done: () => void
 }
 
@@ -120,6 +122,9 @@ export function createLinkScroll(): LinkScroll {
   let state: LinkState | null = null
   const listeners = new Set<() => void>()
   const change = (next: LinkState | null) => {
+    if (next === state) {
+      return
+    }
     state = next
     listeners.forEach((listener) => { listener() })
   }
@@ -129,14 +134,15 @@ export function createLinkScroll(): LinkScroll {
       listeners.add(listener)
       return () => { listeners.delete(listener) }
     },
-    start: (target) => { change({ target, unitShown: false }) },
+    start: (target) => { change({ target, unitShown: false, reached: false }) },
     unitShown: () => { change(state && { ...state, unitShown: true }) },
+    reached: () => { change(state && { ...state, reached: true }) },
     done: () => { change(null) },
   }
 }
 
 function linkRole(state: LinkState | null, elementId: string, unitId: number | null, settled: boolean): LinkRole {
-  if (state === null) {
+  if (state === null || state.reached) {
     return null
   }
   if (state.target.elementId === elementId) {
@@ -155,16 +161,33 @@ const noLink = () => () => undefined
 
 const USER_INPUT_EVENTS = ['wheel', 'touchmove', 'keydown', 'mousedown'] as const
 
-export function endOnUserInput(link: LinkScroll): () => void {
-  const end = () => { link.done() }
-  for (const event of USER_INPUT_EVENTS) {
-    window.addEventListener(event, end, { passive: true })
-  }
-  return () => {
+function linkAnchor(state: LinkState): Element | null {
+  const { elementId, unitId } = state.target
+  return document.getElementById(elementId) ?? (unitId === null ? null : document.getElementById(unitElementId(unitId)))
+}
+
+export function followLink(link: LinkScroll): () => void {
+  const keepInView = new ResizeObserver(() => {
+    const state = link.current()
+    if (state?.reached) {
+      linkAnchor(state)?.scrollIntoView({ block: 'start' })
+    }
+  })
+  keepInView.observe(document.body)
+  const stop = () => {
+    keepInView.disconnect()
     for (const event of USER_INPUT_EVENTS) {
       window.removeEventListener(event, end)
     }
   }
+  const end = () => {
+    stop()
+    link.done()
+  }
+  for (const event of USER_INPUT_EVENTS) {
+    window.addEventListener(event, end, { passive: true })
+  }
+  return stop
 }
 
 export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId: number | null = null, settled = false): RefObject<T | null> {
@@ -182,7 +205,7 @@ export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId
     if (now === 'holder') {
       link.unitShown()
     } else if (now === 'target' || now === 'settled') {
-      link.done()
+      link.reached()
     }
   }, [link, role, elementId, unitId, settled])
   return ref

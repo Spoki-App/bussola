@@ -10,7 +10,7 @@ import { CommentCount } from '../components/CommentCount'
 import { PullRequestsPanel } from '../components/PullRequestsPanel'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { Link } from '../Link'
-import { navigate, reviewPath, useSearch } from '../navigation'
+import { navigate, reviewPath, showReview, useSearch } from '../navigation'
 import { addRepositoryRequestFromSearch, type AddRepositoryRequest } from '../review/pullRequestLink'
 import { progressPercent } from '../review/logic'
 import { REVIEW_FILTER_LABELS, loadReviewFilter, matchesReviewFilter, saveReviewFilter, type ReviewFilter } from '../review/reviewFilter'
@@ -45,7 +45,7 @@ function AddRepositoryPrompt({ request }: { request: AddRepositoryRequest }) {
   const name = request.repository.slice(request.repository.indexOf('/') + 1)
   const open = useOpenPullRequestLink()
   const openPullRequest = () => {
-    open.mutate(request.url, { onSuccess: (review) => { navigate(`${reviewPath(review.id)}${request.search}`, { replace: true }) } })
+    open.mutate(request.url, { onSuccess: (review) => { showReview(review.id, request.search) } })
   }
   return (
     <section className="repo" aria-labelledby="add-repository-title">

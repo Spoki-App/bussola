@@ -34,6 +34,10 @@ export function reviewPath(reviewId: number): string {
   return `/reviews/${String(reviewId)}`
 }
 
+export function showReview(reviewId: number, search = '') {
+  navigate(`${reviewPath(reviewId)}${search}`, { replace: true })
+}
+
 export function reviewIdFromPath(pathname: string): number | null {
   const match = REVIEW_PATH.exec(pathname)
   return match ? Number(match[1]) : null

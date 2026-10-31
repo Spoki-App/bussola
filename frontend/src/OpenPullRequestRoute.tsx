@@ -5,7 +5,7 @@ import { isMissingClone, useOpenPullRequestLink } from './api/pulls'
 import { ErrorNote } from './components/Badges'
 import { ExternalLink } from './components/ExternalLink'
 import { Link } from './Link'
-import { navigate, reviewPath } from './navigation'
+import { navigate, showReview } from './navigation'
 import { addRepositoryPath } from './review/pullRequestLink'
 
 export function OpenPullRequestRoute({ url }: { url: string }) {
@@ -19,7 +19,7 @@ export function OpenPullRequestRoute({ url }: { url: string }) {
     started.current = true
     const { pathname, search } = window.location
     open.mutate(url, {
-      onSuccess: (review) => { navigate(`${reviewPath(review.id)}${search}`, { replace: true }) },
+      onSuccess: (review) => { showReview(review.id, search) },
       onError: (error) => {
         if (isMissingClone(error)) {
           navigate(addRepositoryPath(`${pathname}${search}`), { replace: true })

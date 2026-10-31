@@ -19,7 +19,7 @@ import { UnitTree } from '../components/UnitTree'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
-import { LinkScrollContext, createLinkScroll, endOnUserInput, scrollToElement, unitElementId, type FocusTarget } from '../review/linkFocus'
+import { LinkScrollContext, createLinkScroll, followLink, scrollToElement, unitElementId, type FocusTarget } from '../review/linkFocus'
 import { buildUnitTree } from '../review/unitTree'
 import { searchGroups } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
@@ -160,15 +160,18 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   }
   const [linkScroll] = useState(createLinkScroll)
   useEffect(() => {
-    if (!appliedLink) {
-      return
+    if (appliedLink === undefined) {
+      return undefined
+    }
+    window.history.replaceState(window.history.state, '', window.location.pathname)
+    if (appliedLink === null) {
+      return undefined
     }
     if (appliedLink.unitId !== null) {
       actions.current.get(appliedLink.unitId)?.reveal()
     }
-    window.history.replaceState(window.history.state, '', window.location.pathname)
     linkScroll.start(appliedLink)
-    return endOnUserInput(linkScroll)
+    return followLink(linkScroll)
   }, [appliedLink, linkScroll])
 
   const focusUnit = useCallback((unitId: number) => {
@@ -237,12 +240,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           </div>
           <div className="summary-controls">
             <div className="unit-filters">
-              <Segmented
-                label="Filter units"
-                labels={FILTER_LABELS}
-                value={filter}
-                onChange={setFilter}
-              />
+              <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
               <input
                 type="search"
                 className="unit-search"

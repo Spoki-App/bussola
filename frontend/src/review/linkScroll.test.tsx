@@ -1,8 +1,8 @@
 import { act, render } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { LinkScrollContext, createLinkScroll, endOnUserInput, useLinkedScroll, type LinkScroll } from './linkFocus'
+import { LinkScrollContext, createLinkScroll, followLink, useLinkedScroll, type LinkScroll } from './linkFocus'
 
 function Linked({ id, unitId = null, settled = false, children }: { id: string; unitId?: number | null; settled?: boolean; children?: ReactNode }) {
   const ref = useLinkedScroll<HTMLDivElement>(id, unitId, settled)
@@ -31,7 +31,7 @@ describe('useLinkedScroll', () => {
     Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
   })
 
-  it('scrolls to the unit holding a linked thread, then to the thread, and finishes there', () => {
+  it('scrolls to the unit holding a linked thread, then to the thread, and reaches it', () => {
     const link = createLinkScroll()
     render(withLink(link, (
       <>
@@ -44,7 +44,7 @@ describe('useLinkedScroll', () => {
     act(() => { link.start({ unitId: 2, elementId: 'thread-t' }) })
 
     expect(scrolled).toEqual(['unit-2', 'thread-t'])
-    expect(link.current()).toBeNull()
+    expect(link.current()?.reached).toBe(true)
   })
 
   it('ends on a thread rendered inside its unit', () => {
@@ -58,17 +58,17 @@ describe('useLinkedScroll', () => {
     act(() => { link.start({ unitId: 2, elementId: 'thread-t' }) })
 
     expect(scrolled).toEqual(['thread-t'])
-    expect(link.current()).toBeNull()
+    expect(link.current()?.reached).toBe(true)
   })
 
-  it('waits for the unit diff, then gives up on a thread its diff does not show', () => {
+  it('waits for the unit diff, then stops looking for a thread its diff does not show', () => {
     const link = createLinkScroll()
     const view = render(withLink(link, <Linked id="unit-2" unitId={2} />))
     act(() => { link.start({ unitId: 2, elementId: 'thread-t' }) })
-    expect(link.current()).toEqual({ target: { unitId: 2, elementId: 'thread-t' }, unitShown: true })
+    expect(link.current()).toEqual({ target: { unitId: 2, elementId: 'thread-t' }, unitShown: true, reached: false })
 
     view.rerender(withLink(link, <Linked id="unit-2" unitId={2} settled />))
-    expect(link.current()).toBeNull()
+    expect(link.current()?.reached).toBe(true)
 
     view.rerender(withLink(link, (
       <Linked id="unit-2" unitId={2} settled>
@@ -78,36 +78,87 @@ describe('useLinkedScroll', () => {
     expect(scrolled).toEqual(['unit-2'])
   })
 
-  it('scrolls to a linked unit again once its diff has loaded, then finishes', () => {
+  it('scrolls to a linked unit again once its diff has loaded', () => {
     const link = createLinkScroll()
     const view = render(withLink(link, <Linked id="unit-2" unitId={2} />))
 
     act(() => { link.start({ unitId: 2, elementId: 'unit-2' }) })
     expect(scrolled).toEqual(['unit-2'])
-    expect(link.current()).not.toBeNull()
+    expect(link.current()?.reached).toBe(false)
 
     view.rerender(withLink(link, <Linked id="unit-2" unitId={2} settled />))
 
     expect(scrolled).toEqual(['unit-2', 'unit-2'])
-    expect(link.current()).toBeNull()
-  })
-
-  it('ends the link as soon as the user scrolls, types or clicks', () => {
-    for (const event of [new WheelEvent('wheel'), new KeyboardEvent('keydown'), new MouseEvent('mousedown')]) {
-      const link = createLinkScroll()
-      const stop = endOnUserInput(link)
-      link.start({ unitId: 2, elementId: 'unit-2' })
-
-      window.dispatchEvent(event)
-
-      expect(link.current()).toBeNull()
-      stop()
-    }
+    expect(link.current()?.reached).toBe(true)
   })
 
   it('does nothing without a link', () => {
     render(<Linked id="unit-2" unitId={2} />)
 
     expect(scrolled).toEqual([])
+  })
+})
+
+describe('followLink', () => {
+  let resized: () => void = () => undefined
+
+  beforeEach(() => {
+    scrolled = []
+    Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
+      scrolled.push(this.id)
+    }
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) {
+        resized = callback
+      }
+
+      observe() {
+        return undefined
+      }
+
+      disconnect() {
+        resized = () => undefined
+      }
+    })
+    document.body.innerHTML = '<div id="unit-2"></div>'
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+    document.body.innerHTML = ''
+  })
+
+  it('keeps the reached target in view while the page grows, until the user scrolls', () => {
+    const link = createLinkScroll()
+    const stop = followLink(link)
+    link.start({ unitId: 2, elementId: 'unit-2' })
+    link.reached()
+
+    resized()
+    expect(scrolled).toEqual(['unit-2'])
+
+    window.dispatchEvent(new WheelEvent('wheel'))
+    resized()
+
+    expect(scrolled).toEqual(['unit-2'])
+    expect(link.current()).toBeNull()
+    stop()
+  })
+
+  it('ends the link on a key press or a click too, and only listens once', () => {
+    for (const event of [new KeyboardEvent('keydown'), new MouseEvent('mousedown')]) {
+      const link = createLinkScroll()
+      const notified = vi.fn()
+      link.subscribe(notified)
+      followLink(link)
+      link.start({ unitId: 2, elementId: 'unit-2' })
+
+      window.dispatchEvent(event)
+      window.dispatchEvent(event)
+
+      expect(link.current()).toBeNull()
+      expect(notified).toHaveBeenCalledTimes(2)
+    }
   })
 })

@@ -99,7 +99,7 @@ describe('UnitCard', () => {
 
     act(() => { link.start({ unitId: 1, elementId: 'unit-1' }) })
 
-    await waitFor(() => { expect(link.current()).toBeNull() })
+    await waitFor(() => { expect(link.current()?.reached).toBe(true) })
     Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
   })
 
