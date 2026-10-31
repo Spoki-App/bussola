@@ -9,12 +9,13 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     method,
     credentials: 'same-origin',
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
   })
   if (!response.ok) {
     throw new ApiError(response.status, await errorMessage(response))
@@ -38,7 +39,7 @@ async function errorMessage(response: Response): Promise<string> {
 }
 
 export const getJson = <T>(path: string) => request<T>('GET', path)
-export const postJson = <T>(path: string, body?: unknown) => request<T>('POST', path, body ?? {})
+export const postJson = <T>(path: string, body?: unknown, signal?: AbortSignal) => request<T>('POST', path, body ?? {}, signal)
 export const patchJson = <T>(path: string, body: unknown) => request<T>('PATCH', path, body)
 export const putJson = <T>(path: string, body: unknown) => request<T>('PUT', path, body)
 export const deleteJson = <T>(path: string) => request<T>('DELETE', path)

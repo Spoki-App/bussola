@@ -56,6 +56,8 @@ class RepoAiConfig(BaseModel):
         if not endpoint.lower().startswith(HTTP_SCHEMES):
             raise ValueError("endpoint must start with http:// or https://")
         parts = urllib.parse.urlsplit(endpoint.rstrip("/"))
+        if parts.query or parts.fragment or parts.username is not None or not parts.hostname:
+            raise ValueError("endpoint must be a plain http:// or https:// address with a host, without login, query or fragment")
         return urllib.parse.urlunsplit(parts._replace(scheme=parts.scheme.lower(), netloc=parts.netloc.lower()))
 
 
@@ -157,5 +159,5 @@ def _merge(user: UserAiConfig, override: RepoAiConfig) -> AiSettings:
         timeout=user.timeout,
         api_key_env=user_key if keeps_key else None,
         max_tokens=user.max_tokens if own_provider else None,
-        key_withheld=own_provider and user_key is not None and not keeps_key,
+        key_withheld=own_provider and user_key is not None and endpoint == base_endpoint and model != base_model,
     )

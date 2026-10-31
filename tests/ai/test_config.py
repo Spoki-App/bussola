@@ -298,3 +298,22 @@ def test_a_repository_endpoint_is_ignored_for_claude_code() -> None:
 
     assert settings.provider == ProviderName.CLAUDE_CODE
     assert settings.endpoint is None
+
+
+def test_a_repository_can_send_code_to_a_local_keyless_server_instead_of_your_keyed_one() -> None:
+    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="gpt", endpoint="https://openrouter.ai/api/v1", api_key_env="OR_KEY")
+
+    settings = resolve_ai_settings(user, RepoAiConfig(endpoint="http://localhost:11434/v1", model="qwen2.5-coder"))
+
+    assert settings.api_key_env is None
+    assert not settings.key_withheld
+    assert build_provider(settings).endpoint == "http://localhost:11434/v1"
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    ["https://x.example/v1?api-version=2024", "https://x.example/v1#part", "https://user:secret@x.example/v1", "http:///v1"],
+)
+def test_an_endpoint_with_query_fragment_or_login_is_rejected(endpoint: str) -> None:
+    with pytest.raises(ValueError, match="plain http"):
+        RepoAiConfig(endpoint=endpoint)

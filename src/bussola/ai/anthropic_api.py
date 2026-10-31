@@ -8,6 +8,7 @@ API_VERSION = "2026-10-21"
 MESSAGES_PATH = "/v1/messages"
 STOP_MESSAGES = {
     "max_tokens": "The answer was cut off before it was complete",
+    "model_context_window_exceeded": "The answer was cut off because the context window is full",
     "refusal": "The model declined to answer",
 }
 

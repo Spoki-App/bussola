@@ -12,7 +12,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Any
 
-from bussola.ai.base import MAX_ERROR_LENGTH, AiNotConfiguredError, AiOutputError, AiProviderError, AiRequest, Cancellation, json_object, run_cancellable
+from bussola.ai.base import (
+    MAX_ERROR_LENGTH,
+    AiCancelledError,
+    AiNotConfiguredError,
+    AiOutputError,
+    AiProviderError,
+    AiRequest,
+    Cancellation,
+    json_object,
+    run_cancellable,
+)
 from bussola.ai.config import PROVIDER_LABELS, ProviderName
 
 CLAUDE = "claude"
@@ -168,11 +178,15 @@ class _ClaudeSession:
     def __init__(self, process: subprocess.Popen[bytes]) -> None:
         self._process = process
         self._lock = threading.Lock()
-        self._started = threading.Event()
+        self._started = False
+        self._abandoned = False
         self._exchanged = threading.Event()
 
     def exchange(self, prompt: str) -> tuple[int, str, str]:
-        self._started.set()
+        with self._lock:
+            if self._abandoned:
+                raise AiCancelledError("Cancelled")
+            self._started = True
         try:
             return self._exchange(prompt)
         finally:
@@ -193,8 +207,11 @@ class _ClaudeSession:
         return returncode, stdout.text(), stderr.text()
 
     def finish(self) -> None:
+        with self._lock:
+            self._abandoned = True
+            started = self._started
         self._stop_group()
-        if self._started.is_set():
+        if started:
             self._exchanged.wait(FINISH_WAIT_SECONDS)
         self._reap()
 

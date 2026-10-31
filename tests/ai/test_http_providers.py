@@ -115,7 +115,7 @@ def test_the_anthropic_api_gets_the_key_the_model_and_the_schema(stub: StubServe
     }
 
 
-@pytest.mark.parametrize(("stop_reason", "message"), [("max_tokens", "cut off"), ("refusal", "declined")])
+@pytest.mark.parametrize(("stop_reason", "message"), [("max_tokens", "cut off"), ("model_context_window_exceeded", "context window"), ("refusal", "declined")])
 def test_an_incomplete_anthropic_answer_is_an_error(stub: StubServer, stop_reason: str, message: str) -> None:
     stub.reply({"stop_reason": stop_reason, "content": []})
 
