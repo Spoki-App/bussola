@@ -231,13 +231,38 @@ describe('useCodeNavigation', () => {
   })
 
   it('opens the list above the pointer when there is no room below it', async () => {
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 300 })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 100 })
     serve(() => found([target('lib.py', 1, null), target('lib.py', 5, null)]))
     renderHarness()
 
     const popup = await screen.findByRole('dialog', { name: 'Definitions of price' })
     expect(popup.style.top).toBe('auto')
-    expect(popup.style.bottom).toBe('254px')
+    expect(popup.style.bottom).toBe('54px')
+    expect(popup.style.maxHeight).toBe('38px')
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 })
+  })
+
+  it('fits the list on the side with more room, shrinking it to the space available', async () => {
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 140 })
+    serve(() => found([target('lib.py', 1, null), target('lib.py', 5, null)]))
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'Definitions of price' })
+    expect(popup.style.top).toBe('74px')
+    expect(popup.style.maxHeight).toBe('58px')
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 })
+  })
+
+  it('closes the list on a click outside it but not on a click on its padding', async () => {
+    serve(() => found([target('lib.py', 1, null), target('lib.py', 5, null)]))
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'Definitions of price' })
+    popup.getBoundingClientRect = () => DOMRect.fromRect({ x: 40, y: 74, width: 560, height: 200 })
+    fireEvent.click(popup, { clientX: 45, clientY: 80 })
+    expect(screen.getByRole('dialog', { name: 'Definitions of price' })).toBeInTheDocument()
+
+    fireEvent.click(popup, { clientX: 700, clientY: 400 })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

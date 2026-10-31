@@ -1,4 +1,4 @@
-import { useEffect, type KeyboardEvent } from 'react'
+import { useEffect, type KeyboardEvent, type MouseEvent } from 'react'
 
 import type { NavigationResult, NavigationTarget } from '../api/navigation'
 import { useModalDialog } from '../hooks/useModalDialog'
@@ -21,6 +21,20 @@ const VIEWPORT_MARGIN = 8
 const CURSOR_GAP = 14
 const ENTRY_SELECTOR = 'button.navigation-entry'
 const STEPS: Record<string, number> = { ArrowDown: 1, ArrowUp: -1 }
+
+function verticalPlacement(y: number, viewportHeight: number) {
+  const below = viewportHeight - y - CURSOR_GAP - VIEWPORT_MARGIN
+  const above = y - CURSOR_GAP - VIEWPORT_MARGIN
+  if (below >= POPUP_MAX_HEIGHT || below >= above) {
+    return { top: y + CURSOR_GAP, maxHeight: Math.min(POPUP_MAX_HEIGHT, below) }
+  }
+  return { top: 'auto', bottom: viewportHeight - y + CURSOR_GAP, maxHeight: Math.min(POPUP_MAX_HEIGHT, above) }
+}
+
+function clickedOutside(event: MouseEvent<HTMLDialogElement>): boolean {
+  const box = event.currentTarget.getBoundingClientRect()
+  return event.target === event.currentTarget && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom)
+}
 
 function moveFocus(dialog: HTMLDialogElement, step: number) {
   const entries = [...dialog.querySelectorAll<HTMLButtonElement>(ENTRY_SELECTOR)]
@@ -106,8 +120,7 @@ export function NavigationPopup({ state, point, onChoose, onClose }: Props) {
   }
 
   const left = Math.max(VIEWPORT_MARGIN, Math.min(point.x, window.innerWidth - POPUP_WIDTH - VIEWPORT_MARGIN))
-  const fitsBelow = point.y + CURSOR_GAP + POPUP_MAX_HEIGHT + VIEWPORT_MARGIN <= window.innerHeight
-  const vertical = fitsBelow ? { top: point.y + CURSOR_GAP } : { top: 'auto', bottom: Math.max(VIEWPORT_MARGIN, window.innerHeight - point.y + CURSOR_GAP) }
+  const vertical = verticalPlacement(point.y, window.innerHeight)
   const title = heading(state)
 
   return (
@@ -119,7 +132,7 @@ export function NavigationPopup({ state, point, onChoose, onClose }: Props) {
       onClose={onClose}
       onKeyDown={onKeyDown}
       onClick={(event) => {
-        if (event.target === event.currentTarget) {
+        if (clickedOutside(event)) {
           close()
         }
       }}
