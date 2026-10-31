@@ -361,6 +361,7 @@ def test_open_gives_up_on_a_local_server_that_never_answers_and_starts_its_own(t
     assert started.port != 8765
     assert url == f"http://127.0.0.1:{started.port}/?token={started.token}"
     assert hung in published_servers(tmp_path)
+    assert 10**6 - servers.busy[hung] == 1
 
     servers.busy[hung] = 0
     servers.healthy.add(hung)

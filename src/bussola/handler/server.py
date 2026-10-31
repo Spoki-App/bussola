@@ -283,7 +283,7 @@ class Launcher:
             for port in (DEFAULT_PORT, *[None] * FREE_PORT_ATTEMPTS):
                 address = ServerAddress(DEFAULT_HOST, port or free_port(DEFAULT_HOST), new_token())
                 process = self.start(address, self._server_environment()) if self.port_free(address.host, address.port) else None
-                found = self._wait_for_server(pool, address, process)
+                found = self._wait_for_server(pool, address, process, set(silent))
                 if found is not None:
                     return found
         raise ServerStartError("bussola did not start. Run `bussola serve` to see why.")
@@ -322,9 +322,8 @@ class Launcher:
     def _first_ready(self, states: dict[ServerAddress, Probe]) -> ServerAddress | None:
         return next((candidate for candidate, state in states.items() if state == Probe.READY), None)
 
-    def _wait_for_server(self, pool: ThreadPoolExecutor, started: ServerAddress, process: Process | None) -> ServerAddress | None:
+    def _wait_for_server(self, pool: ThreadPoolExecutor, started: ServerAddress, process: Process | None, tried: set[ServerAddress]) -> ServerAddress | None:
         deadline = time.monotonic() + self.timeout
-        tried: set[ServerAddress] = set()
         while True:
             states = self._probe_all(pool, started, skip=tried)
             found = self._first_ready(states)
