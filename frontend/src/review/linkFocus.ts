@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useSyncExternalStore, type RefObject } from 'react'
 
 import type { Thread, Unit } from '../api/types'
-import { pullRequestRepository, pullRequestUrlFromPath } from './pullRequestLink'
+import { pullRequestRepositoryFromPath } from './pullRequestLink'
 import { isInline } from './threadPlacement'
 
 export interface LinkFocus {
@@ -102,8 +102,12 @@ export function resolveLinkFocus(focus: LinkFocus, units: Unit[], threads: Threa
   return unit ? { unitId: unit.id, elementId: unitElementId(unit.id) } : null
 }
 
+function scrollIntoPlace(element: Element | null) {
+  element?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 export function scrollToElement(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  scrollIntoPlace(document.getElementById(id))
 }
 
 export function createLinkScroll(): LinkScroll {
@@ -153,7 +157,7 @@ export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId
     }
     const now = linkRole(link.current(), elementId, unitId, settled)
     if (now === 'target' || now === 'approach' || now === 'holder') {
-      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      scrollIntoPlace(ref.current)
     }
     if (now === 'holder') {
       link.unitShown()
@@ -170,7 +174,6 @@ export function addRepositoryPath(then: string): string {
 
 export function addRepositoryRequestFromSearch(search: string): AddRepositoryRequest | null {
   const then = new URLSearchParams(search).get(ADD_REPOSITORY_PARAM)
-  const url = then === null ? null : pullRequestUrlFromPath(then.split('?')[0])
-  const repository = url === null ? null : pullRequestRepository(url)
+  const repository = then === null ? null : pullRequestRepositoryFromPath(then.split('?')[0])
   return then !== null && repository !== null ? { repository, then } : null
 }

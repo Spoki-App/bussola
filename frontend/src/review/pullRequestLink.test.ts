@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isPullRequestUrl, pullRequestRepository, pullRequestUrlFromPath } from './pullRequestLink'
+import { isPullRequestUrl, pullRequestRepositoryFromPath, pullRequestUrlFromPath } from './pullRequestLink'
 
 describe('isPullRequestUrl', () => {
   it('accepts pull request links with or without scheme and suffix', () => {
@@ -15,10 +15,10 @@ describe('isPullRequestUrl', () => {
   })
 })
 
-describe('pullRequestRepository', () => {
-  it('reads the repository of a pull request link', () => {
-    expect(pullRequestRepository('https://github.com/acme/widgets/pull/7/files')).toBe('acme/widgets')
-    expect(pullRequestRepository('https://example.com/acme/widgets/pull/7')).toBeNull()
+describe('pullRequestRepositoryFromPath', () => {
+  it('reads the repository of a path that mirrors a pull request link', () => {
+    expect(pullRequestRepositoryFromPath('/github.com/acme/widgets/pull/7/files')).toBe('acme/widgets')
+    expect(pullRequestRepositoryFromPath('/github.com/acme/widgets/issues/7')).toBeNull()
   })
 })
 

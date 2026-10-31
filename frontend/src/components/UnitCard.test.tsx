@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Unit, UnitState } from '../api/types'
+import { LinkScrollContext, createLinkScroll } from '../review/linkFocus'
 import { UnitCard, type UnitActions } from './UnitCard'
 
 function unit(state: UnitState, overrides: Partial<Unit> = {}): Unit {
@@ -82,6 +83,24 @@ describe('UnitCard', () => {
     act(() => { registered.get(1)?.reveal() })
 
     expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('ends a link to the unit even when its diff cannot be loaded', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(Response.json({ detail: 'boom' }, { status: 500 }))))
+    Element.prototype.scrollIntoView = () => undefined
+    const link = createLinkScroll()
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <LinkScrollContext value={link}>
+          <UnitCard reviewId={1} unit={unit('changed')} focused={false} onFocus={() => undefined} register={() => undefined} />
+        </LinkScrollContext>
+      </QueryClientProvider>,
+    )
+
+    act(() => { link.start({ unitId: 1, elementId: 'unit-1' }) })
+
+    await waitFor(() => { expect(link.current()).toBeNull() })
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
   })
 
   it('shows the module before the name of every unit, methods included', () => {
