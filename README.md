@@ -157,7 +157,7 @@ provider = "claude-code"
 model = "claude-opus-5-5"  # optional, the command's default otherwise
 ```
 
-bussola runs `claude -p` with JSON output, no tools, no saved session, safe mode (no hooks, plugins, skills or MCP servers from your Claude Code setup) and an empty temporary folder, so it cannot read or change your files. It needs a version of Claude Code that has `--safe-mode`.
+bussola runs `claude -p` with JSON output, no tools, no saved session, safe mode (no hooks, plugins, skills or MCP servers from your Claude Code setup) and an empty temporary folder, so it cannot read or change your files. It needs a version of Claude Code that has `--safe-mode`. `claude` signs in as it does when you run it yourself: with your Claude account, or with `ANTHROPIC_API_KEY` if that is set in the environment bussola runs in. bussola's own `BUSSOLA_*` variables, such as the session token, are not passed to it.
 
 **Anthropic API** reads the key from the `ANTHROPIC_API_KEY` environment variable:
 

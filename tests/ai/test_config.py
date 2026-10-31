@@ -212,3 +212,13 @@ def test_a_secret_written_in_the_config_is_not_repeated_in_the_error(tmp_path: P
 
     assert "api_key" in str(raised.value)
     assert "sk-ant-secret-value" not in str(raised.value)
+
+
+def test_an_unreadable_configuration_directory_is_reported(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def denied(_path: Path) -> bool:
+        raise PermissionError("Permission denied")
+
+    monkeypatch.setattr(Path, "is_file", denied)
+
+    with pytest.raises(AiNotConfiguredError, match="Permission denied"):
+        load_user_config(tmp_path / "config.toml")

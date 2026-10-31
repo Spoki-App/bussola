@@ -71,6 +71,19 @@ def test_the_cli_runs_without_tools_with_the_schema_and_the_prompt_on_stdin(fake
     assert Path(call["cwd"]).name.startswith("bussola-ai-")
 
 
+def test_bussola_settings_such_as_the_session_token_are_not_passed_to_the_cli(fake_claude: FakeClaude, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BUSSOLA_TOKEN", "session-secret")
+    monkeypatch.setenv("HOME_TOOL_SETTING", "kept")
+    fake_claude.answer({"type": "result", "is_error": False, "result": "{}"})
+
+    provider().complete(REQUEST, Cancellation())
+
+    environment = fake_claude.call()["env"]
+    assert "BUSSOLA_TOKEN" not in environment
+    assert environment["HOME_TOOL_SETTING"] == "kept"
+    assert environment["NO_COLOR"] == "1"
+
+
 def test_without_a_model_the_cli_default_is_used_and_the_text_result_is_read(fake_claude: FakeClaude) -> None:
     fake_claude.answer({"type": "result", "is_error": False, "result": '{"impact": "high"}'})
 

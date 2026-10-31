@@ -13,6 +13,7 @@ from bussola.ai.config import PROVIDER_LABELS, ProviderName
 
 CLAUDE = "claude"
 CLAUDE_ENV = {"NO_COLOR": "1"}
+PRIVATE_ENV_PREFIX = "BUSSOLA_"
 EXIT_POLL_SECONDS = 0.1
 PIPE_GRACE_SECONDS = 0.5
 
@@ -79,7 +80,7 @@ class ClaudeCodeProvider:
                     text=True,
                     encoding="utf-8",
                     errors="replace",
-                    env={**os.environ, **CLAUDE_ENV},
+                    env=_claude_environment(),
                     start_new_session=True,
                 )
             except OSError as error:
@@ -93,6 +94,11 @@ class ClaudeCodeProvider:
                 _kill_group(process)
                 process.wait()
         return process.returncode, stdout, stderr
+
+
+def _claude_environment() -> dict[str, str]:
+    inherited = {name: value for name, value in os.environ.items() if not name.startswith(PRIVATE_ENV_PREFIX)}
+    return {**inherited, **CLAUDE_ENV}
 
 
 def _stop_leftovers(process: subprocess.Popen[str], finished: threading.Event) -> None:
