@@ -42,6 +42,8 @@ EXIT_POLL_SECONDS = 0.05
 
 
 def find_claude() -> str:
+    if sys.platform == "win32":
+        raise AiNotConfiguredError("The Claude Code provider is not supported on Windows yet")
     executable = shutil.which(CLAUDE)
     if executable is None:
         raise AiNotConfiguredError("The claude command is not on PATH. Install Claude Code and run claude once to sign in.")

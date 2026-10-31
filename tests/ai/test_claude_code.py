@@ -3,6 +3,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -285,6 +286,13 @@ def test_a_cancelled_call_does_not_start_claude(fake_claude: FakeClaude) -> None
         provider().complete(REQUEST, cancellation)
 
     assert not fake_claude.log.exists()
+
+
+def test_claude_code_is_reported_as_unsupported_on_windows(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "platform", "win32")
+
+    with pytest.raises(AiNotConfiguredError, match="not supported on Windows"):
+        find_claude()
 
 
 def test_the_provider_needs_the_claude_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
