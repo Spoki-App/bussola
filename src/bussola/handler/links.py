@@ -6,6 +6,7 @@ from bussola.errors import InvalidRequestError
 from bussola.forge.pulls import parse_pull_request_url
 
 SCHEME = "bussola"
+BUSSOLA_MODULE = ("-P", "-m", "bussola")
 HOME_PATH = "/"
 REVIEW_HOST = "review"
 GITHUB_HOSTS = ("github.com", "www.github.com")

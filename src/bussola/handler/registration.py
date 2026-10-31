@@ -13,7 +13,7 @@ from types import ModuleType
 from typing import Any, Protocol
 
 from bussola.errors import DomainError
-from bussola.handler.links import SCHEME
+from bussola.handler.links import BUSSOLA_MODULE, SCHEME
 from bussola.storage.database import DATA_DIR_ENV
 
 WINREG: ModuleType | None = importlib.import_module("winreg") if sys.platform == "win32" else None
@@ -32,7 +32,7 @@ WINDOWS_COMMAND_KEY = rf"{WINDOWS_CLASSES_KEY}\shell\open\command"
 WINDOWS_GUI_PYTHON = "pythonw.exe"
 DESKTOP_RESERVED = re.compile(r"[\s\"'\\><~|&;$*?#()`]")
 DESKTOP_ESCAPED = re.compile(r"([\"`$\\])")
-HANDLER_ARGUMENTS = ("-P", "-m", "bussola", "open-link")
+HANDLER_ARGUMENTS = (*BUSSOLA_MODULE, "open-link")
 END_OF_OPTIONS = "--"
 
 
