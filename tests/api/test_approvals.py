@@ -136,6 +136,23 @@ def test_approve_whole_file(api: ApiClient, git_repo: GitFixture) -> None:
     assert set(api.states(review).values()) == {"approved"}
 
 
+def test_approve_file_includes_units_identical_to_ones_approved_in_another_file(api: ApiClient, git_repo: GitFixture) -> None:
+    feature_with(git_repo, {"base.py": "x = 0\n"}, {"a.py": "def first():\n    return 1\n", "b.py": "def second():\n    return 1\n"})
+    review = api.start_review()
+    api.approve(review, "a.py::first")
+
+    result = api.call("POST", f"/reviews/{review}/approvals", 201, {"path": "b.py"})
+
+    assert [approval["qualified_name"] for approval in result["approvals"]] == ["second"]
+    assert api.states(review) == {"a.py::first": "approved", "b.py::second": "approved"}
+
+    git_repo.commit({"b.py": "def second():\n    return 2\n"})
+    api.refresh(review)
+    changes = [(row["change"], row["text"]) for row in api.diff(review, "b.py::second")["rows"] if row["change"] != "context"]
+
+    assert changes == [("removed", "    return 1"), ("added", "    return 2")]
+
+
 def test_two_reviewers_have_separate_approvals(api: ApiClient, git_repo: GitFixture) -> None:
     feature_with(git_repo, {"app.py": TWO_FUNCTIONS}, {"app.py": TWO_FUNCTIONS.replace("return 1", "return 10")})
     review = api.start_review()

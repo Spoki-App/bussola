@@ -19,6 +19,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Fixed
 
+- **Approve file** no longer skips units whose content matches a unit already approved in another file, such as test classes with the same header. They were taken for approvals moved from that file and left as New.
 - The first requests after starting with a new database no longer fail with a server error when several arrive at once and all try to add the same reviewer.
 - Comments on the whole review, including pull request comments and review summaries imported from GitHub, no longer have a Resolve button and no longer count as open threads, as on GitHub.
 - Expressions inside Python f-strings and JavaScript/TypeScript template literals are highlighted as code instead of string, with the braces, conversions and format specs set apart ([#21](https://github.com/Spoki-App/bussola/issues/21)).
