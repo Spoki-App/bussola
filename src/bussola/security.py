@@ -12,6 +12,7 @@ TOKEN_QUERY = "token"
 TOKEN_ENV = "BUSSOLA_TOKEN"
 API_PATH_PREFIX = "/api/"
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
+INVALID_TOKEN_DETAIL = "Missing or invalid session token"
 
 type CallNext = Callable[[Request], Awaitable[Response]]
 
@@ -35,7 +36,7 @@ def install_security(app: FastAPI, settings: AppSettings) -> None:
         if query_token is not None and secrets.compare_digest(query_token, settings.token):
             return _store_token_and_redirect(request, settings.token)
         if request.url.path.startswith(API_PATH_PREFIX) and not secrets.compare_digest(request.cookies.get(TOKEN_COOKIE, ""), settings.token):
-            return JSONResponse({"detail": "Missing or invalid session token"}, status_code=status.HTTP_403_FORBIDDEN)
+            return JSONResponse({"detail": INVALID_TOKEN_DETAIL}, status_code=status.HTTP_403_FORBIDDEN)
         return await call_next(request)
 
 

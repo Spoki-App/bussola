@@ -1,4 +1,5 @@
 import ipaddress
+import json
 import socket
 import stat
 import subprocess
@@ -27,6 +28,7 @@ from bussola.handler.server import (
     start_server,
     withdraw_server,
 )
+from bussola.security import INVALID_TOKEN_DETAIL
 
 TOKEN = "secret-token"
 
@@ -47,7 +49,7 @@ class FakeServers:
         self.started: list[ServerAddress] = []
         self.opened: list[str] = []
 
-    def start(self, address: ServerAddress) -> FakeProcess:
+    def start(self, address: ServerAddress, _data_dir: Path) -> FakeProcess:
         self.started.append(address)
         if self.comes_up:
             self.healthy.add(address)
@@ -150,10 +152,10 @@ def test_open_finds_a_server_published_while_it_waits(tmp_path: Path) -> None:
     other = ServerAddress("127.0.0.1", 9000, TOKEN)
     servers = FakeServers(comes_up=False)
 
-    def start(address: ServerAddress) -> FakeProcess:
+    def start(address: ServerAddress, data_dir: Path) -> FakeProcess:
         publish_server(tmp_path, other)
         servers.healthy.add(other)
-        return servers.start(address)
+        return servers.start(address, data_dir)
 
     launcher = Launcher(tmp_path, start=start, probe=servers.probe, open_browser=servers.opened.append, sleep=lambda _seconds: None, timeout=0)
 
@@ -279,26 +281,45 @@ def test_start_server_runs_serve_detached_with_the_token(monkeypatch: pytest.Mon
 
     monkeypatch.setattr("subprocess.Popen", popen)
 
-    start_server(ServerAddress("127.0.0.1", 8765, TOKEN))
+    start_server(ServerAddress("127.0.0.1", 8765, TOKEN), Path("/data/bussola"))
 
     [(command, options)] = calls
     assert command == [sys.executable, "-m", "bussola", "serve", "--no-open", "--no-register", "--host", "127.0.0.1", "--port", "8765"]
     assert options["env"]["BUSSOLA_TOKEN"] == TOKEN
+    assert options["env"]["BUSSOLA_DATA_DIR"] == str(Path("/data/bussola"))
     assert options["stdin"] == options["stdout"] == options["stderr"] == subprocess.DEVNULL
 
 
-@pytest.fixture
-def health_server() -> Generator[ServerAddress]:
+def serve_http(answer: Callable[[BaseHTTPRequestHandler], None]) -> ThreadingHTTPServer:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
-            ok = self.path == "/api/health" and self.headers.get("Cookie") == f"bussola_token={TOKEN}"
-            self.send_response(200 if ok else 403)
-            self.end_headers()
+            answer(self)
 
         def log_message(self, format: str, *args: object) -> None:  # noqa: A002
             pass
 
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    return ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+
+
+def answer_like_bussola(request: BaseHTTPRequestHandler) -> None:
+    ok = request.path == "/api/health" and request.headers.get("Cookie") == f"bussola_token={TOKEN}"
+    body = b'{"status":"ok"}' if ok else json.dumps({"detail": INVALID_TOKEN_DETAIL}).encode()
+    request.send_response(200 if ok else 403)
+    request.send_header("Content-Length", str(len(body)))
+    request.end_headers()
+    request.wfile.write(body)
+
+
+def answer_forbidden(request: BaseHTTPRequestHandler) -> None:
+    request.send_response(403)
+    request.send_header("Content-Length", "9")
+    request.end_headers()
+    request.wfile.write(b"Forbidden")
+
+
+@pytest.fixture
+def health_server() -> Generator[ServerAddress]:
+    httpd = serve_http(answer_like_bussola)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     yield ServerAddress("127.0.0.1", httpd.server_address[1], TOKEN)
@@ -309,6 +330,18 @@ def health_server() -> Generator[ServerAddress]:
 def test_probe_needs_the_server_token_to_call_it_ready(health_server: ServerAddress) -> None:
     assert probe_server(health_server) == Probe.READY
     assert probe_server(ServerAddress(health_server.host, health_server.port, "wrong")) == Probe.OTHER_BUSSOLA
+
+
+def test_probe_does_not_take_any_403_for_bussola() -> None:
+    httpd = serve_http(answer_forbidden)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+
+    state = probe_server(ServerAddress("127.0.0.1", httpd.server_address[1], TOKEN))
+
+    httpd.shutdown()
+    httpd.server_close()
+    assert state == Probe.UNKNOWN
 
 
 def test_probe_of_a_port_that_does_not_speak_http_is_unknown() -> None:

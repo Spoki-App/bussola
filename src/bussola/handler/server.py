@@ -1,6 +1,7 @@
 import contextlib
 import http.client
 import ipaddress
+import json
 import logging
 import os
 import re
@@ -11,6 +12,7 @@ import tempfile
 import time
 import webbrowser
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -25,7 +27,8 @@ from pydantic import TypeAdapter, ValidationError
 from bussola.config import DEFAULT_HOST, DEFAULT_PORT
 from bussola.errors import DomainError
 from bussola.handler.links import browser_path, parse_link
-from bussola.security import TOKEN_COOKIE, TOKEN_ENV, TOKEN_QUERY, new_token
+from bussola.security import INVALID_TOKEN_DETAIL, TOKEN_COOKIE, TOKEN_ENV, TOKEN_QUERY, new_token
+from bussola.storage.database import DATA_DIR_ENV
 
 SERVERS_DIR = "servers"
 LINK_LOG_FILE = "open-link.log"
@@ -33,6 +36,7 @@ HEALTH_PATH = "/api/health"
 HEALTH_TIMEOUT_SECONDS = 2.0
 START_TIMEOUT_SECONDS = 30.0
 EXIT_GRACE_SECONDS = 5.0
+MAX_PROBE_BODY = 512
 IPV6_LOOPBACK = "::1"
 UNSAFE_FILE_CHARACTERS = re.compile(r"[^A-Za-z0-9.-]")
 POLL_INTERVAL_SECONDS = 0.25
@@ -116,7 +120,8 @@ def probe_server(address: ServerAddress) -> Probe:
     connection = http.client.HTTPConnection(address.host, address.port, timeout=HEALTH_TIMEOUT_SECONDS)
     try:
         connection.request("GET", HEALTH_PATH, headers={"Cookie": f"{TOKEN_COOKIE}={address.token}"})
-        status = connection.getresponse().status
+        response = connection.getresponse()
+        status, body = response.status, response.read(MAX_PROBE_BODY)
     except ConnectionRefusedError:
         return Probe.CLOSED
     except (OSError, http.client.HTTPException):
@@ -125,7 +130,14 @@ def probe_server(address: ServerAddress) -> Probe:
         connection.close()
     if status == HTTPStatus.OK:
         return Probe.READY
-    return Probe.OTHER_BUSSOLA if status == HTTPStatus.FORBIDDEN else Probe.UNKNOWN
+    return Probe.OTHER_BUSSOLA if status == HTTPStatus.FORBIDDEN and _is_token_refusal(body) else Probe.UNKNOWN
+
+
+def _is_token_refusal(body: bytes) -> bool:
+    try:
+        return json.loads(body) == {"detail": INVALID_TOKEN_DETAIL}
+    except ValueError:
+        return False
 
 
 def record_link_error(data_dir: Path, link: str, error: Exception) -> None:
@@ -156,18 +168,19 @@ class PublishedServer(uvicorn.Server):
 
 def run_published(app: Any, data_dir: Path, address: ServerAddress) -> None:
     config = uvicorn.Config(app, host=address.host, port=address.port, log_level="warning")
-    PublishedServer(config, data_dir, address.reachable()).run()
+    with contextlib.suppress(KeyboardInterrupt):
+        PublishedServer(config, data_dir, address.reachable()).run()
 
 
 class Process(Protocol):
     def poll(self) -> int | None: ...
 
 
-def start_server(address: ServerAddress) -> Process:
+def start_server(address: ServerAddress, data_dir: Path) -> Process:
     command = [sys.executable, "-m", "bussola", "serve", "--no-open", "--no-register", "--host", address.host, "--port", str(address.port)]
     return subprocess.Popen(
         command,
-        env={**os.environ, TOKEN_ENV: address.token},
+        env={**os.environ, TOKEN_ENV: address.token, DATA_DIR_ENV: str(data_dir)},
         cwd=Path.home(),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
@@ -185,7 +198,7 @@ def _detached() -> dict[str, Any]:
 @dataclass(frozen=True)
 class Launcher:
     data_dir: Path
-    start: Callable[[ServerAddress], Process] = start_server
+    start: Callable[[ServerAddress, Path], Process] = start_server
     probe: Callable[[ServerAddress], Probe] = probe_server
     open_browser: Callable[[str], object] = webbrowser.open
     sleep: Callable[[float], object] = time.sleep
@@ -203,7 +216,7 @@ class Launcher:
         if running is not None:
             return running
         address = ServerAddress(DEFAULT_HOST, DEFAULT_PORT, new_token())
-        found = self._wait_for_server(address, self.start(address))
+        found = self._wait_for_server(address, self.start(address, self.data_dir))
         if found is None:
             raise ServerStartError(
                 f"bussola did not start on {address.host}:{address.port}. Another program may be using that port. Run `bussola serve` to see why."
@@ -211,22 +224,29 @@ class Launcher:
         return found
 
     def _first_healthy(self, *extra: ServerAddress) -> ServerAddress | None:
+        return self._first_ready(self._probe_all(extra))
+
+    def _probe_all(self, extra: tuple[ServerAddress, ...]) -> dict[ServerAddress, Probe]:
         published = published_servers(self.data_dir)
-        for candidate in dict.fromkeys([*extra, *published]):
-            state = self.probe(candidate)
-            if state == Probe.READY:
-                return candidate
-            if state == Probe.CLOSED and candidate in published:
+        candidates = list(dict.fromkeys([*extra, *published]))
+        with ThreadPoolExecutor(max_workers=max(len(candidates), 1)) as pool:
+            states = dict(zip(candidates, pool.map(self.probe, candidates), strict=True))
+        for candidate in published:
+            if states[candidate] == Probe.CLOSED:
                 withdraw_server(self.data_dir, candidate)
-        return None
+        return states
+
+    def _first_ready(self, states: dict[ServerAddress, Probe]) -> ServerAddress | None:
+        return next((candidate for candidate, state in states.items() if state == Probe.READY), None)
 
     def _wait_for_server(self, started: ServerAddress, process: Process) -> ServerAddress | None:
         deadline = time.monotonic() + self.timeout
         while True:
-            found = self._first_healthy(started)
+            states = self._probe_all((started,))
+            found = self._first_ready(states)
             if found is not None:
                 return found
-            if process.poll() is not None and self.probe(started) != Probe.OTHER_BUSSOLA:
+            if process.poll() is not None and states[started] != Probe.OTHER_BUSSOLA:
                 deadline = min(deadline, time.monotonic() + self.exit_grace)
             if time.monotonic() >= deadline:
                 return None
