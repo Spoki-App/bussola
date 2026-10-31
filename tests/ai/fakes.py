@@ -17,6 +17,7 @@ class FakeProvider:
     def __init__(self, *answers: Answer, model: str | None = "fake-model", delay: float = 0.0, timeout: float = 5.0) -> None:
         self.model = model
         self.requests: list[AiRequest] = []
+        self.settings: AiSettings | None = None
         self._answers = list(answers)
         self._delay = delay
         self._timeout = timeout
@@ -34,6 +35,7 @@ class FakeProvider:
 def fake_factory(provider: FakeProvider) -> Callable[[AiSettings], FakeProvider]:
     def build(settings: AiSettings) -> FakeProvider:
         provider.model = settings.model
+        provider.settings = settings
         return provider
 
     return build

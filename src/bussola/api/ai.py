@@ -1,11 +1,11 @@
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from fastapi import APIRouter, Request
 
-from bussola.ai.base import AiError, Cancellation
+from bussola.ai.base import AiError, AiProvider, Cancellation
 from bussola.ai.config import AiSettings
-from bussola.ai.connection import check_connection
+from bussola.ai.connection import CONNECTION_TIMEOUT_SECONDS, check_connection
 from bussola.ai.settings import load_ai_settings
 from bussola.api.deps import RepoDep
 from bussola.api.schemas import AiStatusOut, AiTestOut
@@ -27,7 +27,12 @@ def get_repo_ai(repo: RepoDep, request: Request) -> AiStatusOut:
 @router.post("/ai/test")
 def test_ai(request: Request) -> AiTestOut:
     state = app_state(request)
-    result = check_connection(lambda: state.ai_factory(load_ai_settings(state.settings.config_file)), Cancellation())
+
+    def connect() -> AiProvider:
+        settings = load_ai_settings(state.settings.config_file)
+        return state.ai_factory(replace(settings, timeout=min(settings.timeout, CONNECTION_TIMEOUT_SECONDS)))
+
+    result = check_connection(connect, Cancellation())
     return AiTestOut(**asdict(result))
 
 

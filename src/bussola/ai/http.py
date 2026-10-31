@@ -1,12 +1,16 @@
 import http.client
+import ipaddress
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any
 
 from bussola.ai.base import MAX_ERROR_LENGTH, AiProviderError, Cancellation, json_object, run_cancellable
 
 SOCKET_GRACE_SECONDS = 5.0
+MAX_RESPONSE_BYTES = 10 * 1024 * 1024
+LOCAL_HOSTS = frozenset({"localhost"})
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -15,14 +19,30 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 OPENER = urllib.request.build_opener(_NoRedirect)
+LOCAL_OPENER = urllib.request.build_opener(_NoRedirect, urllib.request.ProxyHandler({}))
+
+
+def opener_for(url: str) -> urllib.request.OpenerDirector:
+    return LOCAL_OPENER if _is_loopback(urllib.parse.urlsplit(url).hostname or "") else OPENER
+
+
+def _is_loopback(host: str) -> bool:
+    if host in LOCAL_HOSTS:
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
 
 
 def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeout: float, cancellation: Cancellation) -> dict[str, Any]:
     request = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json", **headers}, method="POST")
 
+    opener = opener_for(url)
+
     def send() -> bytes:
-        with OPENER.open(request, timeout=timeout + SOCKET_GRACE_SECONDS) as response:
-            return response.read()
+        with opener.open(request, timeout=timeout + SOCKET_GRACE_SECONDS) as response:
+            return response.read(MAX_RESPONSE_BYTES + 1)
 
     try:
         body = run_cancellable(send, cancellation, timeout)
@@ -32,6 +52,8 @@ def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeou
         raise AiProviderError(f"Cannot reach {url}: {error.reason}") from error
     except (http.client.HTTPException, OSError) as error:
         raise AiProviderError(f"The connection to {url} failed: {error or type(error).__name__}") from error
+    if len(body) > MAX_RESPONSE_BYTES:
+        raise AiProviderError(f"{url} answered with more than {MAX_RESPONSE_BYTES // (1024 * 1024)} MB")
     try:
         decoded = json_object(json.loads(body))
     except ValueError as error:

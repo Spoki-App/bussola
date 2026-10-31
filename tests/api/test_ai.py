@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from bussola.ai.base import AiProviderError
+from bussola.ai.connection import CONNECTION_TIMEOUT_SECONDS
 from bussola.ai.runner import DEFAULT_MAX_TOKENS
 from bussola.app import create_app
 from bussola.config import AppSettings
@@ -139,6 +140,16 @@ def test_test_connection_fails_when_the_model_does_not_answer_ok(data_dir: Path,
 
     assert result["ok"] is False
     assert result["message"] == "Fake provider answered, but not with the expected result"
+
+
+def test_test_connection_waits_at_most_two_minutes(data_dir: Path, config_file: Path) -> None:
+    write(config_file, '[ai]\nprovider = "anthropic"\ntimeout = 3000\n')
+    provider = FakeProvider({"ok": True})
+
+    client(data_dir, config_file, provider).post("/api/ai/test")
+
+    assert provider.settings is not None
+    assert provider.settings.timeout == CONNECTION_TIMEOUT_SECONDS
 
 
 def test_test_connection_reports_a_failure(data_dir: Path, config_file: Path) -> None:

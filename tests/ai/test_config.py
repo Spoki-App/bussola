@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from bussola.ai.base import AiNotConfiguredError
+from bussola.ai.base import AiNotConfiguredError, AiTargetChangedError
 from bussola.ai.config import CONFIG_DIR_ENV, AiSettings, ProviderName, RepoAiConfig, UserAiConfig, default_config_file, load_user_config, resolve_ai_settings
-from bussola.ai.settings import load_ai_settings
+from bussola.ai.settings import load_ai_settings, require_target
 
 
 def test_without_configuration_no_provider_is_active(tmp_path: Path) -> None:
@@ -163,3 +163,19 @@ def test_a_repository_switching_provider_gets_no_key_for_the_user_endpoint() -> 
     settings = resolve_ai_settings(user, RepoAiConfig(provider=ProviderName.ANTHROPIC, endpoint="http://localhost:11434/v1"))
 
     assert settings.api_key_env is None
+
+
+def test_an_action_runs_only_for_the_target_the_user_confirmed() -> None:
+    settings = resolve_ai_settings(UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="qwen2.5-coder", endpoint="http://localhost:11434/v1"))
+
+    assert require_target(settings, "openai-compatible|qwen2.5-coder|http://localhost:11434/v1") is settings
+    with pytest.raises(AiTargetChangedError, match="Confirm again"):
+        require_target(settings, "openai-compatible|qwen2.5-coder|http://other.example/v1")
+    with pytest.raises(AiTargetChangedError):
+        require_target(AiSettings(ProviderName.NONE), "none||")
+
+
+def test_max_tokens_is_a_user_only_cap() -> None:
+    assert resolve_ai_settings(UserAiConfig(provider=ProviderName.ANTHROPIC, max_tokens=4000)).max_tokens == 4000
+    with pytest.raises(ValueError, match="max_tokens"):
+        RepoAiConfig.model_validate({"max_tokens": 4000})

@@ -88,8 +88,9 @@ class ClaudeCodeProvider:
 
 
 def _kill_group(process: subprocess.Popen[str]) -> None:
-    with contextlib.suppress(OSError):
-        os.killpg(process.pid, signal.SIGKILL)
+    if process.poll() is None:
+        with contextlib.suppress(OSError):
+            os.killpg(process.pid, signal.SIGKILL)
     process.wait()
 
 

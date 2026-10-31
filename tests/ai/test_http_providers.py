@@ -9,7 +9,7 @@ import pytest
 from bussola.ai.anthropic_api import API_VERSION, AnthropicProvider
 from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiOutputError, AiProviderError, AiRequest, AiTimeoutError, Cancellation
 from bussola.ai.config import AiSettings, ProviderName
-from bussola.ai.http import OPENER
+from bussola.ai.http import LOCAL_OPENER, MAX_RESPONSE_BYTES, OPENER, opener_for
 from bussola.ai.openai_compatible import OpenAiCompatibleProvider
 from bussola.ai.providers import build_provider
 
@@ -122,6 +122,16 @@ def test_an_openai_compatible_endpoint_gets_a_json_schema_response_format(stub: 
     }
 
 
+def test_a_configured_max_tokens_caps_the_request(stub: StubServer) -> None:
+    stub.reply({"choices": [{"message": {"content": "{}"}}]})
+
+    OpenAiCompatibleProvider("gpt", stub.url, None, 5.0, max_tokens=256).complete(REQUEST, Cancellation())
+    AnthropicProvider("claude-opus-5-5", stub.url, "sk-test", 5.0, max_tokens=8000).complete(REQUEST, Cancellation())
+
+    assert stub.requests[0]["json"]["max_completion_tokens"] == 256
+    assert stub.requests[1]["json"]["max_tokens"] == 512
+
+
 def test_an_openai_compatible_key_is_sent_as_a_bearer_token(stub: StubServer) -> None:
     stub.reply({"choices": [{"message": {"content": "{}"}}]})
 
@@ -176,13 +186,13 @@ def test_an_answer_that_is_not_utf8_is_a_provider_error(monkeypatch: pytest.Monk
         def __exit__(self, *_args: object) -> None:
             return
 
-        def read(self) -> bytes:
+        def read(self, _size: int = -1) -> bytes:
             return b"\xff\xfe{"
 
     def open_response(*_args: object, **_kwargs: object) -> Response:
         return Response()
 
-    monkeypatch.setattr(OPENER, "open", open_response)
+    monkeypatch.setattr(LOCAL_OPENER, "open", open_response)
 
     with pytest.raises(AiProviderError, match="did not answer with JSON"):
         OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 5.0).complete(REQUEST, Cancellation())
@@ -195,6 +205,40 @@ def test_a_redirect_is_refused_so_the_key_does_not_follow_it(stub: StubServer) -
         OpenAiCompatibleProvider("gpt", stub.url, "local-key", 5.0).complete(REQUEST, Cancellation())
 
     assert len(stub.requests) == 1
+
+
+@pytest.mark.parametrize(
+    ("url", "local"),
+    [
+        ("http://localhost:11434/v1", True),
+        ("http://127.0.0.1:1234/v1", True),
+        ("http://[::1]:8000/v1", True),
+        ("https://api.anthropic.com", False),
+        ("http://192.168.1.20:11434/v1", False),
+    ],
+)
+def test_loopback_endpoints_never_go_through_a_proxy(url: str, local: bool) -> None:
+    assert opener_for(url) is (LOCAL_OPENER if local else OPENER)
+
+
+def test_a_huge_answer_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Response:
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return
+
+        def read(self, size: int = -1) -> bytes:
+            return b" " * size
+
+    def open_response(*_args: object, **_kwargs: object) -> Response:
+        return Response()
+
+    monkeypatch.setattr(LOCAL_OPENER, "open", open_response)
+
+    with pytest.raises(AiProviderError, match=f"more than {MAX_RESPONSE_BYTES // (1024 * 1024)} MB"):
+        OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 5.0).complete(REQUEST, Cancellation())
 
 
 def test_an_unreachable_endpoint_is_reported() -> None:
@@ -213,7 +257,7 @@ def test_a_socket_timeout_is_reported_as_a_timeout(monkeypatch: pytest.MonkeyPat
     def time_out(*_args: Any, **_kwargs: Any) -> None:
         raise TimeoutError("timed out")
 
-    monkeypatch.setattr(OPENER, "open", time_out)
+    monkeypatch.setattr(LOCAL_OPENER, "open", time_out)
 
     with pytest.raises(AiTimeoutError, match=r"No answer within 0\.3 seconds"):
         OpenAiCompatibleProvider("gpt", "http://127.0.0.1:9", None, 0.3).complete(REQUEST, Cancellation())

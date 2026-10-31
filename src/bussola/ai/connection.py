@@ -8,6 +8,7 @@ from bussola.ai.base import AiError, AiProvider, Cancellation
 from bussola.ai.runner import AiRunner, AiTask
 
 MILLISECONDS = 1000
+CONNECTION_TIMEOUT_SECONDS = 120.0
 
 
 class ConnectionCheck(BaseModel):

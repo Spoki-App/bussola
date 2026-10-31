@@ -10,40 +10,40 @@ interface AiActionButtonProps {
   label: string
   title?: string
   disabled?: boolean
-  onRun: () => void
+  onRun: (target: string) => void
 }
 
 export function AiActionButton({ repoId, label, title, disabled = false, onRun }: AiActionButtonProps) {
   const status = useAiStatus(repoId)
-  const [asking, setAsking] = useState(false)
+  const [asking, setAsking] = useState<AiStatus | null>(null)
   const ai = status.data
   if (ai === undefined || (!ai.configured && ai.problem === null)) {
     return null
   }
-  const target = ai.target
-  const start = () => {
-    if (target === null) {
+  const start = async () => {
+    const fresh = (await status.refetch()).data
+    if (!fresh?.configured || fresh.problem !== null || fresh.target === null) {
       return
     }
-    if (hasAiConsent(target)) {
-      onRun()
+    if (hasAiConsent(fresh.target)) {
+      onRun(fresh.target)
     } else {
-      setAsking(true)
+      setAsking(fresh)
     }
   }
   return (
     <>
-      <button type="button" title={ai.problem ?? title} disabled={disabled || ai.problem !== null || target === null} onClick={start}>
+      <button type="button" title={ai.problem ?? title} disabled={disabled || ai.problem !== null || ai.target === null} onClick={() => { void start() }}>
         {label}
       </button>
-      {asking && (
+      {asking?.target && (
         <AiNoticeDialog
-          ai={ai}
+          ai={asking}
           onAnswer={(accepted) => {
-            setAsking(false)
-            if (accepted && target !== null) {
-              rememberAiConsent(target)
-              onRun()
+            setAsking(null)
+            if (accepted && asking.target !== null) {
+              rememberAiConsent(asking.target)
+              onRun(asking.target)
             }
           }}
         />

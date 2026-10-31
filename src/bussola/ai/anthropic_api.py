@@ -16,16 +16,17 @@ class AnthropicProvider:
     name: str = ProviderName.ANTHROPIC
     label = PROVIDER_LABELS[ProviderName.ANTHROPIC]
 
-    def __init__(self, model: str, endpoint: str, api_key: str, timeout: float) -> None:
+    def __init__(self, model: str, endpoint: str, api_key: str, timeout: float, max_tokens: int | None = None) -> None:
         self.model: str | None = model
         self.endpoint: str | None = endpoint
         self._api_key = api_key
         self._timeout = timeout
+        self._max_tokens = max_tokens
 
     def complete(self, request: AiRequest, cancellation: Cancellation) -> str:
         payload = {
             "model": self.model,
-            "max_tokens": request.max_tokens,
+            "max_tokens": min(request.max_tokens, self._max_tokens or request.max_tokens),
             "system": request.system,
             "messages": [{"role": "user", "content": request.prompt}],
             "output_config": {"format": {"type": "json_schema", "schema": request.schema}},

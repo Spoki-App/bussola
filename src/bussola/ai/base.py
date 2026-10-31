@@ -33,6 +33,10 @@ class AiCancelledError(AiError):
     pass
 
 
+class AiTargetChangedError(AiError):
+    pass
+
+
 @dataclass(frozen=True)
 class AiRequest:
     name: str

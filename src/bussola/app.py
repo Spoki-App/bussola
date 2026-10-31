@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from bussola.ai.base import AiCancelledError, AiError, AiNotConfiguredError, AiProvider, AiTimeoutError
+from bussola.ai.base import AiCancelledError, AiError, AiNotConfiguredError, AiProvider, AiTargetChangedError, AiTimeoutError
 from bussola.ai.config import AiSettings
 from bussola.ai.providers import build_provider
 from bussola.api import API_PREFIX, build_api_router
@@ -36,6 +36,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     AiNotConfiguredError: status.HTTP_400_BAD_REQUEST,
     AiTimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,
     AiCancelledError: status.HTTP_409_CONFLICT,
+    AiTargetChangedError: status.HTTP_409_CONFLICT,
     AiError: status.HTTP_502_BAD_GATEWAY,
 }
 

@@ -55,6 +55,7 @@ class RepoAiConfig(BaseModel):
 class UserAiConfig(RepoAiConfig):
     timeout: float = Field(default=DEFAULT_TIMEOUT_SECONDS, gt=0, le=MAX_TIMEOUT_SECONDS)
     api_key_env: str | None = None
+    max_tokens: int | None = Field(default=None, gt=0)
 
 
 class UserConfig(BaseModel):
@@ -71,6 +72,7 @@ class AiSettings:
     timeout: float = DEFAULT_TIMEOUT_SECONDS
     api_key_env: str | None = None
     source: ConfigSource = "user"
+    max_tokens: int | None = None
 
     @property
     def configured(self) -> bool:
@@ -121,4 +123,5 @@ def resolve_ai_settings(user: UserAiConfig, repo: RepoAiConfig | None = None) ->
         timeout=user.timeout,
         api_key_env=(user.api_key_env or DEFAULT_KEY_ENV.get(provider)) if own_provider and endpoint == base_endpoint else None,
         source=source,
+        max_tokens=user.max_tokens,
     )
