@@ -185,6 +185,14 @@ def test_applescript_passes_the_link_as_one_quoted_argument() -> None:
     ]
 
 
+def test_macos_handler_keeps_the_path_of_the_install(tmp_path: Path) -> None:
+    handler = registration_for("darwin", tmp_path, {"PATH": "/opt/homebrew/bin:/usr/bin"}, PYTHON)
+    script = applescript(COMMAND, "/opt/homebrew/bin:/usr/bin")
+
+    assert any(isinstance(step, RunCommand) and step.argv[0] == "osacompile" and script[1] in step.argv for step in handler.install)
+    assert script[1].startswith(f'do shell script "PATH=/opt/homebrew/bin:/usr/bin {PYTHON} -m bussola open-link "')
+
+
 def test_windows_writes_the_url_protocol_keys_under_hkcu(tmp_path: Path) -> None:
     python = tmp_path / "Python 3.13" / "python.exe"
     python.parent.mkdir()

@@ -92,7 +92,7 @@ def registration_for(system: str, home: Path, environ: Mapping[str, str], execut
     if system.startswith("linux"):
         return linux_registration(command, xdg_applications_dir(home, environ), xdg_mimeapps_file(home, environ))
     if system == "darwin":
-        return macos_registration(command, home / "Applications")
+        return macos_registration(command, home / "Applications", environ.get("PATH", ""))
     if system == "win32":
         return windows_registration(command)
     raise HandlerError(f"Registering {SCHEME}:// links is not supported on {system}")
@@ -148,10 +148,10 @@ def desktop_entry(command: Sequence[str]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def macos_registration(command: Sequence[str], applications_dir: Path) -> Registration:
+def macos_registration(command: Sequence[str], applications_dir: Path, search_path: str) -> Registration:
     app = applications_dir / MAC_APP
     staged = applications_dir / MAC_STAGED_APP
-    script = [argument for line in applescript(command) for argument in ("-e", line)]
+    script = [argument for line in applescript(command, search_path) for argument in ("-e", line)]
     return Registration(
         location=str(app),
         install=(
@@ -168,8 +168,9 @@ def macos_registration(command: Sequence[str], applications_dir: Path) -> Regist
     )
 
 
-def applescript(command: Sequence[str]) -> list[str]:
-    shell_command = _applescript_string(f"{shlex.join(command)} ")
+def applescript(command: Sequence[str], search_path: str = "") -> list[str]:
+    environment = f"PATH={shlex.quote(search_path)} " if search_path else ""
+    shell_command = _applescript_string(f"{environment}{shlex.join(command)} ")
     background = _applescript_string(" > /dev/null 2>&1 &")
     return [
         "on run",
