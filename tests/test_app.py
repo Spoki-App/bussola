@@ -1,7 +1,9 @@
+import inspect
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from bussola.api import health
 from bussola.app import create_app
 from bussola.config import AppSettings
 
@@ -42,3 +44,7 @@ def test_root_level_static_files_are_served(tmp_path: Path) -> None:
     response = client_for(tmp_path, tmp_path).get("/favicon.svg")
 
     assert response.text == "<svg/>"
+
+
+def test_health_runs_on_the_event_loop_so_busy_workers_do_not_hide_the_server() -> None:
+    assert inspect.iscoroutinefunction(health.get_health)

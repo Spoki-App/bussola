@@ -240,6 +240,23 @@ def test_port_is_free_ignores_connections_left_in_time_wait() -> None:
         assert port_is_free("127.0.0.1", port)
 
 
+def test_port_is_free_sees_a_server_listening_on_every_interface() -> None:
+    with socket.socket() as everywhere:
+        everywhere.bind((str(ipaddress.ip_address(0)), 0))
+        everywhere.listen()
+
+        assert not port_is_free("127.0.0.1", everywhere.getsockname()[1])
+
+
+def test_probe_counts_a_connection_that_never_opens_as_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    def time_out(_connection: object) -> None:
+        raise TimeoutError
+
+    monkeypatch.setattr("http.client.HTTPConnection.connect", time_out)
+
+    assert probe_server(ServerAddress("127.0.0.1", 8765, TOKEN)) == Probe.CLOSED
+
+
 def test_port_is_free_tells_a_taken_port_apart() -> None:
     with socket.socket() as taken:
         taken.bind(("127.0.0.1", 0))

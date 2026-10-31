@@ -120,11 +120,14 @@ class Probe(StrEnum):
 def probe_server(address: ServerAddress) -> Probe:
     connection = http.client.HTTPConnection(address.host, address.port, timeout=HEALTH_TIMEOUT_SECONDS)
     try:
+        connection.connect()
+    except OSError:
+        connection.close()
+        return Probe.CLOSED
+    try:
         connection.request("GET", HEALTH_PATH, headers={"Cookie": f"{token_cookie(address.port)}={address.token}"})
         response = connection.getresponse()
         status, body = response.status, response.read(MAX_PROBE_BODY)
-    except ConnectionRefusedError:
-        return Probe.CLOSED
     except (OSError, http.client.HTTPException):
         return Probe.SILENT
     finally:
@@ -146,14 +149,22 @@ def _answer(body: bytes) -> Answer:
         return Answer()
 
 
+def _socket_for(host: str) -> socket.socket:
+    return socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET)
+
+
 def free_port(host: str) -> int:
-    with socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET) as probe:
+    with _socket_for(host) as probe:
         probe.bind((host, 0))
         return probe.getsockname()[1]
 
 
 def port_is_free(host: str, port: int) -> bool:
-    with socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET) as probe:
+    with _socket_for(host) as probe:
+        probe.settimeout(HEALTH_TIMEOUT_SECONDS)
+        if probe.connect_ex((host, port)) == 0:
+            return False
+    with _socket_for(host) as probe:
         if sys.platform != "win32":
             probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
