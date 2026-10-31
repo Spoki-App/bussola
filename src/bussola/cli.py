@@ -58,7 +58,7 @@ def serve(
     if register:
         _register_if_repo(settings.data_dir, identity_dir)
     address = ServerAddress(host, port, token)
-    url = address.url("/")
+    url = address.reachable().url("/")
     if not no_open:
         threading.Timer(BROWSER_OPEN_DELAY_SECONDS, webbrowser.open, args=[url]).start()
     typer.echo(f"bussola listening on {url}")

@@ -10,7 +10,7 @@ import sys
 import tempfile
 import time
 import webbrowser
-from collections.abc import Callable
+from collections.abc import Callable, Set
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -36,6 +36,7 @@ HEALTH_TIMEOUT_SECONDS = 2.0
 START_TIMEOUT_SECONDS = 30.0
 EXIT_GRACE_SECONDS = 5.0
 FREE_PORT_ATTEMPTS = 3
+NOTHING_TO_SKIP: frozenset["ServerAddress"] = frozenset()
 MAX_PROBE_BODY = 512
 IPV6_LOOPBACK = "::1"
 UNSAFE_FILE_CHARACTERS = re.compile(r"[^A-Za-z0-9.-]")
@@ -153,6 +154,8 @@ def free_port(host: str) -> int:
 
 def port_is_free(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET) as probe:
+        if sys.platform != "win32":
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             probe.bind((host, port))
         except OSError:
@@ -194,14 +197,6 @@ def run_published(app: Any, data_dir: Path, address: ServerAddress) -> None:
 
 class Process(Protocol):
     def poll(self) -> int | None: ...
-
-
-class NotStarted:
-    def poll(self) -> int:
-        return 1
-
-
-NOT_STARTED = NotStarted()
 
 
 def start_server(address: ServerAddress, data_dir: Path) -> Process:
@@ -250,14 +245,14 @@ class Launcher:
                 return found
             for port in (DEFAULT_PORT, *[None] * FREE_PORT_ATTEMPTS):
                 address = ServerAddress(DEFAULT_HOST, port or free_port(DEFAULT_HOST), new_token())
-                process = self.start(address, self.data_dir) if self.port_free(address.host, address.port) else NOT_STARTED
+                process = self.start(address, self.data_dir) if self.port_free(address.host, address.port) else None
                 found = self._wait_for_server(pool, address, process)
                 if found is not None:
                     return found
         raise ServerStartError("bussola did not start. Run `bussola serve` to see why.")
 
-    def _probe_all(self, pool: ThreadPoolExecutor, *extra: ServerAddress) -> dict[ServerAddress, Probe]:
-        published = published_servers(self.data_dir)
+    def _probe_all(self, pool: ThreadPoolExecutor, *extra: ServerAddress, skip: Set[ServerAddress] = NOTHING_TO_SKIP) -> dict[ServerAddress, Probe]:
+        published = [address for address in published_servers(self.data_dir) if address not in skip]
         candidates = list(dict.fromkeys([*extra, *published]))
         states = dict(zip(candidates, pool.map(self.probe, candidates), strict=True))
         for candidate in published:
@@ -286,14 +281,16 @@ class Launcher:
     def _first_ready(self, states: dict[ServerAddress, Probe]) -> ServerAddress | None:
         return next((candidate for candidate, state in states.items() if state == Probe.READY), None)
 
-    def _wait_for_server(self, pool: ThreadPoolExecutor, started: ServerAddress, process: Process) -> ServerAddress | None:
+    def _wait_for_server(self, pool: ThreadPoolExecutor, started: ServerAddress, process: Process | None) -> ServerAddress | None:
         deadline = time.monotonic() + self.timeout
+        tried: set[ServerAddress] = set()
         while True:
-            states = self._probe_all(pool, started)
+            states = self._probe_all(pool, started, skip=tried)
             found = self._first_ready(states)
             if found is not None:
                 return found
-            exited = process.poll() is not None
+            tried.update(address for address in states if address != started)
+            exited = process is None or process.poll() is not None
             if exited and states[started] != Probe.OTHER_BUSSOLA:
                 return None
             if exited:

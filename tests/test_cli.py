@@ -149,6 +149,37 @@ def test_open_link_uses_the_data_dir_it_is_given_as_an_absolute_path(tmp_path: P
     assert used == [tmp_path.resolve() / "other"]
 
 
+def test_open_link_treats_everything_after_double_dash_as_the_link(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    opened: list[tuple[Path, str]] = []
+
+    def record(launcher: server.Launcher, link: str) -> str:
+        opened.append((launcher.data_dir, link))
+        return ""
+
+    monkeypatch.setattr(server.Launcher, "open", record)
+    injected = 'bussola://x" --data-dir "/attacker'
+
+    result = runner.invoke(app, ["open-link", "--data-dir", str(tmp_path), "--", injected])
+
+    assert result.exit_code == 0, result.output
+    assert opened == [(tmp_path.resolve(), injected)]
+
+
+@pytest.mark.usefixtures("data_dir")
+def test_serve_prints_a_reachable_address_when_listening_everywhere(git_repo: GitFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    git_repo.commit({"a.txt": "a\n"})
+
+    def run(*_args: object) -> None:
+        return None
+
+    monkeypatch.setattr("bussola.cli.run_published", run)
+
+    result = runner.invoke(app, ["serve", "--no-open", "--host", "::", "--repo", str(git_repo.root)])
+
+    assert result.exit_code == 0, result.output
+    assert "http://[::1]:8765/?token=" in result.output
+
+
 def test_serve_refuses_port_0() -> None:
     result = runner.invoke(app, ["serve", "--no-open", "--port", "0"])
 

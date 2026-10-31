@@ -225,6 +225,21 @@ def test_open_tries_another_free_port_if_the_first_one_is_taken_meanwhile(tmp_pa
     assert [address.port for address in servers.started] == [20001, 20002]
 
 
+def test_port_is_free_ignores_connections_left_in_time_wait() -> None:
+    with socket.socket() as listener:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+        port = listener.getsockname()[1]
+        client = socket.create_connection(("127.0.0.1", port))
+        accepted, _ = listener.accept()
+        accepted.close()
+        client.close()
+
+    if sys.platform != "win32":
+        assert port_is_free("127.0.0.1", port)
+
+
 def test_port_is_free_tells_a_taken_port_apart() -> None:
     with socket.socket() as taken:
         taken.bind(("127.0.0.1", 0))
