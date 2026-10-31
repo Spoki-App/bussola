@@ -16,7 +16,8 @@ export function pullRequestUrlFromPath(pathname: string): string | null {
 
 export interface AddRepositoryRequest {
   repository: string
-  then: string
+  url: string
+  search: string
 }
 
 export function addRepositoryPath(then: string): string {
@@ -24,7 +25,10 @@ export function addRepositoryPath(then: string): string {
 }
 
 export function addRepositoryRequestFromSearch(search: string): AddRepositoryRequest | null {
-  const then = new URLSearchParams(search).get(ADD_REPOSITORY_PARAM)
-  const repository = then === null ? null : pullRequestRepositoryFromPath(then.split('?')[0])
-  return then !== null && repository !== null ? { repository, then } : null
+  const then = new URLSearchParams(search).get(ADD_REPOSITORY_PARAM) ?? ''
+  const queryStart = then.includes('?') ? then.indexOf('?') : then.length
+  const pathname = then.slice(0, queryStart)
+  const repository = pullRequestRepositoryFromPath(pathname)
+  const url = pullRequestUrlFromPath(pathname)
+  return repository !== null && url !== null ? { repository, url, search: then.slice(queryStart) } : null
 }

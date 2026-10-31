@@ -1,14 +1,12 @@
 import { useEffect, useRef } from 'react'
 
-import { ApiError, describeError } from './api/client'
-import { useOpenPullRequestLink } from './api/pulls'
+import { describeError } from './api/client'
+import { isMissingClone, useOpenPullRequestLink } from './api/pulls'
 import { ErrorNote } from './components/Badges'
 import { ExternalLink } from './components/ExternalLink'
 import { Link } from './Link'
 import { navigate, reviewPath } from './navigation'
 import { addRepositoryPath } from './review/pullRequestLink'
-
-const NO_LOCAL_CLONE = 'no_local_clone'
 
 export function OpenPullRequestRoute({ url }: { url: string }) {
   const open = useOpenPullRequestLink()
@@ -23,7 +21,7 @@ export function OpenPullRequestRoute({ url }: { url: string }) {
     open.mutate(url, {
       onSuccess: (review) => { navigate(`${reviewPath(review.id)}${search}`, { replace: true }) },
       onError: (error) => {
-        if (error instanceof ApiError && error.code === NO_LOCAL_CLONE) {
+        if (isMissingClone(error)) {
           navigate(addRepositoryPath(`${pathname}${search}`), { replace: true })
         }
       },

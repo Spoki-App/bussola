@@ -33,12 +33,16 @@ describe('pullRequestUrlFromPath', () => {
 })
 
 describe('add repository request', () => {
-  it('takes the repository from the pull request page to open next', () => {
-    const then = '/github.com/acme/widgets/pull/7?path=src%2Fapp.py&line=4'
-    const path = addRepositoryPath(then)
+  it('takes the repository, link and focus from the pull request page to open next', () => {
+    const path = addRepositoryPath('/github.com/acme/widgets/pull/7/files?path=src%2Fapp.py&line=4')
 
     expect(path.startsWith('/?')).toBe(true)
-    expect(addRepositoryRequestFromSearch(path.slice(1))).toEqual({ repository: 'acme/widgets', then })
+    expect(addRepositoryRequestFromSearch(path.slice(1))).toEqual({
+      repository: 'acme/widgets',
+      url: 'https://github.com/acme/widgets/pull/7/files',
+      search: '?path=src%2Fapp.py&line=4',
+    })
+    expect(addRepositoryRequestFromSearch(addRepositoryPath('/github.com/acme/widgets/pull/7').slice(1))?.search).toBe('')
   })
 
   it('refuses anything but a pull request page to open next', () => {

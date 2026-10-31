@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { getJson, postJson } from './client'
+import { ApiError, getJson, postJson } from './client'
 import { invalidate, keys, useInvalidatingMutation } from './hooks'
 import type { PullRequestList, PullSyncResult, ReviewDetail } from './types'
 
@@ -26,4 +26,10 @@ export function useOpenPullRequestLink() {
     mutationFn: (url: string) => postJson<ReviewDetail>('/pulls/open', { url }),
     onSuccess: (review) => invalidate(client, [keys.repos, keys.reviews(review.repo_id)]),
   })
+}
+
+const NO_LOCAL_CLONE = 'no_local_clone'
+
+export function isMissingClone(error: unknown): boolean {
+  return error instanceof ApiError && error.code === NO_LOCAL_CLONE
 }

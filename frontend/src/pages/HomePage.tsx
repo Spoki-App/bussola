@@ -2,6 +2,7 @@ import { useState, type SubmitEvent } from 'react'
 
 import { describeError } from '../api/client'
 import { useCreateReview, useRefs, useRepos, useReviews } from '../api/hooks'
+import { isMissingClone, useOpenPullRequestLink } from '../api/pulls'
 import type { Repo } from '../api/types'
 import { AddRepoForm } from '../components/AddRepoForm'
 import { CourseStrip, ErrorNote } from '../components/Badges'
@@ -42,6 +43,10 @@ export function HomePage() {
 
 function AddRepositoryPrompt({ request }: { request: AddRepositoryRequest }) {
   const name = request.repository.slice(request.repository.indexOf('/') + 1)
+  const open = useOpenPullRequestLink()
+  const openPullRequest = () => {
+    open.mutate(request.url, { onSuccess: (review) => { navigate(`${reviewPath(review.id)}${request.search}`, { replace: true }) } })
+  }
   return (
     <section className="repo" aria-labelledby="add-repository-title">
       <h2 id="add-repository-title">{`Add ${request.repository}`}</h2>
@@ -50,7 +55,13 @@ function AddRepositoryPrompt({ request }: { request: AddRepositoryRequest }) {
         <code>{`git clone https://github.com/${request.repository}.git`}</code>
         {'), then add its folder here. The pull request opens once it is added.'}
       </p>
-      <AddRepoForm filter={name} onAdded={() => { navigate(request.then, { replace: true }) }} />
+      <AddRepoForm filter={name} onAdded={openPullRequest} />
+      {open.isPending && <p className="muted">Opening the pull request...</p>}
+      {open.error && (
+        <ErrorNote
+          message={isMissingClone(open.error) ? `The folder you added is not a clone of github.com/${request.repository}. Add the folder of a clone of it.` : describeError(open.error)}
+        />
+      )}
     </section>
   )
 }

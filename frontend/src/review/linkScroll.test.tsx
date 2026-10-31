@@ -2,7 +2,7 @@ import { act, render } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { LinkScrollContext, createLinkScroll, useLinkedScroll, type LinkScroll } from './linkFocus'
+import { LinkScrollContext, createLinkScroll, endOnUserInput, useLinkedScroll, type LinkScroll } from './linkFocus'
 
 function Linked({ id, unitId = null, settled = false, children }: { id: string; unitId?: number | null; settled?: boolean; children?: ReactNode }) {
   const ref = useLinkedScroll<HTMLDivElement>(id, unitId, settled)
@@ -90,6 +90,19 @@ describe('useLinkedScroll', () => {
 
     expect(scrolled).toEqual(['unit-2', 'unit-2'])
     expect(link.current()).toBeNull()
+  })
+
+  it('ends the link as soon as the user scrolls, types or clicks', () => {
+    for (const event of [new WheelEvent('wheel'), new KeyboardEvent('keydown'), new MouseEvent('mousedown')]) {
+      const link = createLinkScroll()
+      const stop = endOnUserInput(link)
+      link.start({ unitId: 2, elementId: 'unit-2' })
+
+      window.dispatchEvent(event)
+
+      expect(link.current()).toBeNull()
+      stop()
+    }
   })
 
   it('does nothing without a link', () => {

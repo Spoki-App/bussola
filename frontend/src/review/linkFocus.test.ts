@@ -103,8 +103,14 @@ describe('resolveLinkFocus', () => {
     expect(resolveLinkFocus(focus({ path: 'app.py', line: 38 }), nested, [])?.unitId).toBe(4)
   })
 
+  it('picks the unit nearest to a line that no unit contains', () => {
+    expect(resolveLinkFocus(focus({ path: 'src/app.py', line: 11 }), units, [])?.unitId).toBe(2)
+    expect(resolveLinkFocus(focus({ path: 'src/app.py', line: 10 }), units, [])?.unitId).toBe(1)
+    expect(resolveLinkFocus(focus({ path: 'src/app.py', line: 500 }), units, [])?.unitId).toBe(2)
+  })
+
   it('falls back to the first unit of the file', () => {
-    expect(resolveLinkFocus(focus({ path: 'src/app.py', line: 11 }), units, [])?.unitId).toBe(1)
+    expect(resolveLinkFocus(focus({ path: 'src/app.py' }), units, [])?.unitId).toBe(1)
     expect(resolveLinkFocus(focus({ path: 'README.md', line: 3 }), units, [])?.unitId).toBe(3)
     expect(resolveLinkFocus(focus({ path: 'missing.py' }), units, [])).toBeNull()
   })

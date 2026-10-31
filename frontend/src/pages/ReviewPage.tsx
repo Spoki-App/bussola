@@ -19,7 +19,7 @@ import { UnitTree } from '../components/UnitTree'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
-import { LinkScrollContext, createLinkScroll, scrollToElement, unitElementId, type FocusTarget } from '../review/linkFocus'
+import { LinkScrollContext, createLinkScroll, endOnUserInput, scrollToElement, unitElementId, type FocusTarget } from '../review/linkFocus'
 import { buildUnitTree } from '../review/unitTree'
 import { searchGroups } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
@@ -166,7 +166,9 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     if (appliedLink.unitId !== null) {
       actions.current.get(appliedLink.unitId)?.reveal()
     }
+    window.history.replaceState(window.history.state, '', window.location.pathname)
     linkScroll.start(appliedLink)
+    return endOnUserInput(linkScroll)
   }, [appliedLink, linkScroll])
 
   const focusUnit = useCallback((unitId: number) => {
@@ -239,10 +241,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                 label="Filter units"
                 labels={FILTER_LABELS}
                 value={filter}
-                onChange={(next) => {
-                  linkScroll.done()
-                  setFilter(next)
-                }}
+                onChange={setFilter}
               />
               <input
                 type="search"
@@ -250,10 +249,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                 aria-label="Find units by module, name or path"
                 placeholder="Find by module, name or path"
                 value={query}
-                onChange={(event) => {
-                  linkScroll.done()
-                  setQuery(event.target.value)
-                }}
+                onChange={(event) => { setQuery(event.target.value) }}
               />
             </div>
             <DiffLayoutSwitch />

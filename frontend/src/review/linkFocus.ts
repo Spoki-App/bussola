@@ -58,18 +58,31 @@ function linkedThread(focus: LinkFocus, threads: Thread[]): Thread | undefined {
   return threads.find((thread) => thread.comments.some((comment) => comment.remote_url?.endsWith(anchor)))
 }
 
-function headSpan(unit: Unit, line: number): number | null {
-  return unit.head_start !== null && unit.head_end !== null && unit.head_start <= line && line <= unit.head_end ? unit.head_end - unit.head_start : null
+interface Ranked {
+  unit: Unit
+  distance: number
+  span: number
+}
+
+function rank(unit: Unit, line: number): Ranked | null {
+  const { head_start: start, head_end: end } = unit
+  if (start === null || end === null) {
+    return null
+  }
+  return { unit, distance: Math.max(start - line, line - end, 0), span: end - start }
+}
+
+function closer(best: Ranked | undefined, candidate: Ranked): Ranked {
+  if (!best) {
+    return candidate
+  }
+  return best.distance < candidate.distance || (best.distance === candidate.distance && best.span <= candidate.span) ? best : candidate
 }
 
 function unitAt(units: Unit[], path: string, line: number | null): Unit | undefined {
   const inFile = units.filter((unit) => unit.path === path)
-  const containing = line === null ? [] : inFile.flatMap((unit) => {
-    const span = headSpan(unit, line)
-    return span === null ? [] : [{ unit, span }]
-  })
-  const narrowest = containing.reduce<{ unit: Unit; span: number } | undefined>((best, candidate) => (best && best.span <= candidate.span ? best : candidate), undefined)
-  return narrowest?.unit ?? inFile.at(0)
+  const ranked = line === null ? [] : inFile.flatMap((unit) => rank(unit, line) ?? [])
+  return ranked.reduce<Ranked | undefined>(closer, undefined)?.unit ?? inFile.at(0)
 }
 
 export function unitElementId(unitId: number): string {
@@ -139,6 +152,20 @@ function linkRole(state: LinkState | null, elementId: string, unitId: number | n
 }
 
 const noLink = () => () => undefined
+
+const USER_INPUT_EVENTS = ['wheel', 'touchmove', 'keydown', 'mousedown'] as const
+
+export function endOnUserInput(link: LinkScroll): () => void {
+  const end = () => { link.done() }
+  for (const event of USER_INPUT_EVENTS) {
+    window.addEventListener(event, end, { passive: true })
+  }
+  return () => {
+    for (const event of USER_INPUT_EVENTS) {
+      window.removeEventListener(event, end)
+    }
+  }
+}
 
 export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId: number | null = null, settled = false): RefObject<T | null> {
   const link = useContext(LinkScrollContext)
