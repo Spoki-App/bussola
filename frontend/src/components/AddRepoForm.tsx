@@ -8,7 +8,7 @@ import { DirectoryPicker } from './DirectoryPicker'
 export function AddRepoForm({ onAdded, filter }: { onAdded: () => void; filter?: string }) {
   const pathId = useId()
   const [path, setPath] = useState('')
-  const [browsing, setBrowsing] = useState(filter !== undefined)
+  const [browsing, setBrowsing] = useState(false)
   const addRepo = useAddRepo()
   const add = (target: string, done: () => void) => {
     addRepo.mutate(target.trim(), {

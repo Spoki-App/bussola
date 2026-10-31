@@ -45,7 +45,11 @@ function AddRepositoryPrompt({ request }: { request: AddRepositoryRequest }) {
   return (
     <section className="repo" aria-labelledby="add-repository-title">
       <h2 id="add-repository-title">{`Add ${request.repository}`}</h2>
-      <p className="muted">{`No local clone of github.com/${request.repository} was found. Add its folder as a repository and the pull request opens.`}</p>
+      <p className="muted">
+        {`No local clone of github.com/${request.repository} was found. Clone it if you have not yet (`}
+        <code>{`git clone https://github.com/${request.repository}.git`}</code>
+        {'), then add its folder here. The pull request opens once it is added.'}
+      </p>
       <AddRepoForm filter={name} onAdded={() => { navigate(request.then, { replace: true }) }} />
     </section>
   )

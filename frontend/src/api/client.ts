@@ -25,20 +25,23 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 async function apiError(response: Response): Promise<ApiError> {
-  const fallback = `Request failed with status ${String(response.status)}`
   try {
     const payload = (await response.json()) as { detail?: unknown; code?: unknown }
-    const code = typeof payload.code === 'string' ? payload.code : null
-    if (typeof payload.detail === 'string') {
-      return new ApiError(response.status, payload.detail, code)
-    }
-    if (Array.isArray(payload.detail)) {
-      return new ApiError(response.status, payload.detail.map((item: { msg?: string }) => item.msg ?? '').join('; '), code)
-    }
+    return new ApiError(response.status, detailMessage(payload.detail) ?? fallbackMessage(response), typeof payload.code === 'string' ? payload.code : null)
   } catch {
-    return new ApiError(response.status, fallback)
+    return new ApiError(response.status, fallbackMessage(response))
   }
-  return new ApiError(response.status, fallback)
+}
+
+function detailMessage(detail: unknown): string | null {
+  if (typeof detail === 'string') {
+    return detail
+  }
+  return Array.isArray(detail) ? detail.map((item: { msg?: string }) => item.msg ?? '').join('; ') : null
+}
+
+function fallbackMessage(response: Response): string {
+  return `Request failed with status ${String(response.status)}`
 }
 
 export const getJson = <T>(path: string) => request<T>('GET', path)

@@ -30,6 +30,14 @@ describe('ApiError', () => {
     expect([error.status, error.code, error.message]).toEqual([404, 'no_local_clone', 'No local clone of github.com/acme/widgets was found.'])
   })
 
+  it('keeps the code when the detail has another shape', async () => {
+    respond(404, { detail: { reason: 'missing' }, code: 'no_local_clone' })
+
+    const error = await failure()
+
+    expect([error.code, error.message]).toEqual(['no_local_clone', 'Request failed with status 404'])
+  })
+
   it('has no code for other errors', async () => {
     respond(404, { detail: 'Not Found' })
 

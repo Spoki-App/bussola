@@ -72,7 +72,11 @@ test('a pull request link of an unknown repository opens the add repository flow
   await page.goto('/github.com/acme/no-such-repository/pull/7?path=app.py&line=2')
 
   await expect(page.getByRole('heading', { name: 'Add acme/no-such-repository' })).toBeVisible()
+  await expect(page.getByText('git clone https://github.com/acme/no-such-repository.git')).toBeVisible()
+  expect(new URL(page.url()).searchParams.get('add_repo')).toBe('/github.com/acme/no-such-repository/pull/7?path=app.py&line=2')
+
+  await page.getByRole('button', { name: 'Browse...' }).first().click()
+
   await expect(page.getByRole('dialog', { name: 'Add a repository' })).toBeVisible()
   await expect(page.getByLabel('Filter repositories')).toHaveValue('no-such-repository')
-  expect(new URL(page.url()).searchParams.get('then')).toBe('/github.com/acme/no-such-repository/pull/7?path=app.py&line=2')
 })

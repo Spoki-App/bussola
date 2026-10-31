@@ -4,9 +4,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { LinkScrollContext, createLinkScroll, useLinkedScroll, type LinkScroll } from './linkFocus'
 
-function Linked({ id, unitId = null }: { id: string; unitId?: number | null }) {
-  const ref = useLinkedScroll<HTMLDivElement>(id, unitId)
-  return <div id={id} ref={ref} />
+function Linked({ id, unitId = null, settled = false, children }: { id: string; unitId?: number | null; settled?: boolean; children?: ReactNode }) {
+  const ref = useLinkedScroll<HTMLDivElement>(id, unitId, settled)
+  return (
+    <div id={id} ref={ref}>
+      {children}
+    </div>
+  )
 }
 
 let scrolled: string[] = []
@@ -43,16 +47,35 @@ describe('useLinkedScroll', () => {
     expect(link.current()).toBeNull()
   })
 
-  it('scrolls to the holding unit once, even if the thread never shows and the unit mounts again', () => {
+  it('ends on a thread rendered inside its unit', () => {
+    const link = createLinkScroll()
+    render(withLink(link, (
+      <Linked id="unit-2" unitId={2} settled>
+        <Linked id="thread-t" />
+      </Linked>
+    )))
+
+    act(() => { link.start({ unitId: 2, elementId: 'thread-t' }) })
+
+    expect(scrolled).toEqual(['thread-t'])
+    expect(link.current()).toBeNull()
+  })
+
+  it('waits for the unit diff, then gives up on a thread its diff does not show', () => {
     const link = createLinkScroll()
     const view = render(withLink(link, <Linked id="unit-2" unitId={2} />))
     act(() => { link.start({ unitId: 2, elementId: 'thread-t' }) })
+    expect(link.current()).toEqual({ target: { unitId: 2, elementId: 'thread-t' }, unitShown: true })
 
-    view.unmount()
-    render(withLink(link, <Linked id="unit-2" unitId={2} />))
+    view.rerender(withLink(link, <Linked id="unit-2" unitId={2} settled />))
+    expect(link.current()).toBeNull()
 
+    view.rerender(withLink(link, (
+      <Linked id="unit-2" unitId={2} settled>
+        <Linked id="thread-t" />
+      </Linked>
+    )))
     expect(scrolled).toEqual(['unit-2'])
-    expect(link.current()).toEqual({ unitId: null, elementId: 'thread-t' })
   })
 
   it('finishes on a linked unit', () => {

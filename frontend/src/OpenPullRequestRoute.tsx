@@ -7,7 +7,6 @@ import { ExternalLink } from './components/ExternalLink'
 import { Link } from './Link'
 import { navigate, reviewPath } from './navigation'
 import { addRepositoryPath } from './review/linkFocus'
-import { pullRequestRepository } from './review/pullRequestLink'
 
 const NO_LOCAL_CLONE = 'no_local_clone'
 
@@ -21,12 +20,11 @@ export function OpenPullRequestRoute({ url }: { url: string }) {
     }
     started.current = true
     const { pathname, search } = window.location
-    const repository = pullRequestRepository(url)
     open.mutate(url, {
       onSuccess: (review) => { navigate(`${reviewPath(review.id)}${search}`, { replace: true }) },
       onError: (error) => {
-        if (error instanceof ApiError && error.code === NO_LOCAL_CLONE && repository) {
-          navigate(addRepositoryPath(repository, `${pathname}${search}`), { replace: true })
+        if (error instanceof ApiError && error.code === NO_LOCAL_CLONE) {
+          navigate(addRepositoryPath(`${pathname}${search}`), { replace: true })
         }
       },
     })

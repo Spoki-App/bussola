@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useSyncExternalStore, type RefObject } from 'react'
 
 import type { Thread, Unit } from '../api/types'
-import { pullRequestUrlFromPath } from './pullRequestLink'
+import { pullRequestRepository, pullRequestUrlFromPath } from './pullRequestLink'
 import { isInline } from './threadPlacement'
 
 export interface LinkFocus {
@@ -16,15 +16,20 @@ export interface FocusTarget {
   elementId: string
 }
 
+export interface LinkState {
+  target: FocusTarget
+  unitShown: boolean
+}
+
 export interface LinkScroll {
-  current: () => FocusTarget | null
+  current: () => LinkState | null
   subscribe: (listener: () => void) => () => void
   start: (target: FocusTarget) => void
   unitShown: () => void
   done: () => void
 }
 
-type LinkRole = 'target' | 'holder' | null
+type LinkRole = 'target' | 'holder' | 'settled' | null
 
 export interface AddRepositoryRequest {
   repository: string
@@ -32,9 +37,7 @@ export interface AddRepositoryRequest {
 }
 
 const POSITIVE_NUMBER = /^[1-9]\d*$/
-const REPOSITORY = /^[\w.-]{1,100}\/[\w.-]{1,100}$/
 const ADD_REPOSITORY_PARAM = 'add_repo'
-const THEN_PARAM = 'then'
 
 export const LinkScrollContext = createContext<LinkScroll | null>(null)
 
@@ -104,59 +107,70 @@ export function scrollToElement(id: string) {
 }
 
 export function createLinkScroll(): LinkScroll {
-  let target: FocusTarget | null = null
+  let state: LinkState | null = null
   const listeners = new Set<() => void>()
-  const change = (next: FocusTarget | null) => {
-    target = next
+  const change = (next: LinkState | null) => {
+    state = next
     listeners.forEach((listener) => { listener() })
   }
   return {
-    current: () => target,
+    current: () => state,
     subscribe: (listener) => {
       listeners.add(listener)
       return () => { listeners.delete(listener) }
     },
-    start: change,
-    unitShown: () => { change(target && { ...target, unitId: null }) },
+    start: (target) => { change({ target, unitShown: false }) },
+    unitShown: () => { change(state && { ...state, unitShown: true }) },
     done: () => { change(null) },
   }
 }
 
-function linkRole(target: FocusTarget | null, elementId: string, unitId: number | null): LinkRole {
-  if (target?.elementId === elementId) {
+function linkRole(state: LinkState | null, elementId: string, unitId: number | null, settled: boolean): LinkRole {
+  if (state === null) {
+    return null
+  }
+  if (state.target.elementId === elementId) {
     return 'target'
   }
-  return unitId !== null && target?.unitId === unitId ? 'holder' : null
+  if (unitId === null || state.target.unitId !== unitId) {
+    return null
+  }
+  if (!state.unitShown) {
+    return 'holder'
+  }
+  return settled ? 'settled' : null
 }
 
 const noLink = () => () => undefined
 
-export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId: number | null = null): RefObject<T | null> {
+export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId: number | null = null, settled = false): RefObject<T | null> {
   const link = useContext(LinkScrollContext)
   const ref = useRef<T>(null)
-  const role = useSyncExternalStore(link?.subscribe ?? noLink, () => linkRole(link?.current() ?? null, elementId, unitId))
+  const role = useSyncExternalStore(link?.subscribe ?? noLink, () => linkRole(link?.current() ?? null, elementId, unitId, settled))
   useEffect(() => {
     if (!link || role === null) {
       return
     }
-    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    if (role === 'target') {
-      link.done()
-    } else {
-      link.unitShown()
+    const now = linkRole(link.current(), elementId, unitId, settled)
+    if (now === 'target' || now === 'holder') {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
-  }, [link, role])
+    if (now === 'holder') {
+      link.unitShown()
+    } else if (now !== null) {
+      link.done()
+    }
+  }, [link, role, elementId, unitId, settled])
   return ref
 }
 
-export function addRepositoryPath(repository: string, then: string): string {
-  return `/?${new URLSearchParams({ [ADD_REPOSITORY_PARAM]: repository, [THEN_PARAM]: then }).toString()}`
+export function addRepositoryPath(then: string): string {
+  return `/?${new URLSearchParams({ [ADD_REPOSITORY_PARAM]: then }).toString()}`
 }
 
 export function addRepositoryRequestFromSearch(search: string): AddRepositoryRequest | null {
-  const params = new URLSearchParams(search)
-  const repository = params.get(ADD_REPOSITORY_PARAM)
-  const then = params.get(THEN_PARAM)
-  const thenPath = then?.split('?')[0] ?? ''
-  return repository !== null && REPOSITORY.test(repository) && then !== null && pullRequestUrlFromPath(thenPath) !== null ? { repository, then } : null
+  const then = new URLSearchParams(search).get(ADD_REPOSITORY_PARAM)
+  const url = then === null ? null : pullRequestUrlFromPath(then.split('?')[0])
+  const repository = url === null ? null : pullRequestRepository(url)
+  return then !== null && repository !== null ? { repository, then } : null
 }
