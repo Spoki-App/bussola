@@ -1,5 +1,4 @@
 import contextlib
-import functools
 import json
 import os
 import selectors
@@ -9,6 +8,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Any
 
@@ -22,6 +22,7 @@ PIPE_GRACE_SECONDS = 0.5
 REQUIRED_FLAG = "--safe-mode"
 READER_NAME = "bussola-claude-output"
 HELP_TIMEOUT_SECONDS = 15.0
+FAILED_CHECK_SECONDS = 60.0
 READ_CHUNK_BYTES = 64 * 1024
 EXIT_POLL_SECONDS = 0.05
 
@@ -30,28 +31,58 @@ def find_claude() -> str:
     executable = shutil.which(CLAUDE)
     if executable is None:
         raise AiNotConfiguredError("The claude command is not on PATH. Install Claude Code and run claude once to sign in.")
-    problem = _version_problem(executable, Path(executable).stat().st_mtime)
+    try:
+        modified = Path(executable).stat().st_mtime
+    except OSError as error:
+        raise AiNotConfiguredError(f"Cannot read {executable}: {error}") from error
+    problem = _version_problem(executable, modified)
     if problem is not None:
         raise AiNotConfiguredError(problem)
     return executable
 
 
-@functools.cache
-def _version_problem(executable: str, _modified: float) -> str | None:
+@dataclass(frozen=True)
+class _VersionCheck:
+    problem: str | None
+    lasting: bool
+    checked_at: float
+
+
+_version_checks: dict[tuple[str, float], _VersionCheck] = {}
+
+
+def _version_problem(executable: str, modified: float) -> str | None:
+    key = (executable, modified)
+    cached = _version_checks.get(key)
+    if cached is not None and (cached.lasting or time.monotonic() - cached.checked_at < FAILED_CHECK_SECONDS):
+        return cached.problem
+    problem, lasting = _check_version(executable)
+    _version_checks[key] = _VersionCheck(problem, lasting, time.monotonic())
+    return problem
+
+
+def _check_version(executable: str) -> tuple[str | None, bool]:
     try:
-        help_text = subprocess.run(
+        process = subprocess.Popen(
             [executable, "--help"],
             cwd=tempfile.gettempdir(),
             env=_claude_environment(),
-            capture_output=True,
-            text=True,
-            errors="replace",
-            timeout=HELP_TIMEOUT_SECONDS,
-            check=False,
-        ).stdout
-    except (OSError, subprocess.SubprocessError) as error:
-        return f"Cannot run claude --help: {error}"
-    return None if REQUIRED_FLAG in help_text else f"This version of Claude Code has no {REQUIRED_FLAG}. Update it with claude update."
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError as error:
+        return f"Cannot run claude --help: {error}", False
+    try:
+        output, _ = process.communicate(timeout=HELP_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        _kill_group(process)
+        process.wait()
+        return f"claude --help did not answer within {HELP_TIMEOUT_SECONDS:g} seconds", False
+    if REQUIRED_FLAG in output.decode(errors="replace"):
+        return None, True
+    return f"This version of Claude Code has no {REQUIRED_FLAG}. Update it with claude update.", True
 
 
 class ClaudeCodeProvider:
@@ -87,7 +118,7 @@ class ClaudeCodeProvider:
             "--output-format",
             "json",
             "--no-session-persistence",
-            "--safe-mode",
+            REQUIRED_FLAG,
             "--strict-mcp-config",
             "--tools",
             "",

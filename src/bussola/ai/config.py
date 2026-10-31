@@ -76,6 +76,7 @@ class AiSettings:
     api_key_env: str | None = None
     source: ConfigSource = "user"
     max_tokens: int | None = None
+    key_withheld: bool = False
 
     @property
     def configured(self) -> bool:
@@ -133,10 +134,9 @@ def _merge(user: UserAiConfig, override: RepoAiConfig) -> AiSettings:
         raise AiNotConfiguredError(
             f"A repository cannot switch AI to {label}, which uses your own account; it can only choose an OpenAI-compatible endpoint or none"
         )
-    changes_account = _changes(override.model, user.model or DEFAULT_MODELS.get(provider)) or _changes(
-        override.endpoint, user.endpoint or DEFAULT_ENDPOINTS.get(provider)
-    )
-    if provider in ACCOUNT_PROVIDERS and changes_account:
+    changes_model = _changes(override.model, user.model or DEFAULT_MODELS.get(provider))
+    changes_endpoint = provider != ProviderName.CLAUDE_CODE and _changes(override.endpoint, user.endpoint or DEFAULT_ENDPOINTS.get(provider))
+    if provider in ACCOUNT_PROVIDERS and (changes_model or changes_endpoint):
         label = PROVIDER_LABELS[provider]
         raise AiNotConfiguredError(f"A repository cannot change the model or endpoint of {label}, which uses your own account")
     base = user if own_provider else UserAiConfig(provider=provider)
@@ -144,11 +144,14 @@ def _merge(user: UserAiConfig, override: RepoAiConfig) -> AiSettings:
     endpoint = None if provider == ProviderName.CLAUDE_CODE else override.endpoint or base_endpoint
     base_model = base.model or DEFAULT_MODELS.get(provider)
     model = override.model or base_model
+    user_key = user.api_key_env or DEFAULT_KEY_ENV.get(provider)
+    keeps_key = own_provider and endpoint == base_endpoint and model == base_model
     return AiSettings(
         provider=provider,
         model=model,
         endpoint=endpoint,
         timeout=user.timeout,
-        api_key_env=(user.api_key_env or DEFAULT_KEY_ENV.get(provider)) if own_provider and endpoint == base_endpoint and model == base_model else None,
+        api_key_env=user_key if keeps_key else None,
         max_tokens=user.max_tokens if own_provider else None,
+        key_withheld=own_provider and user_key is not None and not keeps_key,
     )

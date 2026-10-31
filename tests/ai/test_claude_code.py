@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import signal
 import subprocess
 import threading
@@ -228,6 +229,36 @@ def test_the_version_check_runs_like_the_real_call_and_is_asked_once(tmp_path: P
     token, cwd = calls[0].split("|")
     assert token == ""
     assert Path(cwd).resolve() != tmp_path.resolve()
+
+
+def test_a_version_check_that_failed_is_tried_again_later(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    log = tmp_path / "calls.log"
+    slow = tmp_path / "claude"
+    slow.write_text(f"#!/bin/sh\necho run >> {log}\n{shutil.which('sleep')} 5\n")
+    slow.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setattr("bussola.ai.claude_code.HELP_TIMEOUT_SECONDS", 0.2)
+    monkeypatch.setattr("bussola.ai.claude_code.FAILED_CHECK_SECONDS", 0.0)
+
+    for _ in range(2):
+        with pytest.raises(AiNotConfiguredError, match="did not answer"):
+            find_claude()
+
+    assert log.read_text().splitlines() == ["run", "run"]
+
+
+def test_a_claude_that_disappears_is_reported(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    link = tmp_path / "claude"
+    link.symlink_to(tmp_path / "gone")
+    monkeypatch.setenv("PATH", str(tmp_path))
+
+    def which(_name: str) -> str:
+        return str(link)
+
+    monkeypatch.setattr("shutil.which", which)
+
+    with pytest.raises(AiNotConfiguredError, match="Cannot read"):
+        find_claude()
 
 
 def test_the_provider_needs_the_claude_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

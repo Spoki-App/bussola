@@ -5,7 +5,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from bussola.ai.base import AiProviderError, Cancellation
-from bussola.ai.connection import CONNECTION_MAX_TOKENS, CONNECTION_TIMEOUT_SECONDS
+from bussola.ai.connection import CONNECTION_TIMEOUT_SECONDS
+from bussola.ai.runner import DEFAULT_MAX_TOKENS
 from bussola.api.ai import cancel_on_disconnect
 from bussola.app import create_app
 from bussola.config import AppSettings
@@ -132,7 +133,7 @@ def test_test_connection_asks_the_provider_for_a_tiny_structured_answer(data_dir
     assert result["message"] == "Fake provider (claude-opus-5-5) answered"
     assert len(provider.requests) == 1
     assert provider.requests[0].name == "connection_check"
-    assert provider.requests[0].max_tokens == CONNECTION_MAX_TOKENS
+    assert provider.requests[0].max_tokens == DEFAULT_MAX_TOKENS
 
 
 def test_test_connection_fails_when_the_model_does_not_answer_ok(data_dir: Path, config_file: Path) -> None:

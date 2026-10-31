@@ -170,7 +170,7 @@ The user configuration (`config.toml`, `[ai]`) sets `provider`, `model`, `endpoi
 
 `.bussola.toml` keeps its `[ai]` section as raw data and it is validated only when AI settings are loaded, so a mistake there turns AI off for the repository, with the reason on its AI buttons, and reviews keep working.
 
-Keys are read from the environment at each call: the variable named by `api_key_env`, or `ANTHROPIC_API_KEY` for `anthropic`. `openai-compatible` sends a key only when `api_key_env` names one. A key is used only with the user's own provider, endpoint and model (or that provider's defaults), so a cloned repository can neither redirect a key nor spend it on another provider or model. `claude-code` has no endpoint; one set in either file is ignored.
+Keys are read from the environment at each call: the variable named by `api_key_env`, or `ANTHROPIC_API_KEY` for `anthropic`. `openai-compatible` sends a key only when `api_key_env` names one. A key is used only with the user's own provider, endpoint and model (or that provider's defaults), so a cloned repository can neither redirect a key nor spend it on another provider or model. `claude-code` has no endpoint; one set in either file is ignored. When a repository's model or endpoint means the user's key would not be sent, the settings record that (`key_withheld`) and the provider reports it as a problem instead of sending no key. The installed `claude` is checked once per binary for `--safe-mode` (a failed check is retried after a minute).
 
 ```
 GET    /ai                                     provider of the user configuration: label, model, endpoint, key variable and whether it is set, problem

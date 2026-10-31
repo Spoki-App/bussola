@@ -67,11 +67,17 @@ def test_the_repository_overrides_the_model_of_an_openai_compatible_endpoint_wit
 
     settings = resolve_ai_settings(user, RepoAiConfig(model="llama3"))
 
-    assert settings == AiSettings(ProviderName.OPENAI_COMPATIBLE, "llama3", "http://localhost:11434/v1", api_key_env=None, source="repository")
+    assert settings == AiSettings(ProviderName.OPENAI_COMPATIBLE, "llama3", "http://localhost:11434/v1", source="repository", key_withheld=True)
 
 
-@pytest.mark.parametrize("provider", [ProviderName.ANTHROPIC, ProviderName.CLAUDE_CODE])
-@pytest.mark.parametrize("override", [RepoAiConfig(model="claude-fable-5-1"), RepoAiConfig(endpoint="https://proxy.example.com")])
+@pytest.mark.parametrize(
+    ("provider", "override"),
+    [
+        (ProviderName.ANTHROPIC, RepoAiConfig(model="claude-fable-5-1")),
+        (ProviderName.ANTHROPIC, RepoAiConfig(endpoint="https://proxy.example.com")),
+        (ProviderName.CLAUDE_CODE, RepoAiConfig(model="claude-fable-5-1")),
+    ],
+)
 def test_a_repository_cannot_change_the_model_or_endpoint_of_your_own_account(provider: ProviderName, override: RepoAiConfig) -> None:
     with pytest.raises(AiNotConfiguredError, match="cannot change the model or endpoint"):
         resolve_ai_settings(UserAiConfig(provider=provider), override)
@@ -258,3 +264,29 @@ def test_a_repository_repeating_your_own_model_is_accepted() -> None:
     assert settings.model == "claude-opus-5-5"
     assert settings.source == "user"
     assert settings.api_key_env == "ANTHROPIC_API_KEY"
+
+
+def test_a_withheld_key_is_reported_instead_of_sending_no_key() -> None:
+    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="gpt", endpoint="https://api.example.com/v1", api_key_env="WORK_KEY")
+
+    settings = resolve_ai_settings(user, RepoAiConfig(model="other"))
+
+    assert settings.key_withheld
+    with pytest.raises(AiNotConfiguredError, match="Your API key is not used"):
+        build_provider(settings)
+
+
+def test_a_keyless_endpoint_can_take_a_model_from_the_repository() -> None:
+    user = UserAiConfig(provider=ProviderName.OPENAI_COMPATIBLE, model="qwen2.5-coder", endpoint="http://localhost:11434/v1")
+
+    settings = resolve_ai_settings(user, RepoAiConfig(model="llama3"))
+
+    assert not settings.key_withheld
+    assert build_provider(settings).model == "llama3"
+
+
+def test_a_repository_endpoint_is_ignored_for_claude_code() -> None:
+    settings = resolve_ai_settings(UserAiConfig(provider=ProviderName.CLAUDE_CODE), RepoAiConfig(endpoint="http://localhost:11434/v1"))
+
+    assert settings.provider == ProviderName.CLAUDE_CODE
+    assert settings.endpoint is None
