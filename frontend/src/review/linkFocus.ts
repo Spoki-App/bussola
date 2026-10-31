@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useSyncExternalStore, type RefObject } from 'react'
 
 import type { Thread, Unit } from '../api/types'
-import { pullRequestRepositoryFromPath } from './pullRequestLink'
 import { isInline } from './threadPlacement'
 
 export interface LinkFocus {
@@ -31,13 +30,7 @@ export interface LinkScroll {
 
 type LinkRole = 'target' | 'approach' | 'holder' | 'settled' | null
 
-export interface AddRepositoryRequest {
-  repository: string
-  then: string
-}
-
 const POSITIVE_NUMBER = /^[1-9]\d*$/
-const ADD_REPOSITORY_PARAM = 'add_repo'
 
 export const LinkScrollContext = createContext<LinkScroll | null>(null)
 
@@ -166,14 +159,4 @@ export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId
     }
   }, [link, role, elementId, unitId, settled])
   return ref
-}
-
-export function addRepositoryPath(then: string): string {
-  return `/?${new URLSearchParams({ [ADD_REPOSITORY_PARAM]: then }).toString()}`
-}
-
-export function addRepositoryRequestFromSearch(search: string): AddRepositoryRequest | null {
-  const then = new URLSearchParams(search).get(ADD_REPOSITORY_PARAM)
-  const repository = then === null ? null : pullRequestRepositoryFromPath(then.split('?')[0])
-  return then !== null && repository !== null ? { repository, then } : null
 }

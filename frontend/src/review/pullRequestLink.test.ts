@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isPullRequestUrl, pullRequestRepositoryFromPath, pullRequestUrlFromPath } from './pullRequestLink'
+import { addRepositoryPath, addRepositoryRequestFromSearch, isPullRequestUrl, pullRequestRepositoryFromPath, pullRequestUrlFromPath } from './pullRequestLink'
 
 describe('isPullRequestUrl', () => {
   it('accepts pull request links with or without scheme and suffix', () => {
@@ -29,5 +29,22 @@ describe('pullRequestUrlFromPath', () => {
 
   it('ignores other paths', () => {
     expect(pullRequestUrlFromPath('/reviews/3')).toBeNull()
+  })
+})
+
+describe('add repository request', () => {
+  it('takes the repository from the pull request page to open next', () => {
+    const then = '/github.com/acme/widgets/pull/7?path=src%2Fapp.py&line=4'
+    const path = addRepositoryPath(then)
+
+    expect(path.startsWith('/?')).toBe(true)
+    expect(addRepositoryRequestFromSearch(path.slice(1))).toEqual({ repository: 'acme/widgets', then })
+  })
+
+  it('refuses anything but a pull request page to open next', () => {
+    expect(addRepositoryRequestFromSearch('')).toBeNull()
+    expect(addRepositoryRequestFromSearch('?add_repo=https://evil.example')).toBeNull()
+    expect(addRepositoryRequestFromSearch('?add_repo=//evil.example/github.com/a/b/pull/1')).toBeNull()
+    expect(addRepositoryRequestFromSearch('?add_repo=/github.com/acme/widgets/issues/7')).toBeNull()
   })
 })

@@ -150,7 +150,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     writeStored(FILES_HIDDEN_KEY, String(!filesHidden))
   }
 
-  const linkedTarget = appliedLink === undefined && linkTarget && units.data ? linkTarget(units.data) : undefined
+  const linkedTarget = appliedLink === undefined && linkTarget && units.data && !units.isPlaceholderData ? linkTarget(units.data) : undefined
   if (linkedTarget !== undefined) {
     setAppliedLink(linkedTarget)
     if (linkedTarget) {
@@ -235,14 +235,25 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           </div>
           <div className="summary-controls">
             <div className="unit-filters">
-              <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
+              <Segmented
+                label="Filter units"
+                labels={FILTER_LABELS}
+                value={filter}
+                onChange={(next) => {
+                  linkScroll.done()
+                  setFilter(next)
+                }}
+              />
               <input
                 type="search"
                 className="unit-search"
                 aria-label="Find units by module, name or path"
                 placeholder="Find by module, name or path"
                 value={query}
-                onChange={(event) => { setQuery(event.target.value) }}
+                onChange={(event) => {
+                  linkScroll.done()
+                  setQuery(event.target.value)
+                }}
               />
             </div>
             <DiffLayoutSwitch />

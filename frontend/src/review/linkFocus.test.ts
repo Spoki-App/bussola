@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import type { Comment, Thread, Unit } from '../api/types'
 import {
-  addRepositoryPath,
-  addRepositoryRequestFromSearch,
   linkFocusFromSearch,
   resolveLinkFocus,
   type LinkFocus,
@@ -136,22 +134,5 @@ describe('resolveLinkFocus', () => {
   it('uses the path when the thread is unknown', () => {
     expect(resolveLinkFocus(focus({ comment: '9', path: 'README.md' }), units, [])?.unitId).toBe(3)
     expect(resolveLinkFocus(focus({ comment: '9' }), units, [])).toBeNull()
-  })
-})
-
-describe('add repository request', () => {
-  it('takes the repository from the pull request page to open next', () => {
-    const then = '/github.com/acme/widgets/pull/7?path=src%2Fapp.py&line=4'
-    const path = addRepositoryPath(then)
-
-    expect(path.startsWith('/?')).toBe(true)
-    expect(addRepositoryRequestFromSearch(path.slice(1))).toEqual({ repository: 'acme/widgets', then })
-  })
-
-  it('refuses anything but a pull request page to open next', () => {
-    expect(addRepositoryRequestFromSearch('')).toBeNull()
-    expect(addRepositoryRequestFromSearch('?add_repo=https://evil.example')).toBeNull()
-    expect(addRepositoryRequestFromSearch('?add_repo=//evil.example/github.com/a/b/pull/1')).toBeNull()
-    expect(addRepositoryRequestFromSearch('?add_repo=/github.com/acme/widgets/issues/7')).toBeNull()
   })
 })

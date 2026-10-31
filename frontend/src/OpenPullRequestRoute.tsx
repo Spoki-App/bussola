@@ -6,7 +6,7 @@ import { ErrorNote } from './components/Badges'
 import { ExternalLink } from './components/ExternalLink'
 import { Link } from './Link'
 import { navigate, reviewPath } from './navigation'
-import { addRepositoryPath } from './review/linkFocus'
+import { addRepositoryPath } from './review/pullRequestLink'
 
 const NO_LOCAL_CLONE = 'no_local_clone'
 
