@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+import json
+import os
+import sys
+import time
+from pathlib import Path
+
+STATE = json.loads(Path(os.environ["FAKE_LSP_STATE"]).read_text())
+LOG = Path(os.environ["FAKE_LSP_LOG"])
+LOCATION_METHODS = {"textDocument/definition": "definition", "textDocument/references": "references"}
+
+
+def read_message():
+    length = None
+    while True:
+        line = sys.stdin.buffer.readline()
+        if not line:
+            return None
+        if not line.strip():
+            break
+        name, _, value = line.decode().partition(":")
+        if name.strip().lower() == "content-length":
+            length = int(value)
+    return json.loads(sys.stdin.buffer.read(length))
+
+
+def send(message):
+    body = json.dumps(message).encode()
+    sys.stdout.buffer.write(b"Content-Length: %d\r\n\r\n%s" % (len(body), body))
+    sys.stdout.buffer.flush()
+
+
+def log(message):
+    with LOG.open("a") as handle:
+        handle.write(json.dumps(message) + "\n")
+
+
+def locations(root, entries):
+    return [{"uri": f"{root}/{entry['path']}", "range": {"start": {"line": entry["line"], "character": entry["character"]}, "end": {"line": entry["line"], "character": entry["character"] + 1}}} for entry in entries]
+
+
+def main():
+    LOG.with_suffix(".env.json").write_text(json.dumps({name: os.environ.get(name) for name in ("GOPROXY", "GOTOOLCHAIN")}))
+    root = None
+    mode = STATE.get("mode", "ok")
+    while (message := read_message()) is not None:
+        log(message)
+        method = message.get("method")
+        if method is None:
+            continue
+        if "id" not in message:
+            if method == "exit":
+                return
+            continue
+        if method == "initialize":
+            if mode == "crash":
+                return
+            root = message["params"]["rootUri"]
+            send({"jsonrpc": "2.0", "id": 900, "method": "workspace/configuration", "params": {"items": [{"section": "python"}]}})
+            send({"jsonrpc": "2.0", "id": message["id"], "result": {"capabilities": {"definitionProvider": True, "referencesProvider": True}}})
+        elif method in LOCATION_METHODS:
+            if mode == "hang":
+                time.sleep(30)
+            send({"jsonrpc": "2.0", "id": message["id"], "result": locations(root, STATE.get(LOCATION_METHODS[method], []))})
+        else:
+            send({"jsonrpc": "2.0", "id": message["id"], "result": None})
+
+
+main()

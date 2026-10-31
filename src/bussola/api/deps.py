@@ -6,6 +6,7 @@ from fastapi import Depends, Request
 from bussola.api.state import app_state
 from bussola.errors import NotFoundError
 from bussola.review.context import ReviewContext
+from bussola.review.rows import Side
 from bussola.storage.models import Repo, Reviewer, Revision, UnitSnapshot
 from bussola.storage.repositories import Store
 
@@ -68,3 +69,11 @@ def snapshot_of(context: ReviewContext, unit_id: int) -> UnitSnapshot:
     if snapshot is None or revision is None or revision.review_id != context.review.id:
         raise NotFoundError(f"Unit {unit_id} not found")
     return snapshot
+
+
+def side_commit(revision: Revision, side: Side) -> str:
+    return revision.merge_base_sha if side == Side.BASE else revision.head_sha
+
+
+def side_path(snapshot: UnitSnapshot, side: Side) -> str:
+    return snapshot.old_path or snapshot.path if side == Side.BASE else snapshot.path

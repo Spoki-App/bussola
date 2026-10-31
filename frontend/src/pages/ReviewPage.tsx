@@ -16,6 +16,7 @@ import { ReviewTitle } from '../components/ReviewTitle'
 import { SyncSummary } from '../components/SyncSummary'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
 import { UnitTree } from '../components/UnitTree'
+import { useCodeNavigation } from '../hooks/useCodeNavigation'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
@@ -141,6 +142,8 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const fileTree = useMemo(() => buildFileTree(searchGroups(fileGroups, deferredQuery)), [fileGroups, deferredQuery])
   const groups = useMemo(() => filesInOrder(fileTree).map((group) => ({ ...group, tree: buildUnitTree(group.units) })), [fileTree])
   const unitList = useMemo(() => groups.flatMap((group) => group.units), [groups])
+  const shownUnits = useMemo(() => new Set(unitList.map((unit) => unit.id)), [unitList])
+  const navigation = useCodeNavigation(reviewId, revisionId, (unitId) => shownUnits.has(unitId))
   const [focusedId, setFocusedId] = useState<number | null>(null)
   const actions = useRef(new Map<number, UnitActions>())
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= WIDE_LAYOUT_PX)
@@ -229,7 +232,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
             <DiffLayoutSwitch />
           </div>
           <div className="summary-row">
-            <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines.</p>
+            <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines. Cmd or Ctrl+click a name to go to its definition or list its usages.</p>
             <div className="summary-actions">
               <DiffWrapButton />
               {extensions.sidePanel && (
@@ -274,6 +277,8 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                     onCommentSelectEnd={extensions.onCommentSelectEnd}
                     renderWidgets={extensions.renderWidgets}
                     highlightRows={extensions.highlightRows}
+                    onNavigate={navigation.navigate}
+                    navigationTarget={navigation.target?.unitId === unit.id ? navigation.target : undefined}
                   />
                 )}
               />
@@ -282,6 +287,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
         </main>
         {panelOpen && extensions.sidePanel && <aside className="side-panel">{extensions.sidePanel.content}</aside>}
       </div>
+      {navigation.element}
     </div>
   )
 }

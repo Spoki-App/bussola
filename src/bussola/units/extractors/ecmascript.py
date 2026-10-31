@@ -22,10 +22,10 @@ class EcmaScriptExtractor:
 
     def __init__(self, name: str, language: Language) -> None:
         self.name: str = name
-        self._language = language
+        self.language = language
 
     def extract(self, source: bytes) -> list[Unit] | None:
-        tree = parse(self._language, source)
+        tree = parse(self.language, source)
         if tree is None:
             return None
         siblings = tree.root_node.named_children

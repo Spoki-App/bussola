@@ -6,6 +6,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Added
 
+- Go to definition and find usages with Cmd+click (Ctrl+click on Linux and Windows) for Python, TypeScript/TSX, JavaScript and Go: a single result in the review scrolls to its line, others open in a list and, outside the review, in a window showing the file at the reviewed commit. A tree-sitter index of the repository works with nothing installed, and basedpyright, pyright, typescript-language-server or gopls are used when found on `PATH` ([#13](https://github.com/Spoki-App/bussola/issues/13)).
 - Diff layout setting: split, unified or automatic, in **Settings** and in the review bar. Automatic splits units that rewrite lines when the window is at least as wide as a threshold set in **Settings** ([#10](https://github.com/Spoki-App/bussola/issues/10)).
 - Changed words inside a modified line are highlighted with a stronger background on both the removed and the added line, when the two lines are similar enough ([#25](https://github.com/Spoki-App/bussola/issues/25)).
 - Long lines in the diff wrap with a hanging indent and one line number per source line. Wrapping is on by default and can be turned off in Settings or with **Wrap lines** above the diff ([#11](https://github.com/Spoki-App/bussola/issues/11)).

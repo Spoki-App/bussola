@@ -74,4 +74,25 @@ describe('UnitCard', () => {
     expect(container.querySelector('.unit-module')).toBeNull()
     expect(screen.getByText('Module code')).toBeInTheDocument()
   })
+
+  it('opens a jump target and shows the base diff when the target is on the base side', () => {
+    const fetchMock = vi.fn<(url: string) => Promise<never>>(() => new Promise(() => undefined))
+    vi.stubGlobal('fetch', fetchMock)
+    Element.prototype.scrollIntoView = vi.fn()
+    const client = new QueryClient()
+    const card = (target?: { unitId: number; line: number; side: 'head' | 'base' }) => (
+      <QueryClientProvider client={client}>
+        <UnitCard reviewId={1} unit={unit('approved')} focused={false} onFocus={() => undefined} register={() => undefined} navigationTarget={target} />
+      </QueryClientProvider>
+    )
+    const { rerender } = render(card())
+    expect(disclosure()).toHaveAttribute('aria-expanded', 'false')
+
+    rerender(card({ unitId: 1, line: 3, side: 'head' }))
+    expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/reviews/1/units/1/diff'])
+
+    rerender(card({ unitId: 1, line: 3, side: 'base' }))
+    expect(fetchMock.mock.calls.map(([url]) => url).at(-1)).toBe('/api/reviews/1/units/1/diff?mode=base')
+  })
 })

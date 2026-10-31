@@ -139,6 +139,22 @@ Comments and descriptions are rendered like on GitHub, in the browser: GitHub Fl
 
 Images attached on GitHub need a signed-in user, so they are loaded through `GET /forge/asset?url=`. Only `https://github.com/user-attachments/assets/<uuid>` and `https://github.com/<owner>/<repository>/assets/<id>/<uuid>` are accepted. The token comes from `gh auth token` at each download, is sent only to `github.com` (not on the redirect to the storage host) and is never stored. Only images up to 25 MB are returned, with `Content-Security-Policy: sandbox` and `nosniff`.
 
+## Code navigation
+
+```
+POST   /reviews/{id}/navigation/index          start indexing the reviewed commit, returns whether it is ready
+GET    /reviews/{id}/navigation?path=&line=&column=&side=   definitions or usages of the name at that position
+GET    /reviews/{id}/source?path=&side=        a file at the reviewed commit, with its GitHub link
+```
+
+`side=head` resolves at the head of the latest revision, `side=base` at its merge base. Columns are UTF-16 offsets, as in the browser and in LSP.
+
+The name under the cursor is found by parsing the clicked file with tree-sitter. It is a definition when it is the name of a function, method, class, interface, type alias or enum, or a module level variable (Python assignments at module level, `const`/`let`/`var` at the top of a JavaScript or TypeScript module, `var` and `const` at the top of a Go package). A definition lists its usages, anything else its definitions. Languages are grouped in families (Python, TypeScript and JavaScript together, Go), and a name only matches within its family.
+
+The index lists, per file, its definitions and the names it uses. It is built from `git ls-tree` and `git cat-file` in a background thread, never from the working tree, skips files over 1 MB and the `ignore` globs, and reuses the symbols of unchanged blobs from the indexes kept in memory (the last four commits). Usages are found by parsing again only the files that use the name. While the index is building the endpoint answers `ready: false` and the page polls. Results are capped at 200.
+
+A language server, when one is on `PATH`, is asked first: `textDocument/definition`, or `textDocument/references` without the declaration. It runs in `checkouts/<commit>` in the data directory, extracted with `git archive`, and is started in the background on first use, so the index answers until it is ready. Locations outside the checkout are dropped. A server that does not start, crashes or takes more than five seconds, or an empty answer, falls back to the index. Up to three servers are kept running; the checkouts are removed when a server is dropped and when bussola stops. Each result says which unit of the review contains its line, if any, so the page can scroll to it.
+
 ## Folder browser
 
 Browsers do not reveal the absolute path of a folder picked with their native dialog, so bussola serves its own:

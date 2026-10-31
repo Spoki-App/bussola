@@ -1,12 +1,12 @@
 from fastapi import APIRouter
 
-from bussola.api import approvals, browser, directories, forge, health, pulls, repos, reviews, threads, units
+from bussola.api import approvals, browser, directories, forge, health, navigation, pulls, repos, reviews, threads, units
 
 API_PREFIX = "/api"
 
 
 def build_api_router() -> APIRouter:
     router = APIRouter(prefix=API_PREFIX)
-    for module in (health, browser, repos, directories, pulls, reviews, units, approvals, threads, forge):
+    for module in (health, browser, repos, directories, pulls, reviews, units, approvals, threads, forge, navigation):
         router.include_router(module.router)
     return router

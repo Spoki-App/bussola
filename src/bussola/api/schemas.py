@@ -3,6 +3,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, model_validator
 
+from bussola.navigation.navigator import Origin, Resolver, TargetRole
 from bussola.review.diffs import DiffMode
 from bussola.review.rows import LineChange, Side
 from bussola.review.scope import ChangeType
@@ -363,3 +364,54 @@ class PullSyncOut(BaseModel):
     updated: int
     closed: int
     failed: list[str]
+
+
+class RevisionSideIn(BaseModel):
+    revision_id: int | None = None
+    side: Side = Side.HEAD
+
+
+class SourceFileIn(RevisionSideIn):
+    path: str = Field(min_length=1)
+
+
+class NavigationIn(SourceFileIn):
+    line: int = Field(ge=1)
+    column: int = Field(ge=0)
+
+
+class NavigationIndexOut(BaseModel):
+    ready: bool
+
+
+class NavigationTargetOut(BaseModel):
+    role: TargetRole
+    path: str
+    line: int
+    column: int
+    preview: str
+    side: Side
+    unit_id: int | None
+
+
+class ServerHintOut(BaseModel):
+    family: str
+    language: str
+    install: str
+
+
+class NavigationOut(BaseModel):
+    ready: bool
+    symbol: str | None
+    origin: Origin | None
+    resolver: Resolver
+    targets: list[NavigationTargetOut]
+    server_hint: ServerHintOut | None
+
+
+class SourceFileOut(BaseModel):
+    path: str
+    side: Side
+    commit: str
+    text: str
+    url: str | None
