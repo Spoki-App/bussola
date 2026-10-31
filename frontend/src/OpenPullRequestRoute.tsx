@@ -1,14 +1,13 @@
 import { useEffect, useRef } from 'react'
 
 import { describeError } from './api/client'
-import { useOpenPullRequestLink } from './api/pulls'
 import { ErrorNote } from './components/Badges'
 import { ExternalLink } from './components/ExternalLink'
 import { Link } from './Link'
-import { navigate, reviewPath } from './navigation'
+import { useOpenReview } from './openReview'
 
 export function OpenPullRequestRoute({ url }: { url: string }) {
-  const open = useOpenPullRequestLink()
+  const { start, visibleError } = useOpenReview()
   const started = useRef(false)
 
   useEffect(() => {
@@ -16,8 +15,8 @@ export function OpenPullRequestRoute({ url }: { url: string }) {
       return
     }
     started.current = true
-    open.mutate(url, { onSuccess: (review) => { navigate(reviewPath(review.id), { replace: true }) } })
-  }, [open, url])
+    start(url, { search: window.location.search, askToAddRepository: true })
+  }, [start, url])
 
   return (
     <div className="page">
@@ -25,9 +24,9 @@ export function OpenPullRequestRoute({ url }: { url: string }) {
       <p>
         <ExternalLink href={url}>{url}</ExternalLink>
       </p>
-      {open.error ? (
+      {visibleError ? (
         <>
-          <ErrorNote message={describeError(open.error)} />
+          <ErrorNote message={describeError(visibleError)} />
           <Link to="/">Back to repositories</Link>
         </>
       ) : (

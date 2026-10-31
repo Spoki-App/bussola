@@ -5,7 +5,7 @@ from bussola.forge.base import ForgeAdapter, ForgeError
 from bussola.forge.conversation import import_conversation
 from bussola.forge.heads import HeadMismatchError
 from bussola.forge.publish import PublishResult, pending_comment_count, publish_comments
-from bussola.forge.pulls import ForgeSession, is_pull_request_review, require_remote, sync_review
+from bussola.forge.pulls import ForgeSession, is_pull_request_review, require_remote, same_repository, sync_review
 from bussola.forge.viewed import ViewedResult, mark_approved_files_viewed
 from bussola.git import GitError, GitRepo, InvalidRefError
 from bussola.review.context import ReviewContext
@@ -76,7 +76,7 @@ def sync_pull_requests(session: ForgeSession, repo: Repo) -> SyncResult:
     failed: list[str] = []
     for link in session.store.forge.links_for_repo(repo.id):
         review = session.store.reviews.get_review(link.review_id)
-        if review is None or link.repository != remote.repository:
+        if review is None or not same_repository(link.repository, remote.repository):
             continue
         try:
             if fetch_and_refresh(ReviewContext(session.store, review, session.reviewer), session.adapter, session.git_repo) is None:

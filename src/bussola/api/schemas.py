@@ -16,6 +16,7 @@ LineRangeIn = Annotated[tuple[int, int], Field(description="Inclusive file line 
 
 class HealthOut(BaseModel):
     status: str
+    app: str
 
 
 class ReviewerOut(BaseModel):
@@ -115,6 +116,8 @@ class UnitOut(BaseModel):
     todo: bool
     action: ApprovalAction
     open_threads: int
+    head_start: int | None
+    head_end: int | None
 
 
 class DiffRowOut(BaseModel):

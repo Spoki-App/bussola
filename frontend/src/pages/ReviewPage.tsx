@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useSync } from '../api/forge'
@@ -18,7 +18,18 @@ import { UnitCard, type CommentTarget, type UnitActions } from '../components/Un
 import { UnitTree } from '../components/UnitTree'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
+import { navigate } from '../navigation'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
+import {
+  LinkScrollContext,
+  createLinkScroll,
+  followLink,
+  scrollToElement,
+  unitElementId,
+  withoutLinkFocus,
+  type FocusTarget,
+  type PendingLink,
+} from '../review/linkFocus'
 import { buildUnitTree } from '../review/unitTree'
 import { searchGroups } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
@@ -33,6 +44,7 @@ export interface ReviewExtensions {
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
   fileActions?: (path: string) => ReactNode
   sidePanel?: { label: string; content: ReactNode }
+  link?: PendingLink
 }
 
 interface Props {
@@ -42,10 +54,6 @@ interface Props {
 
 const WIDE_LAYOUT_PX = 1400
 const FILES_HIDDEN_KEY = 'bussola.filesHidden'
-
-function scrollToElement(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
 
 const SYNC_TITLE =
   'Fetch the branch from its remote and record any new commits as a new revision. If the review is linked to a GitHub pull request, also bring in its comments and send your unsent comments as one review.'
@@ -145,10 +153,53 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const actions = useRef(new Map<number, UnitActions>())
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= WIDE_LAYOUT_PX)
   const [filesHidden, setFilesHidden] = useState(() => readStored(FILES_HIDDEN_KEY) === 'true')
+  const [appliedLink, setAppliedLink] = useState<{ target: FocusTarget | null } | null>(null)
+  const { link } = extensions
   const toggleFiles = () => {
     setFilesHidden(!filesHidden)
     writeStored(FILES_HIDDEN_KEY, String(!filesHidden))
   }
+
+  const [seenLinkKey, setSeenLinkKey] = useState<string | null>(null)
+  if (link === undefined && seenLinkKey !== null) {
+    setSeenLinkKey(null)
+  }
+  const linkIsNew = link !== undefined && link.key !== seenLinkKey
+  if (linkIsNew) {
+    setSeenLinkKey(link.key)
+    setAppliedLink(null)
+    setFilter('all')
+    setQuery('')
+  }
+  const linkPending = link !== undefined && !linkIsNew && appliedLink === null
+  const viewChanged = filter !== 'all' || query !== ''
+  const unitsUnavailable = review.isError || units.isError || review.data?.latest_revision === null
+  const resolveLink = () => (link?.ready && units.data && !units.isPlaceholderData ? link.resolve(units.data) : undefined)
+  const linkedTarget = !linkPending ? undefined : viewChanged || unitsUnavailable ? null : resolveLink()
+  if (linkedTarget !== undefined) {
+    setAppliedLink({ target: linkedTarget })
+    if (linkedTarget?.unitId != null) {
+      setFocusedId(linkedTarget.unitId)
+    }
+    setPanelOpen(panelOpen || linkedTarget?.unitId === null)
+  }
+  const [linkScroll] = useState(createLinkScroll)
+  useEffect(() => {
+    if (appliedLink === null) {
+      return undefined
+    }
+    const { pathname, search, hash } = window.location
+    navigate(`${pathname}${withoutLinkFocus(search)}${hash}`, { replace: true })
+    if (appliedLink.target === null) {
+      return undefined
+    }
+    linkScroll.start(appliedLink.target)
+    const stop = followLink(linkScroll)
+    return () => {
+      stop()
+      linkScroll.done()
+    }
+  }, [appliedLink, linkScroll])
 
   const focusUnit = useCallback((unitId: number) => {
     setFocusedId(unitId)
@@ -168,7 +219,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
       return
     }
     setFocusedId(unitList[target].id)
-    scrollToElement(`unit-${String(unitList[target].id)}`)
+    scrollToElement(unitElementId(unitList[target].id))
   }
   const focusedIndex = focusedPosition(unitList, focusedId)
   const focusedUnit = focusedIndex < 0 ? undefined : unitList[focusedIndex]
@@ -241,47 +292,49 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           </div>
         </section>
       </div>
-      <div className={`review-layout${panelOpen && extensions.sidePanel ? ' with-panel' : ''}${filesHidden ? ' files-hidden' : ''}`}>
-        <aside className="sidebar" aria-label="Files">
-          <button type="button" className="sidebar-toggle" aria-expanded={!filesHidden} aria-controls={filesHidden ? undefined : 'file-tree'} title={filesHidden ? 'Show files' : 'Hide files'} onClick={toggleFiles}>
-            <SidebarIcon />
-            {!filesHidden && <span>Files</span>}
-          </button>
-          {!filesHidden && (
-            <div id="file-tree">
-              <FileTree nodes={fileTree} activePath={focusedUnit?.path} onSelect={(path) => { scrollToElement(`file-${path}`) }} />
-            </div>
-          )}
-        </aside>
-        <main className="units">
-          {units.error && <ErrorNote message={describeError(units.error)} />}
-          {units.data && unitList.length === 0 && <p className="muted">{emptyMessage(filter, deferredQuery, units.data.length)}</p>}
-          {groups.map((group) => (
-            <section key={group.path} id={`file-${group.path}`} className="file-section">
-              <FileHeader reviewId={reviewId} path={group.path} oldPath={group.oldPath} complete={group.complete} actions={extensions.fileActions?.(group.path)} />
-              <UnitTree
-                nodes={group.tree}
-                module={group.units.at(0)?.module ?? null}
-                renderUnit={(unit) => (
-                  <UnitCard
-                    key={unit.id}
-                    reviewId={reviewId}
-                    unit={unit}
-                    focused={focusedUnit?.id === unit.id}
-                    onFocus={focusUnit}
-                    register={register}
-                    onComment={extensions.onComment}
-                    onCommentSelectEnd={extensions.onCommentSelectEnd}
-                    renderWidgets={extensions.renderWidgets}
-                    highlightRows={extensions.highlightRows}
-                  />
-                )}
-              />
-            </section>
-          ))}
-        </main>
-        {panelOpen && extensions.sidePanel && <aside className="side-panel">{extensions.sidePanel.content}</aside>}
-      </div>
+      <LinkScrollContext value={linkScroll}>
+        <div className={`review-layout${panelOpen && extensions.sidePanel ? ' with-panel' : ''}${filesHidden ? ' files-hidden' : ''}`}>
+          <aside className="sidebar" aria-label="Files">
+            <button type="button" className="sidebar-toggle" aria-expanded={!filesHidden} aria-controls={filesHidden ? undefined : 'file-tree'} title={filesHidden ? 'Show files' : 'Hide files'} onClick={toggleFiles}>
+              <SidebarIcon />
+              {!filesHidden && <span>Files</span>}
+            </button>
+            {!filesHidden && (
+              <div id="file-tree">
+                <FileTree nodes={fileTree} activePath={focusedUnit?.path} onSelect={(path) => { scrollToElement(`file-${path}`) }} />
+              </div>
+            )}
+          </aside>
+          <main className="units">
+            {units.error && <ErrorNote message={describeError(units.error)} />}
+            {units.data && unitList.length === 0 && <p className="muted">{emptyMessage(filter, deferredQuery, units.data.length)}</p>}
+            {groups.map((group) => (
+              <section key={group.path} id={`file-${group.path}`} className="file-section">
+                <FileHeader reviewId={reviewId} path={group.path} oldPath={group.oldPath} complete={group.complete} actions={extensions.fileActions?.(group.path)} />
+                <UnitTree
+                  nodes={group.tree}
+                  module={group.units.at(0)?.module ?? null}
+                  renderUnit={(unit) => (
+                    <UnitCard
+                      key={unit.id}
+                      reviewId={reviewId}
+                      unit={unit}
+                      focused={focusedUnit?.id === unit.id}
+                      onFocus={focusUnit}
+                      register={register}
+                      onComment={extensions.onComment}
+                      onCommentSelectEnd={extensions.onCommentSelectEnd}
+                      renderWidgets={extensions.renderWidgets}
+                      highlightRows={extensions.highlightRows}
+                    />
+                  )}
+                />
+              </section>
+            ))}
+          </main>
+          {panelOpen && extensions.sidePanel && <aside className="side-panel">{extensions.sidePanel.content}</aside>}
+        </div>
+      </LinkScrollContext>
     </div>
   )
 }

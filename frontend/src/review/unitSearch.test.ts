@@ -25,6 +25,8 @@ function unit(path: string, module: string | null, qualifiedName: string, oldPat
     todo: true,
     action: 'approve',
     open_threads: 0,
+    head_start: null,
+    head_end: null,
   }
 }
 

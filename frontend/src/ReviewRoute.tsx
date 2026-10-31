@@ -10,7 +10,9 @@ import { Composer } from './components/Composer'
 import { FileCommentButton } from './components/FileCommentButton'
 import { ThreadPanel } from './components/ThreadPanel'
 import { ThreadView } from './components/ThreadView'
+import { useSearch } from './navigation'
 import { ReviewPage } from './pages/ReviewPage'
+import { linkFocusFromSearch, resolveLinkFocus } from './review/linkFocus'
 import { draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, isOpen, nextDraft, threadRow, type Draft } from './review/threadPlacement'
 
 export function ReviewRoute({ reviewId }: { reviewId: number }) {
@@ -29,6 +31,20 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
     return grouped
   }, [threads.data])
   const openCount = (threads.data ?? []).filter(isOpen).length
+  const search = useSearch()
+  const linkFocus = useMemo(() => linkFocusFromSearch(search), [search])
+  const threadsSettled = threads.data !== undefined || threads.error !== null
+  const link = useMemo(
+    () =>
+      linkFocus
+        ? {
+            key: search,
+            ready: threadsSettled || (linkFocus.thread === null && linkFocus.comment === null),
+            resolve: (units: Unit[]) => resolveLinkFocus(linkFocus, units, threads.data ?? []),
+          }
+        : undefined,
+    [search, linkFocus, threadsSettled, threads.data],
+  )
 
   const renderWidgets = useCallback(
     (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => {
@@ -87,6 +103,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
         renderWidgets,
         fileActions,
         sidePanel: { label: `conversation (${String(openCount)})`, content: sidePanelContent },
+        link,
       }}
     />
   )

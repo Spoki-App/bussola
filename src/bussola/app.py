@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from bussola.api import API_PREFIX, build_api_router
 from bussola.api.state import AppState, attach_state
 from bussola.config import AppSettings
-from bussola.errors import ConflictError, ForbiddenError, InvalidRequestError, NotFoundError
+from bussola.errors import ConflictError, DomainError, ForbiddenError, InvalidRequestError, NotFoundError
 from bussola.forge.base import ForgeAdapter, ForgeError
 from bussola.forge.github import GitHubAdapter
 from bussola.git import GitError, InvalidRefError
@@ -48,7 +48,8 @@ def create_app(settings: AppSettings, forge: ForgeAdapter | None = None, url_ope
 
 async def _handle_error(_request: Request, error: Exception) -> JSONResponse:
     code = next((code for error_type, code in ERROR_STATUS.items() if isinstance(error, error_type)), status.HTTP_500_INTERNAL_SERVER_ERROR)
-    return JSONResponse({"detail": str(error)}, status_code=code)
+    error_code = error.code if isinstance(error, DomainError) else None
+    return JSONResponse({"detail": str(error)} | ({"code": error_code} if error_code else {}), status_code=code)
 
 
 def _mount_frontend(app: FastAPI, static_dir: Path) -> None:

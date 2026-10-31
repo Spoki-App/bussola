@@ -1205,6 +1205,7 @@ button.toggle[aria-pressed='true'] {
 .thread {
   max-width: 860px;
   margin: 6px 0;
+  scroll-margin-top: 56px;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-box);

@@ -7,6 +7,7 @@ import { ErrorNote } from './Badges'
 import { ExternalLink } from './ExternalLink'
 import { Composer } from './Composer'
 import { Markdown } from './Markdown'
+import { threadElementId, useLinkedScroll } from '../review/linkFocus'
 import { plural } from '../review/text'
 
 interface Props {
@@ -17,7 +18,11 @@ interface Props {
 
 export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
   const resolved = thread.resolvable && thread.status === 'resolved'
+  const { ref: linkedRef, linked } = useLinkedScroll<HTMLDivElement>(threadElementId(thread.id))
   const [collapsed, setCollapsed] = useState(resolved)
+  if (linked && collapsed) {
+    setCollapsed(false)
+  }
   const reply = useReply(reviewId)
   const setStatus = useSetThreadStatus(reviewId)
   const remove = useDeleteThread(reviewId)
@@ -25,7 +30,7 @@ export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
   const failure = reply.error ?? setStatus.error ?? remove.error
 
   return (
-    <div className={`thread${resolved ? ' resolved' : ''}${thread.anchor?.outdated ? ' outdated' : ''}`} data-testid="thread">
+    <div id={threadElementId(thread.id)} ref={linkedRef} className={`thread${resolved ? ' resolved' : ''}${thread.anchor?.outdated ? ' outdated' : ''}`} data-testid="thread">
       <div className="thread-header">
         <button type="button" className="disclosure" aria-expanded={!collapsed} onClick={() => { setCollapsed(!collapsed) }}>
           {collapsed ? '▸' : '▾'}

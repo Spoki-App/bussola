@@ -24,6 +24,8 @@ function unit(id: number, kind: string, qualifiedName: string): Unit {
     todo: true,
     action: 'approve',
     open_threads: 0,
+    head_start: null,
+    head_end: null,
   }
 }
 

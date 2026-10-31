@@ -16,7 +16,15 @@ from bussola.storage.repositories import Store
 
 PULL_REF_PREFIX = "refs/bussola/pull/"
 OPEN_STATE = "OPEN"
-PULL_URL = re.compile(r"^(?:https?://)?(?:www\.)?github\.com/(?P<repository>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(?P<number>\d+)(?:[/?#].*)?$")
+PULL_URL = re.compile(r"^(?:https?://)?(?:www\.)?github\.com/(?P<repository>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(?P<number>\d{1,18})(?:[/?#].*)?$")
+
+
+class PullRequestFetchError(GitError):
+    pass
+
+
+class NoLocalCloneError(NotFoundError):
+    code = "no_local_clone"
 
 
 @dataclass(frozen=True)
@@ -69,7 +77,7 @@ def find_repo_for(store: Store, adapter: ForgeAdapter, repository: str, candidat
             continue
         if matches:
             return register_repo(store, path)
-    raise NotFoundError(f"No local clone of github.com/{repository} was found. Add its folder as a repository first.")
+    raise NoLocalCloneError(f"No local clone of github.com/{repository} was found. Add its folder as a repository first.")
 
 
 def is_pull_request_review(review: Review) -> bool:
@@ -96,7 +104,7 @@ def list_pull_requests(store: Store, adapter: ForgeAdapter, git_repo: GitRepo, r
     remote = github_remote(adapter, git_repo)
     if remote is None or not status.authenticated:
         return PullRequestList(status, remote.repository if remote else None)
-    reviews = {link.pr_number: link.review_id for link in store.forge.links_for_repo(repo.id) if link.repository == remote.repository}
+    reviews = {link.pr_number: link.review_id for link in store.forge.links_for_repo(repo.id) if same_repository(link.repository, remote.repository)}
     pulls = [PullRequestRow(pull, reviews.get(pull.number)) for pull in adapter.open_pull_requests(remote.repository)]
     return PullRequestList(status, remote.repository, pulls)
 
@@ -115,7 +123,7 @@ def review_pull_request(session: ForgeSession, repo: Repo, number: int, reposito
     conversation = adapter.pull_request_conversation(remote.repository, number)
     pull = conversation.pull
     head_ref, base_ref = fetch_pull_request(git_repo, remote, pull)
-    review = _review_for(store, repo, remote.repository, pull) or store.reviews.find_or_add_review(repo.id, head_ref, base_ref)
+    review = existing_review(store, repo, remote.repository, pull.number) or store.reviews.find_or_add_review(repo.id, head_ref, base_ref)
     review.head_ref, review.base_ref = head_ref, base_ref
     link = _save_link(store, review, adapter.provider, remote.repository, pull)
     result = refresh_review(store, review, git_repo)
@@ -153,7 +161,10 @@ def fetch_pull_request(git_repo: GitRepo, remote: GitHubRemote, pull: PullReques
         raise InvalidRequestError(f"Unexpected base branch name {pull.base_ref!r}")
     head_ref = pull_ref(pull.number)
     base_ref = f"{remote.remote}/{pull.base_ref}"
-    git_repo.fetch_refspecs(remote.remote, [f"+refs/pull/{pull.number}/head:{head_ref}", f"+refs/heads/{pull.base_ref}:refs/remotes/{base_ref}"])
+    try:
+        git_repo.fetch_refspecs(remote.remote, [f"+refs/pull/{pull.number}/head:{head_ref}", f"+refs/heads/{pull.base_ref}:refs/remotes/{base_ref}"])
+    except GitError as error:
+        raise PullRequestFetchError(error.command, error.stderr) from error
     return head_ref, base_ref
 
 
@@ -164,8 +175,13 @@ def require_remote(adapter: ForgeAdapter, git_repo: GitRepo, repository: str | N
     return remote
 
 
-def _review_for(store: Store, repo: Repo, repository: str, pull: PullRequest) -> Review | None:
-    link = next((link for link in store.forge.links_for_repo(repo.id) if link.repository == repository and link.pr_number == pull.number), None)
+def same_repository(first: str, second: str) -> bool:
+    return first.lower() == second.lower()
+
+
+def existing_review(store: Store, repo: Repo, repository: str, number: int) -> Review | None:
+    links = store.forge.links_for_repo(repo.id)
+    link = next((link for link in links if same_repository(link.repository, repository) and link.pr_number == number), None)
     return store.reviews.get_review(link.review_id) if link else None
 
 

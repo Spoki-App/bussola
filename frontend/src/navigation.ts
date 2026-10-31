@@ -15,6 +15,10 @@ export function usePathname(): string {
   return useSyncExternalStore(subscribe, () => window.location.pathname)
 }
 
+export function useSearch(): string {
+  return useSyncExternalStore(subscribe, () => window.location.search)
+}
+
 export function navigate(to: string, { replace = false }: { replace?: boolean } = {}) {
   if (replace) {
     window.history.replaceState(null, '', to)
@@ -28,6 +32,10 @@ const REVIEW_PATH = /^\/reviews\/(\d+)\/?$/
 
 export function reviewPath(reviewId: number): string {
   return `/reviews/${String(reviewId)}`
+}
+
+export function showReview(reviewId: number, search = '', replace = true) {
+  navigate(`${reviewPath(reviewId)}${search}`, { replace })
 }
 
 export function reviewIdFromPath(pathname: string): number | null {

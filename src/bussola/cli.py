@@ -1,25 +1,26 @@
 import os
 import threading
 import webbrowser
-from collections.abc import Generator
+from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated
 
 import typer
-import uvicorn
 
 from bussola.app import create_app
 from bussola.config import DEFAULT_HOST, DEFAULT_PORT, AppSettings, load_repo_config
 from bussola.errors import DomainError
 from bussola.git import GitError, GitRepo, InvalidRefError
+from bussola.handler import registration
+from bussola.handler.server import Launcher, ServerAddress, record_link_error, run_published
 from bussola.identity import GitConfigIdentity
 from bussola.review.context import ReviewContext
 from bussola.review.overview import unit_views
 from bussola.review.refs import NoBaseBranchError, default_base_ref
 from bussola.review.repos import register_repo
 from bussola.review.revisions import refresh_review
-from bussola.security import LOCAL_HOSTS, allowed_hosts_for, new_token
+from bussola.security import TOKEN_ENV, allowed_hosts_for, is_local_host, new_token
 from bussola.storage.database import Database, default_data_dir
 from bussola.storage.repositories import Store
 
@@ -27,7 +28,6 @@ BROWSER_OPEN_DELAY_SECONDS = 1.0
 USAGE_ERROR_EXIT_CODE = 2
 SHORT_SHA_LENGTH = 12
 CLI_ERRORS = (GitError, InvalidRefError, NoBaseBranchError, DomainError)
-TOKEN_ENV = "BUSSOLA_TOKEN"
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -45,21 +45,67 @@ def root() -> None:
 def serve(
     repo: RepoOption = None,
     host: Annotated[str, typer.Option(help="Interface to bind")] = DEFAULT_HOST,
-    port: Annotated[int, typer.Option(help="Port to listen on")] = DEFAULT_PORT,
+    port: Annotated[int, typer.Option(help="Port to listen on", min=1, max=65535)] = DEFAULT_PORT,
     no_open: Annotated[bool, typer.Option("--no-open", help="Do not open the browser")] = False,
+    register: Annotated[bool, typer.Option("--register/--no-register", hidden=True)] = True,
 ) -> None:
     """Start the review UI."""
-    if host not in LOCAL_HOSTS:
+    host = host.removeprefix("[").removesuffix("]")
+    if not is_local_host(host):
         typer.secho(f"warning: listening on {host} exposes your repositories to other machines on the network", fg=typer.colors.YELLOW, err=True)
     identity_dir = repo or Path.cwd()
-    token = os.environ.get(TOKEN_ENV) or new_token()
-    settings = AppSettings(data_dir=default_data_dir(), identity_dir=identity_dir, token=token, allowed_hosts=allowed_hosts_for(host, port))
-    _register_if_repo(settings.data_dir, identity_dir)
-    url = f"http://{host}:{port}/?token={token}"
+    token = os.environ.pop(TOKEN_ENV, None) or new_token()
+    settings = AppSettings(
+        data_dir=default_data_dir().resolve(), identity_dir=identity_dir, token=token, allowed_hosts=allowed_hosts_for(host, port), port=port
+    )
+    if register:
+        _register_if_repo(settings.data_dir, identity_dir)
+    address = ServerAddress(host, port, token)
+    url = address.reachable().url("/")
     if not no_open:
         threading.Timer(BROWSER_OPEN_DELAY_SECONDS, webbrowser.open, args=[url]).start()
     typer.echo(f"bussola listening on {url}")
-    uvicorn.run(create_app(settings), host=host, port=port, log_level="warning")
+    run_published(create_app(settings), settings.data_dir, address)
+
+
+@app.command("open-link")
+def open_link(
+    link: Annotated[str, typer.Argument(help="A bussola:// link")],
+    data_dir: Annotated[Path | None, typer.Option("--data-dir", help="Data folder (default: BUSSOLA_DATA_DIR, then the user data folder)")] = None,
+    search_path: Annotated[str | None, typer.Option("--search-path", hidden=True)] = None,
+) -> None:
+    """Open a bussola:// link, starting the server if it is not running."""
+    data_dir = (data_dir or default_data_dir()).resolve()
+    with _cli_errors():
+        try:
+            Launcher(data_dir, search_path=search_path).open(link)
+        except Exception as error:
+            record_link_error(data_dir, link, error)
+            raise
+
+
+@app.command("install-handler")
+def install_handler() -> None:
+    """Register bussola:// links with the operating system."""
+    _apply_registration(
+        lambda handler: handler.install, "bussola:// links now open bussola", "If anything was written, run `bussola uninstall-handler` to remove it."
+    )
+
+
+@app.command("uninstall-handler")
+def uninstall_handler() -> None:
+    """Remove the bussola:// link registration."""
+    _apply_registration(lambda handler: handler.uninstall, "bussola:// links are no longer registered")
+
+
+def _apply_registration(steps: Callable[[registration.Registration], Sequence[registration.Step]], done: str, on_failure: str = "") -> None:
+    with _cli_errors():
+        handler = registration.current_registration()
+        try:
+            registration.apply(steps(handler))
+        except registration.HandlerError as error:
+            raise registration.HandlerError("\n".join(filter(None, [str(error), on_failure]))) from error
+    typer.echo(f"{done} ({handler.location})")
 
 
 @app.command()

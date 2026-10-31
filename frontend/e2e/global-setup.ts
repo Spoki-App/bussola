@@ -44,7 +44,7 @@ async function waitForServer(server: ChildProcess) {
       throw new Error(`bussola exited with code ${String(server.exitCode)}`)
     }
     try {
-      const response = await fetch(`http://127.0.0.1:${String(E2E_PORT)}/api/health`, { headers: { cookie: `bussola_token=${E2E_TOKEN}` } })
+      const response = await fetch(`http://127.0.0.1:${String(E2E_PORT)}/api/health`, { headers: { cookie: `bussola_token_${String(E2E_PORT)}=${E2E_TOKEN}` } })
       if (response.ok) {
         return
       }

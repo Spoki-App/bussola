@@ -112,6 +112,8 @@ def unit_out(view: UnitView, open_threads: int, modules: ModulePaths) -> UnitOut
         todo=status.is_todo,
         action=status.action(removed=snapshot.head_hash is None),
         open_threads=open_threads,
+        head_start=snapshot.head_start,
+        head_end=snapshot.head_end,
     )
 
 
