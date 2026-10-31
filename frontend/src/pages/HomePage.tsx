@@ -45,7 +45,7 @@ export function HomePage() {
 function AddRepositoryPrompt({ request }: { request: AddRepositoryRequest }) {
   const name = request.repository.slice(request.repository.indexOf('/') + 1)
   const { open, start } = useOpenReview()
-  const openPullRequest = () => { start(request.url, request.search) }
+  const openPullRequest = () => { start(request.url, { search: request.search }) }
   return (
     <section className="repo" aria-labelledby="add-repository-title">
       <h2 id="add-repository-title">{`Add ${request.repository}`}</h2>

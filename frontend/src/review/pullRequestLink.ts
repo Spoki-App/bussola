@@ -3,13 +3,23 @@ const ADD_REPOSITORY_PARAM = 'add_repo'
 const PULL_REQUEST_PATH = /^\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/\d+(?:\/.*)?$/
 
 const GITHUB_PREFIX = /^(?:https?:\/\/)?(?:www\.)?github\.com\//
-const COMMENT_ANCHOR = /#(?:discussion_r|r)(\d+)$/
+const COMMENT_ANCHOR = /#(?:discussion_r|r|issuecomment-)(\d+)$/
 
-export function pullRequestPathFromUrl(url: string): string {
-  const trimmed = url.trim()
+export interface PullRequestTarget {
+  url: string
+  pathname: string
+  search: string
+}
+
+export function commentAnchors(comment: string): string[] {
+  return [`#discussion_r${comment}`, `#issuecomment-${comment}`]
+}
+
+export function pullRequestTargetFromUrl(text: string): PullRequestTarget {
+  const trimmed = text.trim()
   const comment = COMMENT_ANCHOR.exec(trimmed)?.[1]
-  const path = `/github.com/${trimmed.replace(GITHUB_PREFIX, '').replace(/[?#].*$/, '')}`
-  return comment ? `${path}?${new URLSearchParams({ comment }).toString()}` : path
+  const pathname = `/github.com/${trimmed.replace(GITHUB_PREFIX, '').replace(/[?#].*$/, '')}`
+  return { url: githubUrl(pathname), pathname, search: comment ? `?${new URLSearchParams({ comment }).toString()}` : '' }
 }
 
 export function isPullRequestUrl(text: string): boolean {

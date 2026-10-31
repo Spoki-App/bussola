@@ -18,7 +18,7 @@ export function OpenPullRequestRoute({ url }: { url: string }) {
     }
     started.current = true
     const { pathname, search } = window.location
-    start(url, search, () => { navigate(addRepositoryPath(`${pathname}${search}`), { replace: true }) })
+    start(url, { search, onMissingClone: () => { navigate(addRepositoryPath(`${pathname}${search}`), { replace: true }) } })
   }, [start, url])
 
   return (

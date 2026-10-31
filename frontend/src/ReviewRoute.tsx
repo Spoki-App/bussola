@@ -33,7 +33,13 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
   const [linkFocus] = useState(() => linkFocusFromSearch(window.location.search))
   const threadsSettled = threads.data !== undefined || threads.error !== null
   const link = useMemo(
-    () => (linkFocus ? { ready: threadsSettled, resolve: (units: Unit[]) => resolveLinkFocus(linkFocus, units, threads.data ?? []) } : undefined),
+    () =>
+      linkFocus
+        ? {
+            ready: threadsSettled || (linkFocus.thread === null && linkFocus.comment === null),
+            resolve: (units: Unit[]) => resolveLinkFocus(linkFocus, units, threads.data ?? []),
+          }
+        : undefined,
     [linkFocus, threadsSettled, threads.data],
   )
 

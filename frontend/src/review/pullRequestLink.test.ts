@@ -4,7 +4,7 @@ import {
   addRepositoryPath,
   addRepositoryRequestFromSearch,
   isPullRequestUrl,
-  pullRequestPathFromUrl,
+  pullRequestTargetFromUrl,
   pullRequestRepositoryFromPath,
   pullRequestUrlFromPath,
 } from './pullRequestLink'
@@ -22,12 +22,17 @@ describe('isPullRequestUrl', () => {
   })
 })
 
-describe('pullRequestPathFromUrl', () => {
-  it('turns a pasted pull request link into the page that opens it, keeping a comment anchor', () => {
-    expect(pullRequestPathFromUrl(' https://github.com/acme/widgets/pull/7/files ')).toBe('/github.com/acme/widgets/pull/7/files')
-    expect(pullRequestPathFromUrl('www.github.com/acme/widgets/pull/7?w=1')).toBe('/github.com/acme/widgets/pull/7')
-    expect(pullRequestPathFromUrl('https://github.com/acme/widgets/pull/7#discussion_r501')).toBe('/github.com/acme/widgets/pull/7?comment=501')
-    expect(pullRequestPathFromUrl('https://github.com/acme/widgets/pull/7/files#r502')).toBe('/github.com/acme/widgets/pull/7/files?comment=502')
+describe('pullRequestTargetFromUrl', () => {
+  it('turns a pasted pull request link into its page and link, keeping a comment anchor', () => {
+    expect(pullRequestTargetFromUrl(' https://github.com/acme/widgets/pull/7/files ')).toEqual({
+      url: 'https://github.com/acme/widgets/pull/7/files',
+      pathname: '/github.com/acme/widgets/pull/7/files',
+      search: '',
+    })
+    expect(pullRequestTargetFromUrl('www.github.com/acme/widgets/pull/7?w=1').pathname).toBe('/github.com/acme/widgets/pull/7')
+    expect(pullRequestTargetFromUrl('https://github.com/acme/widgets/pull/7#discussion_r501').search).toBe('?comment=501')
+    expect(pullRequestTargetFromUrl('https://github.com/acme/widgets/pull/7/files#r502').search).toBe('?comment=502')
+    expect(pullRequestTargetFromUrl('https://github.com/acme/widgets/pull/7#issuecomment-503').search).toBe('?comment=503')
   })
 })
 

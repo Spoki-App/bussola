@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useSyncExternalStore, type RefObject } from 'react'
 
 import type { Thread, Unit } from '../api/types'
+import { commentAnchors } from './pullRequestLink'
 import { isInline } from './threadPlacement'
 
 export interface LinkFocus {
@@ -74,7 +75,7 @@ function linkedThread(focus: LinkFocus, threads: Thread[]): Thread | undefined {
   if (focus.comment === null) {
     return undefined
   }
-  const anchors = [`#discussion_r${focus.comment}`, `#issuecomment-${focus.comment}`]
+  const anchors = commentAnchors(focus.comment)
   return threads.find((thread) => thread.comments.some((comment) => anchors.some((anchor) => comment.remote_url?.endsWith(anchor))))
 }
 
