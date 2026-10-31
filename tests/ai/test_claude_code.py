@@ -75,6 +75,7 @@ def test_the_cli_runs_without_tools_with_the_schema_and_the_prompt_on_stdin(fake
 
 def test_bussola_settings_such_as_the_session_token_are_not_passed_to_the_cli(fake_claude: FakeClaude, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BUSSOLA_TOKEN", "session-secret")
+    monkeypatch.setenv("CLAUDECODE", "1")
     monkeypatch.setenv("HOME_TOOL_SETTING", "kept")
     fake_claude.answer({"type": "result", "is_error": False, "result": "{}"})
 
@@ -82,6 +83,7 @@ def test_bussola_settings_such_as_the_session_token_are_not_passed_to_the_cli(fa
 
     environment = fake_claude.call()["env"]
     assert "BUSSOLA_TOKEN" not in environment
+    assert "CLAUDECODE" not in environment
     assert environment["HOME_TOOL_SETTING"] == "kept"
     assert environment["NO_COLOR"] == "1"
 
@@ -259,6 +261,17 @@ def test_a_claude_that_disappears_is_reported(tmp_path: Path, monkeypatch: pytes
 
     with pytest.raises(AiNotConfiguredError, match="Cannot read"):
         find_claude()
+
+
+def test_a_version_check_is_not_held_up_by_a_child_keeping_the_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    helper = tmp_path / "claude"
+    helper.write_text(f"#!/bin/sh\necho '--safe-mode'\n{shutil.which('sleep')} 30 &\n")
+    helper.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    started = time.monotonic()
+
+    assert find_claude() == str(helper)
+    assert time.monotonic() - started < 5
 
 
 def test_the_provider_needs_the_claude_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

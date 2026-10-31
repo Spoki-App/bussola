@@ -4,6 +4,7 @@ import functools
 import http.client
 import ipaddress
 import json
+import math
 import socket
 import ssl
 import threading
@@ -195,9 +196,10 @@ def _decode(url: str, body: bytes) -> dict[str, Any]:
 def _retry_after(error: urllib.error.HTTPError) -> float | None:
     value = error.headers.get("retry-after") if error.headers else None
     try:
-        return max(float(value), 0.0) if value else None
+        seconds = float(value) if value else None
     except ValueError:
         return None
+    return max(seconds, 0.0) if seconds is not None and math.isfinite(seconds) else None
 
 
 def _unreachable(reason: object) -> bool:

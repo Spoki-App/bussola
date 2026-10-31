@@ -174,6 +174,16 @@ def test_a_retry_after_longer_than_the_timeout_is_not_waited_for(stub: StubServe
     assert time.monotonic() - started < 2
 
 
+@pytest.mark.parametrize("value", ["nan", "inf", "-5", "soon"])
+def test_an_odd_retry_after_falls_back_to_the_normal_pause(stub: StubServer, value: str) -> None:
+    stub.reply({"error": {"message": "busy"}}, status=503, headers={"Retry-After": value})
+
+    with pytest.raises(AiProviderError, match="HTTP 503"):
+        OpenAiCompatibleProvider("gpt", stub.url, None, 5.0).complete(REQUEST, Cancellation())
+
+    assert len(stub.requests) == MAX_ATTEMPTS
+
+
 def test_a_client_error_is_not_asked_again(stub: StubServer) -> None:
     stub.reply({"error": {"message": "bad request"}}, status=400)
 

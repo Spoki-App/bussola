@@ -21,6 +21,14 @@ export function AiActionButton({ repoId, label, title, disabled = false, onRun }
   const starting = useRef(false)
   const [notice, setNotice] = useState<string | null>(null)
   const ai = status.data
+  if (status.isError && ai === undefined) {
+    const reason = `Could not check the AI provider: ${describeError(status.error)}`
+    return (
+      <button type="button" title={reason} disabled>
+        {label}
+      </button>
+    )
+  }
   if (ai === undefined || (!ai.configured && ai.problem === null)) {
     return null
   }

@@ -66,6 +66,20 @@ describe('AiActionButton', () => {
     expect(screen.queryByRole('button', { name: 'Describe' })).toBeNull()
   })
 
+  it('is disabled with the reason when the status cannot be read', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(Response.json({ detail: 'Repository 3 not found' }, { status: 404 }))))
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <AiActionButton repoId={3} label="Describe" onRun={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    const button = await screen.findByRole('button', { name: 'Describe' })
+
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('title', 'Could not check the AI provider: Repository 3 not found')
+  })
+
   it('is disabled with the reason when the repository configuration is invalid', async () => {
     renderButton({ ...LOCAL, configured: false, provider: null, label: null, target: null, problem: 'Invalid configuration in /repo/.bussola.toml' })
 

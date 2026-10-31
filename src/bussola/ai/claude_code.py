@@ -23,6 +23,8 @@ REQUIRED_FLAG = "--safe-mode"
 READER_NAME = "bussola-claude-output"
 HELP_TIMEOUT_SECONDS = 15.0
 FAILED_CHECK_SECONDS = 60.0
+FINISH_WAIT_SECONDS = 5.0
+NESTED_SESSION_ENV = "CLAUDECODE"
 READ_CHUNK_BYTES = 64 * 1024
 EXIT_POLL_SECONDS = 0.05
 
@@ -48,39 +50,43 @@ class _VersionCheck:
     checked_at: float
 
 
-_version_checks: dict[tuple[str, float], _VersionCheck] = {}
+_version_checks: dict[str, tuple[float, _VersionCheck]] = {}
+_version_lock = threading.Lock()
 
 
 def _version_problem(executable: str, modified: float) -> str | None:
-    key = (executable, modified)
-    cached = _version_checks.get(key)
-    if cached is not None and (cached.lasting or time.monotonic() - cached.checked_at < FAILED_CHECK_SECONDS):
-        return cached.problem
-    problem, lasting = _check_version(executable)
-    _version_checks[key] = _VersionCheck(problem, lasting, time.monotonic())
-    return problem
+    with _version_lock:
+        cached_modified, cached = _version_checks.get(executable, (None, None))
+        if cached is not None and cached_modified == modified and (cached.lasting or time.monotonic() - cached.checked_at < FAILED_CHECK_SECONDS):
+            return cached.problem
+        problem, lasting = _check_version(executable)
+        _version_checks[executable] = (modified, _VersionCheck(problem, lasting, time.monotonic()))
+        return problem
 
 
 def _check_version(executable: str) -> tuple[str | None, bool]:
-    try:
-        process = subprocess.Popen(
-            [executable, "--help"],
-            cwd=tempfile.gettempdir(),
-            env=_claude_environment(),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
-    except OSError as error:
-        return f"Cannot run claude --help: {error}", False
-    try:
-        output, _ = process.communicate(timeout=HELP_TIMEOUT_SECONDS)
-    except subprocess.TimeoutExpired:
-        _kill_group(process)
-        process.wait()
-        return f"claude --help did not answer within {HELP_TIMEOUT_SECONDS:g} seconds", False
-    if REQUIRED_FLAG in output.decode(errors="replace"):
+    with tempfile.TemporaryFile() as output:
+        try:
+            process = subprocess.Popen(
+                [executable, "--help"],
+                cwd=tempfile.gettempdir(),
+                env=_claude_environment(),
+                stdin=subprocess.DEVNULL,
+                stdout=output,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except OSError as error:
+            return f"Cannot run claude --help: {error}", False
+        try:
+            process.wait(timeout=HELP_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            _kill_group(process)
+            process.wait()
+            return f"claude --help did not answer within {HELP_TIMEOUT_SECONDS:g} seconds", False
+        output.seek(0)
+        help_text = output.read().decode(errors="replace")
+    if REQUIRED_FLAG in help_text:
         return None, True
     return f"This version of Claude Code has no {REQUIRED_FLAG}. Update it with claude update.", True
 
@@ -150,7 +156,7 @@ class ClaudeCodeProvider:
 
 
 def _claude_environment() -> dict[str, str]:
-    inherited = {name: value for name, value in os.environ.items() if not name.startswith(PRIVATE_ENV_PREFIX)}
+    inherited = {name: value for name, value in os.environ.items() if not name.startswith(PRIVATE_ENV_PREFIX) and name != NESTED_SESSION_ENV}
     return {**inherited, **CLAUDE_ENV}
 
 
@@ -158,8 +164,17 @@ class _ClaudeSession:
     def __init__(self, process: subprocess.Popen[bytes]) -> None:
         self._process = process
         self._lock = threading.Lock()
+        self._started = threading.Event()
+        self._exchanged = threading.Event()
 
     def exchange(self, prompt: str) -> tuple[int, str, str]:
+        self._started.set()
+        try:
+            return self._exchange(prompt)
+        finally:
+            self._exchanged.set()
+
+    def _exchange(self, prompt: str) -> tuple[int, str, str]:
         stdout, stderr = _Collector(self._process.stdout), _Collector(self._process.stderr)
         self._send(prompt)
         self._wait_for_exit()
@@ -175,6 +190,8 @@ class _ClaudeSession:
 
     def finish(self) -> None:
         self._stop_group()
+        if self._started.is_set():
+            self._exchanged.wait(FINISH_WAIT_SECONDS)
         self._reap()
 
     def _send(self, prompt: str) -> None:
