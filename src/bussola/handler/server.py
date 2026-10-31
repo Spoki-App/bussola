@@ -36,6 +36,7 @@ HEALTH_PATH = "/api/health"
 HEALTH_TIMEOUT_SECONDS = 2.0
 START_TIMEOUT_SECONDS = 30.0
 EXIT_GRACE_SECONDS = 1.0
+SILENT_GRACE_SECONDS = 5.0
 FREE_PORT_ATTEMPTS = 3
 NOTHING_TO_SKIP: frozenset["ServerAddress"] = frozenset()
 MAX_PROBE_BODY = 512
@@ -252,6 +253,7 @@ class Launcher:
     sleep: Callable[[float], object] = time.sleep
     timeout: float = START_TIMEOUT_SECONDS
     exit_grace: float = EXIT_GRACE_SECONDS
+    silent_grace: float = SILENT_GRACE_SECONDS
     port_free: Callable[[str, int], bool] = port_is_free
 
     def open(self, link: str) -> str:
@@ -287,7 +289,7 @@ class Launcher:
         return states
 
     def _wait_for_silent(self, pool: ThreadPoolExecutor, silent: list[ServerAddress]) -> ServerAddress | None:
-        deadline = time.monotonic() + self.timeout
+        deadline = time.monotonic() + min(self.timeout, self.silent_grace)
         while silent and time.monotonic() < deadline:
             self.sleep(POLL_INTERVAL_SECONDS)
             states = dict(zip(silent, pool.map(self.probe, silent), strict=True))

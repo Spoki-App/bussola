@@ -302,6 +302,28 @@ def test_open_waits_for_a_local_server_that_is_busy_instead_of_starting_another(
     assert servers.started == []
 
 
+def test_open_waits_only_a_short_grace_for_a_silent_server(tmp_path: Path) -> None:
+    hung = ServerAddress("127.0.0.1", 9000, "hung")
+    publish_server(tmp_path, hung)
+    servers = FakeServers()
+    servers.busy[hung] = 10**6
+    launcher = Launcher(
+        tmp_path,
+        start=servers.start,
+        probe=servers.probe,
+        open_browser=servers.open_browser,
+        sleep=lambda _seconds: None,
+        timeout=60,
+        silent_grace=0,
+        port_free=servers.port_free,
+    )
+
+    url = launcher.open("bussola://")
+
+    [started] = servers.started
+    assert url == f"http://127.0.0.1:8765/?token={started.token}"
+
+
 def test_open_forgets_a_silent_server_as_soon_as_it_turns_out_closed(tmp_path: Path) -> None:
     gone = ServerAddress("127.0.0.1", 9000, "gone")
     publish_server(tmp_path, gone)
