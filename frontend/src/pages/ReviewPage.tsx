@@ -161,6 +161,9 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   }
 
   const [seenLinkKey, setSeenLinkKey] = useState<string | null>(null)
+  if (link === undefined && seenLinkKey !== null) {
+    setSeenLinkKey(null)
+  }
   const linkIsNew = link !== undefined && link.key !== seenLinkKey
   if (linkIsNew) {
     setSeenLinkKey(link.key)
@@ -189,11 +192,12 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     if (appliedLink === null) {
       return undefined
     }
-    if (appliedLink.unitId !== null) {
-      actions.current.get(appliedLink.unitId)?.reveal()
-    }
     linkScroll.start(appliedLink)
-    return followLink(linkScroll)
+    const stop = followLink(linkScroll)
+    return () => {
+      stop()
+      linkScroll.done()
+    }
   }, [appliedLink, linkScroll])
 
   const focusUnit = useCallback((unitId: number) => {

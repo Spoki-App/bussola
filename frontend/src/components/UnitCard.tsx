@@ -14,7 +14,6 @@ import { UnitDiffView, type GutterSide } from './UnitDiffView'
 export interface UnitActions {
   toggleApproval: () => void
   comment: () => void
-  reveal: () => void
 }
 
 export interface CommentTarget {
@@ -54,7 +53,12 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [anchor, setAnchor] = useState<string | null>(null)
   const diff = useUnitDiff(reviewId, unit, mode, expanded)
-  const linkedRef = useLinkedScroll<HTMLElement>(unitElementId(unit.id), unit.id, expanded && !diff.isPending)
+  const { ref: linkedRef, pending: linked } = useLinkedScroll<HTMLElement>(unitElementId(unit.id), unit.id, expanded && !diff.isPending)
+  const [wasLinked, setWasLinked] = useState(false)
+  if (linked !== wasLinked) {
+    setWasLinked(linked)
+    setExpanded(expanded || linked)
+  }
   const approve = useApprove(reviewId)
   const revoke = useRevoke(reviewId)
   const revokeSelections = useRevokeSelections(reviewId)
@@ -103,7 +107,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
   }
 
   useEffect(() => {
-    register(unit.id, { toggleApproval, comment: commentOnFirstChange, reveal: () => { setExpanded(true) } })
+    register(unit.id, { toggleApproval, comment: commentOnFirstChange })
     return () => {
       register(unit.id, null)
     }

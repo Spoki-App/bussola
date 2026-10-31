@@ -1,6 +1,6 @@
-const PULL_REQUEST_URL = /^(?:https?:\/\/)?(?:www\.)?github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+(?:[/?#].*)?$/
+const PULL_REQUEST_URL = /^(?:https?:\/\/)?(?:www\.)?github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d{1,18}(?:[/?#].*)?$/
 const ADD_REPOSITORY_PARAM = 'add_repo'
-const PULL_REQUEST_PATH = /^\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/\d+(?:\/.*)?$/
+const PULL_REQUEST_PATH = /^\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/\d{1,18}(?:\/.*)?$/
 
 const GITHUB_PREFIX = /^(?:https?:\/\/)?(?:www\.)?github\.com\//
 const COMMENT_ANCHOR = /#(?:discussion_r|r|issuecomment-)(\d+)$/

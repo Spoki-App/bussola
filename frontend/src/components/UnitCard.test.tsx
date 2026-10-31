@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Unit, UnitState } from '../api/types'
 import { LinkScrollContext, createLinkScroll } from '../review/linkFocus'
-import { UnitCard, type UnitActions } from './UnitCard'
+import { UnitCard } from './UnitCard'
 
 function unit(state: UnitState, overrides: Partial<Unit> = {}): Unit {
   return {
@@ -60,29 +60,26 @@ describe('UnitCard', () => {
     expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('registers a reveal action that opens a collapsed unit', () => {
+  it('opens itself when a link points at it or at one of its threads', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
-    const registered = new Map<number, UnitActions>()
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <UnitCard
-          reviewId={1}
-          unit={unit('approved')}
-          focused={false}
-          onFocus={() => undefined}
-          register={(unitId, actions) => {
-            if (actions) {
-              registered.set(unitId, actions)
-            }
-          }}
-        />
-      </QueryClientProvider>,
-    )
-    expect(disclosure()).toHaveAttribute('aria-expanded', 'false')
+    Element.prototype.scrollIntoView = () => undefined
+    for (const elementId of ['unit-1', 'thread-t']) {
+      const link = createLinkScroll()
+      const view = render(
+        <QueryClientProvider client={new QueryClient()}>
+          <LinkScrollContext value={link}>
+            <UnitCard reviewId={1} unit={unit('approved')} focused={false} onFocus={() => undefined} register={() => undefined} />
+          </LinkScrollContext>
+        </QueryClientProvider>,
+      )
+      expect(disclosure()).toHaveAttribute('aria-expanded', 'false')
 
-    act(() => { registered.get(1)?.reveal() })
+      act(() => { link.start({ unitId: 1, elementId }) })
 
-    expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
+      expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
+      view.unmount()
+    }
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
   })
 
   it('ends a link to the unit even when its diff cannot be loaded', async () => {

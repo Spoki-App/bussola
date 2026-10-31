@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LinkScrollContext, createLinkScroll, followLink, useLinkedScroll, type LinkScroll } from './linkFocus'
 
 function Linked({ id, unitId = null, settled = false, children }: { id: string; unitId?: number | null; settled?: boolean; children?: ReactNode }) {
-  const ref = useLinkedScroll<HTMLDivElement>(id, unitId, settled)
+  const { ref } = useLinkedScroll<HTMLDivElement>(id, unitId, settled)
   return (
     <div id={id} ref={ref}>
       {children}

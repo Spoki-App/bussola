@@ -18,7 +18,7 @@ interface Props {
 
 export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
   const resolved = thread.resolvable && thread.status === 'resolved'
-  const linkedRef = useLinkedScroll<HTMLDivElement>(threadElementId(thread.id))
+  const { ref: linkedRef } = useLinkedScroll<HTMLDivElement>(threadElementId(thread.id))
   const [collapsed, setCollapsed] = useState(resolved)
   const reply = useReply(reviewId)
   const setStatus = useSetThreadStatus(reviewId)

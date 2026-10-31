@@ -237,7 +237,12 @@ export function followLink(link: LinkScroll): () => void {
   return stop
 }
 
-export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId: number | null = null, settled = false): RefObject<T | null> {
+export interface LinkedScroll<T extends HTMLElement> {
+  ref: RefObject<T | null>
+  pending: boolean
+}
+
+export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId: number | null = null, settled = false): LinkedScroll<T> {
   const link = useContext(LinkScrollContext)
   const ref = useRef<T>(null)
   const role = useSyncExternalStore(link?.subscribe ?? noLink, () => linkRole(link?.current() ?? null, elementId, unitId, settled))
@@ -255,5 +260,5 @@ export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId
       link.reached()
     }
   }, [link, role, elementId, unitId, settled])
-  return ref
+  return { ref, pending: role === 'approach' || role === 'holder' }
 }
