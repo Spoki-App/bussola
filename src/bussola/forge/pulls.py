@@ -100,7 +100,7 @@ def list_pull_requests(store: Store, adapter: ForgeAdapter, git_repo: GitRepo, r
     remote = github_remote(adapter, git_repo)
     if remote is None or not status.authenticated:
         return PullRequestList(status, remote.repository if remote else None)
-    reviews = {link.pr_number: link.review_id for link in store.forge.links_for_repo(repo.id) if link.repository == remote.repository}
+    reviews = {link.pr_number: link.review_id for link in store.forge.links_for_repo(repo.id) if same_repository(link.repository, remote.repository)}
     pulls = [PullRequestRow(pull, reviews.get(pull.number)) for pull in adapter.open_pull_requests(remote.repository)]
     return PullRequestList(status, remote.repository, pulls)
 
@@ -168,9 +168,13 @@ def require_remote(adapter: ForgeAdapter, git_repo: GitRepo, repository: str | N
     return remote
 
 
+def same_repository(first: str, second: str) -> bool:
+    return first.lower() == second.lower()
+
+
 def existing_review(store: Store, repo: Repo, repository: str, number: int) -> Review | None:
     links = store.forge.links_for_repo(repo.id)
-    link = next((link for link in links if link.repository.lower() == repository.lower() and link.pr_number == number), None)
+    link = next((link for link in links if same_repository(link.repository, repository) and link.pr_number == number), None)
     return store.reviews.get_review(link.review_id) if link else None
 
 

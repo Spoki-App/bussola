@@ -5,6 +5,7 @@ import pytest
 
 from bussola.forge.base import Conversation, ForgeError
 from bussola.forge.github import GitHubAdapter
+from bussola.git import GitError
 from tests.apiclient import ApiClient
 from tests.forge.conftest import FIRST, SECOND, GitHubSandbox
 from tests.gitrepo import GitFixture
@@ -155,6 +156,32 @@ def test_a_pull_request_link_to_a_review_opens_it_even_when_github_cannot_be_rea
 
     assert open_link(api, "https://github.com/Acme/Widgets/pull/7")["id"] == review["id"]
     open_link(api, "https://github.com/acme/widgets/pull/8", 502)
+
+
+def test_a_failed_first_open_leaves_no_half_made_review(api: ApiClient, github: GitHubSandbox, monkeypatch: pytest.MonkeyPatch) -> None:
+    github.open_pull_request({"app.py": FIRST})
+    repo = register(api)
+
+    def import_fails(*_args: object) -> int:
+        raise ForgeError("GitHub went away mid sync")
+
+    monkeypatch.setattr("bussola.forge.pulls.import_conversation", import_fails)
+
+    open_link(api, "https://github.com/acme/widgets/pull/7", 502)
+    assert api.call("GET", f"/repos/{repo}/reviews") == []
+
+
+def test_a_local_git_failure_on_an_existing_review_is_reported(api: ApiClient, github: GitHubSandbox, monkeypatch: pytest.MonkeyPatch) -> None:
+    github.open_pull_request({"app.py": FIRST})
+    register(api)
+    open_link(api, "https://github.com/acme/widgets/pull/7")
+
+    def refresh_fails(*_args: object, **_options: object) -> None:
+        raise GitError(["merge-base"], "no merge base")
+
+    monkeypatch.setattr("bussola.forge.pulls.refresh_review", refresh_fails)
+
+    assert "no merge base" in open_link(api, "https://github.com/acme/widgets/pull/7", 400)["detail"]
 
 
 def test_a_pull_request_link_finds_and_adds_a_clone_under_home(api: ApiClient, github: GitHubSandbox, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
