@@ -119,7 +119,7 @@ def test_linux_handler_keeps_the_path_of_the_install(tmp_path: Path) -> None:
     handler = registration_for("linux", tmp_path, {"PATH": "/home/me/.local/bin:/usr/bin"}, PYTHON)
     install = next(step for step in handler.install if isinstance(step, WriteFile))
 
-    assert f"Exec=env PATH=/home/me/.local/bin:/usr/bin {PYTHON} -P -m bussola open-link -- %u\n" in install.content
+    assert f"Exec={PYTHON} -P -m bussola open-link --search-path /home/me/.local/bin:/usr/bin -- %u\n" in install.content
 
 
 def test_linux_follows_xdg_data_and_config_home(tmp_path: Path) -> None:
@@ -217,10 +217,19 @@ def test_applescript_passes_the_link_as_one_quoted_argument() -> None:
 
 def test_macos_handler_keeps_the_path_of_the_install(tmp_path: Path) -> None:
     handler = registration_for("darwin", tmp_path, {"PATH": "/opt/homebrew/bin:/usr/bin"}, PYTHON)
-    script = applescript(HANDLER, "/opt/homebrew/bin:/usr/bin")
+    compile_step = next(step for step in handler.install if isinstance(step, RunCommand) and step.argv[0] == "osacompile")
 
-    assert any(isinstance(step, RunCommand) and step.argv[0] == "osacompile" and script[1] in step.argv for step in handler.install)
-    assert script[1].startswith(f'do shell script "PATH=/opt/homebrew/bin:/usr/bin {PYTHON} -P -m bussola open-link -- "')
+    assert f'do shell script "{PYTHON} -P -m bussola open-link --search-path /opt/homebrew/bin:/usr/bin -- " & quoted form of linkURL' in " ".join(
+        compile_step.argv
+    )
+
+
+def test_a_python_path_with_an_equals_sign_still_runs(tmp_path: Path) -> None:
+    python = "/home/u/proj=v2/.venv/bin/python"
+    handler = registration_for("linux", tmp_path, {"PATH": "/usr/bin"}, python)
+    install = next(step for step in handler.install if isinstance(step, WriteFile))
+
+    assert "Exec=/home/u/proj=v2/.venv/bin/python -P -m bussola" in install.content
 
 
 def test_windows_writes_the_url_protocol_keys_under_hkcu(tmp_path: Path) -> None:

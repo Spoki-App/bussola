@@ -138,15 +138,17 @@ def current_registration() -> Registration:
 
 def registration_for(system: str, home: Path, environ: Mapping[str, str], executable: str) -> Registration:
     data_dir = environ.get(DATA_DIR_ENV)
-    options = ("--data-dir", str(Path(data_dir).resolve())) if data_dir else ()
+    search_path = environ.get("PATH") if system != "win32" else None
+    options = (
+        *(("--data-dir", str(Path(data_dir).resolve())) if data_dir else ()),
+        *(("--search-path", search_path) if search_path else ()),
+    )
     command = (*handler_command(system, executable), *options, END_OF_OPTIONS)
     if system.startswith("linux"):
         applications_dir = xdg_applications_dir(home, environ)
-        search_path = environ.get("PATH", "")
-        with_path = ("env", f"PATH={search_path}", *command) if search_path else command
-        return linux_registration(with_path, applications_dir, (xdg_mimeapps_file(home, environ), applications_dir / MIMEAPPS_FILE))
+        return linux_registration(command, applications_dir, (xdg_mimeapps_file(home, environ), applications_dir / MIMEAPPS_FILE))
     if system == "darwin":
-        return macos_registration(command, home / "Applications", environ.get("PATH", ""))
+        return macos_registration(command, home / "Applications")
     if system == "win32":
         return windows_registration(command)
     raise HandlerError(f"Registering {SCHEME}:// links is not supported on {system}")
@@ -203,10 +205,10 @@ def desktop_entry(command: Sequence[str]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def macos_registration(command: Sequence[str], applications_dir: Path, search_path: str) -> Registration:
+def macos_registration(command: Sequence[str], applications_dir: Path) -> Registration:
     app = applications_dir / MAC_APP
     staged = applications_dir / MAC_STAGED_APP
-    script = [argument for line in applescript(command, search_path) for argument in ("-e", line)]
+    script = [argument for line in applescript(command) for argument in ("-e", line)]
     return Registration(
         location=str(app),
         install=(
@@ -223,9 +225,8 @@ def macos_registration(command: Sequence[str], applications_dir: Path, search_pa
     )
 
 
-def applescript(command: Sequence[str], search_path: str = "") -> list[str]:
-    environment = f"PATH={shlex.quote(search_path)} " if search_path else ""
-    shell_command = _applescript_string(f"{environment}{shlex.join(command)} ")
+def applescript(command: Sequence[str]) -> list[str]:
+    shell_command = _applescript_string(f"{shlex.join(command)} ")
     background = _applescript_string(" > /dev/null 2>&1 &")
     return [
         "on run",

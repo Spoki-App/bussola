@@ -11,7 +11,7 @@ import sys
 import tempfile
 import time
 import webbrowser
-from collections.abc import Callable, Set
+from collections.abc import Callable, Mapping, Set
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -102,10 +102,13 @@ def withdraw_server(data_dir: Path, address: ServerAddress) -> None:
         path.rename(claimed)
     except FileNotFoundError:
         return
-    if _read_address(claimed) == address or path.exists():
+    try:
+        if _read_address(claimed) != address:
+            os.link(claimed, path)
+    except OSError:
+        pass
+    finally:
         claimed.unlink(missing_ok=True)
-    else:
-        claimed.rename(path)
 
 
 def published_servers(data_dir: Path) -> list[ServerAddress]:
@@ -225,11 +228,11 @@ class Process(Protocol):
     def poll(self) -> int | None: ...
 
 
-def start_server(address: ServerAddress, data_dir: Path) -> Process:
+def start_server(address: ServerAddress, environment: Mapping[str, str]) -> Process:
     command = [sys.executable, *BUSSOLA_MODULE, "serve", "--no-open", "--no-register", "--host", address.host, "--port", str(address.port)]
     return subprocess.Popen(
         command,
-        env={**os.environ, TOKEN_ENV: address.token, DATA_DIR_ENV: str(data_dir)},
+        env={**os.environ, **environment, TOKEN_ENV: address.token},
         cwd=Path.home(),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
@@ -247,7 +250,7 @@ def _detached() -> dict[str, Any]:
 @dataclass(frozen=True)
 class Launcher:
     data_dir: Path
-    start: Callable[[ServerAddress, Path], Process] = start_server
+    start: Callable[[ServerAddress, Mapping[str, str]], Process] = start_server
     probe: Callable[[ServerAddress], Probe] = probe_server
     open_browser: Callable[[str], bool] = webbrowser.open
     sleep: Callable[[float], object] = time.sleep
@@ -255,6 +258,7 @@ class Launcher:
     exit_grace: float = EXIT_GRACE_SECONDS
     silent_grace: float = SILENT_GRACE_SECONDS
     port_free: Callable[[str, int], bool] = port_is_free
+    search_path: str | None = None
 
     def open(self, link: str) -> str:
         path = browser_path(parse_link(link))
@@ -272,11 +276,14 @@ class Launcher:
                 return found
             for port in (DEFAULT_PORT, *[None] * FREE_PORT_ATTEMPTS):
                 address = ServerAddress(DEFAULT_HOST, port or free_port(DEFAULT_HOST), new_token())
-                process = self.start(address, self.data_dir) if self.port_free(address.host, address.port) else None
+                process = self.start(address, self._server_environment()) if self.port_free(address.host, address.port) else None
                 found = self._wait_for_server(pool, address, process)
                 if found is not None:
                     return found
         raise ServerStartError("bussola did not start. Run `bussola serve` to see why.")
+
+    def _server_environment(self) -> dict[str, str]:
+        return {DATA_DIR_ENV: str(self.data_dir), **({"PATH": self.search_path} if self.search_path else {})}
 
     def _probe_all(self, pool: ThreadPoolExecutor, *extra: ServerAddress, skip: Set[ServerAddress] = NOTHING_TO_SKIP) -> dict[ServerAddress, Probe]:
         published = [address for address in published_servers(self.data_dir) if address not in skip]

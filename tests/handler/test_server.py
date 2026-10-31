@@ -6,7 +6,7 @@ import subprocess
 import sys
 import threading
 import time
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Mapping
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -52,7 +52,7 @@ class FakeServers:
         self.opened: list[str] = []
         self.busy: dict[ServerAddress, int] = {}
 
-    def start(self, address: ServerAddress, _data_dir: Path) -> FakeProcess:
+    def start(self, address: ServerAddress, _environment: Mapping[str, str]) -> FakeProcess:
         self.started.append(address)
         if address.port == self.taken_port:
             return FakeProcess(1)
@@ -176,10 +176,10 @@ def test_open_finds_a_server_published_while_it_waits(tmp_path: Path) -> None:
     other = ServerAddress("127.0.0.1", 9000, TOKEN)
     servers = FakeServers(comes_up=False)
 
-    def start(address: ServerAddress, data_dir: Path) -> FakeProcess:
+    def start(address: ServerAddress, environment: Mapping[str, str]) -> FakeProcess:
         publish_server(tmp_path, other)
         servers.healthy.add(other)
-        return servers.start(address, data_dir)
+        return servers.start(address, environment)
 
     launcher = Launcher(tmp_path, start=start, probe=servers.probe, open_browser=servers.open_browser, sleep=lambda _seconds: None, timeout=0)
 
@@ -211,11 +211,11 @@ def test_open_tries_another_free_port_if_the_first_one_is_taken_meanwhile(tmp_pa
     monkeypatch.setattr("bussola.handler.server.free_port", next_port)
     servers = FakeServers(taken_port=8765)
 
-    def start(address: ServerAddress, data_dir: Path) -> FakeProcess:
+    def start(address: ServerAddress, environment: Mapping[str, str]) -> FakeProcess:
         if address.port == 20001:
             servers.started.append(address)
             return FakeProcess(1)
-        return servers.start(address, data_dir)
+        return servers.start(address, environment)
 
     launcher = Launcher(
         tmp_path, start=start, probe=servers.probe, open_browser=servers.open_browser, sleep=lambda _seconds: None, timeout=60, port_free=servers.port_free
@@ -526,13 +526,29 @@ def test_start_server_runs_serve_detached_with_the_token(monkeypatch: pytest.Mon
 
     monkeypatch.setattr("subprocess.Popen", popen)
 
-    start_server(ServerAddress("127.0.0.1", 8765, TOKEN), Path("/data/bussola"))
+    start_server(ServerAddress("127.0.0.1", 8765, TOKEN), {"BUSSOLA_DATA_DIR": "/data/bussola", "PATH": "/opt/bin"})
 
     [(command, options)] = calls
     assert command == [sys.executable, "-P", "-m", "bussola", "serve", "--no-open", "--no-register", "--host", "127.0.0.1", "--port", "8765"]
     assert options["env"]["BUSSOLA_TOKEN"] == TOKEN
-    assert options["env"]["BUSSOLA_DATA_DIR"] == str(Path("/data/bussola"))
+    assert options["env"]["BUSSOLA_DATA_DIR"] == "/data/bussola"
+    assert options["env"]["PATH"] == "/opt/bin"
     assert options["stdin"] == options["stdout"] == options["stderr"] == subprocess.DEVNULL
+
+
+def test_launcher_passes_its_data_dir_and_search_path_to_the_server(tmp_path: Path) -> None:
+    environments: list[Mapping[str, str]] = []
+    servers = FakeServers()
+
+    def start(address: ServerAddress, environment: Mapping[str, str]) -> FakeProcess:
+        environments.append(environment)
+        return servers.start(address, environment)
+
+    Launcher(tmp_path, start=start, probe=servers.probe, open_browser=servers.open_browser, port_free=servers.port_free, search_path="/opt/bin").open(
+        "bussola://"
+    )
+
+    assert environments == [{"BUSSOLA_DATA_DIR": str(tmp_path), "PATH": "/opt/bin"}]
 
 
 def serve_http(answer: Callable[[BaseHTTPRequestHandler], None]) -> ThreadingHTTPServer:

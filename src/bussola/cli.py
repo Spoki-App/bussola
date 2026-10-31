@@ -70,12 +70,13 @@ def serve(
 def open_link(
     link: Annotated[str, typer.Argument(help="A bussola:// link")],
     data_dir: Annotated[Path | None, typer.Option("--data-dir", help="Data folder (default: BUSSOLA_DATA_DIR, then the user data folder)")] = None,
+    search_path: Annotated[str | None, typer.Option("--search-path", hidden=True)] = None,
 ) -> None:
     """Open a bussola:// link, starting the server if it is not running."""
     data_dir = (data_dir or default_data_dir()).resolve()
     with _cli_errors():
         try:
-            Launcher(data_dir).open(link)
+            Launcher(data_dir, search_path=search_path).open(link)
         except Exception as error:
             record_link_error(data_dir, link, error)
             raise
