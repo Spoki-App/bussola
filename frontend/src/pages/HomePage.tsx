@@ -41,7 +41,7 @@ export function HomePage() {
 }
 
 function AddRepositoryPrompt({ request }: { request: AddRepositoryRequest }) {
-  const name = request.repository.split('/').at(-1) ?? request.repository
+  const name = request.repository.slice(request.repository.indexOf('/') + 1)
   return (
     <section className="repo" aria-labelledby="add-repository-title">
       <h2 id="add-repository-title">{`Add ${request.repository}`}</h2>

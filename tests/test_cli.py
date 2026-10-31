@@ -116,6 +116,30 @@ def test_open_link_refuses_invalid_links_before_looking_for_the_server_and_logs_
     assert "'bussola://review?repo=acme/widgets': The pr parameter must be a positive number" in log
 
 
+def test_open_link_uses_the_data_dir_it_is_given(tmp_path: Path) -> None:
+    other = tmp_path / "other"
+
+    result = runner.invoke(app, ["open-link", "--data-dir", str(other), "bussola://review?repo=acme/widgets"])
+
+    assert result.exit_code == 2
+    assert (other / "open-link.log").is_file()
+
+
+@pytest.mark.usefixtures("data_dir")
+def test_serve_exits_quietly_on_ctrl_c(git_repo: GitFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    git_repo.commit({"a.txt": "a\n"})
+
+    def interrupted(_self: server.PublishedServer) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(server.PublishedServer, "run", interrupted)
+
+    result = runner.invoke(app, ["serve", "--no-open", "--repo", str(git_repo.root)])
+
+    assert result.exit_code == 0, result.output
+    assert "Aborted" not in result.output
+
+
 def test_open_link_logs_unexpected_failures_too(data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     def fail(_launcher: server.Launcher, _link: str) -> str:
         raise FileNotFoundError("python is gone")

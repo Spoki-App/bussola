@@ -211,6 +211,13 @@ def test_windows_writes_the_url_protocol_keys_under_hkcu(tmp_path: Path) -> None
     assert handler.uninstall == (RunCommand(("reg", "delete", "HKCU\\Software\\Classes\\bussola", "/f"), required=False),)
 
 
+def test_handler_keeps_the_data_dir_it_was_installed_with(tmp_path: Path) -> None:
+    handler = registration_for("linux", tmp_path, {"BUSSOLA_DATA_DIR": "/srv/bussola data"}, PYTHON)
+    install = next(step for step in handler.install if isinstance(step, WriteFile))
+
+    assert f'Exec={PYTHON} -m bussola open-link --data-dir "/srv/bussola data" %u\n' in install.content
+
+
 def test_handler_command_uses_the_current_python() -> None:
     assert handler_command("linux", PYTHON) == COMMAND
     assert handler_command("win32", "C:/missing/python.exe") == ("C:/missing/python.exe", "-m", "bussola", "open-link")

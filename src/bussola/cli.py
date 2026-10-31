@@ -66,9 +66,12 @@ def serve(
 
 
 @app.command("open-link")
-def open_link(link: Annotated[str, typer.Argument(help="A bussola:// link")]) -> None:
+def open_link(
+    link: Annotated[str, typer.Argument(help="A bussola:// link")],
+    data_dir: Annotated[Path | None, typer.Option("--data-dir", help="Data folder (default: BUSSOLA_DATA_DIR, then the user data folder)")] = None,
+) -> None:
     """Open a bussola:// link, starting the server if it is not running."""
-    data_dir = default_data_dir()
+    data_dir = data_dir or default_data_dir()
     with _cli_errors():
         try:
             Launcher(data_dir).open(link)

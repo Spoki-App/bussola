@@ -12,6 +12,7 @@ from typing import Any
 
 from bussola.errors import DomainError
 from bussola.handler.links import SCHEME
+from bussola.storage.database import DATA_DIR_ENV
 
 DISPLAY_NAME = "bussola"
 BUNDLE_ID = "io.github.spoki-app.bussola"
@@ -88,7 +89,8 @@ def current_registration() -> Registration:
 
 
 def registration_for(system: str, home: Path, environ: Mapping[str, str], executable: str) -> Registration:
-    command = handler_command(system, executable)
+    data_dir = environ.get(DATA_DIR_ENV)
+    command = (*handler_command(system, executable), *(("--data-dir", data_dir) if data_dir else ()))
     if system.startswith("linux"):
         return linux_registration(command, xdg_applications_dir(home, environ), xdg_mimeapps_file(home, environ))
     if system == "darwin":

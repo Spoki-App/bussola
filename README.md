@@ -141,7 +141,7 @@ If bussola is not running, the link starts `bussola serve --no-open` in the back
 - **Linux:** writes `bussola-url-handler.desktop` to `~/.local/share/applications` (or `$XDG_DATA_HOME/applications`) and makes it the default for `x-scheme-handler/bussola` with `xdg-mime`.
 - **Windows:** writes the `HKCU\Software\Classes\bussola` registry keys for the current user.
 
-The handler runs the Python that ran `install-handler`, so run it again after reinstalling bussola somewhere else. `bussola uninstall-handler` removes the registration, and on Linux also the `x-scheme-handler/bussola` default that `xdg-mime` wrote to `mimeapps.list`.
+The handler runs the Python that ran `install-handler`, and keeps the `BUSSOLA_DATA_DIR` it was run with, so run it again after reinstalling bussola somewhere else or moving your data. `bussola uninstall-handler` removes the registration, and on Linux also the `x-scheme-handler/bussola` default that `xdg-mime` wrote to `mimeapps.list`.
 
 ### Sending comments to GitHub
 
@@ -181,7 +181,7 @@ The server is meant for one person on one machine.
 
 - **Network:** it listens on `127.0.0.1` by default and warns if you pass another `--host`.
 - **Session token:** every API call needs the session token cookie (HttpOnly, SameSite=Strict).
-- **Host check:** requests whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` are rejected, which blocks DNS rebinding.
+- **Host check:** requests whose `Host` header is not `127.0.0.1:<port>`, `localhost:<port>`, `[::1]:<port>` or the `--host` you passed are rejected, which blocks DNS rebinding.
 - **Git refs and files:** refs are validated with `git rev-parse --verify --end-of-options` before use. File contents are read only from the git object database.
 - **bussola:// links:** a link only chooses what to open. Its parameters are validated (repository name, numbers, a relative file path, a thread id), anything else in it is ignored, and no link approves, resolves, sends or deletes anything.
 - **Opening links:** GitHub links are opened by the server in your default browser, as a new tab, so they work even when the bussola page runs in an app-style window. The server only opens `https://github.com` addresses.
