@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable, Hashable, Sequence
 from dataclasses import dataclass, field
 
@@ -12,6 +13,7 @@ from bussola.ai.base import (
 )
 
 SAME_ERRORS_IN_A_ROW_TO_STOP = 2
+logger = logging.getLogger(__name__)
 STOPPING_ERRORS = (AiNotConfiguredError, AiTargetChangedError, AiUnreachableError, AiRejectedError)
 
 
@@ -49,6 +51,8 @@ def run_batch[K: Hashable, T](
             outcome.cancelled = True
             break
         except Exception as error:
+            if not isinstance(error, AiError):
+                logger.exception("AI batch item %r failed", item)
             message = str(error) or type(error).__name__
             outcome.errors[item] = message
             failed += 1

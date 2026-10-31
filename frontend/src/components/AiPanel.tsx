@@ -5,11 +5,8 @@ import { ErrorNote } from './Badges'
 
 export function AiPanel() {
   const status = useAiStatus()
-  if (status.error) {
-    return <ErrorNote message={describeError(status.error)} />
-  }
   if (status.data === undefined) {
-    return <p className="muted">Loading...</p>
+    return status.error ? <ErrorNote message={describeError(status.error)} /> : <p className="muted">Loading...</p>
   }
   return status.data.configured ? <ActiveProvider ai={status.data} /> : <NoProvider ai={status.data} />
 }

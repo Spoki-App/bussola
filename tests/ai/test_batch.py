@@ -1,3 +1,5 @@
+import pytest
+
 from bussola.ai.base import (
     AiCancelledError,
     AiNotConfiguredError,
@@ -28,7 +30,7 @@ def test_a_batch_reports_progress_and_keeps_errors_per_item() -> None:
     assert progress == [BatchProgress(1, 0, 3), BatchProgress(2, 1, 3), BatchProgress(3, 1, 3)]
 
 
-def test_an_unexpected_error_stops_the_batch_and_keeps_earlier_results() -> None:
+def test_an_unexpected_error_stops_the_batch_and_keeps_earlier_results(caplog: pytest.LogCaptureFixture) -> None:
     def work(item: int) -> int:
         if item == 2:
             raise KeyError("missing")
@@ -40,6 +42,8 @@ def test_an_unexpected_error_stops_the_batch_and_keeps_earlier_results() -> None
     assert outcome.errors == {2: "'missing'"}
     assert outcome.stopped_by == "'missing'"
     assert not outcome.cancelled
+    assert "AI batch item 2 failed" in caplog.text
+    assert "KeyError" in caplog.text
 
 
 def test_a_cancelled_batch_keeps_the_results_already_produced() -> None:

@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import re
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
@@ -26,7 +27,7 @@ UNSUPPORTED_KEYWORDS = frozenset(
         "uniqueItems",
     }
 )
-CODE_FENCE = re.compile(r"^```[\w-]*\s*(?P<body>.*?)\s*```$", re.DOTALL)
+CODE_FENCE = re.compile(r"```[\w-]*\s*(?P<body>.*?)\s*```", re.DOTALL)
 REPORTED_ERRORS = 3
 
 
@@ -89,15 +90,16 @@ class AiRunner:
             return None
 
 
+@functools.cache
 def output_schema(output: type[BaseModel]) -> dict[str, Any]:
     return _portable(output.model_json_schema())
 
 
 def parse_output[T: BaseModel](text: str, output: type[T]) -> T:
     stripped = text.strip()
-    fenced = CODE_FENCE.match(stripped)
+    fenced = CODE_FENCE.search(stripped)
     try:
-        return output.model_validate_json(fenced.group("body") if fenced else stripped)
+        return output.model_validate_json(fenced.group("body") if fenced and not stripped.startswith("{") else stripped)
     except ValidationError as error:
         raise AiOutputError(f"The model's answer does not match the expected format: {describe_validation_error(error, REPORTED_ERRORS)}") from error
 
