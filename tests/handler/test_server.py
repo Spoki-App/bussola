@@ -68,7 +68,7 @@ def test_address_url_carries_the_token_after_the_link_query() -> None:
 
 def test_address_of_a_server_listening_everywhere_is_reached_on_localhost() -> None:
     assert ServerAddress(str(ipaddress.ip_address(0)), 9000, TOKEN).reachable() == ServerAddress("127.0.0.1", 9000, TOKEN)
-    assert ServerAddress("::", 9000, TOKEN).reachable() == ServerAddress("127.0.0.1", 9000, TOKEN)
+    assert ServerAddress("::", 9000, TOKEN).reachable() == ServerAddress("::1", 9000, TOKEN)
     assert ServerAddress("localhost", 9000, TOKEN).reachable() == ServerAddress("localhost", 9000, TOKEN)
     assert ServerAddress("::1", 9000, TOKEN).url("/") == f"http://[::1]:9000/?token={TOKEN}"
 
@@ -81,7 +81,7 @@ def test_published_server_is_private_and_withdrawn_only_by_its_owner(tmp_path: P
 
     assert published_servers(tmp_path) == [address]
     if sys.platform != "win32":
-        assert stat.S_IMODE((tmp_path / "servers/8765.json").stat().st_mode) == 0o600
+        assert stat.S_IMODE((tmp_path / "servers/127.0.0.1-8765.json").stat().st_mode) == 0o600
     withdraw_server(tmp_path, address)
     assert published_servers(tmp_path) == []
 
@@ -98,9 +98,22 @@ def test_servers_on_different_ports_are_all_published_default_port_first(tmp_pat
     assert published_servers(tmp_path) == [default]
 
 
+def test_servers_on_the_same_port_but_other_hosts_keep_their_own_files(tmp_path: Path) -> None:
+    local = ServerAddress("127.0.0.1", 8765, TOKEN)
+    lan = ServerAddress("192.168.1.5", 8765, "lan")
+    ipv6 = ServerAddress("::1", 8765, "ipv6")
+    for address in (local, lan, ipv6):
+        publish_server(tmp_path, address)
+
+    withdraw_server(tmp_path, lan)
+
+    assert sorted(published_servers(tmp_path), key=lambda address: address.host) == [local, ipv6]
+    assert sorted(path.name for path in (tmp_path / "servers").iterdir()) == ["127.0.0.1-8765.json", "__1-8765.json"]
+
+
 def test_unreadable_server_files_are_skipped(tmp_path: Path) -> None:
     (tmp_path / "servers").mkdir()
-    (tmp_path / "servers/8765.json").write_text('{"host": "127.0.0.1"}')
+    (tmp_path / "servers/127.0.0.1-8765.json").write_text('{"host": "127.0.0.1"}')
 
     assert published_servers(tmp_path) == []
 

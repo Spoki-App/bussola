@@ -37,6 +37,11 @@ def test_foreign_host_header_is_forbidden_even_with_token(client: TestClient) ->
     assert response.status_code == 403
 
 
+def test_ipv6_hosts_are_allowed_as_browsers_send_them() -> None:
+    assert "[::1]:8765" in allowed_hosts_for("::1", 8765)
+    assert "127.0.0.1:8765" in allowed_hosts_for("::1", 8765)
+
+
 def test_localhost_with_the_right_port_is_allowed(client: TestClient) -> None:
     client.cookies.set(TOKEN_COOKIE, TOKEN)
 

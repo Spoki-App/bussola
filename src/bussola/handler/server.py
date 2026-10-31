@@ -2,6 +2,7 @@ import contextlib
 import http.client
 import ipaddress
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -30,6 +31,8 @@ HEALTH_PATH = "/api/health"
 HEALTH_TIMEOUT_SECONDS = 2.0
 START_TIMEOUT_SECONDS = 30.0
 EXIT_GRACE_SECONDS = 5.0
+IPV6_LOOPBACK = "::1"
+UNSAFE_FILE_CHARACTERS = re.compile(r"[^A-Za-z0-9.-]")
 POLL_INTERVAL_SECONDS = 0.25
 
 
@@ -49,7 +52,9 @@ class ServerAddress:
         return f"http://{host}:{self.port}{path}{separator}{urlencode({TOKEN_QUERY: self.token})}"
 
     def reachable(self) -> "ServerAddress":
-        return ServerAddress(DEFAULT_HOST, self.port, self.token) if _listens_everywhere(self.host) else self
+        if not _listens_everywhere(self.host):
+            return self
+        return ServerAddress(IPV6_LOOPBACK if ":" in self.host else DEFAULT_HOST, self.port, self.token)
 
 
 SERVER_ADDRESS = TypeAdapter(ServerAddress)
@@ -62,8 +67,8 @@ def _listens_everywhere(host: str) -> bool:
         return not host
 
 
-def server_file(data_dir: Path, port: int) -> Path:
-    return data_dir / SERVERS_DIR / f"{port}.json"
+def server_file(data_dir: Path, address: ServerAddress) -> Path:
+    return data_dir / SERVERS_DIR / f"{UNSAFE_FILE_CHARACTERS.sub('_', address.host)}-{address.port}.json"
 
 
 def publish_server(data_dir: Path, address: ServerAddress) -> None:
@@ -72,11 +77,11 @@ def publish_server(data_dir: Path, address: ServerAddress) -> None:
     descriptor, temporary = tempfile.mkstemp(dir=folder, suffix=".tmp")
     with os.fdopen(descriptor, "w", encoding="utf-8") as file:
         file.write(SERVER_ADDRESS.dump_json(address).decode())
-    Path(temporary).replace(server_file(data_dir, address.port))
+    Path(temporary).replace(server_file(data_dir, address))
 
 
 def withdraw_server(data_dir: Path, address: ServerAddress) -> None:
-    path = server_file(data_dir, address.port)
+    path = server_file(data_dir, address)
     if _read_address(path) == address:
         path.unlink(missing_ok=True)
 
