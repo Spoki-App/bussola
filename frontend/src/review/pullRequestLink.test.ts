@@ -43,6 +43,7 @@ describe('add repository request', () => {
       search: '?path=src%2Fapp.py&line=4',
     })
     expect(addRepositoryRequestFromSearch(addRepositoryPath('/github.com/acme/widgets/pull/7').slice(1))?.search).toBe('')
+    expect(addRepositoryRequestFromSearch(addRepositoryPath('/github.com/acme/widgets/pull/7?line=4#top').slice(1))?.search).toBe('?line=4')
   })
 
   it('refuses anything but a pull request page to open next', () => {

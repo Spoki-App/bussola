@@ -29,9 +29,11 @@ export function addRepositoryPath(then: string): string {
 }
 
 export function addRepositoryRequestFromSearch(search: string): AddRepositoryRequest | null {
-  const then = new URLSearchParams(search).get(ADD_REPOSITORY_PARAM) ?? ''
-  const queryStart = then.includes('?') ? then.indexOf('?') : then.length
-  const pathname = then.slice(0, queryStart)
-  const repository = pullRequestRepositoryFromPath(pathname)
-  return repository === null ? null : { repository, url: githubUrl(pathname), search: then.slice(queryStart) }
+  const then = new URLSearchParams(search).get(ADD_REPOSITORY_PARAM)
+  if (then === null) {
+    return null
+  }
+  const { origin, pathname, search: focus } = new URL(then, window.location.origin)
+  const repository = origin === window.location.origin ? pullRequestRepositoryFromPath(pathname) : null
+  return repository === null ? null : { repository, url: githubUrl(pathname), search: focus }
 }
