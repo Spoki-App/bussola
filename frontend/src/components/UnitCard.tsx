@@ -53,11 +53,9 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [anchor, setAnchor] = useState<string | null>(null)
   const diff = useUnitDiff(reviewId, unit, mode, expanded)
-  const { ref: linkedRef, pending: linked } = useLinkedScroll<HTMLElement>(unitElementId(unit.id), unit.id, expanded && !diff.isPending)
-  const [wasLinked, setWasLinked] = useState(false)
-  if (linked !== wasLinked) {
-    setWasLinked(linked)
-    setExpanded(expanded || linked)
+  const { ref: linkedRef, linked } = useLinkedScroll<HTMLElement>(unitElementId(unit.id), unit.id, expanded && !diff.isPending)
+  if (linked && !expanded) {
+    setExpanded(true)
   }
   const approve = useApprove(reviewId)
   const revoke = useRevoke(reviewId)

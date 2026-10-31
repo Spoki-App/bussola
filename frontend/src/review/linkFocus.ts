@@ -238,7 +238,7 @@ export function followLink(link: LinkScroll): () => void {
 
 export interface LinkedScroll<T extends HTMLElement> {
   ref: RefObject<T | null>
-  pending: boolean
+  linked: boolean
 }
 
 export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId: number | null = null, settled = false): LinkedScroll<T> {
@@ -259,5 +259,5 @@ export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId
       link.reached()
     }
   }, [link, role, elementId, unitId, settled])
-  return { ref, pending: role === 'approach' || role === 'holder' }
+  return { ref, linked: role !== null }
 }
