@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import urlencode
 
 import uvicorn
@@ -78,7 +78,7 @@ def is_healthy(address: ServerAddress) -> bool:
     try:
         connection.request("GET", HEALTH_PATH, headers={"Cookie": f"{TOKEN_COOKIE}={address.token}"})
         return connection.getresponse().status == HTTPStatus.OK
-    except OSError:
+    except (OSError, http.client.HTTPException):
         return False
     finally:
         connection.close()
@@ -115,9 +115,13 @@ def run_published(app: Any, data_dir: Path, address: ServerAddress) -> None:
     PublishedServer(uvicorn.Config(app, host=address.host, port=address.port, log_level="warning"), data_dir, address).run()
 
 
-def start_server(address: ServerAddress) -> None:
+class Process(Protocol):
+    def poll(self) -> int | None: ...
+
+
+def start_server(address: ServerAddress) -> Process:
     command = [sys.executable, "-m", "bussola", "serve", "--no-open", "--no-register", "--host", address.host, "--port", str(address.port)]
-    subprocess.Popen(
+    return subprocess.Popen(
         command,
         env={**os.environ, TOKEN_ENV: address.token},
         cwd=Path.home(),
@@ -137,7 +141,7 @@ def _detached() -> dict[str, Any]:
 @dataclass(frozen=True)
 class Launcher:
     data_dir: Path
-    start: Callable[[ServerAddress], object] = start_server
+    start: Callable[[ServerAddress], Process] = start_server
     healthy: Callable[[ServerAddress], bool] = is_healthy
     open_browser: Callable[[str], object] = webbrowser.open
     sleep: Callable[[float], object] = time.sleep
@@ -154,18 +158,19 @@ class Launcher:
         if running is not None and self.healthy(running):
             return running
         address = ServerAddress(DEFAULT_HOST, DEFAULT_PORT, new_token())
-        self.start(address)
-        found = self._wait_for_server(address)
+        found = self._wait_for_server(address, self.start(address))
         if found is None:
-            raise ServerStartError(f"bussola did not start on {address.host}:{address.port}. Run `bussola serve` to see why.")
+            raise ServerStartError(
+                f"bussola did not start on {address.host}:{address.port}. Another program may be using that port. Run `bussola serve` to see why."
+            )
         return found
 
-    def _wait_for_server(self, started: ServerAddress) -> ServerAddress | None:
+    def _wait_for_server(self, started: ServerAddress, process: Process) -> ServerAddress | None:
         deadline = time.monotonic() + self.timeout
         while True:
             published = published_server(self.data_dir)
             candidates = [started] if published in (None, started) else [started, published]
             found = next((candidate for candidate in candidates if self.healthy(candidate)), None)
-            if found is not None or time.monotonic() >= deadline:
+            if found is not None or process.poll() is not None or time.monotonic() >= deadline:
                 return found
             self.sleep(POLL_INTERVAL_SECONDS)

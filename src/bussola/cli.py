@@ -53,7 +53,7 @@ def serve(
     if host not in LOCAL_HOSTS:
         typer.secho(f"warning: listening on {host} exposes your repositories to other machines on the network", fg=typer.colors.YELLOW, err=True)
     identity_dir = repo or Path.cwd()
-    token = os.environ.get(TOKEN_ENV) or new_token()
+    token = os.environ.pop(TOKEN_ENV, None) or new_token()
     settings = AppSettings(data_dir=default_data_dir(), identity_dir=identity_dir, token=token, allowed_hosts=allowed_hosts_for(host, port))
     if register:
         _register_if_repo(settings.data_dir, identity_dir)
@@ -72,7 +72,7 @@ def open_link(link: Annotated[str, typer.Argument(help="A bussola:// link")]) ->
     with _cli_errors():
         try:
             Launcher(data_dir).open(link)
-        except DomainError as error:
+        except Exception as error:
             record_link_error(data_dir, link, error)
             raise
 

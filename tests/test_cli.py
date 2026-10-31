@@ -1,3 +1,4 @@
+import os
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -115,6 +116,18 @@ def test_open_link_refuses_invalid_links_before_looking_for_the_server_and_logs_
     assert "'bussola://review?repo=acme/widgets': The pr parameter must be a positive number" in log
 
 
+def test_open_link_logs_unexpected_failures_too(data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail(_launcher: server.Launcher, _link: str) -> str:
+        raise FileNotFoundError("python is gone")
+
+    monkeypatch.setattr(server.Launcher, "open", fail)
+
+    result = runner.invoke(app, ["open-link", "bussola://"])
+
+    assert result.exit_code != 0
+    assert "'bussola://': python is gone" in (data_dir / "open-link.log").read_text()
+
+
 def test_serve_registers_the_folder_unless_told_not_to(git_repo: GitFixture, data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     git_repo.commit({"a.txt": "a\n"})
     published: list[server.ServerAddress] = []
@@ -128,6 +141,8 @@ def test_serve_registers_the_folder_unless_told_not_to(git_repo: GitFixture, dat
 
     skipped = runner.invoke(app, ["serve", "--no-open", "--no-register", "--port", "9123", "--repo", str(git_repo.root)])
     assert repos.call("GET", "/repos") == []
+    assert "BUSSOLA_TOKEN" not in os.environ
+    monkeypatch.setenv("BUSSOLA_TOKEN", "fixed-token")
     registered = runner.invoke(app, ["serve", "--no-open", "--port", "9123", "--repo", str(git_repo.root)])
 
     assert skipped.exit_code == registered.exit_code == 0, skipped.output + registered.output

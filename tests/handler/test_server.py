@@ -29,17 +29,27 @@ from bussola.handler.server import (
 TOKEN = "secret-token"
 
 
+class FakeProcess:
+    def __init__(self, exit_code: int | None) -> None:
+        self.exit_code = exit_code
+
+    def poll(self) -> int | None:
+        return self.exit_code
+
+
 class FakeServers:
-    def __init__(self, healthy: set[ServerAddress] | None = None, comes_up: bool = True) -> None:
+    def __init__(self, healthy: set[ServerAddress] | None = None, comes_up: bool = True, exit_code: int | None = None) -> None:
         self.healthy = healthy or set()
         self.comes_up = comes_up
+        self.exit_code = exit_code
         self.started: list[ServerAddress] = []
         self.opened: list[str] = []
 
-    def start(self, address: ServerAddress) -> None:
+    def start(self, address: ServerAddress) -> FakeProcess:
         self.started.append(address)
         if self.comes_up:
             self.healthy.add(address)
+        return FakeProcess(self.exit_code)
 
     def is_healthy(self, address: ServerAddress) -> bool:
         return address in self.healthy
@@ -113,10 +123,10 @@ def test_open_finds_a_server_published_while_it_waits(tmp_path: Path) -> None:
     other = ServerAddress("127.0.0.1", 9000, TOKEN)
     servers = FakeServers(comes_up=False)
 
-    def start(address: ServerAddress) -> None:
-        servers.start(address)
+    def start(address: ServerAddress) -> FakeProcess:
         claim_server(tmp_path, other, healthy=lambda _address: False)
         servers.healthy.add(other)
+        return servers.start(address)
 
     launcher = Launcher(tmp_path, start=start, healthy=servers.is_healthy, open_browser=servers.opened.append, sleep=lambda _seconds: None, timeout=0)
 
@@ -130,6 +140,17 @@ def test_open_reports_a_server_that_does_not_come_up(tmp_path: Path) -> None:
         servers.launcher(tmp_path).open("bussola://")
 
     assert servers.opened == []
+
+
+def test_open_stops_waiting_as_soon_as_the_started_server_exits(tmp_path: Path) -> None:
+    servers = FakeServers(comes_up=False, exit_code=1)
+    naps: list[float] = []
+    launcher = Launcher(tmp_path, start=servers.start, healthy=servers.is_healthy, open_browser=servers.opened.append, sleep=naps.append, timeout=60)
+
+    with pytest.raises(ServerStartError, match="Another program may be using that port"):
+        launcher.open("bussola://")
+
+    assert naps == []
 
 
 def test_invalid_links_neither_start_the_server_nor_open_the_browser(tmp_path: Path) -> None:
@@ -218,6 +239,25 @@ def health_server() -> Generator[ServerAddress]:
 def test_health_check_needs_the_server_token(health_server: ServerAddress) -> None:
     assert is_healthy(health_server)
     assert not is_healthy(ServerAddress(health_server.host, health_server.port, "wrong"))
+
+
+def test_health_check_of_a_port_that_does_not_speak_http_fails() -> None:
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+
+        def answer_garbage() -> None:
+            connection, _ = listener.accept()
+            with connection:
+                connection.recv(1024)
+                connection.sendall(b"not http\r\n\r\n")
+
+        thread = threading.Thread(target=answer_garbage)
+        thread.start()
+        healthy = is_healthy(ServerAddress("127.0.0.1", listener.getsockname()[1], TOKEN))
+        thread.join(5)
+
+    assert not healthy
 
 
 def test_health_check_of_a_closed_port_fails() -> None:
