@@ -49,6 +49,7 @@ class FakeServers:
         self.taken_port = taken_port
         self.started: list[ServerAddress] = []
         self.opened: list[str] = []
+        self.busy: dict[ServerAddress, int] = {}
 
     def start(self, address: ServerAddress, _data_dir: Path) -> FakeProcess:
         self.started.append(address)
@@ -58,14 +59,21 @@ class FakeServers:
             self.healthy.add(address)
         return FakeProcess(self.exit_code)
 
+    def open_browser(self, url: str) -> bool:
+        self.opened.append(url)
+        return True
+
     def probe(self, address: ServerAddress) -> Probe:
+        if self.busy.get(address, 0) > 0:
+            self.busy[address] -= 1
+            return Probe.UNKNOWN
         if address in self.healthy:
             return Probe.READY
         listening = {(running.host, running.port) for running in self.healthy}
         return Probe.OTHER_BUSSOLA if (address.host, address.port) in listening else Probe.CLOSED
 
     def launcher(self, data_dir: Path, *, sleep: Callable[[float], object] = lambda _seconds: None, timeout: float = 0, exit_grace: float = 0) -> Launcher:
-        return Launcher(data_dir, start=self.start, probe=self.probe, open_browser=self.opened.append, sleep=sleep, timeout=timeout, exit_grace=exit_grace)
+        return Launcher(data_dir, start=self.start, probe=self.probe, open_browser=self.open_browser, sleep=sleep, timeout=timeout, exit_grace=exit_grace)
 
 
 def test_address_url_carries_the_token_after_the_link_query() -> None:
@@ -160,7 +168,7 @@ def test_open_finds_a_server_published_while_it_waits(tmp_path: Path) -> None:
         servers.healthy.add(other)
         return servers.start(address, data_dir)
 
-    launcher = Launcher(tmp_path, start=start, probe=servers.probe, open_browser=servers.opened.append, sleep=lambda _seconds: None, timeout=0)
+    launcher = Launcher(tmp_path, start=start, probe=servers.probe, open_browser=servers.open_browser, sleep=lambda _seconds: None, timeout=0)
 
     assert launcher.open("bussola://") == f"http://127.0.0.1:9000/?token={TOKEN}"
 
@@ -202,6 +210,51 @@ def test_open_does_not_start_a_second_server_while_the_first_is_still_starting(t
         servers.launcher(tmp_path).open("bussola://")
 
     assert len(servers.started) == 1
+
+
+def test_open_waits_for_a_local_server_that_is_busy_instead_of_starting_another(tmp_path: Path) -> None:
+    running = ServerAddress("127.0.0.1", 8765, TOKEN)
+    publish_server(tmp_path, running)
+    servers = FakeServers({running})
+    servers.busy[running] = 3
+
+    url = servers.launcher(tmp_path, timeout=60).open("bussola://")
+
+    assert url == f"http://127.0.0.1:8765/?token={TOKEN}"
+    assert servers.started == []
+
+
+def test_open_reports_a_local_server_that_never_answers(tmp_path: Path) -> None:
+    running = ServerAddress("127.0.0.1", 8765, TOKEN)
+    publish_server(tmp_path, running)
+    servers = FakeServers({running})
+    servers.busy[running] = 10**6
+
+    with pytest.raises(ServerStartError, match="not answering"):
+        servers.launcher(tmp_path, timeout=0).open("bussola://")
+
+    assert servers.started == []
+
+
+def test_open_ignores_a_silent_server_on_another_host(tmp_path: Path) -> None:
+    lan = ServerAddress("192.168.1.5", 8765, "lan")
+    publish_server(tmp_path, lan)
+    servers = FakeServers()
+    servers.busy[lan] = 10**6
+
+    url = servers.launcher(tmp_path).open("bussola://")
+
+    [started] = servers.started
+    assert url == f"http://127.0.0.1:8765/?token={started.token}"
+
+
+def test_open_reports_a_browser_that_cannot_be_opened(tmp_path: Path) -> None:
+    running = ServerAddress("127.0.0.1", 8765, TOKEN)
+    publish_server(tmp_path, running)
+    launcher = Launcher(tmp_path, probe=FakeServers({running}).probe, open_browser=lambda _url: False)
+
+    with pytest.raises(ServerStartError, match="no browser could be opened"):
+        launcher.open("bussola://")
 
 
 def test_open_works_when_a_stale_server_file_cannot_be_removed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -278,6 +331,23 @@ def test_published_server_announces_itself_only_while_it_listens(tmp_path: Path)
 
     instance.should_exit = True
     thread.join(10)
+    assert published_servers(tmp_path) == []
+
+
+def test_a_server_on_port_0_publishes_the_port_it_got(tmp_path: Path) -> None:
+    address = ServerAddress("127.0.0.1", 0, TOKEN)
+    instance = PublishedServer(uvicorn.Config(FastAPI(), host=address.host, port=0, log_level="warning"), tmp_path, address)
+    thread = threading.Thread(target=instance.run)
+    thread.start()
+    deadline = time.monotonic() + 10
+    while not published_servers(tmp_path) and time.monotonic() < deadline:
+        time.sleep(0.05)
+
+    [published] = published_servers(tmp_path)
+    instance.should_exit = True
+    thread.join(10)
+
+    assert published.port != 0
     assert published_servers(tmp_path) == []
 
 

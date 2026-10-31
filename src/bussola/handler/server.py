@@ -139,6 +139,13 @@ def _refuses_the_token(body: bytes) -> bool:
         return False
 
 
+def _is_loopback(host: str) -> bool:
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host == "localhost"
+
+
 def free_port(host: str) -> int:
     with socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET) as probe:
         probe.bind((host, 0))
@@ -160,6 +167,9 @@ class PublishedServer(uvicorn.Server):
 
     async def startup(self, sockets: list[socket.socket] | None = None) -> None:
         await super().startup(sockets)
+        listening = [sock.getsockname()[1] for server in self.servers for sock in server.sockets]
+        if listening:
+            self.address = ServerAddress(self.address.host, listening[0], self.address.token)
         try:
             publish_server(self.data_dir, self.address)
         except OSError as error:
@@ -205,7 +215,7 @@ class Launcher:
     data_dir: Path
     start: Callable[[ServerAddress, Path], Process] = start_server
     probe: Callable[[ServerAddress], Probe] = probe_server
-    open_browser: Callable[[str], object] = webbrowser.open
+    open_browser: Callable[[str], bool] = webbrowser.open
     sleep: Callable[[float], object] = time.sleep
     timeout: float = START_TIMEOUT_SECONDS
     exit_grace: float = EXIT_GRACE_SECONDS
@@ -213,14 +223,19 @@ class Launcher:
     def open(self, link: str) -> str:
         path = browser_path(parse_link(link))
         url = self.ensure_server().url(path)
-        self.open_browser(url)
+        if not self.open_browser(url):
+            raise ServerStartError("bussola is running, but no browser could be opened. Open bussola from the link `bussola serve` prints.")
         return url
 
     def ensure_server(self) -> ServerAddress:
         with ThreadPoolExecutor() as pool:
-            running = self._first_ready(self._probe_all(pool))
+            states = self._probe_all(pool)
+            running = self._first_ready(states)
             if running is not None:
                 return running
+            busy = [address for address, state in states.items() if state == Probe.UNKNOWN and _is_loopback(address.host)]
+            if busy:
+                return self._wait_for_busy(pool, busy)
             for port in (DEFAULT_PORT, None):
                 address = ServerAddress(DEFAULT_HOST, port or free_port(DEFAULT_HOST), new_token())
                 found = self._wait_for_server(pool, address, self.start(address, self.data_dir))
@@ -229,7 +244,7 @@ class Launcher:
         raise ServerStartError("bussola did not start. Run `bussola serve` to see why.")
 
     def _probe_all(self, pool: ThreadPoolExecutor, *extra: ServerAddress) -> dict[ServerAddress, Probe]:
-        published = published_servers(self.data_dir)
+        published = [address for address in published_servers(self.data_dir) if _is_loopback(address.host) or not extra]
         candidates = list(dict.fromkeys([*extra, *published]))
         states = dict(zip(candidates, pool.map(self.probe, candidates), strict=True))
         for candidate in published:
@@ -237,6 +252,15 @@ class Launcher:
                 with contextlib.suppress(OSError):
                     withdraw_server(self.data_dir, candidate)
         return states
+
+    def _wait_for_busy(self, pool: ThreadPoolExecutor, busy: list[ServerAddress]) -> ServerAddress:
+        deadline = time.monotonic() + self.timeout
+        while time.monotonic() < deadline:
+            self.sleep(POLL_INTERVAL_SECONDS)
+            found = self._first_ready(dict(zip(busy, pool.map(self.probe, busy), strict=True)))
+            if found is not None:
+                return found
+        raise ServerStartError(f"bussola on {host_port(busy[0].host, busy[0].port)} is not answering. Open the link again in a moment.")
 
     def _first_ready(self, states: dict[ServerAddress, Probe]) -> ServerAddress | None:
         return next((candidate for candidate, state in states.items() if state == Probe.READY), None)
