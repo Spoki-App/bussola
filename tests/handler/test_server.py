@@ -5,7 +5,7 @@ import subprocess
 import sys
 import threading
 import time
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -17,10 +17,11 @@ from fastapi import FastAPI
 from bussola.errors import InvalidRequestError
 from bussola.handler.server import (
     Launcher,
+    Probe,
     PublishedServer,
     ServerAddress,
     ServerStartError,
-    is_healthy,
+    probe_server,
     publish_server,
     published_servers,
     start_server,
@@ -52,11 +53,14 @@ class FakeServers:
             self.healthy.add(address)
         return FakeProcess(self.exit_code)
 
-    def is_healthy(self, address: ServerAddress) -> bool:
-        return address in self.healthy
+    def probe(self, address: ServerAddress) -> Probe:
+        if address in self.healthy:
+            return Probe.READY
+        listening = {(running.host, running.port) for running in self.healthy}
+        return Probe.OTHER_BUSSOLA if (address.host, address.port) in listening else Probe.CLOSED
 
-    def launcher(self, data_dir: Path) -> Launcher:
-        return Launcher(data_dir, start=self.start, healthy=self.is_healthy, open_browser=self.opened.append, sleep=lambda _seconds: None, timeout=0)
+    def launcher(self, data_dir: Path, *, sleep: Callable[[float], object] = lambda _seconds: None, timeout: float = 0, exit_grace: float = 0) -> Launcher:
+        return Launcher(data_dir, start=self.start, probe=self.probe, open_browser=self.opened.append, sleep=sleep, timeout=timeout, exit_grace=exit_grace)
 
 
 def test_address_url_carries_the_token_after_the_link_query() -> None:
@@ -151,22 +155,35 @@ def test_open_finds_a_server_published_while_it_waits(tmp_path: Path) -> None:
         servers.healthy.add(other)
         return servers.start(address)
 
-    launcher = Launcher(tmp_path, start=start, healthy=servers.is_healthy, open_browser=servers.opened.append, sleep=lambda _seconds: None, timeout=0)
+    launcher = Launcher(tmp_path, start=start, probe=servers.probe, open_browser=servers.opened.append, sleep=lambda _seconds: None, timeout=0)
 
     assert launcher.open("bussola://") == f"http://127.0.0.1:9000/?token={TOKEN}"
 
 
-def test_open_still_finds_a_server_that_another_link_started_when_its_own_exits(tmp_path: Path) -> None:
+def test_open_keeps_waiting_while_another_bussola_holds_the_port_and_starts(tmp_path: Path) -> None:
     winner = ServerAddress("127.0.0.1", 8765, "winner")
-    servers = FakeServers(comes_up=False, exit_code=1)
+    servers = FakeServers({winner}, comes_up=False, exit_code=1)
+    naps: list[float] = []
 
-    def winner_comes_up(_seconds: float) -> None:
-        publish_server(tmp_path, winner)
-        servers.healthy.add(winner)
+    def winner_publishes_late(seconds: float) -> None:
+        naps.append(seconds)
+        if len(naps) == 3:
+            publish_server(tmp_path, winner)
 
-    launcher = Launcher(tmp_path, start=servers.start, healthy=servers.is_healthy, open_browser=servers.opened.append, sleep=winner_comes_up, timeout=60)
+    launcher = servers.launcher(tmp_path, sleep=winner_publishes_late, timeout=60, exit_grace=0)
 
     assert launcher.open("bussola://") == "http://127.0.0.1:8765/?token=winner"
+    assert len(naps) == 3
+
+
+def test_open_forgets_server_files_whose_port_is_closed(tmp_path: Path) -> None:
+    gone = ServerAddress("127.0.0.1", 9000, "gone")
+    publish_server(tmp_path, gone)
+    servers = FakeServers()
+
+    servers.launcher(tmp_path).open("bussola://")
+
+    assert published_servers(tmp_path) == []
 
 
 def test_open_reports_a_server_that_does_not_come_up(tmp_path: Path) -> None:
@@ -181,9 +198,7 @@ def test_open_reports_a_server_that_does_not_come_up(tmp_path: Path) -> None:
 def test_open_stops_waiting_as_soon_as_the_started_server_exits(tmp_path: Path) -> None:
     servers = FakeServers(comes_up=False, exit_code=1)
     naps: list[float] = []
-    launcher = Launcher(
-        tmp_path, start=servers.start, healthy=servers.is_healthy, open_browser=servers.opened.append, sleep=naps.append, timeout=60, exit_grace=0
-    )
+    launcher = servers.launcher(tmp_path, sleep=naps.append, timeout=60)
 
     with pytest.raises(ServerStartError, match="Another program may be using that port"):
         launcher.open("bussola://")
@@ -239,6 +254,23 @@ def test_a_server_that_cannot_listen_leaves_the_published_one_alone(tmp_path: Pa
     assert published_servers(tmp_path) == [running]
 
 
+def test_a_server_that_cannot_publish_still_serves(tmp_path: Path) -> None:
+    (tmp_path / "servers").write_text("a file, not a folder")
+    address = ServerAddress("127.0.0.1", free_port(), TOKEN)
+    instance = PublishedServer(uvicorn.Config(FastAPI(), host=address.host, port=address.port, log_level="critical"), tmp_path, address)
+    thread = threading.Thread(target=instance.run)
+    thread.start()
+    deadline = time.monotonic() + 10
+    while not instance.started and time.monotonic() < deadline:
+        time.sleep(0.05)
+
+    assert instance.started
+
+    instance.should_exit = True
+    thread.join(10)
+    assert not thread.is_alive()
+
+
 def test_start_server_runs_serve_detached_with_the_token(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[list[str], dict[str, Any]]] = []
 
@@ -274,12 +306,12 @@ def health_server() -> Generator[ServerAddress]:
     httpd.server_close()
 
 
-def test_health_check_needs_the_server_token(health_server: ServerAddress) -> None:
-    assert is_healthy(health_server)
-    assert not is_healthy(ServerAddress(health_server.host, health_server.port, "wrong"))
+def test_probe_needs_the_server_token_to_call_it_ready(health_server: ServerAddress) -> None:
+    assert probe_server(health_server) == Probe.READY
+    assert probe_server(ServerAddress(health_server.host, health_server.port, "wrong")) == Probe.OTHER_BUSSOLA
 
 
-def test_health_check_of_a_port_that_does_not_speak_http_fails() -> None:
+def test_probe_of_a_port_that_does_not_speak_http_is_unknown() -> None:
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         listener.listen()
@@ -292,14 +324,14 @@ def test_health_check_of_a_port_that_does_not_speak_http_fails() -> None:
 
         thread = threading.Thread(target=answer_garbage)
         thread.start()
-        healthy = is_healthy(ServerAddress("127.0.0.1", listener.getsockname()[1], TOKEN))
+        state = probe_server(ServerAddress("127.0.0.1", listener.getsockname()[1], TOKEN))
         thread.join(5)
 
-    assert not healthy
+    assert state == Probe.UNKNOWN
 
 
-def test_health_check_of_a_closed_port_fails() -> None:
+def test_probe_of_a_closed_port_says_so() -> None:
     with ThreadingHTTPServer(("127.0.0.1", 0), BaseHTTPRequestHandler) as unused:
         port = unused.server_address[1]
 
-    assert not is_healthy(ServerAddress("127.0.0.1", port, TOKEN))
+    assert probe_server(ServerAddress("127.0.0.1", port, TOKEN)) == Probe.CLOSED

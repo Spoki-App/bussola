@@ -11,7 +11,7 @@ TOKEN_COOKIE = "bussola_token"
 TOKEN_QUERY = "token"
 TOKEN_ENV = "BUSSOLA_TOKEN"
 API_PATH_PREFIX = "/api/"
-LOCAL_HOSTS = ("127.0.0.1", "localhost")
+LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
 
 type CallNext = Callable[[Request], Awaitable[Response]]
 

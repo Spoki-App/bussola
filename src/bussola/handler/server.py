@@ -1,6 +1,7 @@
 import contextlib
 import http.client
 import ipaddress
+import logging
 import os
 import re
 import socket
@@ -12,6 +13,7 @@ import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import StrEnum
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Protocol
@@ -58,6 +60,7 @@ class ServerAddress:
 
 
 SERVER_ADDRESS = TypeAdapter(ServerAddress)
+logger = logging.getLogger(__name__)
 
 
 def _listens_everywhere(host: str) -> bool:
@@ -74,10 +77,14 @@ def server_file(data_dir: Path, address: ServerAddress) -> Path:
 def publish_server(data_dir: Path, address: ServerAddress) -> None:
     folder = data_dir / SERVERS_DIR
     folder.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(dir=folder, suffix=".tmp")
-    with os.fdopen(descriptor, "w", encoding="utf-8") as file:
-        file.write(SERVER_ADDRESS.dump_json(address).decode())
-    Path(temporary).replace(server_file(data_dir, address))
+    descriptor, name = tempfile.mkstemp(dir=folder, suffix=".tmp")
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+            file.write(SERVER_ADDRESS.dump_json(address).decode())
+        temporary.replace(server_file(data_dir, address))
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def withdraw_server(data_dir: Path, address: ServerAddress) -> None:
@@ -98,15 +105,27 @@ def _read_address(path: Path) -> ServerAddress | None:
         return None
 
 
-def is_healthy(address: ServerAddress) -> bool:
+class Probe(StrEnum):
+    READY = "ready"
+    OTHER_BUSSOLA = "other_bussola"
+    CLOSED = "closed"
+    UNKNOWN = "unknown"
+
+
+def probe_server(address: ServerAddress) -> Probe:
     connection = http.client.HTTPConnection(address.host, address.port, timeout=HEALTH_TIMEOUT_SECONDS)
     try:
         connection.request("GET", HEALTH_PATH, headers={"Cookie": f"{TOKEN_COOKIE}={address.token}"})
-        return connection.getresponse().status == HTTPStatus.OK
+        status = connection.getresponse().status
+    except ConnectionRefusedError:
+        return Probe.CLOSED
     except (OSError, http.client.HTTPException):
-        return False
+        return Probe.UNKNOWN
     finally:
         connection.close()
+    if status == HTTPStatus.OK:
+        return Probe.READY
+    return Probe.OTHER_BUSSOLA if status == HTTPStatus.FORBIDDEN else Probe.UNKNOWN
 
 
 def record_link_error(data_dir: Path, link: str, error: Exception) -> None:
@@ -124,10 +143,14 @@ class PublishedServer(uvicorn.Server):
 
     async def startup(self, sockets: list[socket.socket] | None = None) -> None:
         await super().startup(sockets)
-        publish_server(self.data_dir, self.address)
+        try:
+            publish_server(self.data_dir, self.address)
+        except OSError as error:
+            logger.warning("bussola:// links will not find this server: %s", error)
 
     async def shutdown(self, sockets: list[socket.socket] | None = None) -> None:
-        withdraw_server(self.data_dir, self.address)
+        with contextlib.suppress(OSError):
+            withdraw_server(self.data_dir, self.address)
         await super().shutdown(sockets)
 
 
@@ -163,7 +186,7 @@ def _detached() -> dict[str, Any]:
 class Launcher:
     data_dir: Path
     start: Callable[[ServerAddress], Process] = start_server
-    healthy: Callable[[ServerAddress], bool] = is_healthy
+    probe: Callable[[ServerAddress], Probe] = probe_server
     open_browser: Callable[[str], object] = webbrowser.open
     sleep: Callable[[float], object] = time.sleep
     timeout: float = START_TIMEOUT_SECONDS
@@ -188,8 +211,14 @@ class Launcher:
         return found
 
     def _first_healthy(self, *extra: ServerAddress) -> ServerAddress | None:
-        candidates = dict.fromkeys([*extra, *published_servers(self.data_dir)])
-        return next((candidate for candidate in candidates if self.healthy(candidate)), None)
+        published = published_servers(self.data_dir)
+        for candidate in dict.fromkeys([*extra, *published]):
+            state = self.probe(candidate)
+            if state == Probe.READY:
+                return candidate
+            if state == Probe.CLOSED and candidate in published:
+                withdraw_server(self.data_dir, candidate)
+        return None
 
     def _wait_for_server(self, started: ServerAddress, process: Process) -> ServerAddress | None:
         deadline = time.monotonic() + self.timeout
@@ -197,7 +226,7 @@ class Launcher:
             found = self._first_healthy(started)
             if found is not None:
                 return found
-            if process.poll() is not None:
+            if process.poll() is not None and self.probe(started) != Probe.OTHER_BUSSOLA:
                 deadline = min(deadline, time.monotonic() + self.exit_grace)
             if time.monotonic() >= deadline:
                 return None
