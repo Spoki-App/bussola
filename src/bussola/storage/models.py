@@ -226,3 +226,16 @@ class PublishedComment(Base):
     published_body_hash: Mapped[str] = mapped_column()
     published_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
     remote_body_hash: Mapped[str | None] = mapped_column(default=None)
+
+
+class AiResult(Base):
+    __tablename__ = "ai_results"
+
+    task: Mapped[str] = mapped_column(primary_key=True)
+    prompt_version: Mapped[int] = mapped_column(primary_key=True)
+    provider: Mapped[str] = mapped_column(primary_key=True)
+    model: Mapped[str] = mapped_column(primary_key=True)
+    endpoint: Mapped[str] = mapped_column(primary_key=True)
+    content_hash: Mapped[str] = mapped_column(primary_key=True)
+    result: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)

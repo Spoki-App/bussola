@@ -4,6 +4,8 @@ from typing import cast
 
 from fastapi import FastAPI, Request
 
+from bussola.ai.base import AiProvider
+from bussola.ai.config import AiSettings
 from bussola.config import AppSettings
 from bussola.forge.base import ForgeAdapter
 from bussola.identity import GitConfigIdentity
@@ -17,6 +19,7 @@ class AppState:
     identity: GitConfigIdentity
     forge: ForgeAdapter
     url_opener: Callable[[str], object]
+    ai_factory: Callable[[AiSettings], AiProvider]
 
 
 def attach_state(app: FastAPI, state: AppState) -> None:

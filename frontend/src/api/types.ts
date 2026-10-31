@@ -275,3 +275,23 @@ export interface RepositoryScan {
   repositories: FoundRepository[]
   truncated: boolean
 }
+
+export interface AiStatus {
+  configured: boolean
+  provider: string | null
+  label: string | null
+  model: string | null
+  endpoint: string | null
+  source: 'user' | 'repository' | null
+  api_key_env: string | null
+  api_key_set: boolean
+  problem: string | null
+  config_file: string | null
+  target: string | null
+}
+
+export interface AiTestResult {
+  ok: boolean
+  message: string
+  elapsed_ms: number
+}

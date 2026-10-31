@@ -50,7 +50,7 @@ The UI build goes to `src/bussola/static/` and is packaged with the Python wheel
 bussola serve
 ```
 
-Run inside a repository to register it and open the browser. **Settings** (top right) opens a window with **Open pull request**, **Add repository**, **Code font**, **Diff layout** and **Line wrap**. To add other repositories, use **Browse...** under **Add repository**: it lists the git repositories found in your home folder (up to four levels deep, skipping hidden folders, `node_modules`, `Library` and similar), and its **Browse folders** tab lets you pick any other folder. You can also paste a path. Options: `--repo PATH`, `--host 127.0.0.1`, `--port 8765`, `--no-open`.
+Run inside a repository to register it and open the browser. **Settings** (top right) opens a window with **Open pull request**, **Add repository**, **Code font**, **Diff layout**, **Line wrap** and **AI**. To add other repositories, use **Browse...** under **Add repository**: it lists the git repositories found in your home folder (up to four levels deep, skipping hidden folders, `node_modules`, `Library` and similar), and its **Browse folders** tab lets you pick any other folder. You can also paste a path. Options: `--repo PATH`, `--host 127.0.0.1`, `--port 8765`, `--no-open`.
 
 The printed link contains a one-time session token. Opening it stores the token in a cookie for that browser; if you open bussola another way and see "Not authorized", use the printed link again.
 
@@ -145,6 +145,51 @@ ignore = ["vendor/**", "docs/**"]
 - `ignore`: globs left out of the review entirely.
 - Glob matching: a pattern without `/` matches the file name at any depth, `**/` matches any number of directories, and `*` stays within one directory.
 
+## AI providers
+
+AI features are optional and off until you choose a provider. This version sets up the provider and **Test connection**; the AI actions themselves (unit descriptions, impact ratings, AI review) come in later versions and follow the rules below. bussola talks to one of three providers, set in the `[ai]` section of your user configuration, `config.toml` in `platformdirs.user_config_dir("bussola")` (on macOS `~/Library/Application Support/bussola/config.toml`, on Linux `~/.config/bussola/config.toml`; set `BUSSOLA_CONFIG_DIR` to use another directory). **AI** in **Settings** shows the active provider and model, where the configuration is read from, and a **Test connection** button that sends a short fixed prompt and no code.
+
+**Claude Code CLI** runs the `claude` command already installed and signed in on your machine, so bussola needs no key:
+
+```toml
+[ai]
+provider = "claude-code"
+model = "claude-opus-5-5"  # optional, the command's default otherwise
+```
+
+bussola runs `claude -p` with JSON output, no tools, no saved session, safe mode (no hooks, plugins, skills or MCP servers from your Claude Code setup) and an empty temporary folder, so it cannot read or change your files. It needs a version of Claude Code that has `--safe-mode`; **Settings** tells you when yours is too old. `claude` signs in as it does when you run it yourself: with your Claude account, or with `ANTHROPIC_API_KEY` if that is set in the environment bussola runs in. bussola's own `BUSSOLA_*` variables, such as the session token, are not passed to it.
+
+**Anthropic API** reads the key from the `ANTHROPIC_API_KEY` environment variable. `endpoint` defaults to `https://api.anthropic.com`; if you set it (for a gateway), give the base address without `/v1`:
+
+```toml
+[ai]
+provider = "anthropic"
+model = "claude-opus-5-5"  # the default
+```
+
+**OpenAI-compatible endpoint** covers Ollama, LM Studio, vLLM and similar local servers, and hosted services with the same API. The key is optional: set `api_key_env` to the environment variable that holds it, and bussola sends it as a bearer token. The answer length is capped with `max_completion_tokens`; servers that do not know it ignore it:
+
+```toml
+[ai]
+provider = "openai-compatible"
+endpoint = "http://localhost:11434/v1"  # Ollama; LM Studio uses http://localhost:1234/v1
+model = "qwen2.5-coder"
+```
+
+Other options: `timeout` (seconds per request, default 600, at most 3600) and `api_key_env` (the name of the environment variable that holds the key, for example `api_key_env = "WORK_ANTHROPIC_KEY"`; the Anthropic API defaults to `ANTHROPIC_API_KEY`). Claude Code ignores `endpoint`. `max_tokens` sets the answer budget for the Anthropic API and OpenAI-compatible endpoints (default 16000), for example `max_tokens = 4000` for a local model with a small context window or more for long answers. Busy answers (HTTP 429 and 5xx) are retried twice, after the delay the server asks for, as long as that fits in the timeout. Requests to `localhost` and other loopback addresses never go through an HTTP proxy, and **Test connection** waits at most two minutes.
+
+Keys are read only from environment variables. bussola never writes them to the database or to a configuration file, and `api_key` is not an accepted option.
+
+Once you have chosen a provider, a repository can make limited changes in the `[ai]` section of its `.bussola.toml`, for example to use a local model for a confidential project or to turn AI off with `provider = "none"`. It can switch to an OpenAI-compatible endpoint (`provider`, `model`, `endpoint`), or change the `model` and `endpoint` of your own OpenAI-compatible endpoint. Claude Code and the Anthropic API use your own account, so a repository can neither switch to them nor change their model or endpoint. A repository cannot turn AI on when you have not chosen a provider, and cannot set `timeout`, `api_key_env` or `max_tokens`. A mistake in its `[ai]` section turns AI off for that repository, and the AI buttons there show the reason; reviews keep working. When a repository switches provider, only `timeout` is taken from your configuration. Your API key is used only with your own provider, endpoint and model, so it is never sent to an endpoint or spent on a model that only the repository's `.bussola.toml` names; **Settings** and the AI buttons say so when a repository's choice would need your key. These limits exist because `.bussola.toml` comes with the clone: a repository you review, or a pull request you open in bussola, must not be able to send your code or your key somewhere else, or spend your credit on a provider or model you did not choose.
+
+### What leaves your machine
+
+- Nothing, while no provider is configured.
+- Code is sent only when you start an AI action, and only the code that action works on. The first time an action would send code to a provider, model and endpoint, bussola names them and waits for **Send code**; the choice is kept in that browser.
+- With Claude Code or the Anthropic API, the code goes to Anthropic under the terms of your account. With an OpenAI-compatible endpoint, it goes only to the address you configured, which stays on your machine for a local server.
+- Answers are checked against the format each action expects, and a clear error is shown when the model returns something unusable. Each request has a timeout and can be cancelled.
+- Results are cached in the local database by the content hash of what was sent, the prompt version, the model and the endpoint, so unchanged code is not sent again. With Claude Code and no `model` set, the model actually used is not known, so nothing is cached. Set `model` to a full model ID rather than an alias such as `opus`, so that cached results follow the model you use.
+
 ## Data
 
 Reviews, approvals and comments are stored in SQLite at `platformdirs.user_data_dir("bussola")/bussola.db` (on macOS `~/Library/Application Support/bussola`). Set `BUSSOLA_DATA_DIR` to use another directory.
@@ -160,7 +205,7 @@ The server is meant for one person on one machine.
 - **Host check:** requests whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` are rejected, which blocks DNS rebinding.
 - **Git refs and files:** refs are validated with `git rev-parse --verify --end-of-options` before use. File contents are read only from the git object database.
 - **Opening links:** GitHub links are opened by the server in your default browser, as a new tab, so they work even when the bussola page runs in an app-style window. The server only opens `https://github.com` addresses.
-- **Outbound traffic:** the only network access is `git fetch` when you ask for it, `gh` when you sync or have a pull request review open, and downloads of images attached on GitHub shown in comments and descriptions.
+- **Outbound traffic:** the only network access is `git fetch` when you ask for it, `gh` when you sync or have a pull request review open, downloads of images attached on GitHub shown in comments and descriptions, and requests to the AI provider you configured, only when you start an AI action or test the connection (see [AI providers](#ai-providers)).
 - **Rendered Markdown:** HTML in comments and descriptions is sanitized with GitHub's rules before it is shown. Attached images are served from `/api/forge/asset` only for `https://github.com/.../assets/...` links and only when they are images, with a sandboxing Content-Security-Policy.
 
 ## Status
@@ -171,7 +216,7 @@ bussola is used on real pull requests, but it is young. Until 1.0, commands, opt
 
 <details><summary><b>Does my code leave my machine?</b></summary>
 
-No. bussola reads your local clone. It only talks to your git remote when you sync, and to GitHub through your own `gh` login when you use the pull request features.
+No. bussola reads your local clone. It only talks to your git remote when you sync, and to GitHub through your own `gh` login when you use the pull request features. If you configure an AI provider, the code of an AI action goes to that provider when you start the action; see [What leaves your machine](#what-leaves-your-machine).
 </details>
 
 <details><summary><b>Do I need GitHub?</b></summary>
