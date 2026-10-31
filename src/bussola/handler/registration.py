@@ -32,7 +32,7 @@ WINDOWS_COMMAND_KEY = rf"{WINDOWS_CLASSES_KEY}\shell\open\command"
 WINDOWS_GUI_PYTHON = "pythonw.exe"
 DESKTOP_RESERVED = re.compile(r"[\s\"'\\><~|&;$*?#()`]")
 DESKTOP_ESCAPED = re.compile(r"([\"`$\\])")
-HANDLER_ARGUMENTS = ("-m", "bussola", "open-link")
+HANDLER_ARGUMENTS = ("-P", "-m", "bussola", "open-link")
 END_OF_OPTIONS = "--"
 
 

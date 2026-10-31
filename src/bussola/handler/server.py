@@ -38,6 +38,8 @@ EXIT_GRACE_SECONDS = 1.0
 FREE_PORT_ATTEMPTS = 3
 NOTHING_TO_SKIP: frozenset["ServerAddress"] = frozenset()
 MAX_PROBE_BODY = 512
+MAX_LINK_LOG_BYTES = 1_000_000
+MAX_LOGGED_LINK = 500
 IPV6_LOOPBACK = "::1"
 UNSAFE_FILE_CHARACTERS = re.compile(r"[^A-Za-z0-9.-]")
 POLL_INTERVAL_SECONDS = 0.25
@@ -128,8 +130,10 @@ def probe_server(address: ServerAddress) -> Probe:
         connection.request("GET", HEALTH_PATH, headers={"Cookie": f"{token_cookie(address.port)}={address.token}"})
         response = connection.getresponse()
         status, body = response.status, response.read(MAX_PROBE_BODY)
-    except (OSError, http.client.HTTPException):
+    except TimeoutError:
         return Probe.SILENT
+    except (OSError, http.client.HTTPException):
+        return Probe.WRONG
     finally:
         connection.close()
     if status == HTTPStatus.OK:
@@ -177,8 +181,10 @@ def port_is_free(host: str, port: int) -> bool:
 def record_link_error(data_dir: Path, link: str, error: Exception) -> None:
     with contextlib.suppress(OSError):
         data_dir.mkdir(parents=True, exist_ok=True)
-        with (data_dir / LINK_LOG_FILE).open("a", encoding="utf-8") as file:
-            file.write(f"{datetime.now(UTC).isoformat(timespec='seconds')} {link!r}: {error}\n")
+        log = data_dir / LINK_LOG_FILE
+        mode = "w" if log.is_file() and log.stat().st_size > MAX_LINK_LOG_BYTES else "a"
+        with log.open(mode, encoding="utf-8") as file:
+            file.write(f"{datetime.now(UTC).isoformat(timespec='seconds')} {link[:MAX_LOGGED_LINK]!r}: {error}\n")
 
 
 class PublishedServer(uvicorn.Server):
@@ -211,7 +217,7 @@ class Process(Protocol):
 
 
 def start_server(address: ServerAddress, data_dir: Path) -> Process:
-    command = [sys.executable, "-m", "bussola", "serve", "--no-open", "--no-register", "--host", address.host, "--port", str(address.port)]
+    command = [sys.executable, "-P", "-m", "bussola", "serve", "--no-open", "--no-register", "--host", address.host, "--port", str(address.port)]
     return subprocess.Popen(
         command,
         env={**os.environ, TOKEN_ENV: address.token, DATA_DIR_ENV: str(data_dir)},

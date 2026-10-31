@@ -180,6 +180,22 @@ def test_serve_prints_a_reachable_address_when_listening_everywhere(git_repo: Gi
     assert "http://[::1]:8765/?token=" in result.output
 
 
+@pytest.mark.usefixtures("data_dir")
+def test_serve_accepts_a_bracketed_ipv6_host(git_repo: GitFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    git_repo.commit({"a.txt": "a\n"})
+
+    def run(*_args: object) -> None:
+        return None
+
+    monkeypatch.setattr("bussola.cli.run_published", run)
+
+    result = runner.invoke(app, ["serve", "--no-open", "--host", "[::1]", "--repo", str(git_repo.root)])
+
+    assert result.exit_code == 0, result.output
+    assert "warning" not in result.output
+    assert "http://[::1]:8765/?token=" in result.output
+
+
 def test_serve_refuses_port_0() -> None:
     result = runner.invoke(app, ["serve", "--no-open", "--port", "0"])
 
@@ -200,6 +216,17 @@ def test_serve_exits_quietly_on_ctrl_c(git_repo: GitFixture, monkeypatch: pytest
 
     assert result.exit_code == 0, result.output
     assert "Aborted" not in result.output
+
+
+def test_open_link_log_stays_small(data_dir: Path) -> None:
+    data_dir.mkdir()
+    (data_dir / "open-link.log").write_text("x" * 2_000_000)
+
+    runner.invoke(app, ["open-link", "bussola://review?repo=" + "a" * 5000])
+
+    log = (data_dir / "open-link.log").read_text()
+    assert len(log) < 1000
+    assert log.count("\n") == 1
 
 
 def test_open_link_logs_unexpected_failures_too(data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:

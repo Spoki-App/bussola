@@ -50,6 +50,7 @@ def serve(
     register: Annotated[bool, typer.Option("--register/--no-register", hidden=True)] = True,
 ) -> None:
     """Start the review UI."""
+    host = host.removeprefix("[").removesuffix("]")
     if not is_local_host(host):
         typer.secho(f"warning: listening on {host} exposes your repositories to other machines on the network", fg=typer.colors.YELLOW, err=True)
     identity_dir = repo or Path.cwd()

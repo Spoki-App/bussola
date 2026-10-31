@@ -507,7 +507,7 @@ def test_start_server_runs_serve_detached_with_the_token(monkeypatch: pytest.Mon
     start_server(ServerAddress("127.0.0.1", 8765, TOKEN), Path("/data/bussola"))
 
     [(command, options)] = calls
-    assert command == [sys.executable, "-m", "bussola", "serve", "--no-open", "--no-register", "--host", "127.0.0.1", "--port", "8765"]
+    assert command == [sys.executable, "-P", "-m", "bussola", "serve", "--no-open", "--no-register", "--host", "127.0.0.1", "--port", "8765"]
     assert options["env"]["BUSSOLA_TOKEN"] == TOKEN
     assert options["env"]["BUSSOLA_DATA_DIR"] == str(Path("/data/bussola"))
     assert options["stdin"] == options["stdout"] == options["stderr"] == subprocess.DEVNULL
@@ -587,7 +587,7 @@ def test_probe_does_not_take_any_403_for_bussola() -> None:
     assert state == Probe.WRONG
 
 
-def test_probe_of_a_port_that_does_not_speak_http_is_silent() -> None:
+def test_probe_of_a_port_that_does_not_speak_http_is_wrong() -> None:
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
         listener.listen()
@@ -602,6 +602,17 @@ def test_probe_of_a_port_that_does_not_speak_http_is_silent() -> None:
         thread.start()
         state = probe_server(ServerAddress("127.0.0.1", listener.getsockname()[1], TOKEN))
         thread.join(5)
+
+    assert state == Probe.WRONG
+
+
+def test_probe_of_a_server_that_accepts_but_never_answers_is_silent(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("bussola.handler.server.HEALTH_TIMEOUT_SECONDS", 0.2)
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+
+        state = probe_server(ServerAddress("127.0.0.1", listener.getsockname()[1], TOKEN))
 
     assert state == Probe.SILENT
 

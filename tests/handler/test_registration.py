@@ -27,7 +27,7 @@ from bussola.handler.registration import (
 )
 
 PYTHON = "/opt/tools/bussola/bin/python"
-COMMAND = (PYTHON, "-m", "bussola", "open-link")
+COMMAND = (PYTHON, "-P", "-m", "bussola", "open-link")
 HANDLER = (*COMMAND, "--")
 
 
@@ -52,7 +52,7 @@ def test_linux_registers_a_desktop_file_as_default_for_the_scheme(tmp_path: Path
     assert handler.location == str(desktop)
     assert desktop.read_text() == desktop_entry(HANDLER)
     assert "MimeType=x-scheme-handler/bussola;\n" in desktop.read_text()
-    assert f"Exec={PYTHON} -m bussola open-link -- %u\n" in desktop.read_text()
+    assert f"Exec={PYTHON} -P -m bussola open-link -- %u\n" in desktop.read_text()
     assert recorder.commands == [
         ("xdg-mime", "--version"),
         ("xdg-mime", "default", "bussola-url-handler.desktop", "x-scheme-handler/bussola"),
@@ -119,7 +119,7 @@ def test_linux_handler_keeps_the_path_of_the_install(tmp_path: Path) -> None:
     handler = registration_for("linux", tmp_path, {"PATH": "/home/me/.local/bin:/usr/bin"}, PYTHON)
     install = next(step for step in handler.install if isinstance(step, WriteFile))
 
-    assert f"Exec=env PATH=/home/me/.local/bin:/usr/bin {PYTHON} -m bussola open-link -- %u\n" in install.content
+    assert f"Exec=env PATH=/home/me/.local/bin:/usr/bin {PYTHON} -P -m bussola open-link -- %u\n" in install.content
 
 
 def test_linux_follows_xdg_data_and_config_home(tmp_path: Path) -> None:
@@ -220,7 +220,7 @@ def test_macos_handler_keeps_the_path_of_the_install(tmp_path: Path) -> None:
     script = applescript(HANDLER, "/opt/homebrew/bin:/usr/bin")
 
     assert any(isinstance(step, RunCommand) and step.argv[0] == "osacompile" and script[1] in step.argv for step in handler.install)
-    assert script[1].startswith(f'do shell script "PATH=/opt/homebrew/bin:/usr/bin {PYTHON} -m bussola open-link -- "')
+    assert script[1].startswith(f'do shell script "PATH=/opt/homebrew/bin:/usr/bin {PYTHON} -P -m bussola open-link -- "')
 
 
 def test_windows_writes_the_url_protocol_keys_under_hkcu(tmp_path: Path) -> None:
@@ -235,7 +235,7 @@ def test_windows_writes_the_url_protocol_keys_under_hkcu(tmp_path: Path) -> None
     assert handler.install == (
         SetRegistryValue("Software\\Classes\\bussola", "", "URL:bussola link"),
         SetRegistryValue("Software\\Classes\\bussola", "URL Protocol", ""),
-        SetRegistryValue("Software\\Classes\\bussola\\shell\\open\\command", "", f'"{windowless}" -m bussola open-link -- "%1"'),
+        SetRegistryValue("Software\\Classes\\bussola\\shell\\open\\command", "", f'"{windowless}" -P -m bussola open-link -- "%1"'),
     )
     assert handler.uninstall == (DeleteRegistryTree("Software\\Classes\\bussola"),)
 
@@ -259,7 +259,7 @@ def test_windows_install_and_uninstall_through_the_registry(tmp_path: Path) -> N
     registry = FakeRegistry()
 
     apply(handler.install, Recorder(), registry)
-    assert registry.values[("Software\\Classes\\bussola\\shell\\open\\command", "")] == 'C:/Python/python.exe -m bussola open-link -- "%1"'
+    assert registry.values[("Software\\Classes\\bussola\\shell\\open\\command", "")] == 'C:/Python/python.exe -P -m bussola open-link -- "%1"'
 
     apply(handler.uninstall, Recorder(), registry)
     assert registry.values == {}
@@ -284,7 +284,7 @@ def test_handler_keeps_the_data_dir_it_was_installed_with(tmp_path: Path) -> Non
     handler = registration_for("linux", tmp_path, {"BUSSOLA_DATA_DIR": "/srv/bussola data"}, PYTHON)
     install = next(step for step in handler.install if isinstance(step, WriteFile))
 
-    assert f'Exec={PYTHON} -m bussola open-link --data-dir "/srv/bussola data" -- %u\n' in install.content
+    assert f'Exec={PYTHON} -P -m bussola open-link --data-dir "/srv/bussola data" -- %u\n' in install.content
 
 
 def test_every_handler_ends_options_before_the_link(tmp_path: Path) -> None:
@@ -303,7 +303,7 @@ def test_every_handler_ends_options_before_the_link(tmp_path: Path) -> None:
 
 def test_handler_command_uses_the_current_python() -> None:
     assert handler_command("linux", PYTHON) == COMMAND
-    assert handler_command("win32", "C:/missing/python.exe") == ("C:/missing/python.exe", "-m", "bussola", "open-link")
+    assert handler_command("win32", "C:/missing/python.exe") == ("C:/missing/python.exe", "-P", "-m", "bussola", "open-link")
 
 
 def test_unsupported_platform_is_refused(tmp_path: Path) -> None:
