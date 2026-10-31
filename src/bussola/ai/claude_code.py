@@ -1,12 +1,15 @@
 import contextlib
+import functools
 import json
 import os
+import selectors
 import shutil
 import signal
 import subprocess
 import tempfile
 import threading
 import time
+from pathlib import Path
 from typing import IO, Any
 
 from bussola.ai.base import MAX_ERROR_LENGTH, AiNotConfiguredError, AiOutputError, AiProviderError, AiRequest, Cancellation, json_object, run_cancellable
@@ -16,6 +19,9 @@ CLAUDE = "claude"
 CLAUDE_ENV = {"NO_COLOR": "1"}
 PRIVATE_ENV_PREFIX = "BUSSOLA_"
 PIPE_GRACE_SECONDS = 0.5
+REQUIRED_FLAG = "--safe-mode"
+READER_NAME = "bussola-claude-output"
+HELP_TIMEOUT_SECONDS = 15.0
 READ_CHUNK_BYTES = 64 * 1024
 EXIT_POLL_SECONDS = 0.05
 
@@ -24,7 +30,17 @@ def find_claude() -> str:
     executable = shutil.which(CLAUDE)
     if executable is None:
         raise AiNotConfiguredError("The claude command is not on PATH. Install Claude Code and run claude once to sign in.")
+    if REQUIRED_FLAG not in _help_text(executable, Path(executable).stat().st_mtime):
+        raise AiNotConfiguredError(f"This version of Claude Code has no {REQUIRED_FLAG}. Update it with claude update.")
     return executable
+
+
+@functools.cache
+def _help_text(executable: str, _modified: float) -> str:
+    try:
+        return subprocess.run([executable, "--help"], capture_output=True, text=True, errors="replace", timeout=HELP_TIMEOUT_SECONDS, check=False).stdout
+    except (OSError, subprocess.SubprocessError) as error:
+        raise AiNotConfiguredError(f"Cannot run claude --help: {error}") from error
 
 
 class ClaudeCodeProvider:
@@ -111,6 +127,8 @@ class _ClaudeSession:
             _kill_group(self._process)
             stdout.wait(PIPE_GRACE_SECONDS)
             stderr.wait(PIPE_GRACE_SECONDS)
+        stdout.stop()
+        stderr.stop()
         return returncode, stdout.text(), stderr.text()
 
     def finish(self) -> None:
@@ -122,6 +140,7 @@ class _ClaudeSession:
         if stdin is not None:
             with contextlib.suppress(BrokenPipeError, ValueError):
                 stdin.write(prompt.encode())
+            with contextlib.suppress(OSError):
                 stdin.close()
 
     def _wait_for_exit(self) -> None:
@@ -150,10 +169,11 @@ class _Collector:
         self._chunks: list[bytes] = []
         self._lock = threading.Lock()
         self._done = threading.Event()
+        self._stopped = threading.Event()
         if stream is None:
             self._done.set()
         else:
-            threading.Thread(target=self._read, args=(stream,), daemon=True).start()
+            threading.Thread(target=self._read, args=(stream,), name=READER_NAME, daemon=True).start()
 
     def wait(self, timeout: float) -> bool:
         return self._done.wait(timeout)
@@ -162,11 +182,22 @@ class _Collector:
         with self._lock:
             return b"".join(self._chunks).decode(errors="replace")
 
+    def stop(self) -> None:
+        self._stopped.set()
+
     def _read(self, stream: IO[bytes]) -> None:
-        with contextlib.suppress(OSError, ValueError):
-            while chunk := os.read(stream.fileno(), READ_CHUNK_BYTES):
+        with contextlib.suppress(OSError, ValueError), selectors.DefaultSelector() as selector:
+            selector.register(stream, selectors.EVENT_READ)
+            while not self._stopped.is_set():
+                if not selector.select(timeout=EXIT_POLL_SECONDS):
+                    continue
+                chunk = os.read(stream.fileno(), READ_CHUNK_BYTES)
+                if not chunk:
+                    break
                 with self._lock:
                     self._chunks.append(chunk)
+        with contextlib.suppress(OSError):
+            stream.close()
         self._done.set()
 
 

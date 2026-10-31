@@ -4,7 +4,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -24,7 +24,7 @@ from bussola.ai.base import (
     Cancellation,
 )
 from bussola.ai.config import AiSettings, ProviderName
-from bussola.ai.http import MAX_RESPONSE_BYTES, bypasses_proxy
+from bussola.ai.http import MAX_ATTEMPTS, MAX_RESPONSE_BYTES, bypasses_proxy
 from bussola.ai.openai_compatible import OpenAiCompatibleProvider
 from bussola.ai.providers import build_provider
 
@@ -38,6 +38,7 @@ class StubServer:
         self.body: dict[str, Any] = {}
         self.delay = 0.0
         self.headers: dict[str, str] = {}
+        self.before_reply: Callable[[], None] | None = None
         self.release = threading.Event()
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
 
@@ -57,6 +58,8 @@ class StubServer:
                 stub.requests.append(
                     {"path": self.path, "headers": {name.lower(): value for name, value in self.headers.items()}, "json": json.loads(self.rfile.read(length))}
                 )
+                if stub.before_reply is not None:
+                    stub.before_reply()
                 stub.release.wait(stub.delay)
                 payload = json.dumps(stub.body).encode()
                 self.send_response(stub.status)
@@ -71,6 +74,11 @@ class StubServer:
                 return
 
         return Handler
+
+
+@pytest.fixture(autouse=True)
+def quick_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("bussola.ai.http.RETRY_BASE_SECONDS", 0.01)
 
 
 @pytest.fixture
@@ -121,6 +129,37 @@ def test_auth_and_rate_limit_answers_are_rejections(stub: StubServer, status: in
         OpenAiCompatibleProvider("gpt", stub.url, None, 5.0).complete(REQUEST, Cancellation())
 
     assert isinstance(raised.value, AiRejectedError) is rejected
+
+
+def test_a_busy_endpoint_is_asked_again_and_its_answer_used(stub: StubServer) -> None:
+    replies = iter([(429, {"error": {"message": "slow down"}}), (503, {"error": {"message": "overloaded"}})])
+
+    def answer() -> None:
+        status, body = next(replies, (200, {"choices": [{"message": {"content": '{"impact": "low"}'}}]}))
+        stub.reply(body, status=status, headers={"Retry-After": "0"})
+
+    stub.before_reply = answer
+
+    assert OpenAiCompatibleProvider("gpt", stub.url, None, 5.0).complete(REQUEST, Cancellation()) == '{"impact": "low"}'
+    assert len(stub.requests) == 3
+
+
+def test_a_rate_limit_that_lasts_is_reported_after_a_few_tries(stub: StubServer) -> None:
+    stub.reply({"error": {"message": "slow down"}}, status=429)
+
+    with pytest.raises(AiRejectedError, match="HTTP 429: slow down"):
+        OpenAiCompatibleProvider("gpt", stub.url, None, 5.0).complete(REQUEST, Cancellation())
+
+    assert len(stub.requests) == MAX_ATTEMPTS
+
+
+def test_a_client_error_is_not_asked_again(stub: StubServer) -> None:
+    stub.reply({"error": {"message": "bad request"}}, status=400)
+
+    with pytest.raises(AiProviderError, match="HTTP 400"):
+        OpenAiCompatibleProvider("gpt", stub.url, None, 5.0).complete(REQUEST, Cancellation())
+
+    assert len(stub.requests) == 1
 
 
 def test_an_http_error_shows_the_message_of_the_api(stub: StubServer) -> None:

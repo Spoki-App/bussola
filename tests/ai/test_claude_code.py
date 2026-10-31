@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiProviderError, AiRequest, AiTimeoutError, Cancellation
-from bussola.ai.claude_code import ClaudeCodeProvider, find_claude
+from bussola.ai.claude_code import READER_NAME, ClaudeCodeProvider, find_claude
 from bussola.ai.config import AiSettings, ProviderName
 from bussola.ai.providers import build_provider
 
@@ -186,6 +186,10 @@ def test_a_process_in_another_session_holding_the_output_does_not_hold_up_the_an
 
     assert answer == '{"impact": "high"}'
     assert time.monotonic() - started < 5
+    deadline = time.monotonic() + 2
+    while any(thread.name == READER_NAME for thread in threading.enumerate()) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not any(thread.name == READER_NAME for thread in threading.enumerate())
 
 
 def test_a_claude_command_that_cannot_run_is_reported(tmp_path: Path) -> None:
@@ -194,6 +198,16 @@ def test_a_claude_command_that_cannot_run_is_reported(tmp_path: Path) -> None:
 
     with pytest.raises(AiProviderError, match="Cannot run claude"):
         ClaudeCodeProvider(str(broken), None, 5.0).complete(REQUEST, Cancellation())
+
+
+def test_a_claude_without_safe_mode_is_reported(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    old = tmp_path / "claude"
+    old.write_text("#!/bin/sh\necho 'Usage: claude [options]'\n")
+    old.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+
+    with pytest.raises(AiNotConfiguredError, match="has no --safe-mode"):
+        find_claude()
 
 
 def test_the_provider_needs_the_claude_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

@@ -4,7 +4,7 @@ from typing import Any, Protocol, cast
 
 from pydantic import BaseModel, ValidationError
 
-from bussola.ai.base import AiOutputError, AiProvider, AiRequest, Cancellation
+from bussola.ai.base import AiOutputError, AiProvider, AiRequest, Cancellation, describe_validation_error
 
 DEFAULT_MAX_TOKENS = 16000
 NAME_MAPS = frozenset({"properties", "$defs"})
@@ -94,7 +94,7 @@ def parse_output[T: BaseModel](text: str, output: type[T]) -> T:
     try:
         return output.model_validate_json(fenced.group("body") if fenced else stripped)
     except ValidationError as error:
-        raise AiOutputError(f"The model's answer does not match the expected format: {_summary(error)}") from error
+        raise AiOutputError(f"The model's answer does not match the expected format: {describe_validation_error(error, REPORTED_ERRORS)}") from error
 
 
 def _portable(schema: Any) -> Any:
@@ -113,8 +113,3 @@ def _portable(schema: Any) -> Any:
     if "properties" in node:
         node["required"] = list(node["properties"])
     return node
-
-
-def _summary(error: ValidationError) -> str:
-    problems = [f"{'.'.join(str(part) for part in item['loc']) or 'answer'}: {item['msg']}" for item in error.errors()[:REPORTED_ERRORS]]
-    return "; ".join(problems)

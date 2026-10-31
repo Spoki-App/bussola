@@ -7,17 +7,32 @@ import json
 import socket
 import ssl
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any
 
-from bussola.ai.base import MAX_ERROR_LENGTH, AiProviderError, AiRejectedError, AiUnreachableError, Cancellation, json_object, run_cancellable
+from bussola.ai.base import (
+    MAX_ERROR_LENGTH,
+    AiProviderError,
+    AiRejectedError,
+    AiTimeoutError,
+    AiUnreachableError,
+    Cancellation,
+    json_object,
+    run_cancellable,
+    timed_out,
+)
 
 SOCKET_GRACE_SECONDS = 5.0
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 MAX_ERROR_BODY_BYTES = 64 * 1024
 REJECTING_STATUSES = frozenset({401, 403, 429})
+RETRY_STATUSES = frozenset({429, 500, 502, 503, 504, 529})
+MAX_ATTEMPTS = 3
+RETRY_BASE_SECONDS = 1.0
+MAX_RETRY_WAIT_SECONDS = 30.0
 UNREACHABLE_ERRNOS = frozenset({errno.ENETUNREACH, errno.EHOSTUNREACH})
 LOOPBACK_NAME = "localhost"
 
@@ -74,10 +89,11 @@ class _GuardedHttpsConnection(http.client.HTTPSConnection):
 
 
 class _HttpStatusError(Exception):
-    def __init__(self, code: int, detail: str) -> None:
+    def __init__(self, code: int, detail: str, retry_after: float | None) -> None:
         super().__init__(code, detail)
         self.code = code
         self.detail = detail
+        self.retry_after = retry_after
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -122,6 +138,25 @@ def _opener(url: str, connections: _Connections) -> urllib.request.OpenerDirecto
 
 def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeout: float, cancellation: Cancellation) -> dict[str, Any]:
     request = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json", **headers}, method="POST")
+    deadline = time.monotonic() + timeout
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            body = _send(request, max(deadline - time.monotonic(), 0.0), cancellation)
+        except AiTimeoutError as error:
+            raise timed_out(timeout) from error
+        except _HttpStatusError as error:
+            pause = min(error.retry_after or RETRY_BASE_SECONDS * attempt, MAX_RETRY_WAIT_SECONDS)
+            if error.code not in RETRY_STATUSES or attempt == MAX_ATTEMPTS or time.monotonic() + pause >= deadline:
+                failure = AiRejectedError if error.code in REJECTING_STATUSES else AiProviderError
+                raise failure(f"{url} answered HTTP {error.code}: {error.detail}") from error
+            cancellation.sleep(pause)
+            continue
+        return _decode(url, body)
+    raise AiProviderError(f"{url} did not answer")
+
+
+def _send(request: urllib.request.Request, timeout: float, cancellation: Cancellation) -> bytes:
+    url = request.full_url
     connections = _Connections()
     opener = _opener(url, connections)
 
@@ -130,13 +165,10 @@ def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeou
             with opener.open(request, timeout=timeout + SOCKET_GRACE_SECONDS) as response:
                 return response.read(MAX_RESPONSE_BYTES + 1)
         except urllib.error.HTTPError as error:
-            raise _HttpStatusError(error.code, _error_detail(error)) from error
+            raise _HttpStatusError(error.code, _error_detail(error), _retry_after(error)) from error
 
     try:
-        body = run_cancellable(send, cancellation, timeout, abort=connections.close)
-    except _HttpStatusError as error:
-        failure = AiRejectedError if error.code in REJECTING_STATUSES else AiProviderError
-        raise failure(f"{url} answered HTTP {error.code}: {error.detail}") from error
+        return run_cancellable(send, cancellation, timeout, abort=connections.close)
     except urllib.error.URLError as error:
         failure = AiUnreachableError if _unreachable(error.reason) else AiProviderError
         raise failure(f"Cannot reach {url}: {error.reason}") from error
@@ -144,6 +176,9 @@ def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeou
         raise AiProviderError(f"The connection to {url} failed: {error or type(error).__name__}") from error
     except ValueError as error:
         raise AiProviderError(f"The request to {url} could not be sent: {error}") from error
+
+
+def _decode(url: str, body: bytes) -> dict[str, Any]:
     if len(body) > MAX_RESPONSE_BYTES:
         raise AiProviderError(f"{url} answered with more than {MAX_RESPONSE_BYTES // (1024 * 1024)} MB")
     try:
@@ -153,6 +188,14 @@ def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeou
     if decoded is None:
         raise AiProviderError(f"{url} answered with unexpected JSON")
     return decoded
+
+
+def _retry_after(error: urllib.error.HTTPError) -> float | None:
+    value = error.headers.get("retry-after") if error.headers else None
+    try:
+        return max(float(value), 0.0) if value else None
+    except ValueError:
+        return None
 
 
 def _unreachable(reason: object) -> bool:

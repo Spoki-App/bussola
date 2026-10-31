@@ -250,3 +250,11 @@ def test_a_named_key_variable_that_is_not_set_is_reported_for_openai_compatible(
 
     with pytest.raises(AiNotConfiguredError, match="Set the WORK_KEY environment variable"):
         build_provider(settings)
+
+
+def test_a_repository_repeating_your_own_model_is_accepted() -> None:
+    settings = resolve_ai_settings(UserAiConfig(provider=ProviderName.ANTHROPIC), RepoAiConfig(provider=ProviderName.ANTHROPIC, model="claude-opus-5-5"))
+
+    assert settings.model == "claude-opus-5-5"
+    assert settings.source == "user"
+    assert settings.api_key_env == "ANTHROPIC_API_KEY"

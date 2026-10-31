@@ -6,6 +6,9 @@ import sys
 import time
 from pathlib import Path
 
+if "--help" in sys.argv:
+    sys.stdout.write("Usage: claude [options]\n  --safe-mode  Start with all customizations disabled\n")
+    sys.exit(0)
 prompt = sys.stdin.read()
 Path(os.environ["FAKE_CLAUDE_LOG"]).write_text(json.dumps({"args": sys.argv[1:], "prompt": prompt, "cwd": os.getcwd(), "env": dict(os.environ)}))
 if os.environ.get("FAKE_CLAUDE_ESCAPED_CHILD_PID"):

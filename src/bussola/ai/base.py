@@ -5,6 +5,8 @@ from concurrent.futures import Future, wait
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
+from pydantic import ValidationError
+
 POLL_SECONDS = 0.05
 WORKER_NAME = "bussola-ai-call"
 MAX_ERROR_LENGTH = 300
@@ -80,6 +82,10 @@ class Cancellation:
         if self.cancelled:
             raise AiCancelledError("Cancelled")
 
+    def sleep(self, seconds: float) -> None:
+        self._event.wait(seconds)
+        self.check()
+
 
 def run_cancellable[T](work: Callable[[], T], cancellation: Cancellation, timeout: float, abort: Callable[[], None] | None = None) -> T:
     cancellation.check()
@@ -98,7 +104,7 @@ def run_cancellable[T](work: Callable[[], T], cancellation: Cancellation, timeou
             cancellation.check()
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise _timed_out(timeout)
+                raise timed_out(timeout)
             wait([future], timeout=min(POLL_SECONDS, remaining))
     except AiError:
         if abort is not None:
@@ -107,12 +113,17 @@ def run_cancellable[T](work: Callable[[], T], cancellation: Cancellation, timeou
     try:
         return future.result()
     except TimeoutError as error:
-        raise _timed_out(timeout) from error
+        raise timed_out(timeout) from error
 
 
-def _timed_out(timeout: float) -> AiTimeoutError:
+def timed_out(timeout: float) -> AiTimeoutError:
     return AiTimeoutError(f"No answer within {timeout:g} seconds")
 
 
 def json_object(value: Any) -> dict[str, Any] | None:
     return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def describe_validation_error(error: ValidationError, limit: int | None = None) -> str:
+    items = error.errors(include_input=False, include_url=False)[:limit]
+    return "; ".join(f"{'.'.join(str(part) for part in item['loc']) or 'answer'}: {item['msg']}" for item in items)

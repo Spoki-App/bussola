@@ -9,7 +9,7 @@ from bussola.ai.runner import AiRunner, AiTask
 
 MILLISECONDS = 1000
 CONNECTION_TIMEOUT_SECONDS = 120.0
-CONNECTION_MAX_TOKENS = 2048
+CONNECTION_MAX_TOKENS = 4096
 
 
 class ConnectionCheck(BaseModel):
