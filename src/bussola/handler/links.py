@@ -17,7 +17,8 @@ MAX_NUMBER = 999_999_999
 DIGITS = re.compile(rf"[0-9]{{1,{len(str(MAX_NUMBER))}}}")
 REPOSITORY = re.compile(rf"(?P<owner>{NAME})/(?P<name>{NAME})")
 THREAD_ID = re.compile(r"[0-9a-f]{32}")
-DISCUSSION_ANCHOR = re.compile(r"(?:discussion_)?r(?P<comment>[1-9][0-9]{0,19})")
+COMMENT_ID = re.compile(r"[1-9][0-9]{0,19}")
+DISCUSSION_ANCHOR = re.compile(rf"(?:discussion_)?r(?P<comment>{COMMENT_ID.pattern})")
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 
 
@@ -83,6 +84,7 @@ def _review_link(query: str) -> ReviewLink:
         path=path,
         line=line,
         thread=_thread_id(single("thread")),
+        comment=_optional_comment(single("comment")),
     )
 
 
@@ -125,6 +127,12 @@ def _file_path(value: str | None) -> str | None:
     if len(value) > MAX_PATH_LENGTH or "\\" in value or CONTROL_CHARACTERS.search(value) or any(segment in ("", ".", "..") for segment in segments):
         raise InvalidLinkError("The path parameter must be a file path relative to the repository")
     return value
+
+
+def _optional_comment(value: str | None) -> int | None:
+    if value is not None and COMMENT_ID.fullmatch(value) is None:
+        raise InvalidLinkError("The comment parameter must be a GitHub comment id")
+    return None if value is None else int(value)
 
 
 def _thread_id(value: str | None) -> str | None:

@@ -43,6 +43,17 @@ const POSITIVE_NUMBER = /^[1-9]\d*$/
 
 export const LinkScrollContext = createContext<LinkScroll | null>(null)
 
+const FOCUS_PARAMS = ['path', 'line', 'thread', 'comment']
+
+export function withoutLinkFocus(search: string): string {
+  const params = new URLSearchParams(search)
+  for (const name of FOCUS_PARAMS) {
+    params.delete(name)
+  }
+  const rest = params.toString()
+  return rest ? `?${rest}` : ''
+}
+
 export function linkFocusFromSearch(search: string): LinkFocus | null {
   const params = new URLSearchParams(search)
   const path = params.get('path')

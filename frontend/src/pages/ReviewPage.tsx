@@ -20,7 +20,16 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
 import { navigate } from '../navigation'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
-import { LinkScrollContext, createLinkScroll, followLink, scrollToElement, unitElementId, type FocusTarget, type PendingLink } from '../review/linkFocus'
+import {
+  LinkScrollContext,
+  createLinkScroll,
+  followLink,
+  scrollToElement,
+  unitElementId,
+  withoutLinkFocus,
+  type FocusTarget,
+  type PendingLink,
+} from '../review/linkFocus'
 import { buildUnitTree } from '../review/unitTree'
 import { searchGroups } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
@@ -166,7 +175,8 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     if (appliedLink === undefined) {
       return undefined
     }
-    navigate(window.location.pathname, { replace: true })
+    const { pathname, search, hash } = window.location
+    navigate(`${pathname}${withoutLinkFocus(search)}${hash}`, { replace: true })
     if (appliedLink === null) {
       return undefined
     }

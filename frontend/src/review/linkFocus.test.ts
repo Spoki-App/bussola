@@ -4,6 +4,7 @@ import type { Comment, Thread, Unit } from '../api/types'
 import {
   linkFocusFromSearch,
   resolveLinkFocus,
+  withoutLinkFocus,
   type LinkFocus,
 } from './linkFocus'
 
@@ -87,6 +88,14 @@ describe('linkFocusFromSearch', () => {
     expect(linkFocusFromSearch('?line=4')).toBeNull()
     expect(linkFocusFromSearch('?path=a.py&line=0')).toEqual(focus({ path: 'a.py' }))
     expect(linkFocusFromSearch('?path=a.py&line=4x')).toEqual(focus({ path: 'a.py' }))
+  })
+})
+
+describe('withoutLinkFocus', () => {
+  it('drops only the link parameters', () => {
+    expect(withoutLinkFocus('?path=a.py&line=2&thread=t&comment=1')).toBe('')
+    expect(withoutLinkFocus('?path=a.py&view=split')).toBe('?view=split')
+    expect(withoutLinkFocus('')).toBe('')
   })
 })
 
