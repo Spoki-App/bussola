@@ -19,6 +19,7 @@ URL_NAME = f"{DISPLAY_NAME} link"
 DESKTOP_FILE = "bussola-url-handler.desktop"
 MIME_TYPE = f"x-scheme-handler/{SCHEME}"
 MAC_APP = f"{DISPLAY_NAME}.app"
+MAC_STAGED_APP = f".{DISPLAY_NAME}-new.app"
 LSREGISTER = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 WINDOWS_KEY = rf"HKCU\Software\Classes\{SCHEME}"
 WINDOWS_COMMAND_KEY = rf"{WINDOWS_KEY}\shell\open\command"
@@ -49,6 +50,12 @@ class RemovePath:
 
 
 @dataclass(frozen=True)
+class MovePath:
+    source: Path
+    target: Path
+
+
+@dataclass(frozen=True)
 class UpdatePlist:
     path: Path
     values: Mapping[str, Any]
@@ -65,7 +72,7 @@ class RunCommand:
     required: bool = True
 
 
-type Step = CreateDirectory | WriteFile | RemovePath | UpdatePlist | ForgetMimeDefault | RunCommand
+type Step = CreateDirectory | WriteFile | RemovePath | MovePath | UpdatePlist | ForgetMimeDefault | RunCommand
 type Runner = Callable[[Sequence[str]], object]
 
 
@@ -143,15 +150,18 @@ def desktop_entry(command: Sequence[str]) -> str:
 
 def macos_registration(command: Sequence[str], applications_dir: Path) -> Registration:
     app = applications_dir / MAC_APP
+    staged = applications_dir / MAC_STAGED_APP
     script = [argument for line in applescript(command) for argument in ("-e", line)]
     return Registration(
         location=str(app),
         install=(
-            RemovePath(app),
+            RemovePath(staged),
             CreateDirectory(applications_dir),
-            RunCommand(("osacompile", "-o", str(app), *script)),
-            UpdatePlist(app / "Contents" / "Info.plist", app_properties()),
-            RunCommand(("codesign", "--force", "--sign", "-", str(app))),
+            RunCommand(("osacompile", "-o", str(staged), *script)),
+            UpdatePlist(staged / "Contents" / "Info.plist", app_properties()),
+            RunCommand(("codesign", "--force", "--sign", "-", str(staged))),
+            RemovePath(app),
+            MovePath(staged, app),
             RunCommand((LSREGISTER, "-f", str(app))),
         ),
         uninstall=(RunCommand((LSREGISTER, "-u", str(app)), required=False), RemovePath(app)),
@@ -199,20 +209,29 @@ def run_command(argv: Sequence[str]) -> None:
 
 def apply(steps: Sequence[Step], run: Runner | None = None) -> None:
     for step in steps:
-        match step:
-            case CreateDirectory(path):
-                path.mkdir(parents=True, exist_ok=True)
-            case WriteFile(path, content):
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(content, encoding="utf-8")
-            case RemovePath(path):
-                _remove(path)
-            case UpdatePlist(path, values):
-                _update_plist(path, values)
-            case ForgetMimeDefault(path):
-                _forget_mime_default(path)
-            case RunCommand(argv, required):
-                _run(run or run_command, argv, required=required)
+        try:
+            _apply_step(step, run or run_command)
+        except (OSError, ValueError) as error:
+            raise HandlerError(f"Could not update the registration: {error}") from error
+
+
+def _apply_step(step: Step, run: Runner) -> None:
+    match step:
+        case CreateDirectory(path):
+            path.mkdir(parents=True, exist_ok=True)
+        case WriteFile(path, content):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        case RemovePath(path):
+            _remove(path)
+        case MovePath(source, target):
+            source.rename(target)
+        case UpdatePlist(path, values):
+            _update_plist(path, values)
+        case ForgetMimeDefault(path):
+            _forget_mime_default(path)
+        case RunCommand(argv, required):
+            _run(run, argv, required=required)
 
 
 def _run(run: Runner, argv: Sequence[str], *, required: bool) -> None:

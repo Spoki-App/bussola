@@ -10,6 +10,7 @@ from bussola.handler.registration import (
     CreateDirectory,
     ForgetMimeDefault,
     HandlerError,
+    MovePath,
     RemovePath,
     RunCommand,
     UpdatePlist,
@@ -103,15 +104,17 @@ def test_desktop_entry_refuses_line_breaks() -> None:
 def test_macos_builds_an_app_bundle_declaring_the_scheme(tmp_path: Path) -> None:
     handler = registration_for("darwin", tmp_path, {}, PYTHON)
     app = tmp_path / "Applications/bussola.app"
-    plist = app / "Contents/Info.plist"
+    staged = tmp_path / "Applications/.bussola-new.app"
 
     assert handler.location == str(app)
     assert handler.install == (
-        RemovePath(app),
+        RemovePath(staged),
         CreateDirectory(tmp_path / "Applications"),
-        RunCommand(("osacompile", "-o", str(app), *[part for line in applescript(COMMAND) for part in ("-e", line)])),
-        UpdatePlist(plist, app_properties()),
-        RunCommand(("codesign", "--force", "--sign", "-", str(app))),
+        RunCommand(("osacompile", "-o", str(staged), *[part for line in applescript(COMMAND) for part in ("-e", line)])),
+        UpdatePlist(staged / "Contents/Info.plist", app_properties()),
+        RunCommand(("codesign", "--force", "--sign", "-", str(staged))),
+        RemovePath(app),
+        MovePath(staged, app),
         RunCommand((LSREGISTER, "-f", str(app))),
     )
     assert handler.uninstall == (RunCommand((LSREGISTER, "-u", str(app)), required=False), RemovePath(app))
@@ -123,8 +126,9 @@ def test_macos_app_bundle_info_plist_after_install(tmp_path: Path) -> None:
 
     def fake_osacompile(argv: Sequence[str]) -> None:
         if argv[0] == "osacompile":
-            plist.parent.mkdir(parents=True)
-            plist.write_bytes(plistlib.dumps({"CFBundleExecutable": "applet", "CFBundleIdentifier": "com.apple.ScriptEditor.id.bussola"}))
+            staged_plist = Path(argv[2]) / "Contents/Info.plist"
+            staged_plist.parent.mkdir(parents=True)
+            staged_plist.write_bytes(plistlib.dumps({"CFBundleExecutable": "applet", "CFBundleIdentifier": "com.apple.ScriptEditor.id.bussola"}))
 
     apply(handler.install, fake_osacompile)
 
@@ -137,6 +141,25 @@ def test_macos_app_bundle_info_plist_after_install(tmp_path: Path) -> None:
     apply(handler.uninstall, lambda _argv: None)
 
     assert not plist.parent.parent.exists()
+
+
+def test_a_failed_macos_reinstall_keeps_the_working_app(tmp_path: Path) -> None:
+    handler = registration_for("darwin", tmp_path, {}, PYTHON)
+    working = tmp_path / "Applications/bussola.app/Contents/Info.plist"
+    working.parent.mkdir(parents=True)
+    working.write_bytes(plistlib.dumps({"CFBundleExecutable": "applet"}))
+
+    with pytest.raises(HandlerError, match="osacompile failed"):
+        apply(handler.install, Recorder(failing=("osacompile",)))
+
+    assert working.is_file()
+
+
+def test_file_errors_are_reported_as_handler_errors(tmp_path: Path) -> None:
+    (tmp_path / "applications").write_text("a file, not a folder")
+
+    with pytest.raises(HandlerError, match="Could not update the registration"):
+        apply((WriteFile(tmp_path / "applications/bussola-url-handler.desktop", "x"),), Recorder())
 
 
 def test_applescript_passes_the_link_as_one_quoted_argument() -> None:
