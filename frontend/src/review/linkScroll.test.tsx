@@ -78,13 +78,17 @@ describe('useLinkedScroll', () => {
     expect(scrolled).toEqual(['unit-2'])
   })
 
-  it('finishes on a linked unit', () => {
+  it('scrolls to a linked unit again once its diff has loaded, then finishes', () => {
     const link = createLinkScroll()
-    render(withLink(link, <Linked id="unit-2" unitId={2} />))
+    const view = render(withLink(link, <Linked id="unit-2" unitId={2} />))
 
     act(() => { link.start({ unitId: 2, elementId: 'unit-2' }) })
-
     expect(scrolled).toEqual(['unit-2'])
+    expect(link.current()).not.toBeNull()
+
+    view.rerender(withLink(link, <Linked id="unit-2" unitId={2} settled />))
+
+    expect(scrolled).toEqual(['unit-2', 'unit-2'])
     expect(link.current()).toBeNull()
   })
 

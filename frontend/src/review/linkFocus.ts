@@ -29,7 +29,7 @@ export interface LinkScroll {
   done: () => void
 }
 
-type LinkRole = 'target' | 'holder' | 'settled' | null
+type LinkRole = 'target' | 'approach' | 'holder' | 'settled' | null
 
 export interface AddRepositoryRequest {
   repository: string
@@ -130,7 +130,7 @@ function linkRole(state: LinkState | null, elementId: string, unitId: number | n
     return null
   }
   if (state.target.elementId === elementId) {
-    return 'target'
+    return unitId !== null && !settled ? 'approach' : 'target'
   }
   if (unitId === null || state.target.unitId !== unitId) {
     return null
@@ -152,12 +152,12 @@ export function useLinkedScroll<T extends HTMLElement>(elementId: string, unitId
       return
     }
     const now = linkRole(link.current(), elementId, unitId, settled)
-    if (now === 'target' || now === 'holder') {
+    if (now === 'target' || now === 'approach' || now === 'holder') {
       ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
     if (now === 'holder') {
       link.unitShown()
-    } else if (now !== null) {
+    } else if (now === 'target' || now === 'settled') {
       link.done()
     }
   }, [link, role, elementId, unitId, settled])
