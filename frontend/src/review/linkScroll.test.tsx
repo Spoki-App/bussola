@@ -47,6 +47,25 @@ describe('useLinkedScroll', () => {
     expect(link.current()?.reached).toBe(true)
   })
 
+  it('scrolls to the linked line inside its unit', () => {
+    const link = createLinkScroll()
+    render(withLink(link, (
+      <Linked id="unit-2" unitId={2} settled>
+        <table>
+          <tbody>
+            <tr id="line-4" />
+            <tr id="line-5" className="row-target-new" />
+          </tbody>
+        </table>
+      </Linked>
+    )))
+
+    act(() => { link.start({ unitId: 2, elementId: 'unit-2', line: 5 }) })
+
+    expect(scrolled).toEqual(['line-5'])
+    expect(link.current()?.reached).toBe(true)
+  })
+
   it('ends on a thread rendered inside its unit', () => {
     const link = createLinkScroll()
     render(withLink(link, (

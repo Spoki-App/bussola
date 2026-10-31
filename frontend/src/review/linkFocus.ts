@@ -14,6 +14,7 @@ export interface LinkFocus {
 export interface FocusTarget {
   unitId: number | null
   elementId: string
+  line?: number
 }
 
 export interface LinkState {
@@ -42,6 +43,8 @@ export interface LinkScroll {
 type LinkRole = 'target' | 'approach' | 'holder' | 'settled' | null
 
 const POSITIVE_NUMBER = /^[1-9]\d*$/
+
+export const TARGET_ROW_SELECTOR = '.row-target, .row-target-old, .row-target-new'
 
 export const LinkScrollContext = createContext<LinkScroll | null>(null)
 
@@ -126,7 +129,15 @@ export function resolveLinkFocus(focus: LinkFocus, units: Unit[], threads: Threa
     }
   }
   const unit = focus.path === null ? undefined : unitAt(units, focus.path, focus.line)
-  return unit ? { unitId: unit.id, elementId: unitElementId(unit.id) } : null
+  if (!unit) {
+    return null
+  }
+  const target = { unitId: unit.id, elementId: unitElementId(unit.id) }
+  return focus.line === null ? target : { ...target, line: focus.line }
+}
+
+function targetRowIn(element: Element | null, target: FocusTarget | undefined): Element | null {
+  return target?.line === undefined ? element : (element?.querySelector(TARGET_ROW_SELECTOR) ?? element)
 }
 
 export function scrollToElement(id: string) {
@@ -157,7 +168,8 @@ export function createLinkScroll(): LinkScroll {
     unitShown: () => { change(state && { ...state, unitShown: true }) },
     reached: () => { change(state && { ...state, reached: true }) },
     done: () => { change(null) },
-    place: (element) => {
+    place: (unitOrThread) => {
+      const element = targetRowIn(unitOrThread, state?.target)
       if (element) {
         element.scrollIntoView({ block: 'start' })
         placed = { element, top: element.getBoundingClientRect().top }
@@ -191,7 +203,7 @@ const FOLLOW_LINK_MS = 15_000
 
 function linkAnchor(state: LinkState): Element | null {
   const { elementId, unitId } = state.target
-  return document.getElementById(elementId) ?? (unitId === null ? null : document.getElementById(unitElementId(unitId)))
+  return targetRowIn(document.getElementById(elementId) ?? (unitId === null ? null : document.getElementById(unitElementId(unitId))), state.target)
 }
 
 export function followLink(link: LinkScroll): () => void {

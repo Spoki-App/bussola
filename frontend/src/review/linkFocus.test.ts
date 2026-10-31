@@ -101,7 +101,7 @@ describe('withoutLinkFocus', () => {
 
 describe('resolveLinkFocus', () => {
   it('picks the unit of the file that contains the line', () => {
-    expect(resolveLinkFocus(focus({ path: 'src/app.py', line: 20 }), units, [])).toEqual({ unitId: 2, elementId: 'unit-2' })
+    expect(resolveLinkFocus(focus({ path: 'src/app.py', line: 20 }), units, [])).toEqual({ unitId: 2, elementId: 'unit-2', line: 20 })
   })
 
   it('picks the narrowest unit when a module or class contains the unit of the line', () => {
@@ -119,7 +119,7 @@ describe('resolveLinkFocus', () => {
   })
 
   it('falls back to the first unit of the file', () => {
-    expect(resolveLinkFocus(focus({ path: 'src/app.py' }), units, [])?.unitId).toBe(1)
+    expect(resolveLinkFocus(focus({ path: 'src/app.py' }), units, [])).toEqual({ unitId: 1, elementId: 'unit-1' })
     expect(resolveLinkFocus(focus({ path: 'README.md', line: 3 }), units, [])?.unitId).toBe(3)
     expect(resolveLinkFocus(focus({ path: 'missing.py' }), units, [])).toBeNull()
   })

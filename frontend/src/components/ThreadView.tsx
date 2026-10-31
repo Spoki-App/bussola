@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useContext, useState } from 'react'
 
 import { describeError } from '../api/client'
 import { useDeleteComment, useDeleteThread, useEditComment, useReply, useSetThreadStatus } from '../api/threads'
 import type { Comment, Thread } from '../api/types'
 import { ErrorNote } from './Badges'
+import { CopyLinkButton } from './CopyLinkButton'
 import { ExternalLink } from './ExternalLink'
 import { Composer } from './Composer'
 import { Markdown } from './Markdown'
 import { threadElementId, useLinkedScroll } from '../review/linkFocus'
+import { ReviewLinkContext } from '../review/reviewLink'
 import { plural } from '../review/text'
 
 interface Props {
@@ -23,6 +25,7 @@ export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
   if (linked && collapsed) {
     setCollapsed(false)
   }
+  const makeLink = useContext(ReviewLinkContext)
   const reply = useReply(reviewId)
   const setStatus = useSetThreadStatus(reviewId)
   const remove = useDeleteThread(reviewId)
@@ -42,6 +45,7 @@ export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
           <span className="muted">{`lines ${String(thread.anchor.file_line)}-${String(thread.anchor.end_file_line)}`}</span>
         )}
         <span className="muted">{plural(thread.comments.length, 'comment')}</span>
+        {makeLink && <CopyLinkButton link={makeLink({ thread: thread.id })} label="Copy link to this thread" className="icon" />}
         <span className="spacer" />
         {thread.can_delete && !confirmingDelete && (
           <button type="button" onClick={() => { setConfirmingDelete(true) }}>

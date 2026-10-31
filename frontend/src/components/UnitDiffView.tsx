@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useContext, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Decoration, Diff, Hunk, getChangeKey, isDelete, isInsert, parseDiff, type ChangeData, type HunkData } from 'react-diff-view'
 import 'react-diff-view/style/index.css'
 
@@ -8,8 +8,10 @@ import { columnAt, isNavigationClick, type ScreenPoint } from '../review/codeNav
 import { collapsedUnified, segmentRows, type Segment } from '../review/collapse'
 import { diffTokens, languageFor } from '../review/highlight'
 import { isSelectable, rowKey } from '../review/selection'
+import { ReviewLinkContext } from '../review/reviewLink'
 import { plural } from '../review/text'
 import { hasModification } from '../settings/diffLayout'
+import { CopyLinkButton } from './CopyLinkButton'
 
 const PLACEHOLDER_GUTTER = '⋯'
 const FILE_HEADER_LINES = 3
@@ -90,6 +92,10 @@ function gutterNumber(row: DiffRow | undefined, side: GutterSide): string {
   return line === null ? PLACEHOLDER_GUTTER : String(line)
 }
 
+function linkedHeadLine(row: DiffRow | undefined, side: GutterSide): number | null {
+  return side === 'new' && row && !row.placeholder && row.change !== 'removed' ? row.new_line : null
+}
+
 function gutterSide(row: DiffRow): GutterSide {
   return row.change === 'removed' ? 'old' : 'new'
 }
@@ -149,6 +155,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
   const viewType = useViewType(modified)
   const dragging = useRef(false)
   const endSelection = useRef(onLineSelectEnd)
+  const makeLink = useContext(ReviewLinkContext)
 
   useEffect(() => {
     endSelection.current = onLineSelectEnd
@@ -216,7 +223,19 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
         const rows = (changes as (ChangeData | null)[]).map(index.rowOf)
         return [defaultGenerate(), ...lineClasses(rows, highlighted, targetRow)].join(' ')
       }}
-      renderGutter={({ change, side }) => gutterNumber(index.rowOf(change), side)}
+      renderGutter={({ change, side }) => {
+        const row = index.rowOf(change)
+        const line = makeLink ? linkedHeadLine(row, side) : null
+        if (!makeLink || line === null) {
+          return gutterNumber(row, side)
+        }
+        return (
+          <>
+            <CopyLinkButton link={makeLink({ path, line })} label={`Copy link to line ${String(line)}`} className="line-link" focusable={false} />
+            {gutterNumber(row, side)}
+          </>
+        )
+      }}
       gutterEvents={{
         onMouseDown: ({ change, side }, event: MouseEvent<HTMLElement>) => {
           const row = index.rowOf(change)

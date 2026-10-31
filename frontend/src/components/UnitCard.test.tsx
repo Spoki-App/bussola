@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Unit, UnitState } from '../api/types'
 import { LinkScrollContext, createLinkScroll } from '../review/linkFocus'
+import { ReviewLinkContext, reviewLinkMaker } from '../review/reviewLink'
 import { UnitCard } from './UnitCard'
 
 function unit(state: UnitState, overrides: Partial<Unit> = {}): Unit {
@@ -98,6 +99,27 @@ describe('UnitCard', () => {
 
     await waitFor(() => { expect(link.current()?.reached).toBe(true) })
     Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+  })
+
+  it('offers a link to its first line only in a pull request review', () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
+    const client = new QueryClient()
+    const card = (makeLink: ReturnType<typeof reviewLinkMaker>, overrides: Partial<Unit>) => (
+      <QueryClientProvider client={client}>
+        <ReviewLinkContext value={makeLink}>
+          <UnitCard reviewId={1} unit={unit('approved', overrides)} focused={false} onFocus={() => undefined} register={() => undefined} />
+        </ReviewLinkContext>
+      </QueryClientProvider>
+    )
+    const makeLink = reviewLinkMaker('https://github.com/acme/widgets/pull/3')
+    const { rerender } = render(card(makeLink, { head_start: 12, head_end: 20 }))
+    expect(screen.getByRole('button', { name: 'Copy link to this unit' })).toBeInTheDocument()
+
+    rerender(card(makeLink, { head_start: null, head_end: null }))
+    expect(screen.queryByRole('button', { name: 'Copy link to this unit' })).toBeNull()
+
+    rerender(card(null, { head_start: 12, head_end: 20 }))
+    expect(screen.queryByRole('button', { name: 'Copy link to this unit' })).toBeNull()
   })
 
   it('shows the module before the name of every unit, methods included', () => {

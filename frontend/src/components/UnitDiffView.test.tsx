@@ -1,9 +1,10 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DiffRow, UnitDiff } from '../api/types'
 import { setDiffLayout } from '../hooks/useDiffLayout'
 import { clearCaret, placeCaret } from '../test/caret'
+import { ReviewLinkContext, reviewLinkMaker, type MakeLink } from '../review/reviewLink'
 import { rowKey } from '../review/selection'
 import { DEFAULT_DIFF_LAYOUT, type DiffLayout } from '../settings/diffLayout'
 import { UnitDiffView, type TargetLine } from './UnitDiffView'
@@ -56,22 +57,25 @@ interface Options {
   onLineNumberClick?: (row: DiffRow, side: 'old' | 'new', extend: boolean) => void
   onNavigate?: (row: DiffRow, side: 'old' | 'new', column: number, point: { x: number; y: number }) => void
   target?: TargetLine
+  makeLink?: MakeLink | null
 }
 
-function view({ rows = rewritten, threads = [], highlighted, onRowClick, onLineNumberClick, onNavigate, target }: Options = {}) {
+function view({ rows = rewritten, threads = [], highlighted, onRowClick, onLineNumberClick, onNavigate, target, makeLink }: Options = {}) {
   const { container } = render(
-    <UnitDiffView
-      diff={diff(rows)}
-      path="app.py"
-      selectable={onRowClick !== undefined}
-      selected={new Set()}
-      onRowClick={onRowClick ?? (() => undefined)}
-      onLineNumberClick={onLineNumberClick}
-      highlighted={highlighted}
-      onNavigate={onNavigate}
-      target={target}
-      widgets={(changeKeyOf) => Object.fromEntries(threads.map((thread) => [changeKeyOf(thread) ?? '', <p key={thread.text}>{`thread on ${thread.text.trim()}`}</p>]))}
-    />,
+    <ReviewLinkContext value={makeLink ?? null}>
+      <UnitDiffView
+        diff={diff(rows)}
+        path="app.py"
+        selectable={onRowClick !== undefined}
+        selected={new Set()}
+        onRowClick={onRowClick ?? (() => undefined)}
+        onLineNumberClick={onLineNumberClick}
+        highlighted={highlighted}
+        onNavigate={onNavigate}
+        target={target}
+        widgets={(changeKeyOf) => Object.fromEntries(threads.map((thread) => [changeKeyOf(thread) ?? '', <p key={thread.text}>{`thread on ${thread.text.trim()}`}</p>]))}
+      />
+    </ReviewLinkContext>,
   )
   return container.querySelector('table') as HTMLTableElement
 }
@@ -183,6 +187,25 @@ describe('UnitDiffView layout', () => {
 
     fireEvent.mouseDown(gutter(table, '    return sum(items)', 'new'), { button: 0, shiftKey: true })
     expect(onLineNumberClick).toHaveBeenLastCalledWith(added, 'new', true)
+  })
+
+  it('copies a link to a head line from its gutter without starting a comment', async () => {
+    chooseLayout('split')
+    const writeText = vi.fn(() => Promise.resolve())
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const onLineNumberClick = vi.fn()
+    const table = view({ onLineNumberClick, makeLink: reviewLinkMaker('https://github.com/acme/widgets/pull/7') })
+
+    expect(gutter(table, '    return 0', 'old').querySelector('button')).toBeNull()
+    const button = screen.getByRole('button', { name: 'Copy link to line 2' })
+    expect(gutter(table, '    return sum(items)', 'new')).toContainElement(button)
+    fireEvent.mouseDown(button, { button: 0 })
+    fireEvent.click(button)
+
+    expect(onLineNumberClick).not.toHaveBeenCalled()
+    expect(writeText).toHaveBeenCalledWith('bussola://review?repo=acme/widgets&pr=7&path=app.py&line=2')
+    await waitFor(() => { expect(button).toHaveAttribute('title', 'Link copied') })
+    Reflect.deleteProperty(navigator, 'clipboard')
   })
 
   it('marks the commented side of a split line only', () => {

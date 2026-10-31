@@ -1133,6 +1133,64 @@ button.toggle[aria-pressed='true'] {
   color: var(--accent);
 }
 
+.diff .diff-gutter-insert,
+.diff .diff-gutter-normal {
+  position: relative;
+}
+
+.copy-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.copy-link-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+button.copy-link.icon,
+button.copy-link.line-link {
+  min-height: 0;
+  padding: 2px;
+  border: none;
+  background: none;
+  color: var(--faint);
+}
+
+button.copy-link.icon:hover:not(:disabled),
+button.copy-link.line-link:hover:not(:disabled),
+button.copy-link.copied {
+  background: none;
+  color: var(--accent);
+}
+
+button.copy-link.failed {
+  color: var(--danger);
+}
+
+.diff .line-link {
+  position: absolute;
+  top: 1px;
+  left: 2px;
+  opacity: 0;
+}
+
+.diff tr:hover .line-link,
+.diff .line-link:is(.copied, .failed) {
+  opacity: 1;
+}
+
+.diff tr:is(.row-target, .row-target-old, .row-target-new) {
+  scroll-margin-top: 30vh;
+}
+
 .diff .diff-code .diff-code-edit {
   color: inherit;
   border-radius: 2px;
