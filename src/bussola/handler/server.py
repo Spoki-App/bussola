@@ -41,6 +41,7 @@ FREE_PORT_ATTEMPTS = 3
 NOTHING_TO_SKIP: frozenset["ServerAddress"] = frozenset()
 MAX_PROBE_BODY = 512
 MAX_LINK_LOG_BYTES = 1_000_000
+PRIVATE_FILE_MODE = 0o600
 MAX_LOGGED_LINK = 500
 IPV6_LOOPBACK = "::1"
 TOKEN_FINGERPRINT_LENGTH = 16
@@ -198,8 +199,9 @@ def record_link_error(data_dir: Path, link: str, error: Exception) -> None:
     with contextlib.suppress(OSError):
         data_dir.mkdir(parents=True, exist_ok=True)
         log = data_dir / LINK_LOG_FILE
-        mode = "w" if log.is_file() and log.stat().st_size > MAX_LINK_LOG_BYTES else "a"
-        with log.open(mode, encoding="utf-8") as file:
+        flags = os.O_WRONLY | os.O_CREAT | (os.O_TRUNC if log.is_file() and log.stat().st_size > MAX_LINK_LOG_BYTES else os.O_APPEND)
+        with os.fdopen(os.open(log, flags, PRIVATE_FILE_MODE), "w", encoding="utf-8") as file:
+            log.chmod(PRIVATE_FILE_MODE)
             file.write(f"{datetime.now(UTC).isoformat(timespec='seconds')} {link[:MAX_LOGGED_LINK]!r}: {error}\n")
 
 
@@ -270,7 +272,7 @@ class Launcher:
         path = browser_path(parse_link(link))
         url = self.ensure_server().url(path)
         if not self.open_browser(url):
-            raise ServerStartError("bussola is running, but no browser could be opened. Open bussola from the link `bussola serve` prints.")
+            raise ServerStartError(f"bussola is running, but no browser could be opened. Open {url} yourself.")
         return url
 
     def ensure_server(self) -> ServerAddress:

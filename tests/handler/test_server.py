@@ -1,5 +1,6 @@
 import ipaddress
 import json
+import re
 import socket
 import stat
 import subprocess
@@ -441,7 +442,7 @@ def test_open_reports_a_browser_that_cannot_be_opened(tmp_path: Path) -> None:
     publish_server(tmp_path, running)
     launcher = Launcher(tmp_path, probe=FakeServers({running}).probe, open_browser=lambda _url: False)
 
-    with pytest.raises(ServerStartError, match="no browser could be opened"):
+    with pytest.raises(ServerStartError, match=re.escape(f"Open http://127.0.0.1:8765/?token={TOKEN} yourself")):
         launcher.open("bussola://")
 
 

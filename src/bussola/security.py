@@ -56,12 +56,16 @@ def install_security(app: FastAPI, settings: AppSettings) -> None:
         if settings.token is None:
             return await call_next(request)
         query_token = request.query_params.get(TOKEN_QUERY)
-        if query_token is not None and secrets.compare_digest(query_token, settings.token):
+        if query_token is not None and _same_token(query_token, settings.token):
             return _store_token_and_redirect(request, settings.token, token_cookie(settings.port))
         cookie = request.cookies.get(token_cookie(settings.port), "")
-        if request.url.path.startswith(API_PATH_PREFIX) and not secrets.compare_digest(cookie, settings.token):
+        if request.url.path.startswith(API_PATH_PREFIX) and not _same_token(cookie, settings.token):
             return JSONResponse({"detail": INVALID_TOKEN_DETAIL, "code": INVALID_TOKEN_CODE}, status_code=status.HTTP_403_FORBIDDEN)
         return await call_next(request)
+
+
+def _same_token(given: str, token: str) -> bool:
+    return secrets.compare_digest(given.encode(), token.encode())
 
 
 def _store_token_and_redirect(request: Request, token: str, cookie: str) -> Response:

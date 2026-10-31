@@ -1,5 +1,7 @@
 import os
+import stat
 import subprocess
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -227,6 +229,8 @@ def test_open_link_log_stays_small(data_dir: Path) -> None:
     log = (data_dir / "open-link.log").read_text()
     assert len(log) < 1000
     assert log.count("\n") == 1
+    if sys.platform != "win32":
+        assert stat.S_IMODE((data_dir / "open-link.log").stat().st_mode) == 0o600
 
 
 def test_open_link_logs_unexpected_failures_too(data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:

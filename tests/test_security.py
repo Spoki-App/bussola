@@ -38,6 +38,13 @@ def test_foreign_host_header_is_forbidden_even_with_token(client: TestClient) ->
     assert response.status_code == 403
 
 
+def test_a_non_ascii_token_is_refused_not_an_error(client: TestClient) -> None:
+    cookie = f"{TOKEN_COOKIE}=\u00e9".encode("latin-1")
+
+    assert client.get("/api/health", headers=[(b"cookie", cookie)]).status_code == 403
+    assert client.get("/reviews/1?token=%C3%A9", follow_redirects=False).status_code != 500
+
+
 def test_the_session_cookie_belongs_to_one_port(client: TestClient) -> None:
     client.cookies.set("bussola_token_9000", TOKEN)
 
