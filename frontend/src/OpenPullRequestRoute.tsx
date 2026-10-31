@@ -1,15 +1,15 @@
 import { useEffect, useRef } from 'react'
 
 import { describeError } from './api/client'
-import { isMissingClone, useOpenPullRequestLink } from './api/pulls'
 import { ErrorNote } from './components/Badges'
 import { ExternalLink } from './components/ExternalLink'
 import { Link } from './Link'
-import { navigate, showReview } from './navigation'
+import { navigate } from './navigation'
+import { useOpenReview } from './openReview'
 import { addRepositoryPath } from './review/pullRequestLink'
 
 export function OpenPullRequestRoute({ url }: { url: string }) {
-  const open = useOpenPullRequestLink()
+  const { open, start } = useOpenReview()
   const started = useRef(false)
 
   useEffect(() => {
@@ -18,15 +18,8 @@ export function OpenPullRequestRoute({ url }: { url: string }) {
     }
     started.current = true
     const { pathname, search } = window.location
-    open.mutate(url, {
-      onSuccess: (review) => { showReview(review.id, search) },
-      onError: (error) => {
-        if (isMissingClone(error)) {
-          navigate(addRepositoryPath(`${pathname}${search}`), { replace: true })
-        }
-      },
-    })
-  }, [open, url])
+    start(url, search, () => { navigate(addRepositoryPath(`${pathname}${search}`), { replace: true }) })
+  }, [start, url])
 
   return (
     <div className="page">

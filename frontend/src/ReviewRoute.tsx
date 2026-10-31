@@ -32,8 +32,8 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
   const openCount = (threads.data ?? []).filter(isOpen).length
   const [linkFocus] = useState(() => linkFocusFromSearch(window.location.search))
   const threadsSettled = threads.data !== undefined || threads.error !== null
-  const linkTarget = useMemo(
-    () => (linkFocus && threadsSettled ? (units: Unit[]) => resolveLinkFocus(linkFocus, units, threads.data ?? []) : undefined),
+  const link = useMemo(
+    () => (linkFocus ? { ready: threadsSettled, resolve: (units: Unit[]) => resolveLinkFocus(linkFocus, units, threads.data ?? []) } : undefined),
     [linkFocus, threadsSettled, threads.data],
   )
 
@@ -94,7 +94,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
         renderWidgets,
         fileActions,
         sidePanel: { label: `conversation (${String(openCount)})`, content: sidePanelContent },
-        linkTarget,
+        link,
       }}
     />
   )

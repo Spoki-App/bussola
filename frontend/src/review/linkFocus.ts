@@ -21,6 +21,11 @@ export interface LinkState {
   reached: boolean
 }
 
+export interface PendingLink {
+  ready: boolean
+  resolve: (units: Unit[]) => FocusTarget | null
+}
+
 export interface LinkScroll {
   current: () => LinkState | null
   subscribe: (listener: () => void) => () => void
@@ -184,8 +189,13 @@ export function followLink(link: LinkScroll): () => void {
   keepInView.observe(document.body)
   let deadline: number | undefined
   const unsubscribe = link.subscribe(() => {
-    if (link.current()?.reached && deadline === undefined) {
-      deadline = window.setTimeout(end, FOLLOW_AFTER_REACHED_MS)
+    const state = link.current()
+    if (!state?.reached || deadline !== undefined) {
+      return
+    }
+    deadline = window.setTimeout(end, FOLLOW_AFTER_REACHED_MS)
+    for (let element = linkAnchor(state); element; element = element.parentElement) {
+      keepInView.observe(element)
     }
   })
   const stop = () => {

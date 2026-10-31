@@ -101,6 +101,7 @@ describe('useLinkedScroll', () => {
 
 describe('followLink', () => {
   let resized: () => void = () => undefined
+  let observed: Element[] = []
 
   beforeEach(() => {
     scrolled = []
@@ -110,10 +111,11 @@ describe('followLink', () => {
     vi.stubGlobal('ResizeObserver', class {
       constructor(callback: () => void) {
         resized = callback
+        observed = []
       }
 
-      observe() {
-        return undefined
+      observe(element: Element) {
+        observed.push(element)
       }
 
       disconnect() {
@@ -144,6 +146,17 @@ describe('followLink', () => {
     expect(scrolled).toEqual(['unit-2'])
     expect(link.current()).toBeNull()
     stop()
+  })
+
+  it('watches the containers of the reached target, such as the conversation panel', () => {
+    document.body.innerHTML = '<aside id="panel"><div id="thread-t"></div></aside>'
+    const link = createLinkScroll()
+    followLink(link)
+    link.start({ unitId: null, elementId: 'thread-t' })
+
+    link.reached()
+
+    expect(observed.map((element) => element.id || element.tagName)).toEqual(['BODY', 'thread-t', 'panel', 'BODY', 'HTML'])
   })
 
   it('stops following the target ten seconds after reaching it', () => {

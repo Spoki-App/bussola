@@ -20,7 +20,7 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Link } from '../Link'
 import { navigate } from '../navigation'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
-import { LinkScrollContext, createLinkScroll, followLink, scrollToElement, unitElementId, type FocusTarget } from '../review/linkFocus'
+import { LinkScrollContext, createLinkScroll, followLink, scrollToElement, unitElementId, type FocusTarget, type PendingLink } from '../review/linkFocus'
 import { buildUnitTree } from '../review/unitTree'
 import { searchGroups } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
@@ -35,7 +35,7 @@ export interface ReviewExtensions {
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
   fileActions?: (path: string) => ReactNode
   sidePanel?: { label: string; content: ReactNode }
-  linkTarget?: (units: Unit[]) => FocusTarget | null
+  link?: PendingLink
 }
 
 interface Props {
@@ -145,15 +145,15 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= WIDE_LAYOUT_PX)
   const [filesHidden, setFilesHidden] = useState(() => readStored(FILES_HIDDEN_KEY) === 'true')
   const [appliedLink, setAppliedLink] = useState<FocusTarget | null | undefined>(undefined)
-  const { linkTarget } = extensions
+  const { link } = extensions
   const toggleFiles = () => {
     setFilesHidden(!filesHidden)
     writeStored(FILES_HIDDEN_KEY, String(!filesHidden))
   }
 
   const viewChanged = filter !== 'all' || query !== ''
-  const resolveLink = () => (linkTarget && units.data && !units.isPlaceholderData ? linkTarget(units.data) : undefined)
-  const linkedTarget = appliedLink !== undefined ? undefined : viewChanged ? null : resolveLink()
+  const resolveLink = () => (link?.ready && units.data && !units.isPlaceholderData ? link.resolve(units.data) : undefined)
+  const linkedTarget = !link || appliedLink !== undefined ? undefined : viewChanged ? null : resolveLink()
   if (linkedTarget !== undefined) {
     setAppliedLink(linkedTarget)
     if (linkedTarget) {

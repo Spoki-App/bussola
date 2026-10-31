@@ -2,7 +2,7 @@ import { useState, type SubmitEvent } from 'react'
 
 import { describeError } from '../api/client'
 import { useCreateReview, useRefs, useRepos, useReviews } from '../api/hooks'
-import { isMissingClone, useOpenPullRequestLink } from '../api/pulls'
+import { isMissingClone } from '../api/pulls'
 import type { Repo } from '../api/types'
 import { AddRepoForm } from '../components/AddRepoForm'
 import { CourseStrip, ErrorNote } from '../components/Badges'
@@ -10,7 +10,8 @@ import { CommentCount } from '../components/CommentCount'
 import { PullRequestsPanel } from '../components/PullRequestsPanel'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { Link } from '../Link'
-import { navigate, reviewPath, showReview, useSearch } from '../navigation'
+import { navigate, reviewPath, useSearch } from '../navigation'
+import { useOpenReview } from '../openReview'
 import { addRepositoryRequestFromSearch, type AddRepositoryRequest } from '../review/pullRequestLink'
 import { progressPercent } from '../review/logic'
 import { REVIEW_FILTER_LABELS, loadReviewFilter, matchesReviewFilter, saveReviewFilter, type ReviewFilter } from '../review/reviewFilter'
@@ -43,10 +44,8 @@ export function HomePage() {
 
 function AddRepositoryPrompt({ request }: { request: AddRepositoryRequest }) {
   const name = request.repository.slice(request.repository.indexOf('/') + 1)
-  const open = useOpenPullRequestLink()
-  const openPullRequest = () => {
-    open.mutate(request.url, { onSuccess: (review) => { showReview(review.id, request.search) } })
-  }
+  const { open, start } = useOpenReview()
+  const openPullRequest = () => { start(request.url, request.search) }
   return (
     <section className="repo" aria-labelledby="add-repository-title">
       <h2 id="add-repository-title">{`Add ${request.repository}`}</h2>
