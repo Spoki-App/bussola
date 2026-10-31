@@ -26,6 +26,10 @@ class AiUnreachableError(AiProviderError):
     pass
 
 
+class AiRejectedError(AiProviderError):
+    pass
+
+
 class AiOutputError(AiError):
     pass
 

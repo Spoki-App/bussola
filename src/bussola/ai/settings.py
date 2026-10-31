@@ -1,19 +1,20 @@
 from pathlib import Path
 
 from bussola.ai.base import AiNotConfiguredError, AiTargetChangedError
-from bussola.ai.config import AiSettings, RepoAiConfig, load_user_config, resolve_ai_settings
+from bussola.ai.config import AiSettings, RepoAiConfig, describe_config_error, load_user_config, resolve_ai_settings
 from bussola.config import REPO_CONFIG_FILE, load_repo_config
 
 
 def load_ai_settings(config_file: Path | None, repo_root: Path | None = None) -> AiSettings:
     user = load_user_config(config_file).ai
-    if repo_root is None or not resolve_ai_settings(user).configured:
-        return resolve_ai_settings(user)
+    own = resolve_ai_settings(user)
+    if repo_root is None or not own.configured:
+        return own
     try:
         section = load_repo_config(repo_root).ai
         repo = None if section is None else RepoAiConfig.model_validate(section)
     except (OSError, ValueError) as error:
-        raise AiNotConfiguredError(f"Invalid configuration in {repo_root / REPO_CONFIG_FILE}: {error}") from error
+        raise AiNotConfiguredError(f"Invalid configuration in {repo_root / REPO_CONFIG_FILE}: {describe_config_error(error)}") from error
     return resolve_ai_settings(user, repo)
 
 

@@ -11,11 +11,12 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-from bussola.ai.base import MAX_ERROR_LENGTH, AiProviderError, AiUnreachableError, Cancellation, json_object, run_cancellable
+from bussola.ai.base import MAX_ERROR_LENGTH, AiProviderError, AiRejectedError, AiUnreachableError, Cancellation, json_object, run_cancellable
 
 SOCKET_GRACE_SECONDS = 5.0
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 MAX_ERROR_BODY_BYTES = 64 * 1024
+REJECTING_STATUSES = frozenset({401, 403, 429})
 LOOPBACK_NAME = "localhost"
 
 
@@ -133,11 +134,12 @@ def post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeou
     try:
         body = run_cancellable(send, cancellation, timeout, abort=connections.close)
     except _HttpStatusError as error:
-        raise AiProviderError(f"{url} answered HTTP {error.code}: {error.detail}") from error
+        failure = AiRejectedError if error.code in REJECTING_STATUSES else AiProviderError
+        raise failure(f"{url} answered HTTP {error.code}: {error.detail}") from error
     except urllib.error.URLError as error:
         raise AiUnreachableError(f"Cannot reach {url}: {error.reason}") from error
     except (http.client.HTTPException, OSError) as error:
-        raise AiUnreachableError(f"The connection to {url} failed: {error or type(error).__name__}") from error
+        raise AiProviderError(f"The connection to {url} failed: {error or type(error).__name__}") from error
     except ValueError as error:
         raise AiProviderError(f"The request to {url} could not be sent: {error}") from error
     if len(body) > MAX_RESPONSE_BYTES:

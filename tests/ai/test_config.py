@@ -201,3 +201,14 @@ def test_a_repository_switching_provider_does_not_inherit_max_tokens() -> None:
 
     assert resolve_ai_settings(user, local).max_tokens is None
     assert resolve_ai_settings(user, RepoAiConfig(model="claude-sonnet-5-5")).max_tokens == 512
+
+
+def test_a_secret_written_in_the_config_is_not_repeated_in_the_error(tmp_path: Path) -> None:
+    config = tmp_path / "config.toml"
+    config.write_text('[ai]\nprovider = "anthropic"\napi_key = "sk-ant-secret-value"\n')
+
+    with pytest.raises(AiNotConfiguredError) as raised:
+        load_user_config(config)
+
+    assert "api_key" in str(raised.value)
+    assert "sk-ant-secret-value" not in str(raised.value)

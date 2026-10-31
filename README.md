@@ -147,7 +147,7 @@ ignore = ["vendor/**", "docs/**"]
 
 ## AI providers
 
-AI features are optional and off until you choose a provider. bussola talks to one of three providers, set in the `[ai]` section of your user configuration, `config.toml` in `platformdirs.user_config_dir("bussola")` (on macOS `~/Library/Application Support/bussola/config.toml`, on Linux `~/.config/bussola/config.toml`; set `BUSSOLA_CONFIG_DIR` to use another directory). **AI** in **Settings** shows the active provider and model, where the configuration is read from, and a **Test connection** button that sends a short fixed prompt and no code.
+AI features are optional and off until you choose a provider. This version sets up the provider and **Test connection**; the AI actions themselves (unit descriptions, impact ratings, AI review) come in later versions and follow the rules below. bussola talks to one of three providers, set in the `[ai]` section of your user configuration, `config.toml` in `platformdirs.user_config_dir("bussola")` (on macOS `~/Library/Application Support/bussola/config.toml`, on Linux `~/.config/bussola/config.toml`; set `BUSSOLA_CONFIG_DIR` to use another directory). **AI** in **Settings** shows the active provider and model, where the configuration is read from, and a **Test connection** button that sends a short fixed prompt and no code.
 
 **Claude Code CLI** runs the `claude` command already installed and signed in on your machine, so bussola needs no key:
 

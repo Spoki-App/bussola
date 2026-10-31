@@ -1,4 +1,14 @@
-from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiOutputError, AiTargetChangedError, AiTimeoutError, AiUnreachableError, Cancellation
+from bussola.ai.base import (
+    AiCancelledError,
+    AiNotConfiguredError,
+    AiOutputError,
+    AiProviderError,
+    AiRejectedError,
+    AiTargetChangedError,
+    AiTimeoutError,
+    AiUnreachableError,
+    Cancellation,
+)
 from bussola.ai.batch import BatchProgress, run_batch
 
 
@@ -69,7 +79,7 @@ def test_a_configuration_error_stops_the_batch() -> None:
 
     assert calls == [1]
     assert outcome.stopped_by == "Set the ANTHROPIC_API_KEY environment variable"
-    assert outcome.errors == {}
+    assert outcome.errors == {1: "Set the ANTHROPIC_API_KEY environment variable"}
 
 
 def test_progress_counts_every_item_even_when_items_repeat() -> None:
@@ -114,3 +124,51 @@ def test_two_timeouts_in_a_row_stop_the_batch_but_one_does_not() -> None:
     assert outcome.results == {2: 2}
     assert set(outcome.errors) == {1, 3, 4}
     assert outcome.stopped_by == "No answer within 600 seconds"
+
+
+def test_timeouts_separated_by_another_failure_are_not_in_a_row() -> None:
+    def work(item: int) -> int:
+        if item in {1, 3}:
+            raise AiTimeoutError("No answer within 600 seconds")
+        raise AiOutputError("unusable")
+
+    outcome = run_batch([1, 2, 3, 4], work, Cancellation())
+
+    assert outcome.stopped_by is None
+    assert set(outcome.errors) == {1, 2, 3, 4}
+
+
+def test_a_rejected_key_or_rate_limit_stops_the_batch() -> None:
+    calls: list[int] = []
+
+    def work(item: int) -> int:
+        calls.append(item)
+        raise AiRejectedError("answered HTTP 401: invalid x-api-key")
+
+    outcome = run_batch([1, 2, 3], work, Cancellation())
+
+    assert calls == [1]
+    assert outcome.stopped_by == "answered HTTP 401: invalid x-api-key"
+
+
+def test_a_one_off_connection_failure_does_not_stop_the_batch() -> None:
+    def work(item: int) -> int:
+        if item == 1:
+            raise AiProviderError("The connection to http://localhost:11434/v1/chat/completions failed: Remote end closed connection")
+        return item
+
+    outcome = run_batch([1, 2], work, Cancellation())
+
+    assert outcome.results == {2: 2}
+    assert outcome.stopped_by is None
+
+
+def test_the_item_that_stops_the_batch_is_counted_in_the_progress() -> None:
+    progress: list[BatchProgress] = []
+
+    def work(_item: int) -> int:
+        raise AiUnreachableError("Cannot reach the endpoint")
+
+    run_batch([1, 2], work, Cancellation(), progress.append)
+
+    assert progress == [BatchProgress(1, 1, 2)]

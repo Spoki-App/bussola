@@ -10,7 +10,17 @@ from typing import Any
 import pytest
 
 from bussola.ai.anthropic_api import API_VERSION, AnthropicProvider
-from bussola.ai.base import WORKER_NAME, AiCancelledError, AiNotConfiguredError, AiOutputError, AiProviderError, AiRequest, AiTimeoutError, Cancellation
+from bussola.ai.base import (
+    WORKER_NAME,
+    AiCancelledError,
+    AiNotConfiguredError,
+    AiOutputError,
+    AiProviderError,
+    AiRejectedError,
+    AiRequest,
+    AiTimeoutError,
+    Cancellation,
+)
 from bussola.ai.config import AiSettings, ProviderName
 from bussola.ai.http import MAX_RESPONSE_BYTES, bypasses_proxy
 from bussola.ai.openai_compatible import OpenAiCompatibleProvider
@@ -99,6 +109,16 @@ def test_an_incomplete_anthropic_answer_is_an_error(stub: StubServer, stop_reaso
 
     with pytest.raises(AiOutputError, match=message):
         AnthropicProvider("claude-opus-5-5", stub.url, "sk-test", 5.0).complete(REQUEST, Cancellation())
+
+
+@pytest.mark.parametrize(("status", "rejected"), [(401, True), (403, True), (429, True), (500, False)])
+def test_auth_and_rate_limit_answers_are_rejections(stub: StubServer, status: int, rejected: bool) -> None:
+    stub.reply({"error": {"message": "nope"}}, status=status)
+
+    with pytest.raises(AiProviderError) as raised:
+        OpenAiCompatibleProvider("gpt", stub.url, None, 5.0).complete(REQUEST, Cancellation())
+
+    assert isinstance(raised.value, AiRejectedError) is rejected
 
 
 def test_an_http_error_shows_the_message_of_the_api(stub: StubServer) -> None:

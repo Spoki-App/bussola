@@ -1,9 +1,10 @@
 from collections.abc import Callable, Hashable, Sequence
 from dataclasses import dataclass, field
 
-from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiTargetChangedError, AiTimeoutError, AiUnreachableError, Cancellation
+from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiRejectedError, AiTargetChangedError, AiTimeoutError, AiUnreachableError, Cancellation
 
 TIMEOUTS_IN_A_ROW_TO_STOP = 2
+STOPPING_ERRORS = (AiNotConfiguredError, AiTargetChangedError, AiUnreachableError, AiRejectedError)
 
 
 @dataclass(frozen=True)
@@ -35,23 +36,19 @@ def run_batch[K: Hashable, T](
             break
         try:
             outcome.results[item] = work(item)
-            timeouts_in_a_row = 0
         except AiCancelledError:
             outcome.cancelled = True
             break
-        except (AiNotConfiguredError, AiTargetChangedError, AiUnreachableError) as error:
-            outcome.stopped_by = str(error)
-            break
-        except AiTimeoutError as error:
-            outcome.errors[item] = str(error)
-            failed += 1
-            timeouts_in_a_row += 1
-            if timeouts_in_a_row >= TIMEOUTS_IN_A_ROW_TO_STOP:
-                outcome.stopped_by = str(error)
-                break
         except Exception as error:
             outcome.errors[item] = str(error) or type(error).__name__
             failed += 1
+            timeouts_in_a_row = timeouts_in_a_row + 1 if isinstance(error, AiTimeoutError) else 0
+            if isinstance(error, STOPPING_ERRORS) or timeouts_in_a_row >= TIMEOUTS_IN_A_ROW_TO_STOP:
+                outcome.stopped_by = outcome.errors[item]
+        else:
+            timeouts_in_a_row = 0
         if on_progress is not None:
             on_progress(BatchProgress(done, failed, len(items)))
+        if outcome.stopped_by is not None:
+            break
     return outcome

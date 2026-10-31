@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 import platformdirs
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from bussola.ai.base import AiNotConfiguredError
 from bussola.storage.database import APP_NAME
@@ -102,7 +102,13 @@ def load_user_config(path: Path | None) -> UserConfig:
     try:
         return UserConfig.model_validate(tomllib.loads(path.read_text(encoding="utf-8")))
     except (OSError, ValueError) as error:
-        raise AiNotConfiguredError(f"Invalid configuration in {path}: {error}") from error
+        raise AiNotConfiguredError(f"Invalid configuration in {path}: {describe_config_error(error)}") from error
+
+
+def describe_config_error(error: Exception) -> str:
+    if isinstance(error, ValidationError):
+        return "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors(include_input=False, include_url=False))
+    return str(error)
 
 
 def resolve_ai_settings(user: UserAiConfig, repo: RepoAiConfig | None = None) -> AiSettings:
