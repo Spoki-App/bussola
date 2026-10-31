@@ -7,8 +7,10 @@ from bussola.api.schemas import PullRequestLinkIn, PullRequestListOut, PullReque
 from bussola.api.state import app_state
 from bussola.api.views import forge_status_out, pull_request_out, review_detail_out
 from bussola.directories import find_repositories
-from bussola.forge.pulls import ForgeSession, find_repo_for, list_pull_requests, parse_pull_request_url, review_pull_request
+from bussola.forge.base import ForgeError
+from bussola.forge.pulls import ForgeSession, existing_review, find_repo_for, list_pull_requests, parse_pull_request_url, review_pull_request
 from bussola.forge.review_sync import sync_pull_requests
+from bussola.git import GitError
 from bussola.review.context import ReviewContext
 from bussola.review.repos import open_repo
 
@@ -41,7 +43,12 @@ def open_pull_request_link(body: PullRequestLinkIn, store: StoreDep, reviewer: R
     address = parse_pull_request_url(body.url)
     adapter = app_state(request).forge
     repo = find_repo_for(store, adapter, address.repository, _repositories_under_home)
-    review = review_pull_request(ForgeSession(store, adapter, open_repo(repo), reviewer), repo, address.number, address.repository)
+    try:
+        review = review_pull_request(ForgeSession(store, adapter, open_repo(repo), reviewer), repo, address.number, address.repository)
+    except (ForgeError, GitError):
+        review = existing_review(store, repo, address.repository, address.number)
+        if review is None:
+            raise
     store.commit()
     return review_detail_out(ReviewContext(store, review, reviewer), repo)
 

@@ -119,7 +119,7 @@ def review_pull_request(session: ForgeSession, repo: Repo, number: int, reposito
     conversation = adapter.pull_request_conversation(remote.repository, number)
     pull = conversation.pull
     head_ref, base_ref = fetch_pull_request(git_repo, remote, pull)
-    review = _review_for(store, repo, remote.repository, pull) or store.reviews.find_or_add_review(repo.id, head_ref, base_ref)
+    review = existing_review(store, repo, remote.repository, pull.number) or store.reviews.find_or_add_review(repo.id, head_ref, base_ref)
     review.head_ref, review.base_ref = head_ref, base_ref
     link = _save_link(store, review, adapter.provider, remote.repository, pull)
     result = refresh_review(store, review, git_repo)
@@ -168,8 +168,9 @@ def require_remote(adapter: ForgeAdapter, git_repo: GitRepo, repository: str | N
     return remote
 
 
-def _review_for(store: Store, repo: Repo, repository: str, pull: PullRequest) -> Review | None:
-    link = next((link for link in store.forge.links_for_repo(repo.id) if link.repository == repository and link.pr_number == pull.number), None)
+def existing_review(store: Store, repo: Repo, repository: str, number: int) -> Review | None:
+    links = store.forge.links_for_repo(repo.id)
+    link = next((link for link in links if link.repository.lower() == repository.lower() and link.pr_number == number), None)
     return store.reviews.get_review(link.review_id) if link else None
 
 

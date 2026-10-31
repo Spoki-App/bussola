@@ -3,6 +3,8 @@ from typing import Any
 
 import pytest
 
+from bussola.forge.base import Conversation, ForgeError
+from bussola.forge.github import GitHubAdapter
 from tests.apiclient import ApiClient
 from tests.forge.conftest import FIRST, SECOND, GitHubSandbox
 from tests.gitrepo import GitFixture
@@ -137,6 +139,22 @@ def test_a_pull_request_link_opens_its_review_in_the_matching_repository(api: Ap
 
     assert (review["repo_id"], review["pull_request"]["number"], review["latest_revision"]["head_sha"]) == (repo, 7, head)
     assert open_link(api, url)["id"] == review["id"]
+
+
+def test_a_pull_request_link_to_a_review_opens_it_even_when_github_cannot_be_reached(
+    api: ApiClient, github: GitHubSandbox, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    github.open_pull_request({"app.py": FIRST})
+    register(api)
+    review = open_link(api, "https://github.com/acme/widgets/pull/7")
+
+    def offline(_adapter: GitHubAdapter, _repository: str, _number: int) -> Conversation:
+        raise ForgeError("Could not reach GitHub")
+
+    monkeypatch.setattr(GitHubAdapter, "pull_request_conversation", offline)
+
+    assert open_link(api, "https://github.com/Acme/Widgets/pull/7")["id"] == review["id"]
+    open_link(api, "https://github.com/acme/widgets/pull/8", 502)
 
 
 def test_a_pull_request_link_finds_and_adds_a_clone_under_home(api: ApiClient, github: GitHubSandbox, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
