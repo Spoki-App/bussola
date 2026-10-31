@@ -55,12 +55,17 @@ class UpdatePlist:
 
 
 @dataclass(frozen=True)
+class ForgetMimeDefault:
+    path: Path
+
+
+@dataclass(frozen=True)
 class RunCommand:
     argv: tuple[str, ...]
     required: bool = True
 
 
-type Step = CreateDirectory | WriteFile | RemovePath | UpdatePlist | RunCommand
+type Step = CreateDirectory | WriteFile | RemovePath | UpdatePlist | ForgetMimeDefault | RunCommand
 type Runner = Callable[[Sequence[str]], object]
 
 
@@ -78,7 +83,7 @@ def current_registration() -> Registration:
 def registration_for(system: str, home: Path, environ: Mapping[str, str], executable: str) -> Registration:
     command = handler_command(system, executable)
     if system.startswith("linux"):
-        return linux_registration(command, xdg_applications_dir(home, environ))
+        return linux_registration(command, xdg_applications_dir(home, environ), xdg_mimeapps_file(home, environ))
     if system == "darwin":
         return macos_registration(command, home / "Applications")
     if system == "win32":
@@ -95,12 +100,19 @@ def handler_command(system: str, executable: str) -> tuple[str, ...]:
 
 
 def xdg_applications_dir(home: Path, environ: Mapping[str, str]) -> Path:
-    data_home = environ.get("XDG_DATA_HOME", "")
-    base = Path(data_home) if Path(data_home).is_absolute() else home / ".local" / "share"
-    return base / "applications"
+    return _xdg_dir(environ, "XDG_DATA_HOME", home / ".local" / "share") / "applications"
 
 
-def linux_registration(command: Sequence[str], applications_dir: Path) -> Registration:
+def xdg_mimeapps_file(home: Path, environ: Mapping[str, str]) -> Path:
+    return _xdg_dir(environ, "XDG_CONFIG_HOME", home / ".config") / "mimeapps.list"
+
+
+def _xdg_dir(environ: Mapping[str, str], variable: str, default: Path) -> Path:
+    value = Path(environ.get(variable, ""))
+    return value if value.is_absolute() else default
+
+
+def linux_registration(command: Sequence[str], applications_dir: Path, mimeapps: Path) -> Registration:
     desktop = applications_dir / DESKTOP_FILE
     refresh = RunCommand(("update-desktop-database", str(applications_dir)), required=False)
     return Registration(
@@ -110,7 +122,7 @@ def linux_registration(command: Sequence[str], applications_dir: Path) -> Regist
             RunCommand(("xdg-mime", "default", DESKTOP_FILE, MIME_TYPE)),
             refresh,
         ),
-        uninstall=(RemovePath(desktop), refresh),
+        uninstall=(RemovePath(desktop), ForgetMimeDefault(mimeapps), refresh),
     )
 
 
@@ -197,6 +209,8 @@ def apply(steps: Sequence[Step], run: Runner | None = None) -> None:
                 _remove(path)
             case UpdatePlist(path, values):
                 _update_plist(path, values)
+            case ForgetMimeDefault(path):
+                _forget_mime_default(path)
             case RunCommand(argv, required):
                 _run(run or run_command, argv, required=required)
 
@@ -225,6 +239,25 @@ def _update_plist(path: Path, values: Mapping[str, Any]) -> None:
     properties.update(values)
     with path.open("wb") as file:
         plistlib.dump(properties, file)
+
+
+def _forget_mime_default(path: Path) -> None:
+    if not path.is_file():
+        return
+    text = path.read_text(encoding="utf-8")
+    kept = [line for line in (_without_handler(line) for line in text.splitlines(keepends=True)) if line is not None]
+    if "".join(kept) != text:
+        path.write_text("".join(kept), encoding="utf-8")
+
+
+def _without_handler(line: str) -> str | None:
+    key, separator, value = line.rstrip("\r\n").partition("=")
+    if not separator or key.strip() != MIME_TYPE:
+        return line
+    handlers = [handler for handler in value.split(";") if handler.strip() and handler.strip() != DESKTOP_FILE]
+    if not handlers:
+        return None
+    return f"{key}={';'.join(handlers)}{';' if value.endswith(';') else ''}\n"
 
 
 def _desktop_argument(argument: str) -> str:

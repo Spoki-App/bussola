@@ -8,6 +8,7 @@ import pytest
 from bussola.handler.registration import (
     LSREGISTER,
     CreateDirectory,
+    ForgetMimeDefault,
     HandlerError,
     RemovePath,
     RunCommand,
@@ -57,10 +58,35 @@ def test_linux_registers_a_desktop_file_as_default_for_the_scheme(tmp_path: Path
     assert not desktop.exists()
 
 
-def test_linux_follows_xdg_data_home(tmp_path: Path) -> None:
-    handler = registration_for("linux", tmp_path / "home", {"XDG_DATA_HOME": str(tmp_path / "data")}, PYTHON)
+def test_linux_uninstall_forgets_the_default_xdg_mime_wrote(tmp_path: Path) -> None:
+    mimeapps = tmp_path / ".config/mimeapps.list"
+    mimeapps.parent.mkdir(parents=True)
+    lines = [
+        "[Default Applications]",
+        "x-scheme-handler/bussola=bussola-url-handler.desktop",
+        "text/html=firefox.desktop",
+        "[Added Associations]",
+        "x-scheme-handler/bussola=other.desktop;bussola-url-handler.desktop;",
+    ]
+    mimeapps.write_text("\n".join(lines) + "\n")
+
+    apply(registration_for("linux", tmp_path, {}, PYTHON).uninstall, Recorder())
+
+    assert mimeapps.read_text() == "[Default Applications]\ntext/html=firefox.desktop\n[Added Associations]\nx-scheme-handler/bussola=other.desktop;\n"
+
+
+def test_linux_uninstall_without_mimeapps_list_creates_none(tmp_path: Path) -> None:
+    apply(registration_for("linux", tmp_path, {}, PYTHON).uninstall, Recorder())
+
+    assert not (tmp_path / ".config").exists()
+
+
+def test_linux_follows_xdg_data_and_config_home(tmp_path: Path) -> None:
+    environ = {"XDG_DATA_HOME": str(tmp_path / "data"), "XDG_CONFIG_HOME": str(tmp_path / "config")}
+    handler = registration_for("linux", tmp_path / "home", environ, PYTHON)
 
     assert handler.location == str(tmp_path / "data/applications/bussola-url-handler.desktop")
+    assert ForgetMimeDefault(tmp_path / "config/mimeapps.list") in handler.uninstall
 
 
 def test_desktop_entry_quotes_arguments_with_reserved_characters() -> None:
