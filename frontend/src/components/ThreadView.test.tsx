@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Thread } from '../api/types'
+import { LinkScrollContext, createLinkScroll } from '../review/linkFocus'
 import { ThreadView } from './ThreadView'
 
 function thread(canDelete: boolean, resolvable: boolean): Thread {
@@ -74,5 +75,26 @@ describe('ThreadView resolution', () => {
     renderThread(false, false)
 
     expect(screen.queryByRole('button', { name: 'Resolve' })).toBeNull()
+  })
+})
+
+describe('ThreadView links', () => {
+  it('opens a resolved thread that a link points at', () => {
+    Element.prototype.scrollIntoView = () => undefined
+    const link = createLinkScroll()
+    const resolved = { ...thread(false, true), status: 'resolved' as const }
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <LinkScrollContext value={link}>
+          <ThreadView reviewId={1} thread={resolved} />
+        </LinkScrollContext>
+      </QueryClientProvider>,
+    )
+    expect(screen.getByRole('button', { name: '▸' })).toHaveAttribute('aria-expanded', 'false')
+
+    act(() => { link.start({ unitId: null, elementId: 'thread-t1' }) })
+
+    expect(screen.getByRole('button', { name: '▾' })).toHaveAttribute('aria-expanded', 'true')
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
   })
 })

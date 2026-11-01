@@ -24,6 +24,8 @@ function unit(id: number, path: string, state: UnitState, qualifiedName = `f${St
     todo: !state.startsWith('approved'),
     action: state.startsWith('approved') ? 'revoke' : 'approve',
     open_threads: 0,
+    head_start: null,
+    head_end: null,
   }
 }
 

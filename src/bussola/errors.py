@@ -1,5 +1,5 @@
 class DomainError(Exception):
-    pass
+    code: str | None = None
 
 
 class NotFoundError(DomainError):

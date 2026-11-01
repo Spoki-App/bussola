@@ -76,6 +76,8 @@ export interface Unit {
   todo: boolean
   action: ApprovalAction
   open_threads: number
+  head_start: number | null
+  head_end: number | null
 }
 
 export interface DiffRow {

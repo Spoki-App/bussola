@@ -2,13 +2,17 @@ import { useState, type SubmitEvent } from 'react'
 
 import { describeError } from '../api/client'
 import { useCreateReview, useRefs, useRepos, useReviews } from '../api/hooks'
+import { isMissingClone } from '../api/pulls'
 import type { Repo } from '../api/types'
+import { AddRepoForm } from '../components/AddRepoForm'
 import { CourseStrip, ErrorNote } from '../components/Badges'
 import { CommentCount } from '../components/CommentCount'
 import { PullRequestsPanel } from '../components/PullRequestsPanel'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { Link } from '../Link'
-import { navigate, reviewPath } from '../navigation'
+import { navigate, reviewPath, useSearch } from '../navigation'
+import { useOpenReview } from '../openReview'
+import { addRepositoryRequestFromSearch, type AddRepositoryRequest } from '../review/pullRequestLink'
 import { progressPercent } from '../review/logic'
 import { REVIEW_FILTER_LABELS, loadReviewFilter, matchesReviewFilter, saveReviewFilter, type ReviewFilter } from '../review/reviewFilter'
 import { defaultReviewRefs, reviewFormProblem } from '../review/newReview'
@@ -18,6 +22,7 @@ import { plural } from '../review/text'
 
 export function HomePage() {
   const repos = useRepos()
+  const addRequest = addRepositoryRequestFromSearch(useSearch())
   const [filter, setFilter] = useState<ReviewFilter>(loadReviewFilter)
   const choose = (option: ReviewFilter) => {
     setFilter(option)
@@ -29,10 +34,34 @@ export function HomePage() {
         <h1>Repositories</h1>
         <Segmented label="Show reviews" labels={REVIEW_FILTER_LABELS} value={filter} onChange={choose} />
       </div>
+      {addRequest && <AddRepositoryPrompt request={addRequest} />}
       {repos.error && <ErrorNote message={describeError(repos.error)} />}
       {repos.data?.length === 0 && <p className="muted">No repositories yet. Add one from Settings (top right), or run `bussola serve` inside a repository.</p>}
       {repos.data?.map((repo) => <RepoSection key={repo.id} repo={repo} filter={filter} />)}
     </div>
+  )
+}
+
+function AddRepositoryPrompt({ request }: { request: AddRepositoryRequest }) {
+  const name = request.repository.slice(request.repository.indexOf('/') + 1)
+  const { open, start } = useOpenReview()
+  const openPullRequest = () => { start(request.url, { search: request.search }) }
+  return (
+    <section className="repo" aria-labelledby="add-repository-title">
+      <h2 id="add-repository-title">{`Add ${request.repository}`}</h2>
+      <p className="muted">
+        {`No local clone of github.com/${request.repository} was found. Clone it if you have not yet (`}
+        <code>{`git clone https://github.com/${request.repository}.git`}</code>
+        {'), then add its folder here. The pull request opens once it is added.'}
+      </p>
+      <AddRepoForm filter={name} onAdded={openPullRequest} />
+      {open.isPending && <p className="muted">Opening the pull request...</p>}
+      {open.error && (
+        <ErrorNote
+          message={isMissingClone(open.error) ? `The folder you added is not a clone of github.com/${request.repository}. Add the folder of a clone of it.` : describeError(open.error)}
+        />
+      )}
+    </section>
   )
 }
 

@@ -1,22 +1,17 @@
 import { useState, type SubmitEvent } from 'react'
 
 import { describeError } from '../api/client'
-import { useOpenPullRequestLink } from '../api/pulls'
-import { navigate, reviewPath } from '../navigation'
-import { isPullRequestUrl } from '../review/pullRequestLink'
+import { useOpenReview } from '../openReview'
+import { isPullRequestUrl, pullRequestTargetFromUrl } from '../review/pullRequestLink'
 import { ErrorNote } from './Badges'
 
 export function OpenPullRequestForm({ onOpened }: { onOpened: () => void }) {
   const [url, setUrl] = useState('')
-  const open = useOpenPullRequestLink()
+  const { open, start, visibleError } = useOpenReview()
   const submit = (event: SubmitEvent) => {
     event.preventDefault()
-    open.mutate(url.trim(), {
-      onSuccess: (review) => {
-        onOpened()
-        navigate(reviewPath(review.id))
-      },
-    })
+    const target = pullRequestTargetFromUrl(url)
+    start(target.url, { search: target.search, replace: false, askToAddRepository: true, onOpened })
   }
   return (
     <form className="inline-form" onSubmit={submit}>
@@ -31,7 +26,7 @@ export function OpenPullRequestForm({ onOpened }: { onOpened: () => void }) {
       <button type="submit" className="primary" disabled={!isPullRequestUrl(url) || open.isPending}>
         {open.isPending ? 'Opening...' : 'Open'}
       </button>
-      {open.error && <ErrorNote message={describeError(open.error)} />}
+      {visibleError && <ErrorNote message={describeError(visibleError)} />}
     </form>
   )
 }
