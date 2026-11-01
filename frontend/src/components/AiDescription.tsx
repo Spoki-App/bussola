@@ -46,7 +46,7 @@ export function AiDescription({ repoId, ai }: Props) {
             Cancel
           </button>
         ) : (
-          description && <AiActionButton repoId={repoId} label="Regenerate" title="Ask the AI provider again and replace this description" onRun={(target) => { ai.run(target, true) }} />
+          description && <AiActionButton repoId={repoId} label="Regenerate" title="Ask the AI provider again and replace this description" onRun={(target) => { ai.run(target, !description.outdated) }} />
         )}
       </div>
       {pending && (
@@ -57,7 +57,7 @@ export function AiDescription({ repoId, ai }: Props) {
       {error && <ErrorNote message={describeError(error)} />}
       {description && open && (
         <div className={`pr-description-body${pending ? ' stale' : ''}`}>
-          <Markdown text={description.description} />
+          <Markdown text={description.description} media={false} />
           <p className="ai-impact">
             <strong>{`${IMPACT_LABELS[description.impact]} impact`}</strong>
             {`: ${description.impact_reason}`}

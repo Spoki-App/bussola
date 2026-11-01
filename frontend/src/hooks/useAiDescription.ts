@@ -4,6 +4,7 @@ import type { Unit, UnitDescription } from '../api/types'
 
 export interface AiDescriptionState {
   description: UnitDescription | null
+  loaded: boolean
   pending: boolean
   error: Error | null
   run: (target: string, regenerate: boolean) => void
@@ -17,6 +18,7 @@ export function useAiDescription(reviewId: number, unit: Unit): AiDescriptionSta
   const cancelCall = useCancelAiCall()
   return {
     description: stored.data ?? null,
+    loaded: stored.isSuccess,
     pending: running.length > 0,
     error: describe.error ?? cancelCall.error,
     run: (target, regenerate) => {

@@ -192,7 +192,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
         {unit.rows_total > 0 && <span className="label">{`${String(unit.rows_approved)}/${String(unit.rows_total)} lines approved`}</span>}
         {unit.open_threads > 0 && <span className={`label threads${unit.todo ? '' : ' warn'}`}>{`${String(unit.open_threads)} open thread${unit.open_threads > 1 ? 's' : ''}`}</span>}
         <span className="spacer" />
-        {!unit.binary && !ai.description && !ai.pending && (
+        {!unit.binary && ai.loaded && !ai.description && !ai.pending && (
           <AiActionButton
             repoId={repoId}
             label="Describe"

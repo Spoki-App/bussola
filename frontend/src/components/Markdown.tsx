@@ -21,6 +21,10 @@ const schema: SanitizeSchema = {
   },
 }
 
+const MEDIA_TAGS = new Set(['img', 'picture', 'source'])
+
+const withoutMediaSchema: SanitizeSchema = { ...schema, tagNames: (schema.tagNames ?? []).filter((tag) => !MEDIA_TAGS.has(tag)) }
+
 function textOf(node: ElementContent): string {
   if (node.type === 'text') {
     return node.value
@@ -46,12 +50,12 @@ const components: Components = {
   },
 }
 
-export function Markdown({ text }: { text: string }) {
+export function Markdown({ text, media = true }: { text: string; media?: boolean }) {
   return (
     <div className="markdown">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks, remarkAlerts, remarkGitHubReferences]}
-        rehypePlugins={[rehypeRaw, [rehypeSanitize, schema], [rehypeHighlight, { plainText: ['mermaid'] }]]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, media ? schema : withoutMediaSchema], [rehypeHighlight, { plainText: ['mermaid'] }]]}
         components={components}
       >
         {text}

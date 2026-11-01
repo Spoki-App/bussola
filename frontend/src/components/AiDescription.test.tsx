@@ -188,7 +188,23 @@ describe('AI description on a unit card', () => {
 
     expect(await screen.findByText('Applies a tax.')).toBeInTheDocument()
     expect(screen.queryByText('outdated')).toBeNull()
+    expect(posted(fetchMock, '/api/reviews/1/units/7/description')).toEqual([{ target: AI.target, regenerate: false, call_id: expect.stringMatching(/^[0-9a-f]{32}$/) as unknown }])
+  })
+
+  it('regenerates a current description without the cached answer', async () => {
+    const fetchMock = renderCard({ stored: [DESCRIBED], answer: () => Response.json({ ...DESCRIBED, description: 'Applies a tax.' }) })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Regenerate' }))
+
+    expect(await screen.findByText('Applies a tax.')).toBeInTheDocument()
     expect(posted(fetchMock, '/api/reviews/1/units/7/description')).toEqual([{ target: AI.target, regenerate: true, call_id: expect.stringMatching(/^[0-9a-f]{32}$/) as unknown }])
+  })
+
+  it('offers Describe only once the stored descriptions are known', async () => {
+    renderCard({ stored: [DESCRIBED] })
+
+    expect(await screen.findByText('tax')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Describe' })).toBeNull()
   })
 
   it('can collapse the description', async () => {
