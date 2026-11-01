@@ -329,6 +329,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                       <UnitCard
                         key={unit.id}
                         reviewId={reviewId}
+                        repoId={data.repo_id}
                         unit={unit}
                         focused={focusedUnit?.id === unit.id}
                         onFocus={focusUnit}

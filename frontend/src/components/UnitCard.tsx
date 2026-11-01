@@ -7,7 +7,10 @@ import type { NavigationClick, ScreenPoint, UnitTarget } from '../review/codeNav
 import { TARGET_ROW_SELECTOR, unitElementId, useLinkedScroll } from '../review/linkFocus'
 import { unitTitle } from '../review/logic'
 import { ReviewLinkContext } from '../review/reviewLink'
+import { useAiDescription } from '../hooks/useAiDescription'
 import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
+import { AiActionButton } from './AiActionButton'
+import { AiDescription } from './AiDescription'
 import { ErrorNote, KindBadge, StateBadge } from './Badges'
 import { CopyLinkButton } from './CopyLinkButton'
 import { ImagePreview } from './ImagePreview'
@@ -30,6 +33,7 @@ export interface CommentTarget {
 
 interface Props {
   reviewId: number
+  repoId?: number
   unit: Unit
   focused: boolean
   onFocus: (unitId: number) => void
@@ -54,7 +58,7 @@ function targetLine(target: UnitTarget | undefined, linkedLine: number | undefin
   return linkedLine === undefined ? undefined : { side: 'new', line: linkedLine }
 }
 
-export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, onNavigate, navigationTarget, linkedLine }: Props) {
+export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, onNavigate, navigationTarget, linkedLine }: Props) {
   const todo = unit.todo
   const [expanded, setExpanded] = useState(todo)
   const [wasTodo, setWasTodo] = useState(todo)
@@ -84,6 +88,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
   const approve = useApprove(reviewId)
   const revoke = useRevoke(reviewId)
   const revokeSelections = useRevokeSelections(reviewId)
+  const ai = useAiDescription(reviewId, unit, repoId !== undefined)
   const rows = diff.data?.rows ?? []
   const busy = approve.isPending || revoke.isPending || revokeSelections.isPending
   const failure = approve.error ?? revoke.error ?? revokeSelections.error
@@ -187,6 +192,17 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
         {unit.rows_total > 0 && <span className="label">{`${String(unit.rows_approved)}/${String(unit.rows_total)} lines approved`}</span>}
         {unit.open_threads > 0 && <span className={`label threads${unit.todo ? '' : ' warn'}`}>{`${String(unit.open_threads)} open thread${unit.open_threads > 1 ? 's' : ''}`}</span>}
         <span className="spacer" />
+        {repoId !== undefined && !unit.binary && !ai.description && !ai.pending && (
+          <AiActionButton
+            repoId={repoId}
+            label="Describe"
+            title="Ask the AI provider what this unit does and what the change does to it"
+            onRun={(target) => {
+              setExpanded(true)
+              ai.run(target, false)
+            }}
+          />
+        )}
         {canSwitchMode && (
           <div className="segmented" role="group" aria-label="Diff mode">
             {(['approved', 'base'] as DiffMode[]).map((option) => (
@@ -220,6 +236,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
       {failure && <ErrorNote message={describeError(failure)} />}
       {expanded && (
         <div className="unit-body">
+          {repoId !== undefined && <AiDescription repoId={repoId} ai={ai} />}
           {diff.data?.approved_text_unavailable && <p className="diff-note">The approved version is too large to keep, so only the base diff is available.</p>}
           {unit.row_approvable && unit.todo && <p className="hint">Click changed lines to select them, shift-click to extend, then approve the selection.</p>}
           {diff.isPending && <p className="diff-note">Loading diff...</p>}

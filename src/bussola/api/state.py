@@ -1,10 +1,11 @@
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import cast
 
 from fastapi import FastAPI, Request
 
 from bussola.ai.base import AiProvider
+from bussola.ai.calls import RunningCalls
 from bussola.ai.config import AiSettings
 from bussola.config import AppSettings
 from bussola.forge.base import ForgeAdapter
@@ -22,6 +23,7 @@ class AppState:
     url_opener: Callable[[str], object]
     navigator: Navigator
     ai_factory: Callable[[AiSettings], AiProvider]
+    ai_calls: RunningCalls = field(default_factory=RunningCalls)
 
 
 def attach_state(app: FastAPI, state: AppState) -> None:

@@ -184,7 +184,7 @@ ignore = ["vendor/**", "docs/**"]
 
 ## AI providers
 
-AI features are optional and off until you choose a provider. This version sets up the provider and **Test connection**; the AI actions themselves (unit descriptions, impact ratings, AI review) come in later versions and follow the rules below. bussola talks to one of three providers, set in the `[ai]` section of your user configuration, `config.toml` in `platformdirs.user_config_dir("bussola")` (on macOS `~/Library/Application Support/bussola/config.toml`, on Linux `~/.config/bussola/config.toml`; set `BUSSOLA_CONFIG_DIR` to use another directory). **AI** in **Settings** shows the active provider and model, where the configuration is read from, and a **Test connection** button that sends a short fixed prompt and no code.
+AI features are optional and off until you choose a provider. This version has **Test connection** and AI descriptions of units (see [AI descriptions](#ai-descriptions)); the other AI actions (impact badges, sorting by impact, AI review) come in later versions and follow the rules below. bussola talks to one of three providers, set in the `[ai]` section of your user configuration, `config.toml` in `platformdirs.user_config_dir("bussola")` (on macOS `~/Library/Application Support/bussola/config.toml`, on Linux `~/.config/bussola/config.toml`; set `BUSSOLA_CONFIG_DIR` to use another directory). **AI** in **Settings** shows the active provider and model, where the configuration is read from, and a **Test connection** button that sends a short fixed prompt and no code.
 
 **Claude Code CLI** runs the `claude` command already installed and signed in on your machine, so bussola needs no key:
 
@@ -218,6 +218,12 @@ Other options: `timeout` (seconds per request, default 600, at most 3600) and `a
 Keys are read only from environment variables. bussola never writes them to the database or to a configuration file, and `api_key` is not an accepted option.
 
 Only your own configuration chooses the provider, model and endpoint. A repository can only turn AI off, with `provider = "none"` in the `[ai]` section of its `.bussola.toml`, for example for a confidential project; any other setting there is reported as a mistake, turns AI off for that repository and shows the reason on its AI buttons, while reviews keep working. A repository cannot turn AI on when you have not chosen a provider. This limit exists because `.bussola.toml` comes with the clone: a repository you review, or a pull request you open in bussola, must not be able to send your code or your key somewhere else, or spend your credit on a provider or model you did not choose.
+
+### AI descriptions
+
+With a provider configured, each unit card has a **Describe** button. One request to the provider explains what the unit does and what this change does to it, and rates the impact of the change as Low, Medium or High with a one-line reason. The answer appears above the diff in a collapsible block, rendered as Markdown and labelled as AI generated with the provider and model. While it runs the card shows that it is working and a **Cancel** button; a failure is shown on the card and **Describe** stays available.
+
+Descriptions are kept per review for each version of a unit, so they are there when you open the review again. When a new revision changes a unit, its description is marked **outdated** until you press **Regenerate**; units that did not change keep theirs. **Regenerate** asks the provider again and replaces the description. Binary files cannot be described.
 
 ### What leaves your machine
 

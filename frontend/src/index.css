@@ -2068,6 +2068,56 @@ button.danger {
   mask-image: linear-gradient(to bottom, black 70%, transparent);
 }
 
+.ai-description {
+  margin: 8px 12px;
+  padding: 6px 12px 8px;
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-control);
+  background: var(--info-bg);
+}
+
+.ai-description-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-description-toggle {
+  min-height: 26px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-weight: 650;
+}
+
+.ai-description-toggle:hover:not(:disabled) {
+  background: none;
+}
+
+.ai-description .label.warn {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.ai-description .diff-note {
+  padding: 4px 0;
+}
+
+.ai-description-body {
+  max-width: 860px;
+  overflow-wrap: anywhere;
+}
+
+.ai-description-body.stale {
+  opacity: 0.6;
+}
+
+.ai-impact {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
 .code-font-panel input:not([type='checkbox']) {
   width: 100%;
 }

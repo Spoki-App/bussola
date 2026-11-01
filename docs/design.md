@@ -197,3 +197,15 @@ POST   /ai/test                                send a fixed prompt with a one-fi
 ```
 
 The UI shows AI buttons only when the repository's provider is configured, disabled with the reason when it cannot be used or its status cannot be read. On click the button reads the status again, and before an action first sends code to a target (the JSON list of provider, model and endpoint) it names the provider, model and endpoint and waits for confirmation, kept in the browser's local storage per target. The confirmed target is passed to the action, and an action's endpoint must check it with `require_target` against the settings it loads, so code is never sent to a target the user has not confirmed. These pieces (`AiActionButton`, `run_batch`, `SqlAiCache`, `require_target`) are used by the AI actions as they are added.
+
+### Unit descriptions
+
+`describe_unit` sends one unit to the `describe_unit` task: its path (and old path after a rename), kind, name, and the text before and after the change, each side clipped at 40,000 characters. The answer is a description in Markdown, an impact (`low`, `medium` or `high`) and a one-line reason, so describing a unit also rates it. The result goes to the `unit_descriptions` table, one row per review, unit key (path, kind, qualified name) and change hash (the base and head content hashes of the unit), with the revision it was made on, the provider, its label and the model. A unit's description is the row with its current change hash; when there is none, the latest row for its key is shown as outdated, which is how a description outlives revisions that do not change the unit. **Describe** goes through `AiRunner` with the result cache, so the same change described in another review reuses the answer; **Regenerate** skips the cached answer (`refresh=True`), asks again, and replaces both the cached answer and the row.
+
+A running call is registered in `RunningCalls` under the unit's ID. Cancelling sets its `Cancellation`, which stops the provider call, and the request answers 409 `Cancelled`; starting a new call for the same unit cancels the previous one.
+
+```
+GET    /reviews/{review_id}/descriptions?revision_id=      stored descriptions of the units of a revision (latest by default), with outdated
+POST   /reviews/{review_id}/units/{unit_id}/description    {target, regenerate}: describe and rate the unit, store and return it
+POST   /reviews/{review_id}/units/{unit_id}/description/cancel   cancel the running call for the unit, {cancelled}
+```

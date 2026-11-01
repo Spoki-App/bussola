@@ -1,8 +1,11 @@
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from fastapi.testclient import TestClient
 
+from bussola.ai.base import AiProvider
+from bussola.ai.config import AiSettings
 from bussola.app import create_app
 from bussola.config import AppSettings
 from tests.gitrepo import GitFixture
@@ -17,10 +20,16 @@ class ApiClient:
         self.opened_urls = opened_urls
 
     @classmethod
-    def create(cls, git: GitFixture, data_dir: Path) -> "ApiClient":
-        settings = AppSettings(data_dir=data_dir, static_dir=data_dir / "static", identity_dir=git.root)
+    def create(
+        cls,
+        git: GitFixture,
+        data_dir: Path,
+        config_file: Path | None = None,
+        ai_factory: Callable[[AiSettings], AiProvider] | None = None,
+    ) -> "ApiClient":
+        settings = AppSettings(data_dir=data_dir, static_dir=data_dir / "static", identity_dir=git.root, config_file=config_file)
         opened: list[str] = []
-        return cls(TestClient(create_app(settings, url_opener=opened.append)), git, opened)
+        return cls(TestClient(create_app(settings, url_opener=opened.append, ai_factory=ai_factory)), git, opened)
 
     def call(self, method: str, url: str, expected: int = 200, body: Json = None) -> Json:
         response = self.client.request(method, f"/api{url}", json=body)

@@ -4,6 +4,7 @@ from typing import Annotated
 from pydantic import BaseModel, Field, model_validator
 
 from bussola.navigation.navigator import Origin, Resolver, TargetRole
+from bussola.review.descriptions import Impact
 from bussola.review.diffs import DiffMode
 from bussola.review.rows import LineChange, Side
 from bussola.review.scope import ChangeType
@@ -437,3 +438,24 @@ class AiTestOut(BaseModel):
     ok: bool
     message: str
     elapsed_ms: int
+
+
+class DescribeUnitIn(BaseModel):
+    target: str = Field(min_length=1)
+    regenerate: bool = False
+
+
+class UnitDescriptionOut(BaseModel):
+    unit_id: int
+    description: str
+    impact: Impact
+    impact_reason: str
+    provider: str
+    provider_label: str
+    model: str | None
+    created_at: datetime
+    outdated: bool
+
+
+class CancelOut(BaseModel):
+    cancelled: bool
