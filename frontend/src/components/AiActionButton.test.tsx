@@ -11,7 +11,6 @@ const LOCAL: AiStatus = {
   label: 'OpenAI-compatible endpoint',
   model: 'qwen2.5-coder',
   endpoint: 'http://localhost:11434/v1',
-  source: 'repository',
   api_key_env: null,
   api_key_set: false,
   problem: null,
@@ -108,7 +107,6 @@ describe('AiActionButton', () => {
 
     const notice = await screen.findByRole('dialog', { name: 'Send code to OpenAI-compatible endpoint?' })
     expect(notice).toHaveTextContent('This action sends the code it works on to OpenAI-compatible endpoint (model qwen2.5-coder) at http://localhost:11434/v1.')
-    expect(notice).toHaveTextContent("This provider is set by the repository's .bussola.toml.")
     expect(onRun).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Send code' }))

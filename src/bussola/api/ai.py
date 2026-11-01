@@ -47,7 +47,6 @@ def _status(state: AppState, repo_root: Path | None) -> AiStatusOut:
         label=settings.label,
         model=settings.model,
         endpoint=settings.endpoint,
-        source=settings.source,
         api_key_env=settings.api_key_env,
         api_key_set=settings.api_key() is not None,
         problem=_problem(state, settings),

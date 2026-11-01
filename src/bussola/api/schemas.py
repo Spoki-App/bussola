@@ -426,7 +426,6 @@ class AiStatusOut(BaseModel):
     label: str | None = None
     model: str | None = None
     endpoint: str | None = None
-    source: str | None = None
     api_key_env: str | None = None
     api_key_set: bool = False
     problem: str | None = None

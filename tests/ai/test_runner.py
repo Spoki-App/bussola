@@ -7,7 +7,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 from bussola.ai.base import AiCancelledError, AiOutputError, AiTimeoutError, Cancellation, run_cancellable
-from bussola.ai.runner import AiCacheKey, AiRunner, AiTask, output_schema, parse_output
+from bussola.ai.runner import AiCacheKey, AiRunner, AiTask, instructions_hash, output_schema, parse_output
 from bussola.storage.ai_cache import SqlAiCache
 from bussola.storage.database import Database
 from tests.ai.fakes import FakeProvider
@@ -135,15 +135,37 @@ def test_results_are_cached_by_content_hash_prompt_version_and_model(tmp_path: P
         session.commit()
 
     with database.session() as session:
-        stored = SqlAiCache(session).get(AiCacheKey("rate", 1, "fake", "model-a", "", "hash-1"))
+        stored = SqlAiCache(session).get(AiCacheKey("rate", 1, instructions_hash(RATE), "fake", "model-a", "", "hash-1"))
     assert stored == GOOD
+
+
+class DetailedRating(Rating):
+    risk: str
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        AiTask(name="rate", version=1, system="Rate the change strictly.", output=Rating),
+        AiTask(name="rate", version=1, system="Rate the change.", output=DetailedRating),
+    ],
+)
+def test_a_changed_system_prompt_or_schema_is_asked_again_without_a_new_version(tmp_path: Path, changed: AiTask[Any]) -> None:
+    provider = FakeProvider({**GOOD, "risk": "billing"})
+    with Database.open(tmp_path).session() as session:
+        runner = AiRunner(provider, SqlAiCache(session))
+
+        runner.run(RATE, "code", Cancellation(), content_hash="hash")
+        runner.run(changed, "code", Cancellation(), content_hash="hash")
+
+    assert len(provider.requests) == 2
 
 
 def test_an_unusable_cached_result_is_asked_again(tmp_path: Path) -> None:
     provider = FakeProvider(GOOD)
     with Database.open(tmp_path).session() as session:
         cache = SqlAiCache(session)
-        cache.put(AiCacheKey("rate", 1, "fake", "fake-model", "", "hash"), {"impact": "unknown"})
+        cache.put(AiCacheKey("rate", 1, instructions_hash(RATE), "fake", "fake-model", "", "hash"), {"impact": "unknown"})
 
         rating = AiRunner(provider, cache).run(RATE, "code", Cancellation(), content_hash="hash")
 
@@ -224,7 +246,7 @@ def test_the_provider_max_tokens_caps_the_request() -> None:
 
 def test_two_sessions_caching_the_same_result_do_not_conflict(tmp_path: Path) -> None:
     database = Database.open(tmp_path)
-    key = AiCacheKey("rate", 1, "fake", "fake-model", "", "hash")
+    key = AiCacheKey("rate", 1, instructions_hash(RATE), "fake", "fake-model", "", "hash")
 
     def cache_second() -> None:
         with database.session() as second:
@@ -274,7 +296,7 @@ def test_a_replaced_cache_entry_is_read_back_in_the_same_session(tmp_path: Path)
     provider = FakeProvider(GOOD)
     with Database.open(tmp_path).session() as session:
         cache = SqlAiCache(session)
-        cache.put(AiCacheKey("rate", 1, "fake", "fake-model", "", "hash"), {"impact": "unknown"})
+        cache.put(AiCacheKey("rate", 1, instructions_hash(RATE), "fake", "fake-model", "", "hash"), {"impact": "unknown"})
         runner = AiRunner(provider, cache)
 
         runner.run(RATE, "code", Cancellation(), content_hash="hash")

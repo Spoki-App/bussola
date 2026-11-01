@@ -233,6 +233,7 @@ class AiResult(Base):
 
     task: Mapped[str] = mapped_column(primary_key=True)
     prompt_version: Mapped[int] = mapped_column(primary_key=True)
+    instructions_hash: Mapped[str] = mapped_column(primary_key=True)
     provider: Mapped[str] = mapped_column(primary_key=True)
     model: Mapped[str] = mapped_column(primary_key=True)
     endpoint: Mapped[str] = mapped_column(primary_key=True)

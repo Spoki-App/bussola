@@ -22,14 +22,13 @@ def build_provider(settings: AiSettings) -> AiProvider:
 
 def _required(value: str | None, name: str) -> str:
     if not value:
-        raise AiNotConfiguredError(f"Set {name} in the [ai] section of your configuration or of the repository's .bussola.toml")
+        raise AiNotConfiguredError(f"Set {name} in the [ai] section of your configuration")
     return value
 
 
 def _api_key(settings: AiSettings) -> str:
-    if settings.api_key_env is None:
-        raise AiNotConfiguredError("Your API key is not used for a provider, model or endpoint chosen by the repository's .bussola.toml")
+    key_env = _required(settings.api_key_env, "api_key_env")
     key = settings.api_key()
     if key is None:
-        raise AiNotConfiguredError(f"Set the {settings.api_key_env} environment variable")
+        raise AiNotConfiguredError(f"Set the {key_env} environment variable")
     return key

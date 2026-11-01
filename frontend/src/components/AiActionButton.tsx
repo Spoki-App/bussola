@@ -109,7 +109,6 @@ function AiNoticeDialog({ ai, onAnswer }: { ai: AiStatus; onAnswer: (accepted: b
         )}
         .
       </p>
-      {ai.source === 'repository' && <p className="muted">This provider is set by the repository's .bussola.toml.</p>}
       <p className="muted">bussola asks once for each provider, model and endpoint. Nothing is sent until you choose Send code.</p>
       <div className="ai-notice-actions">
         <button type="button" onClick={close}>

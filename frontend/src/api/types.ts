@@ -284,7 +284,6 @@ export interface AiStatus {
   label: string | null
   model: string | null
   endpoint: string | null
-  source: 'user' | 'repository' | null
   api_key_env: string | null
   api_key_set: boolean
   problem: string | null

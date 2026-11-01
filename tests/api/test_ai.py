@@ -50,7 +50,6 @@ def test_the_status_names_the_provider_model_and_key_variable(data_dir: Path, co
         "label": "Anthropic API",
         "model": "claude-opus-5-5",
         "endpoint": "https://api.anthropic.com",
-        "source": "user",
         "api_key_env": "ANTHROPIC_API_KEY",
         "api_key_set": True,
         "problem": None,
@@ -79,7 +78,7 @@ def test_an_invalid_configuration_turns_ai_off_with_the_reason(data_dir: Path, c
     assert "Invalid configuration" in status["problem"]
 
 
-def test_the_repository_status_applies_the_bussola_toml_override(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
+def test_a_repository_can_turn_ai_off_in_its_bussola_toml(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
     write(config_file, ANTHROPIC)
     git_repo.commit({".bussola.toml": '[ai]\nprovider = "none"\n'}, "turn ai off")
     api = client(data_dir, config_file, FakeProvider({"ok": True}))
@@ -88,7 +87,7 @@ def test_the_repository_status_applies_the_bussola_toml_override(git_repo: GitFi
     repo_status = api.get(f"/api/repos/{repo['id']}/ai").json()
 
     assert repo_status["configured"] is False
-    assert repo_status["source"] == "repository"
+    assert repo_status["problem"] is None
     assert api.get("/api/ai").json()["configured"] is True
 
 

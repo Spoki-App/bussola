@@ -1,5 +1,7 @@
 import contextlib
 import functools
+import hashlib
+import json
 import re
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
@@ -44,6 +46,7 @@ class AiTask[T: BaseModel]:
 class AiCacheKey:
     task: str
     prompt_version: int
+    instructions_hash: str
     provider: str
     model: str
     endpoint: str
@@ -75,7 +78,7 @@ class AiRunner:
     def _key(self, task: AiTask[Any], content_hash: str | None) -> AiCacheKey | None:
         if content_hash is None or self._cache is None or self.provider.model is None:
             return None
-        return AiCacheKey(task.name, task.version, self.provider.name, self.provider.model, self.provider.endpoint or "", content_hash)
+        return AiCacheKey(task.name, task.version, instructions_hash(task), self.provider.name, self.provider.model, self.provider.endpoint or "", content_hash)
 
     def _cached[T: BaseModel](self, task: AiTask[T], key: AiCacheKey | None) -> T | None:
         stored = None
@@ -88,6 +91,11 @@ class AiRunner:
             return task.output.model_validate(stored)
         except ValidationError:
             return None
+
+
+def instructions_hash(task: AiTask[Any]) -> str:
+    instructions = json.dumps([task.system, output_schema(task.output)], sort_keys=True)
+    return hashlib.sha256(instructions.encode()).hexdigest()
 
 
 @functools.cache
