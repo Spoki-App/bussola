@@ -33,7 +33,7 @@ export interface CommentTarget {
 
 interface Props {
   reviewId: number
-  repoId?: number
+  repoId: number
   unit: Unit
   focused: boolean
   onFocus: (unitId: number) => void
@@ -88,7 +88,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
   const approve = useApprove(reviewId)
   const revoke = useRevoke(reviewId)
   const revokeSelections = useRevokeSelections(reviewId)
-  const ai = useAiDescription(reviewId, unit, repoId !== undefined)
+  const ai = useAiDescription(reviewId, unit)
   const rows = diff.data?.rows ?? []
   const busy = approve.isPending || revoke.isPending || revokeSelections.isPending
   const failure = approve.error ?? revoke.error ?? revokeSelections.error
@@ -192,7 +192,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
         {unit.rows_total > 0 && <span className="label">{`${String(unit.rows_approved)}/${String(unit.rows_total)} lines approved`}</span>}
         {unit.open_threads > 0 && <span className={`label threads${unit.todo ? '' : ' warn'}`}>{`${String(unit.open_threads)} open thread${unit.open_threads > 1 ? 's' : ''}`}</span>}
         <span className="spacer" />
-        {repoId !== undefined && !unit.binary && !ai.description && !ai.pending && (
+        {!unit.binary && !ai.description && !ai.pending && (
           <AiActionButton
             repoId={repoId}
             label="Describe"
@@ -236,7 +236,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
       {failure && <ErrorNote message={describeError(failure)} />}
       {expanded && (
         <div className="unit-body">
-          {repoId !== undefined && <AiDescription repoId={repoId} ai={ai} />}
+          <AiDescription repoId={repoId} ai={ai} />
           {diff.data?.approved_text_unavailable && <p className="diff-note">The approved version is too large to keep, so only the base diff is available.</p>}
           {unit.row_approvable && unit.todo && <p className="hint">Click changed lines to select them, shift-click to extend, then approve the selection.</p>}
           {diff.isPending && <p className="diff-note">Loading diff...</p>}

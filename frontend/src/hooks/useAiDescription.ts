@@ -4,13 +4,13 @@ import type { Unit, UnitDescription } from '../api/types'
 export interface AiDescriptionState {
   description: UnitDescription | null
   pending: boolean
-  error: unknown
+  error: Error | null
   run: (target: string, regenerate: boolean) => void
   cancel: () => void
 }
 
-export function useAiDescription(reviewId: number, unit: Unit, enabled: boolean): AiDescriptionState {
-  const stored = useUnitDescription(reviewId, unit, enabled)
+export function useAiDescription(reviewId: number, unit: Unit): AiDescriptionState {
+  const stored = useUnitDescription(reviewId, unit)
   const describe = useDescribeUnit(reviewId, unit)
   const cancelCall = useCancelDescription(reviewId, unit)
   return {

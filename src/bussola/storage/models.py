@@ -247,7 +247,6 @@ class UnitDescription(Base):
     __table_args__ = (UniqueConstraint("review_id", "path", "kind", "qualified_name", "change_hash"),)
 
     review_id: Mapped[int] = mapped_column(ForeignKey("reviews.id"), index=True)
-    revision_id: Mapped[int] = mapped_column(ForeignKey("revisions.id"))
     path: Mapped[str] = mapped_column()
     kind: Mapped[str] = mapped_column()
     qualified_name: Mapped[str] = mapped_column()

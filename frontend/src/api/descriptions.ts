@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getJson, postJson } from './client'
 import type { Unit, UnitDescription } from './types'
 
-export const descriptionsKey = (reviewId: number, revisionId: number) => ['descriptions', reviewId, revisionId] as const
+const descriptionsKey = (reviewId: number, revisionId: number) => ['descriptions', reviewId, revisionId] as const
 
-export interface DescribeRequest {
+interface DescribeRequest {
   target: string
   regenerate: boolean
 }
@@ -14,9 +14,8 @@ function unitPath(reviewId: number, unit: Unit) {
   return `/reviews/${String(reviewId)}/units/${String(unit.id)}/description`
 }
 
-export function useUnitDescription(reviewId: number, unit: Unit, enabled: boolean) {
+export function useUnitDescription(reviewId: number, unit: Unit) {
   return useQuery({
-    enabled,
     queryKey: descriptionsKey(reviewId, unit.revision_id),
     queryFn: () => getJson<UnitDescription[]>(`/reviews/${String(reviewId)}/descriptions?revision_id=${String(unit.revision_id)}`),
     select: (descriptions) => descriptions.find((description) => description.unit_id === unit.id) ?? null,

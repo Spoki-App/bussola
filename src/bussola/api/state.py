@@ -11,6 +11,7 @@ from bussola.config import AppSettings
 from bussola.forge.base import ForgeAdapter
 from bussola.identity import GitConfigIdentity
 from bussola.navigation.navigator import Navigator
+from bussola.storage.ai_cache import DatabaseAiCache
 from bussola.storage.database import Database
 
 
@@ -24,6 +25,10 @@ class AppState:
     navigator: Navigator
     ai_factory: Callable[[AiSettings], AiProvider]
     ai_calls: RunningCalls = field(default_factory=RunningCalls)
+
+    @property
+    def ai_cache(self) -> DatabaseAiCache:
+        return DatabaseAiCache(self.database)
 
 
 def attach_state(app: FastAPI, state: AppState) -> None:

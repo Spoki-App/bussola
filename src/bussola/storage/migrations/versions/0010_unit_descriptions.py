@@ -13,7 +13,6 @@ def upgrade() -> None:
     op.create_table(
         "unit_descriptions",
         sa.Column("review_id", sa.Integer(), nullable=False),
-        sa.Column("revision_id", sa.Integer(), nullable=False),
         sa.Column("path", sa.Text(), nullable=False),
         sa.Column("kind", sa.Text(), nullable=False),
         sa.Column("qualified_name", sa.Text(), nullable=False),
@@ -27,7 +26,6 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(["review_id"], ["reviews.id"]),
-        sa.ForeignKeyConstraint(["revision_id"], ["revisions.id"]),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("review_id", "path", "kind", "qualified_name", "change_hash"),
     )

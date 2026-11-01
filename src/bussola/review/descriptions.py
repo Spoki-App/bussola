@@ -1,7 +1,6 @@
 import hashlib
 import json
 from collections.abc import Iterable
-from dataclasses import dataclass
 from enum import StrEnum
 
 from pydantic import BaseModel, Field, field_validator
@@ -21,7 +20,7 @@ class Impact(StrEnum):
 
 
 MAX_SIDE_CHARACTERS = 40_000
-UNIT_NAMES = {"file": "file", "module": "module-level code"}
+UNIT_NAMES = {"module": "module-level code"}
 
 
 class UnitInsight(BaseModel):
@@ -59,39 +58,31 @@ DESCRIBE_UNIT = AiTask(
 )
 
 
-@dataclass(frozen=True)
-class StoredDescription:
-    description: UnitDescription
-    outdated: bool
-
-
 def change_hash(snapshot: UnitSnapshot) -> str:
     return hashlib.sha256(json.dumps([snapshot.base_hash, snapshot.head_hash]).encode()).hexdigest()
 
 
-def describable(snapshot: UnitSnapshot) -> bool:
-    return not is_binary(snapshot)
-
-
-def stored_descriptions(snapshots: Iterable[UnitSnapshot], descriptions: Iterable[UnitDescription]) -> dict[int, StoredDescription]:
+def stored_descriptions(snapshots: Iterable[UnitSnapshot], descriptions: Iterable[UnitDescription]) -> dict[int, UnitDescription]:
     latest: dict[KeyTuple, UnitDescription] = {}
     exact: dict[tuple[KeyTuple, str], UnitDescription] = {}
     for description in descriptions:
-        key = (description.path, description.kind, description.qualified_name)
-        latest[key] = description
-        exact[(key, description.change_hash)] = description
-    found: dict[int, StoredDescription] = {}
+        latest[key_of(description)] = description
+        exact[(key_of(description), description.change_hash)] = description
+    found: dict[int, UnitDescription] = {}
     for snapshot in snapshots:
-        current = exact.get((key_of(snapshot), change_hash(snapshot)))
-        if current is not None:
-            found[snapshot.id] = StoredDescription(current, outdated=False)
-        elif (previous := latest.get(key_of(snapshot))) is not None:
-            found[snapshot.id] = StoredDescription(previous, outdated=True)
+        key = key_of(snapshot)
+        description = exact.get((key, change_hash(snapshot))) or latest.get(key)
+        if description is not None:
+            found[snapshot.id] = description
     return found
 
 
+def is_outdated(description: UnitDescription, snapshot: UnitSnapshot) -> bool:
+    return description.change_hash != change_hash(snapshot)
+
+
 def describe_unit(snapshot: UnitSnapshot, provider: AiProvider, cache: AiCache | None, cancellation: Cancellation, *, regenerate: bool = False) -> UnitInsight:
-    if not describable(snapshot):
+    if is_binary(snapshot):
         raise InvalidRequestError("Binary files cannot be described")
     prompt = unit_prompt(snapshot)
     content_hash = hashlib.sha256(prompt.encode()).hexdigest()

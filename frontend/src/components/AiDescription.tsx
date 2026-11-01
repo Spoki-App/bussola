@@ -21,14 +21,14 @@ export function AiDescription({ repoId, ai }: Props) {
     return null
   }
   return (
-    <section className="ai-description" aria-label="AI description">
+    <section className="ai-description notice" aria-label="AI description">
       <div className="ai-description-header">
         {description ? (
-          <button type="button" className="ai-description-toggle" aria-expanded={open} onClick={() => { setOpen(!open) }}>
+          <button type="button" className="pr-description-toggle" aria-expanded={open} onClick={() => { setOpen(!open) }}>
             <span aria-hidden="true">{open ? '▾' : '▸'}</span> AI description
           </button>
         ) : (
-          <span className="ai-description-toggle">AI description</span>
+          <span className="pr-description-toggle">AI description</span>
         )}
         {description?.outdated && (
           <span className="label warn" title="The unit changed since this description was written">
@@ -54,9 +54,9 @@ export function AiDescription({ repoId, ai }: Props) {
           {description ? 'Regenerating the description...' : 'Describing this unit...'}
         </p>
       )}
-      {error !== null && error !== undefined && <ErrorNote message={describeError(error)} />}
+      {error && <ErrorNote message={describeError(error)} />}
       {description && open && (
-        <div className={`ai-description-body${pending ? ' stale' : ''}`}>
+        <div className={`pr-description-body${pending ? ' stale' : ''}`}>
           <Markdown text={description.description} />
           <p className="ai-impact">
             <strong>{`${IMPACT_LABELS[description.impact]} impact`}</strong>
