@@ -24,11 +24,11 @@ from urllib.parse import urlencode
 import uvicorn
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
-from bussola.config import DEFAULT_HOST, DEFAULT_PORT
+from bussola.config import APP_NAME, DEFAULT_HOST, DEFAULT_PORT
 from bussola.errors import DomainError
 from bussola.handler.links import BUSSOLA_MODULE, browser_path, parse_link
 from bussola.security import API_PATH_PREFIX, INVALID_TOKEN_CODE, TOKEN_ENV, TOKEN_QUERY, host_port, is_ipv6_host, is_local_host, new_token, token_cookie
-from bussola.storage.database import APP_NAME, DATA_DIR_ENV
+from bussola.storage.database import DATA_DIR_ENV
 
 SERVERS_DIR = "servers"
 LINK_LOG_FILE = "open-link.log"

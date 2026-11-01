@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+if "--help" in sys.argv:
+    sys.stdout.write("Usage: claude [options]\n  --safe-mode  Start with all customizations disabled\n")
+    sys.exit(0)
+prompt = sys.stdin.read()
+Path(os.environ["FAKE_CLAUDE_LOG"]).write_text(json.dumps({"args": sys.argv[1:], "prompt": prompt, "cwd": os.getcwd(), "env": dict(os.environ)}))
+if os.environ.get("FAKE_CLAUDE_ESCAPED_CHILD_PID"):
+    escaped = subprocess.Popen(["sleep", "60"], start_new_session=True)
+    Path(os.environ["FAKE_CLAUDE_ESCAPED_CHILD_PID"]).write_text(str(escaped.pid))
+if os.environ.get("FAKE_CLAUDE_DETACHED_CHILD_PID"):
+    detached = subprocess.Popen(["sleep", "60"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    Path(os.environ["FAKE_CLAUDE_DETACHED_CHILD_PID"]).write_text(str(detached.pid))
+if os.environ.get("FAKE_CLAUDE_CHILD_PID"):
+    child = subprocess.Popen(["sleep", "60"])
+    Path(os.environ["FAKE_CLAUDE_CHILD_PID"]).write_text(str(child.pid))
+time.sleep(float(os.environ.get("FAKE_CLAUDE_SLEEP", "0")))
+sys.stdout.write(os.environ.get("FAKE_CLAUDE_STDOUT", ""))
+sys.stderr.write(os.environ.get("FAKE_CLAUDE_STDERR", ""))
+sys.exit(int(os.environ.get("FAKE_CLAUDE_EXIT", "0")))

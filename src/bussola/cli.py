@@ -8,6 +8,7 @@ from typing import Annotated
 
 import typer
 
+from bussola.ai.config import default_config_file
 from bussola.app import create_app
 from bussola.config import DEFAULT_HOST, DEFAULT_PORT, AppSettings, load_repo_config
 from bussola.errors import DomainError
@@ -56,7 +57,12 @@ def serve(
     identity_dir = repo or Path.cwd()
     token = os.environ.pop(TOKEN_ENV, None) or new_token()
     settings = AppSettings(
-        data_dir=default_data_dir().resolve(), identity_dir=identity_dir, token=token, allowed_hosts=allowed_hosts_for(host, port), port=port
+        data_dir=default_data_dir().resolve(),
+        identity_dir=identity_dir,
+        token=token,
+        allowed_hosts=allowed_hosts_for(host, port),
+        port=port,
+        config_file=default_config_file(),
     )
     if register:
         _register_if_repo(settings.data_dir, identity_dir)

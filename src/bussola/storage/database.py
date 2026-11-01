@@ -11,7 +11,8 @@ from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import ConnectionPoolEntry
 
-APP_NAME = "bussola"
+from bussola.config import APP_NAME
+
 DATA_DIR_ENV = "BUSSOLA_DATA_DIR"
 DATABASE_FILE = "bussola.db"
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"

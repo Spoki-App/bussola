@@ -77,7 +77,7 @@ export default async function globalSetup() {
   mkdirSync(dirname(SERVER_LOG), { recursive: true })
   const log = openSync(SERVER_LOG, 'w')
   const server = spawn('uv', ['run', '--project', PROJECT_ROOT, 'bussola', 'serve', '--no-open', '--port', String(E2E_PORT), '--repo', repo], {
-    env: { ...process.env, BUSSOLA_DATA_DIR: join(root, 'data'), BUSSOLA_TOKEN: E2E_TOKEN },
+    env: { ...process.env, BUSSOLA_DATA_DIR: join(root, 'data'), BUSSOLA_CONFIG_DIR: join(root, 'config'), BUSSOLA_TOKEN: E2E_TOKEN },
     stdio: ['ignore', log, log],
     detached: true,
   })

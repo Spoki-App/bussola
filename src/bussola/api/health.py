@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from bussola.api.schemas import HealthOut
-from bussola.storage.database import APP_NAME
+from bussola.config import APP_NAME
 
 router = APIRouter(tags=["health"])
 
