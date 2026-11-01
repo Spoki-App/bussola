@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { getJson, postJson } from './client'
 import type { Unit, UnitDescription } from './types'
@@ -24,17 +24,26 @@ export function useUnitDescription(reviewId: number, unit: Unit) {
   })
 }
 
+export const describeKey = (reviewId: number, unit: Unit) => ['describe', reviewId, unit.id] as const
+
 export function useDescribeUnit(reviewId: number, unit: Unit) {
   const client = useQueryClient()
   return useMutation({
+    mutationKey: describeKey(reviewId, unit),
     mutationFn: (request: DescribeRequest) => postJson<UnitDescription>(unitPath(reviewId, unit), request),
-    onSuccess: async (described) => {
+    onSuccess: (described) => {
       const queryKey = descriptionsKey(reviewId, unit.revision_id)
-      await client.cancelQueries({ queryKey })
-      client.setQueryData<UnitDescription[]>(queryKey, (descriptions = []) => [
-        ...descriptions.filter((description) => description.unit_id !== described.unit_id),
-        described,
-      ])
+      client.setQueryData<UnitDescription[]>(queryKey, (descriptions) =>
+        descriptions && [...descriptions.filter((description) => description.unit_id !== described.unit_id), described],
+      )
+      return client.invalidateQueries({ queryKey })
     },
+  })
+}
+
+export function usePendingDescribeCalls(reviewId: number, unit: Unit): string[] {
+  return useMutationState({
+    filters: { mutationKey: describeKey(reviewId, unit), status: 'pending' },
+    select: (mutation) => (mutation.state.variables as DescribeRequest).call_id,
   })
 }

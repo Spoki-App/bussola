@@ -1,7 +1,5 @@
-import { useRef } from 'react'
-
 import { newCallId, useCancelAiCall } from '../api/ai'
-import { useDescribeUnit, useUnitDescription } from '../api/descriptions'
+import { useDescribeUnit, usePendingDescribeCalls, useUnitDescription } from '../api/descriptions'
 import type { Unit, UnitDescription } from '../api/types'
 
 export interface AiDescriptionState {
@@ -15,21 +13,20 @@ export interface AiDescriptionState {
 export function useAiDescription(reviewId: number, unit: Unit): AiDescriptionState {
   const stored = useUnitDescription(reviewId, unit)
   const describe = useDescribeUnit(reviewId, unit)
+  const running = usePendingDescribeCalls(reviewId, unit)
   const cancelCall = useCancelAiCall()
-  const callId = useRef<string | null>(null)
   return {
     description: stored.data ?? null,
-    pending: describe.isPending,
+    pending: running.length > 0,
     error: describe.error ?? cancelCall.error,
     run: (target, regenerate) => {
       cancelCall.reset()
-      callId.current = newCallId()
-      describe.mutate({ target, regenerate, call_id: callId.current })
+      describe.mutate({ target, regenerate, call_id: newCallId() })
     },
     cancel: () => {
       describe.reset()
-      if (callId.current !== null) {
-        cancelCall.mutate(callId.current)
+      for (const callId of running) {
+        cancelCall.mutate(callId)
       }
     },
   }

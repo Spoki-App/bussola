@@ -58,32 +58,47 @@ const DESCRIBED: UnitDescription = {
 interface Routes {
   ai?: AiStatus
   stored?: UnitDescription[]
-  describe?: () => Promise<Response>
+  answer?: () => Response | null
 }
 
-function renderCard({ ai = AI, stored = [], describe = () => Promise.resolve(Response.json(DESCRIBED)) }: Routes = {}) {
-  const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>((url) => {
+function renderCard({ ai = AI, stored = [], answer = () => Response.json(DESCRIBED) }: Routes = {}) {
+  let saved = stored
+  let cancelRunning: () => void = () => undefined
+  const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async (url) => {
     if (url === '/api/repos/3/ai') {
-      return Promise.resolve(Response.json(ai))
+      return Response.json(ai)
     }
     if (url === '/api/reviews/1/descriptions?revision_id=2') {
-      return Promise.resolve(Response.json(stored))
+      return Response.json(saved)
     }
     if (url === '/api/reviews/1/units/7/description') {
-      return describe()
+      const response = answer()
+      if (response === null) {
+        return new Promise<Response>((resolve) => {
+          cancelRunning = () => { resolve(Response.json({ detail: 'Cancelled' }, { status: 409 })) }
+        })
+      }
+      if (response.ok) {
+        const described = (await response.clone().json()) as UnitDescription
+        saved = [...saved.filter((description) => description.unit_id !== described.unit_id), described]
+      }
+      return response
     }
     if (url.startsWith('/api/ai/calls/')) {
-      return Promise.resolve(Response.json({ cancelled: true }))
+      cancelRunning()
+      return Response.json({ cancelled: true })
     }
     return new Promise<Response>(() => undefined)
   })
   vi.stubGlobal('fetch', fetchMock)
-  render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <UnitCard reviewId={1} repoId={3} unit={UNIT} focused={false} onFocus={() => undefined} register={() => undefined} />
-    </QueryClientProvider>,
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const card = (key: string) => (
+    <QueryClientProvider client={client}>
+      <UnitCard key={key} reviewId={1} repoId={3} unit={UNIT} focused={false} onFocus={() => undefined} register={() => undefined} />
+    </QueryClientProvider>
   )
-  return fetchMock
+  const view = render(card('first'))
+  return Object.assign(fetchMock, { remount: () => { view.rerender(card('second')) } })
 }
 
 function posted(fetchMock: ReturnType<typeof renderCard>, url: string): unknown[] {
@@ -118,7 +133,7 @@ describe('AI description on a unit card', () => {
   })
 
   it('shows the loading state and can cancel the call', async () => {
-    const fetchMock = renderCard({ describe: () => new Promise<Response>(() => undefined) })
+    const fetchMock = renderCard({ answer: () => null })
 
     fireEvent.click(await screen.findByRole('button', { name: 'Describe' }))
     expect(await screen.findByRole('status')).toHaveTextContent('Describing this unit...')
@@ -130,8 +145,34 @@ describe('AI description on a unit card', () => {
     expect(screen.getByRole('button', { name: 'Describe' })).toBeEnabled()
   })
 
+  it('keeps showing a running call when the card is collapsed', async () => {
+    renderCard({ answer: () => null })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Describe' }))
+    await screen.findByRole('status')
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse unit' }))
+
+    expect(screen.getByRole('button', { name: 'Expand unit' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Describing this unit...')
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Describe' })).toBeNull()
+  })
+
+  it('still knows about a running call after the card is mounted again', async () => {
+    const fetchMock = renderCard({ answer: () => null })
+    fireEvent.click(await screen.findByRole('button', { name: 'Describe' }))
+    await screen.findByRole('status')
+
+    fetchMock.remount()
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Describing this unit...')
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => { expect(screen.queryByRole('status')).toBeNull() })
+    expect(posted(fetchMock, '/api/reviews/1/units/7/description')).toHaveLength(1)
+  })
+
   it('shows an error and lets the reviewer try again', async () => {
-    renderCard({ describe: () => Promise.resolve(Response.json({ detail: 'No answer within 600 seconds' }, { status: 504 })) })
+    renderCard({ answer: () => Response.json({ detail: 'No answer within 600 seconds' }, { status: 504 }) })
 
     fireEvent.click(await screen.findByRole('button', { name: 'Describe' }))
 
@@ -140,7 +181,7 @@ describe('AI description on a unit card', () => {
   })
 
   it('marks a description of an earlier version as outdated and regenerates it', async () => {
-    const fetchMock = renderCard({ stored: [{ ...DESCRIBED, outdated: true }], describe: () => Promise.resolve(Response.json({ ...DESCRIBED, description: 'Applies a tax.' })) })
+    const fetchMock = renderCard({ stored: [{ ...DESCRIBED, outdated: true }], answer: () => Response.json({ ...DESCRIBED, description: 'Applies a tax.' }) })
 
     expect(await screen.findByText('outdated')).toBeInTheDocument()
     fireEvent.click(await screen.findByRole('button', { name: 'Regenerate' }))

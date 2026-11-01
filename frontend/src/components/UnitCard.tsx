@@ -234,6 +234,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
         )}
       </header>
       {failure && <ErrorNote message={describeError(failure)} />}
+      {!expanded && (ai.pending || ai.error) && <AiDescription repoId={repoId} ai={ai} />}
       {expanded && (
         <div className="unit-body">
           <AiDescription repoId={repoId} ai={ai} />

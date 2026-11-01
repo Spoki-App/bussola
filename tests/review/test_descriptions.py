@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from bussola.review.descriptions import MAX_SIDE_CHARACTERS, UnitInsight, unit_prompt
+from bussola.review.descriptions import BINARY_SIDE, MAX_SIDE_CHARACTERS, UnitInsight, unit_prompt
 from bussola.storage.models import UnitSnapshot
 
 
@@ -54,9 +54,20 @@ def test_the_impact_reason_is_kept_on_one_line() -> None:
 
 
 @pytest.mark.parametrize("field", ["description", "impact_reason"])
-def test_an_empty_answer_is_refused(field: str) -> None:
+@pytest.mark.parametrize("blank", ["", "  \n "])
+def test_a_blank_answer_is_refused(field: str, blank: str) -> None:
     with pytest.raises(ValueError, match=field):
-        UnitInsight.model_validate({"description": "Text", "impact": "low", "impact_reason": "Reason"} | {field: ""})
+        UnitInsight.model_validate({"description": "Text", "impact": "low", "impact_reason": "Reason"} | {field: blank})
+
+
+def test_a_side_that_became_binary_is_not_described_as_removed() -> None:
+    binary_head = snapshot("placeholder", None)
+    binary_head.head_hash = "blob"
+
+    prompt = unit_prompt(binary_head)
+
+    assert f"<after>{BINARY_SIDE}</after>" in prompt
+    assert "removes the unit" not in prompt
 
 
 def test_code_cannot_close_the_block_it_is_quoted_in() -> None:

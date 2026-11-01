@@ -21,6 +21,7 @@ class Impact(StrEnum):
 
 MAX_SIDE_CHARACTERS = 40_000
 MARKER_HASH_LENGTH = 16
+BINARY_SIDE = "Binary content that cannot be shown."
 UNIT_NAMES = {"module": "module-level code"}
 
 
@@ -32,12 +33,18 @@ class UnitInsight(BaseModel):
     @field_validator("description")
     @classmethod
     def _trimmed(cls, description: str) -> str:
-        return description.strip()
+        return _not_blank(description.strip())
 
     @field_validator("impact_reason")
     @classmethod
     def _one_line(cls, reason: str) -> str:
-        return " ".join(reason.split())
+        return _not_blank(" ".join(reason.split()))
+
+
+def _not_blank(text: str) -> str:
+    if not text:
+        raise ValueError("must not be blank")
+    return text
 
 
 DESCRIBE_UNIT = AiTask(
@@ -68,15 +75,13 @@ def change_hash(snapshot: UnitSnapshot) -> str:
 def stored_descriptions(snapshots: Iterable[UnitSnapshot], descriptions: Iterable[UnitDescription]) -> dict[int, UnitDescription]:
     latest: dict[KeyTuple, UnitDescription] = {}
     exact: dict[tuple[KeyTuple, str], UnitDescription] = {}
-    same_change: dict[str, UnitDescription] = {}
     for description in descriptions:
         latest[key_of(description)] = description
         exact[(key_of(description), description.change_hash)] = description
-        same_change[description.change_hash] = description
     found: dict[int, UnitDescription] = {}
     for snapshot in snapshots:
-        key, change = key_of(snapshot), change_hash(snapshot)
-        description = exact.get((key, change)) or same_change.get(change) or latest.get(key) or latest.get(_old_key(snapshot))
+        key, old_key, change = key_of(snapshot), _old_key(snapshot), change_hash(snapshot)
+        description = exact.get((key, change)) or exact.get((old_key, change)) or latest.get(key) or latest.get(old_key)
         if description is not None:
             found[snapshot.id] = description
     return found
@@ -104,14 +109,14 @@ def unit_prompt(snapshot: UnitSnapshot) -> str:
     if snapshot.old_path and snapshot.old_path != snapshot.path:
         lines.append(f"Renamed from: {snapshot.old_path}")
     lines += [f"Kind: {snapshot.kind}", f"Name: {name}", ""]
-    lines += _side("before", snapshot.base_text, "The unit did not exist before this change.")
-    lines += _side("after", snapshot.head_text, "This change removes the unit.")
+    lines += _side("before", snapshot.base_hash, snapshot.base_text, "The unit did not exist before this change.")
+    lines += _side("after", snapshot.head_hash, snapshot.head_text, "This change removes the unit.")
     return "\n".join(lines)
 
 
-def _side(tag: str, text: str | None, missing: str) -> list[str]:
+def _side(tag: str, content_hash: str | None, text: str | None, missing: str) -> list[str]:
     if text is None:
-        return [f"<{tag}>{missing}</{tag}>", ""]
+        return [f"<{tag}>{missing if content_hash is None else BINARY_SIDE}</{tag}>", ""]
     clipped = _clipped(text)
     marker = f"{tag}-{hashlib.sha256(clipped.encode()).hexdigest()[:MARKER_HASH_LENGTH]}"
     return [f"<{marker}>", clipped, f"</{marker}>", ""]

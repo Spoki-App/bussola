@@ -38,7 +38,7 @@ def test_ai(request: Request) -> AiTestOut:
 
 
 @router.post("/ai/calls/{call_id}/cancel")
-def cancel_call(call_id: Annotated[str, PathParameter(max_length=MAX_CALL_ID_LENGTH)], request: Request) -> CancelOut:
+async def cancel_call(call_id: Annotated[str, PathParameter(max_length=MAX_CALL_ID_LENGTH)], request: Request) -> CancelOut:
     return CancelOut(cancelled=app_state(request).ai_calls.cancel(call_id))
 
 

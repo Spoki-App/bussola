@@ -248,6 +248,26 @@ def test_a_description_follows_a_unit_moved_to_another_file(git_repo: GitFixture
     assert (stored["description"], stored["outdated"]) == ("Adds the **tax** to the total.", outdated)
 
 
+def test_units_with_the_same_content_keep_their_own_descriptions(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
+    git_repo.commit({"README.md": "hello\n"}, "base")
+    git_repo.branch("feature")
+    git_repo.commit({"a/__init__.py": "VERSION = 1\n", "b/__init__.py": "VERSION = 1\n"}, "packages")
+    api = ai_client(git_repo, data_dir, config_file, FakeProvider(INSIGHT))
+    review_id = api.start_review()
+
+    describe(api, review_id, "a/__init__.py")
+
+    assert list(descriptions(api, review_id)) == [api.unit(review_id, "a/__init__.py")["id"]]
+
+
+def test_a_blank_answer_is_refused_and_nothing_is_stored(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    api = ai_client(billing, data_dir, config_file, FakeProvider({"description": " \n", "impact": "low", "impact_reason": " "}))
+    review_id = api.start_review()
+
+    assert "must not be blank" in describe(api, review_id, "app.py::total", 502)["detail"]
+    assert descriptions(api, review_id) == {}
+
+
 def test_a_binary_file_cannot_be_described(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
     git_repo.commit({"README.md": "hello\n"}, "base")
     git_repo.branch("feature")
