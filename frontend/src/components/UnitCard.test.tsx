@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Unit, UnitState } from '../api/types'
+import { LinkScrollContext, createLinkScroll } from '../review/linkFocus'
+import { ReviewLinkContext, reviewLinkMaker } from '../review/reviewLink'
 import { UnitCard } from './UnitCard'
 
 function unit(state: UnitState, overrides: Partial<Unit> = {}): Unit {
@@ -26,6 +28,8 @@ function unit(state: UnitState, overrides: Partial<Unit> = {}): Unit {
     todo: !state.startsWith('approved'),
     action: state.startsWith('approved') ? 'revoke' : 'approve',
     open_threads: 0,
+    head_start: null,
+    head_end: null,
     ...overrides,
   }
 }
@@ -57,6 +61,67 @@ describe('UnitCard', () => {
     expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
   })
 
+  it('opens itself when a link points at it or at one of its threads', () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
+    Element.prototype.scrollIntoView = () => undefined
+    for (const elementId of ['unit-1', 'thread-t']) {
+      const link = createLinkScroll()
+      const view = render(
+        <QueryClientProvider client={new QueryClient()}>
+          <LinkScrollContext value={link}>
+            <UnitCard reviewId={1} unit={unit('approved')} focused={false} onFocus={() => undefined} register={() => undefined} />
+          </LinkScrollContext>
+        </QueryClientProvider>,
+      )
+      expect(disclosure()).toHaveAttribute('aria-expanded', 'false')
+
+      act(() => { link.start({ unitId: 1, elementId }) })
+
+      expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
+      view.unmount()
+    }
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+  })
+
+  it('ends a link to the unit even when its diff cannot be loaded', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(Response.json({ detail: 'boom' }, { status: 500 }))))
+    Element.prototype.scrollIntoView = () => undefined
+    const link = createLinkScroll()
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <LinkScrollContext value={link}>
+          <UnitCard reviewId={1} unit={unit('changed')} focused={false} onFocus={() => undefined} register={() => undefined} />
+        </LinkScrollContext>
+      </QueryClientProvider>,
+    )
+
+    act(() => { link.start({ unitId: 1, elementId: 'unit-1' }) })
+
+    await waitFor(() => { expect(link.current()?.reached).toBe(true) })
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+  })
+
+  it('offers a link to its first line only in a pull request review', () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
+    const client = new QueryClient()
+    const card = (makeLink: ReturnType<typeof reviewLinkMaker>, overrides: Partial<Unit>) => (
+      <QueryClientProvider client={client}>
+        <ReviewLinkContext value={makeLink}>
+          <UnitCard reviewId={1} unit={unit('approved', overrides)} focused={false} onFocus={() => undefined} register={() => undefined} />
+        </ReviewLinkContext>
+      </QueryClientProvider>
+    )
+    const makeLink = reviewLinkMaker('https://github.com/acme/widgets/pull/3')
+    const { rerender } = render(card(makeLink, { head_start: 12, head_end: 20 }))
+    expect(screen.getByRole('button', { name: 'Copy link to this unit' })).toBeInTheDocument()
+
+    rerender(card(makeLink, { head_start: null, head_end: null }))
+    expect(screen.queryByRole('button', { name: 'Copy link to this unit' })).toBeNull()
+
+    rerender(card(null, { head_start: 12, head_end: 20 }))
+    expect(screen.queryByRole('button', { name: 'Copy link to this unit' })).toBeNull()
+  })
+
   it('shows the module before the name of every unit, methods included', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
     const client = new QueryClient()
@@ -73,5 +138,26 @@ describe('UnitCard', () => {
     rerender(card({ module: 'shop.app', kind: 'module', qualified_name: '' }))
     expect(container.querySelector('.unit-module')).toBeNull()
     expect(screen.getByText('Module code')).toBeInTheDocument()
+  })
+
+  it('opens a jump target and shows the base diff when the target is on the base side', () => {
+    const fetchMock = vi.fn<(url: string) => Promise<never>>(() => new Promise(() => undefined))
+    vi.stubGlobal('fetch', fetchMock)
+    Element.prototype.scrollIntoView = vi.fn()
+    const client = new QueryClient()
+    const card = (target?: { unitId: number; line: number; side: 'head' | 'base' }) => (
+      <QueryClientProvider client={client}>
+        <UnitCard reviewId={1} unit={unit('approved')} focused={false} onFocus={() => undefined} register={() => undefined} navigationTarget={target} />
+      </QueryClientProvider>
+    )
+    const { rerender } = render(card())
+    expect(disclosure()).toHaveAttribute('aria-expanded', 'false')
+
+    rerender(card({ unitId: 1, line: 3, side: 'head' }))
+    expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/reviews/1/units/1/diff'])
+
+    rerender(card({ unitId: 1, line: 3, side: 'base' }))
+    expect(fetchMock.mock.calls.map(([url]) => url).at(-1)).toBe('/api/reviews/1/units/1/diff?mode=base')
   })
 })

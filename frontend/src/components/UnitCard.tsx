@@ -1,14 +1,18 @@
-import { memo, useEffect, useState, type ReactNode } from 'react'
+import { memo, useContext, useEffect, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/hooks'
 import type { DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
+import type { NavigationClick, ScreenPoint, UnitTarget } from '../review/codeNavigation'
+import { TARGET_ROW_SELECTOR, unitElementId, useLinkedScroll } from '../review/linkFocus'
 import { unitTitle } from '../review/logic'
+import { ReviewLinkContext } from '../review/reviewLink'
 import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
 import { ErrorNote, KindBadge, StateBadge } from './Badges'
+import { CopyLinkButton } from './CopyLinkButton'
 import { ImagePreview } from './ImagePreview'
 import { QualifiedName } from './QualifiedName'
-import { UnitDiffView, type GutterSide } from './UnitDiffView'
+import { UnitDiffView, type GutterSide, type TargetLine } from './UnitDiffView'
 
 export interface UnitActions {
   toggleApproval: () => void
@@ -34,13 +38,23 @@ interface Props {
   onCommentSelectEnd?: () => void
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
+  onNavigate?: (click: NavigationClick) => void
+  navigationTarget?: UnitTarget
+  linkedLine?: number
 }
 
 const APPROVE_LABELS = { approve: 'Approve', approve_under_name: 'Approve under this name', confirm_removal: 'Confirm removal' } as const
 
 const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', base: 'Base → head' }
 
-export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows }: Props) {
+function targetLine(target: UnitTarget | undefined, linkedLine: number | undefined): TargetLine | undefined {
+  if (target) {
+    return { side: target.side === 'base' ? 'old' : 'new', line: target.line }
+  }
+  return linkedLine === undefined ? undefined : { side: 'new', line: linkedLine }
+}
+
+export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, onNavigate, navigationTarget, linkedLine }: Props) {
   const todo = unit.todo
   const [expanded, setExpanded] = useState(todo)
   const [wasTodo, setWasTodo] = useState(todo)
@@ -49,9 +63,24 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
     setExpanded(todo)
   }
   const [mode, setMode] = useState<DiffMode | undefined>(undefined)
+  const [seenTarget, setSeenTarget] = useState<UnitTarget | undefined>(undefined)
+  if (navigationTarget !== seenTarget) {
+    setSeenTarget(navigationTarget)
+    if (navigationTarget) {
+      setExpanded(true)
+    }
+    if (navigationTarget?.side === 'base') {
+      setMode('base')
+    }
+  }
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [anchor, setAnchor] = useState<string | null>(null)
   const diff = useUnitDiff(reviewId, unit, mode, expanded)
+  const { ref: linkedRef, linked } = useLinkedScroll<HTMLElement>(unitElementId(unit.id), unit.id, expanded && !diff.isPending)
+  if (linked && !expanded) {
+    setExpanded(true)
+  }
+  const makeLink = useContext(ReviewLinkContext)
   const approve = useApprove(reviewId)
   const revoke = useRevoke(reviewId)
   const revokeSelections = useRevokeSelections(reviewId)
@@ -106,6 +135,25 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
     }
   })
 
+  const diffLoaded = diff.data !== undefined
+  useEffect(() => {
+    if (!navigationTarget) {
+      return
+    }
+    onFocus(unit.id)
+    const element = linkedRef.current?.querySelector(TARGET_ROW_SELECTOR) ?? linkedRef.current
+    element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [navigationTarget, diffLoaded, onFocus, unit.id, linkedRef])
+
+  const navigateFrom = (row: DiffRow, side: GutterSide, column: number, point: ScreenPoint) => {
+    const base = side === 'old'
+    const line = base ? row.old_line : row.new_line
+    if (!onNavigate || line === null || (base && diff.data?.mode !== 'base')) {
+      return
+    }
+    onNavigate({ path: base ? (unit.old_path ?? unit.path) : unit.path, side: base ? 'base' : 'head', line, column, point })
+  }
+
   const onRowClick = (row: DiffRow, extend: boolean) => {
     const key = rowKey(row)
     if (extend && anchor) {
@@ -125,13 +173,14 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
   const canSwitchMode = diff.data?.available_modes.includes('approved') ?? false
 
   return (
-    <article id={`unit-${String(unit.id)}`} className={`unit-card state-${unit.state}${focused ? ' focused' : ''}`} onClick={() => { onFocus(unit.id) }}>
+    <article id={unitElementId(unit.id)} ref={linkedRef} className={`unit-card state-${unit.state}${focused ? ' focused' : ''}`} onClick={() => { onFocus(unit.id) }}>
       <header className="unit-header">
         <button type="button" className="disclosure" aria-expanded={expanded} aria-label={expanded ? 'Collapse unit' : 'Expand unit'} onClick={() => { setExpanded(!expanded) }}>
           {expanded ? '▾' : '▸'}
         </button>
         <KindBadge kind={unit.kind} />
         <QualifiedName module={unit.qualified_name ? unit.module : null} name={unitTitle(unit)} />
+        {makeLink && unit.head_start !== null && <CopyLinkButton link={makeLink({ path: unit.path, line: unit.head_start })} label="Copy link to this unit" className="icon" />}
         <StateBadge state={unit.state} />
         {unit.change_type !== 'modified' && <span className="label">{unit.change_type}</span>}
         {unit.base_changed && <span className="label" title="The base changed since you approved this unit">base changed</span>}
@@ -186,6 +235,8 @@ export const UnitCard = memo(function UnitCard({ reviewId, unit, focused, onFocu
               onLineNumberClick={onComment ? (row, side, extend) => { onComment({ unit, row, side, mode: diff.data.mode, extend, selecting: true }) } : undefined}
               onLineSelectEnd={onCommentSelectEnd}
               highlighted={highlightRows?.(unit, diff.data)}
+              onNavigate={onNavigate ? navigateFrom : undefined}
+              target={targetLine(navigationTarget, linkedLine)}
               widgets={renderWidgets ? (changeKeyOf) => renderWidgets(unit, diff.data, changeKeyOf) : undefined}
             />
           )}

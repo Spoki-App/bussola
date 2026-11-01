@@ -93,6 +93,10 @@ function splitFormatSpec(body: ElementContent[]): ElementContent[] {
   return body
 }
 
+export function highlightCode(value: string, language: string): ElementContent[] {
+  return refractor.highlight(value, language)
+}
+
 export function languageFor(path: string): string | null {
   const name = path.split('/').at(-1)?.toLowerCase() ?? ''
   const extension = name.includes('.') ? (name.split('.').at(-1) ?? '') : name

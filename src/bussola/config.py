@@ -38,3 +38,4 @@ class AppSettings:
     token: str | None = None
     allowed_hosts: frozenset[str] = field(default_factory=frozenset)
     config_file: Path | None = None
+    port: int | None = None

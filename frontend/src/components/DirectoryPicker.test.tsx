@@ -42,11 +42,11 @@ function stubApi() {
   return fetchMock
 }
 
-function renderPicker(onSelect = vi.fn()) {
+function renderPicker(onSelect = vi.fn(), filter?: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
-      <DirectoryPicker busy={false} error={null} onSelect={onSelect} onClose={vi.fn()} />
+      <DirectoryPicker filter={filter} busy={false} error={null} onSelect={onSelect} onClose={vi.fn()} />
     </QueryClientProvider>,
   )
   return onSelect
@@ -86,6 +86,15 @@ describe('DirectoryPicker', () => {
 
     expect(screen.queryByRole('button', { name: 'Add shop' })).toBeNull()
     expect(screen.getByText('api')).toBeInTheDocument()
+  })
+
+  it('starts with the filter it is given', async () => {
+    stubApi()
+    renderPicker(vi.fn(), 'shop')
+
+    expect(await screen.findByRole('button', { name: 'Add shop' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Filter repositories')).toHaveValue('shop')
+    expect(screen.queryByText('api')).toBeNull()
   })
 
   it('browses folders and opens one when clicked', async () => {

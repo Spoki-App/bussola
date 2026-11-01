@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Response
 
-from bussola.api.deps import ContextDep, repo_of, resolve_revision, snapshot_of
+from bussola.api.deps import ContextDep, repo_of, resolve_revision, side_commit, side_path, snapshot_of
 from bussola.api.images import image_response
 from bussola.api.schemas import DiffOut, DiffRowOut, UnitOut
 from bussola.api.views import unit_out
@@ -63,12 +63,12 @@ def get_diff(context: ContextDep, unit_id: int, mode: DiffMode | None = None) ->
 @router.get("/reviews/{review_id}/units/{unit_id}/image")
 def get_image(context: ContextDep, unit_id: int, side: Side) -> Response:
     snapshot = snapshot_of(context, unit_id)
-    path = snapshot.old_path or snapshot.path if side == Side.BASE else snapshot.path
+    path = side_path(snapshot, side)
     media_type = image_type(path)
     revision = context.store.reviews.get_revision(snapshot.revision_id)
     if media_type is None or revision is None:
         raise InvalidRequestError(f"{path} is not an image bussola can show")
-    commit = revision.merge_base_sha if side == Side.BASE else revision.head_sha
+    commit = side_commit(revision, side)
     data = open_repo(repo_of(context)).file_at(commit, path)
     if data is None:
         raise NotFoundError(f"{path} does not exist on the {side.value} side")

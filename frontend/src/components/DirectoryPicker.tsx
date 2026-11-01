@@ -8,6 +8,7 @@ import { useModalDialog } from '../hooks/useModalDialog'
 import { Segmented } from './Segmented'
 
 interface Props {
+  filter?: string
   busy: boolean
   error: unknown
   onSelect: (path: string) => void
@@ -18,7 +19,7 @@ type PickerTab = 'found' | 'browse'
 
 const TAB_LABELS: Record<PickerTab, string> = { found: 'Found in your home folder', browse: 'Browse folders' }
 
-export function DirectoryPicker({ busy, error, onSelect, onClose }: Props) {
+export function DirectoryPicker({ filter = '', busy, error, onSelect, onClose }: Props) {
   const { ref: dialog, close } = useModalDialog()
   const [tab, setTab] = useState<PickerTab>('found')
 
@@ -31,14 +32,14 @@ export function DirectoryPicker({ busy, error, onSelect, onClose }: Props) {
         </button>
       </header>
       <Segmented label="How to find the repository" labels={TAB_LABELS} value={tab} onChange={setTab} />
-      {tab === 'found' ? <FoundRepositories busy={busy} onSelect={onSelect} /> : <FolderBrowser busy={busy} onSelect={onSelect} />}
+      {tab === 'found' ? <FoundRepositories filter={filter} busy={busy} onSelect={onSelect} /> : <FolderBrowser busy={busy} onSelect={onSelect} />}
       {error ? <ErrorNote message={describeError(error)} /> : null}
     </dialog>
   )
 }
 
-function FoundRepositories({ busy, onSelect }: { busy: boolean; onSelect: (path: string) => void }) {
-  const [query, setQuery] = useState('')
+function FoundRepositories({ filter, busy, onSelect }: { filter: string; busy: boolean; onSelect: (path: string) => void }) {
+  const [query, setQuery] = useState(filter)
   const scan = useRepositoryScan()
   const home = useDirectories(undefined).data?.home ?? ''
   const matches = filterRepositories(scan.data?.repositories ?? [], query)

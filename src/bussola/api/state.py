@@ -9,6 +9,7 @@ from bussola.ai.config import AiSettings
 from bussola.config import AppSettings
 from bussola.forge.base import ForgeAdapter
 from bussola.identity import GitConfigIdentity
+from bussola.navigation.navigator import Navigator
 from bussola.storage.database import Database
 
 
@@ -19,6 +20,7 @@ class AppState:
     identity: GitConfigIdentity
     forge: ForgeAdapter
     url_opener: Callable[[str], object]
+    navigator: Navigator
     ai_factory: Callable[[AiSettings], AiProvider]
 
 

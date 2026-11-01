@@ -2,10 +2,12 @@ const API_BASE = '/api'
 
 export class ApiError extends Error {
   readonly status: number
+  readonly code: string | null
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code: string | null = null) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -17,23 +19,28 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   if (!response.ok) {
-    throw new ApiError(response.status, await errorMessage(response))
+    throw await apiError(response)
   }
   return (await response.json()) as T
 }
 
-async function errorMessage(response: Response): Promise<string> {
+async function apiError(response: Response): Promise<ApiError> {
   try {
-    const payload = (await response.json()) as { detail?: unknown }
-    if (typeof payload.detail === 'string') {
-      return payload.detail
-    }
-    if (Array.isArray(payload.detail)) {
-      return payload.detail.map((item: { msg?: string }) => item.msg ?? '').join('; ')
-    }
+    const payload = (await response.json()) as { detail?: unknown; code?: unknown }
+    return new ApiError(response.status, detailMessage(payload.detail) ?? fallbackMessage(response), typeof payload.code === 'string' ? payload.code : null)
   } catch {
-    return `Request failed with status ${String(response.status)}`
+    return new ApiError(response.status, fallbackMessage(response))
   }
+}
+
+function detailMessage(detail: unknown): string | null {
+  if (typeof detail === 'string') {
+    return detail
+  }
+  return Array.isArray(detail) ? detail.map((item: { msg?: string }) => item.msg ?? '').join('; ') : null
+}
+
+function fallbackMessage(response: Response): string {
   return `Request failed with status ${String(response.status)}`
 }
 

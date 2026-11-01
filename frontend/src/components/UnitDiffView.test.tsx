@@ -1,11 +1,13 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { DiffRow, UnitDiff } from '../api/types'
 import { setDiffLayout } from '../hooks/useDiffLayout'
+import { clearCaret, placeCaret } from '../test/caret'
+import { ReviewLinkContext, reviewLinkMaker, type MakeLink } from '../review/reviewLink'
 import { rowKey } from '../review/selection'
 import { DEFAULT_DIFF_LAYOUT, type DiffLayout } from '../settings/diffLayout'
-import { UnitDiffView } from './UnitDiffView'
+import { UnitDiffView, type TargetLine } from './UnitDiffView'
 
 const HEADER = 'diff --git a/app.py b/app.py\n--- a/app.py\n+++ b/app.py\n'
 
@@ -53,20 +55,27 @@ interface Options {
   highlighted?: ReadonlySet<string>
   onRowClick?: (row: DiffRow, extend: boolean) => void
   onLineNumberClick?: (row: DiffRow, side: 'old' | 'new', extend: boolean) => void
+  onNavigate?: (row: DiffRow, side: 'old' | 'new', column: number, point: { x: number; y: number }) => void
+  target?: TargetLine
+  makeLink?: MakeLink | null
 }
 
-function view({ rows = rewritten, threads = [], highlighted, onRowClick, onLineNumberClick }: Options = {}) {
+function view({ rows = rewritten, threads = [], highlighted, onRowClick, onLineNumberClick, onNavigate, target, makeLink }: Options = {}) {
   const { container } = render(
-    <UnitDiffView
-      diff={diff(rows)}
-      path="app.py"
-      selectable={onRowClick !== undefined}
-      selected={new Set()}
-      onRowClick={onRowClick ?? (() => undefined)}
-      onLineNumberClick={onLineNumberClick}
-      highlighted={highlighted}
-      widgets={(changeKeyOf) => Object.fromEntries(threads.map((thread) => [changeKeyOf(thread) ?? '', <p key={thread.text}>{`thread on ${thread.text.trim()}`}</p>]))}
-    />,
+    <ReviewLinkContext value={makeLink ?? null}>
+      <UnitDiffView
+        diff={diff(rows)}
+        path="app.py"
+        selectable={onRowClick !== undefined}
+        selected={new Set()}
+        onRowClick={onRowClick ?? (() => undefined)}
+        onLineNumberClick={onLineNumberClick}
+        highlighted={highlighted}
+        onNavigate={onNavigate}
+        target={target}
+        widgets={(changeKeyOf) => Object.fromEntries(threads.map((thread) => [changeKeyOf(thread) ?? '', <p key={thread.text}>{`thread on ${thread.text.trim()}`}</p>]))}
+      />
+    </ReviewLinkContext>,
   )
   return container.querySelector('table') as HTMLTableElement
 }
@@ -180,6 +189,25 @@ describe('UnitDiffView layout', () => {
     expect(onLineNumberClick).toHaveBeenLastCalledWith(added, 'new', true)
   })
 
+  it('copies a link to a head line from its gutter without starting a comment', async () => {
+    chooseLayout('split')
+    const writeText = vi.fn(() => Promise.resolve())
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const onLineNumberClick = vi.fn()
+    const table = view({ onLineNumberClick, makeLink: reviewLinkMaker('https://github.com/acme/widgets/pull/7') })
+
+    expect(gutter(table, '    return 0', 'old').querySelector('button')).toBeNull()
+    const button = screen.getByRole('button', { name: 'Copy link to line 2' })
+    expect(gutter(table, '    return sum(items)', 'new')).toContainElement(button)
+    fireEvent.mouseDown(button, { button: 0 })
+    fireEvent.click(button)
+
+    expect(onLineNumberClick).not.toHaveBeenCalled()
+    expect(writeText).toHaveBeenCalledWith('bussola://review?repo=acme/widgets&pr=7&path=app.py&line=2')
+    await waitFor(() => { expect(button).toHaveAttribute('title', 'Link copied') })
+    Reflect.deleteProperty(navigator, 'clipboard')
+  })
+
   it('marks the commented side of a split line only', () => {
     chooseLayout('split')
     const table = view({ highlighted: new Set([rowKey(removed)]) })
@@ -234,5 +262,75 @@ describe('UnitDiffView hanging indent', () => {
       [wrapped[2], true],
     ])
     expect(onLineNumberClick).toHaveBeenCalledWith(wrapped[2], 'new', true)
+  })
+})
+
+describe('UnitDiffView navigation', () => {
+  afterEach(() => {
+    act(() => {
+      setDiffLayout(DEFAULT_DIFF_LAYOUT)
+    })
+    clearCaret()
+  })
+
+  function caretIn(cell: HTMLElement, offset: number) {
+    const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT)
+    let remaining = offset
+    let node = walker.nextNode()
+    while (node && remaining > (node.textContent ?? '').length) {
+      remaining -= (node.textContent ?? '').length
+      node = walker.nextNode()
+    }
+    placeCaret(node as Text, remaining)
+  }
+
+  it.each([
+    ['metaKey', 'unified'],
+    ['ctrlKey', 'split'],
+  ] as const)('reports the row, side and column of a %s click in %s view instead of selecting', (modifier, layout) => {
+    chooseLayout(layout)
+    const onRowClick = vi.fn()
+    const onNavigate = vi.fn()
+    const table = view({ onRowClick, onNavigate })
+    const cell = codeCell(table, '    return sum(items)')
+    caretIn(cell, 12)
+
+    fireEvent.mouseDown(cell, { button: 0, [modifier]: true })
+    fireEvent.click(cell, { button: 0, [modifier]: true, clientX: 30, clientY: 40 })
+
+    expect(onRowClick).not.toHaveBeenCalled()
+    expect(onNavigate).toHaveBeenCalledWith(added, 'new', 12, { x: 30, y: 40 })
+  })
+
+  it('reports the old side of a removed line', () => {
+    chooseLayout('split')
+    const onNavigate = vi.fn()
+    const cell = codeCell(view({ onNavigate }), '    return 0')
+    caretIn(cell, 5)
+
+    fireEvent.click(cell, { button: 0, metaKey: true })
+
+    expect(onNavigate).toHaveBeenCalledWith(removed, 'old', 5, { x: 0, y: 0 })
+  })
+
+  it('keeps plain clicks for selection', () => {
+    const onRowClick = vi.fn()
+    const onNavigate = vi.fn()
+    fireEvent.click(codeCell(view({ onRowClick, onNavigate }), '    return sum(items)'))
+
+    expect(onNavigate).not.toHaveBeenCalled()
+    expect(onRowClick).toHaveBeenCalledWith(added, false)
+  })
+
+  it('reveals and marks the target line even inside a collapsed context', () => {
+    chooseLayout('unified')
+    const context = Array.from({ length: 20 }, (_, index) => row('context', index + 2, index + 2, `    step_${String(index)}()`))
+    const rows = [header, removed, added, ...context]
+
+    expect(view({ rows }).querySelector('.row-target')).toBeNull()
+    cleanup()
+    const table = view({ rows, target: { side: 'new', line: 18 } })
+
+    expect(table.querySelector('.row-target')).toHaveTextContent('step_15()')
   })
 })

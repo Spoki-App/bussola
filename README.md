@@ -97,11 +97,22 @@ A unit's own name does not count towards its content, so renaming a function wit
 
 To approve part of a module or file, click changed lines in its diff (shift-click extends the selection) and press "Approve selection". An approved line needs review again if it or the line next to it changes.
 
-Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve or revoke (or approve the selected lines), `c` comment, `r` check for new commits.
+Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve or revoke (or approve the selected lines), `c` comment, `r` check for new commits. Cmd/Ctrl+click a name to go to its definition or usages.
 
 ### Comments
 
 Click a line number to start a thread on that line. To comment on several lines, drag over their line numbers or shift-click another line number; the thread is sent to GitHub as a multi-line comment. Use "Comment on file" in a file header, or the conversation panel for comments on the whole review. Comments and pull request descriptions are rendered like on GitHub: GitHub Flavored Markdown (tables, task lists, line breaks), `> [!NOTE]` style alerts, safe HTML, highlighted code, mermaid diagrams, `owner/repo#123` links, and images attached on GitHub (downloaded through bussola with your `gh` login, since GitHub only serves them to signed-in users). You can edit or delete your own comments, and delete a thread you started as long as nobody else replied to it (otherwise resolve it). As on GitHub, only line and file threads can be resolved and count as open; comments on the whole review are part of the conversation. Deleted threads disappear from bussola but stay on GitHub if they were already sent. When the code changes, a thread moves with its line. It follows a renamed unit, and becomes outdated, showing the original snippet, when its line is gone.
+
+### Code navigation
+
+Cmd+click (Ctrl+click on Linux and Windows) a name in a diff to navigate, as in IntelliJ, in Python, TypeScript/TSX, JavaScript and Go files:
+
+- On a call or any other use of a name, bussola looks for its definition. On the name of a function, method, class or module level variable where it is defined, it lists its usages.
+- When there is exactly one result and it is part of the review, the page scrolls to that unit and highlights the line.
+- Otherwise a list opens next to the pointer: definitions first, then usages grouped by file, each with its line and a preview, and results inside the review marked **in review**. Use the arrow keys, Enter and Esc.
+- A result outside the review opens the file at the reviewed commit in a window, highlighted and scrolled to the line, with a link to the file on GitHub when the branch has a GitHub remote. Cmd/Ctrl+click works there too, and **Back** returns along the chain.
+
+Results come from an index of the repository at the reviewed commit, built with tree-sitter in the background when the review opens and kept per commit. It matches names, so it needs nothing installed but can list unrelated functions with the same name. When a language server is on your `PATH`, its precise answers are used instead: `basedpyright-langserver` or `pyright-langserver` for Python, `typescript-language-server` for TypeScript and JavaScript, `gopls` for Go. It runs on a copy of the reviewed commit, never on your working tree. If the server finds nothing, fails or takes more than five seconds, the index answers instead. The first time you navigate in a language without a server, a note shows the command that installs one; it is shown once.
 
 ### Reviewing GitHub pull requests
 
@@ -118,6 +129,32 @@ For a repository with a GitHub remote, **Pull requests** on its card lists the o
 - Resolving or reopening a thread that is also on GitHub does the same on GitHub. If GitHub refuses (for example, you lack write access), the thread stays as it was and the error is shown.
 
 bussola contacts GitHub only when you press one of these buttons, or for the automatic sync while a pull request review is open.
+
+### Opening bussola:// links
+
+Register the `bussola://` URL scheme once, so links in GitHub, Slack or a terminal open straight in bussola:
+
+```bash
+bussola install-handler
+```
+
+| Link | Opens |
+|---|---|
+| `bussola://` | the home page |
+| `bussola://review?repo=<owner>/<name>&pr=<number>` | the review of that pull request, started if there is none yet |
+| `bussola://review?repo=<owner>/<name>&pr=<number>&path=src/app.py&line=42` | the same review, scrolled to that line, which stays highlighted |
+| `bussola://review?repo=<owner>/<name>&pr=<number>&thread=<id>` | the same review, scrolled to that thread (`comment=<GitHub comment id>` works too) |
+| `bussola://github.com/<owner>/<name>/pull/<number>` | a GitHub pull request link with `https` replaced by `bussola`; `/files` and other pages of the pull request work too, and a comment anchor (`#discussion_r<id>` or `#r<id>`) scrolls to the imported thread |
+
+In a pull request review, bussola copies these links for you: **Copy bussola link** next to **View on GitHub** for the review, the link icon after a unit's name for its first line, the link icon in a thread's header for the thread, and the link icon that appears next to the new line number when you hover a line for that line (removed lines have none).
+
+If bussola is not running, the link starts `bussola serve --no-open` in the background on `127.0.0.1:8765`, waits for it, then opens the browser. Each running `bussola serve` writes its address and session token to a file in `servers/` in the data folder (readable only by you) once it is listening, so links can find it; a link prefers the server on port 8765. A server started by a link does not add your home folder as a repository. The repository is found as **Open pull request** finds it; if there is no local clone, the home page asks you to clone it and add its folder (**Browse...** starts filtered on its name), and the pull request opens once you add it (or the prompt says the folder is not a clone of it). If GitHub cannot be reached, a link to a pull request you are already reviewing opens that review as it is. `bussola open-link '<link>'` does the same from a terminal. A link that cannot be opened (not a valid link, or the server did not start) is recorded in `open-link.log` in the data folder, since the operating system shows no output.
+
+- **macOS:** builds `~/Applications/bussola.app`, a small AppleScript app that declares the scheme, and registers it with Launch Services. It keeps the `PATH` of the shell that ran `install-handler`, so a server it starts finds `gh` and `git`. Opening the app itself opens bussola.
+- **Linux:** writes `bussola-url-handler.desktop` to `~/.local/share/applications` (or `$XDG_DATA_HOME/applications`) and makes it the default for `x-scheme-handler/bussola` with `xdg-mime`. Like on macOS, it keeps the `PATH` of the shell that ran `install-handler`.
+- **Windows:** writes the `HKCU\Software\Classes\bussola` registry keys for the current user.
+
+The handler runs the Python that ran `install-handler`, and keeps the `BUSSOLA_DATA_DIR` it was run with, so run it again after reinstalling bussola somewhere else or moving your data. `bussola uninstall-handler` removes the registration, and on Linux also the `x-scheme-handler/bussola` default that `xdg-mime` wrote to `mimeapps.list`.
 
 ### Sending comments to GitHub
 
@@ -192,7 +229,7 @@ Once you have chosen a provider, a repository can make limited changes in the `[
 
 ## Data
 
-Reviews, approvals and comments are stored in SQLite at `platformdirs.user_data_dir("bussola")/bussola.db` (on macOS `~/Library/Application Support/bussola`). Set `BUSSOLA_DATA_DIR` to use another directory.
+Reviews, approvals and comments are stored in SQLite at `platformdirs.user_data_dir("bussola")/bussola.db` (on macOS `~/Library/Application Support/bussola`). Set `BUSSOLA_DATA_DIR` to use another directory. Language servers run on copies of reviewed commits in its `checkouts` folder, which is removed when bussola stops.
 
 A registered repository is remembered by its path and its first commit. If you move it, add it again from the new location and its reviews follow.
 
@@ -201,11 +238,12 @@ A registered repository is remembered by its path and its first commit. If you m
 The server is meant for one person on one machine.
 
 - **Network:** it listens on `127.0.0.1` by default and warns if you pass another `--host`.
-- **Session token:** every API call needs the session token cookie (HttpOnly, SameSite=Strict).
-- **Host check:** requests whose `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` are rejected, which blocks DNS rebinding.
+- **Session token:** every API call needs the session token cookie (HttpOnly, SameSite=Strict, one per port, so two servers do not log each other out).
+- **Host check:** requests whose `Host` header is not `127.0.0.1:<port>`, `localhost:<port>`, `[::1]:<port>` or the `--host` you passed are rejected, which blocks DNS rebinding.
 - **Git refs and files:** refs are validated with `git rev-parse --verify --end-of-options` before use. File contents are read only from the git object database.
+- **bussola:// links:** a link chooses what to open. Like **Open pull request**, opening a pull request link fetches it with `git fetch` into `refs/bussola/pull/<number>` and starts its review if there is none. Its parameters are validated (repository name, numbers, a relative file path, a thread or comment id), anything else in it is ignored, and no link approves, resolves, sends or deletes anything.
 - **Opening links:** GitHub links are opened by the server in your default browser, as a new tab, so they work even when the bussola page runs in an app-style window. The server only opens `https://github.com` addresses.
-- **Outbound traffic:** the only network access is `git fetch` when you ask for it, `gh` when you sync or have a pull request review open, downloads of images attached on GitHub shown in comments and descriptions, and requests to the AI provider you configured, only when you start an AI action or test the connection (see [AI providers](#ai-providers)).
+- **Outbound traffic:** the only network access is `git fetch` when you ask for it (including by opening a pull request link), `gh` when you sync or have a pull request review open, downloads of images attached on GitHub shown in comments and descriptions, and requests to the AI provider you configured, only when you start an AI action or test the connection (see [AI providers](#ai-providers)). Language servers are started with downloads turned off (`GOPROXY=off` for gopls, no automatic type acquisition for TypeScript).
 - **Rendered Markdown:** HTML in comments and descriptions is sanitized with GitHub's rules before it is shown. Attached images are served from `/api/forge/asset` only for `https://github.com/.../assets/...` links and only when they are images, with a sandboxing Content-Security-Policy.
 
 ## Status
