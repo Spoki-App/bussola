@@ -242,7 +242,9 @@ class SqlDescriptionRepository(_SqlRepository):
         replaced = {name: value for name, value in values.items() if name not in DESCRIPTION_KEY}
         statement = insert(UnitDescription).values(**values).on_conflict_do_update(index_elements=list(DESCRIPTION_KEY), set_=replaced)
         with self._session.begin_nested():
-            return self._session.scalars(statement.returning(UnitDescription), execution_options={"populate_existing": True}).one()
+            self._session.execute(statement)
+        query = select(UnitDescription).where(*(getattr(UnitDescription, name) == values[name] for name in DESCRIPTION_KEY))
+        return self._session.scalars(query, execution_options={"populate_existing": True}).one()
 
 
 class Store:

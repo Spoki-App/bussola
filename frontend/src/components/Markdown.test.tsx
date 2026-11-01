@@ -74,4 +74,11 @@ describe('Markdown', () => {
     expect(container.querySelector('img, picture, source')).toBeNull()
     expect(container.innerHTML).not.toContain('evil.example')
   })
+
+  it('shows diagrams as code when media is left out, since a diagram can load images', () => {
+    const container = render(<Markdown text={`${FENCE}mermaid\nflowchart LR\nA@{ img: "https://evil.example/p" }\n${FENCE}`} media={false} />).container
+
+    expect(container.querySelector('svg')).toBeNull()
+    expect(container.querySelector('pre code')?.textContent).toContain('flowchart LR')
+  })
 })

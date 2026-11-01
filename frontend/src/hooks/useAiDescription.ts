@@ -18,7 +18,7 @@ export function useAiDescription(reviewId: number, unit: Unit): AiDescriptionSta
   const cancelCall = useCancelAiCall()
   return {
     description: stored.data ?? null,
-    loaded: stored.isSuccess,
+    loaded: !stored.isPending,
     pending: running.length > 0,
     error: describe.error ?? cancelCall.error,
     run: (target, regenerate) => {

@@ -57,19 +57,19 @@ const DESCRIBED: UnitDescription = {
 
 interface Routes {
   ai?: AiStatus
-  stored?: UnitDescription[]
+  stored?: UnitDescription[] | null
   answer?: () => Response | null
 }
 
 function renderCard({ ai = AI, stored = [], answer = () => Response.json(DESCRIBED) }: Routes = {}) {
-  let saved = stored
+  let saved = stored ?? []
   let cancelRunning: () => void = () => undefined
   const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async (url) => {
     if (url === '/api/repos/3/ai') {
       return Response.json(ai)
     }
     if (url === '/api/reviews/1/descriptions?revision_id=2') {
-      return Response.json(saved)
+      return stored === null ? Response.json({ detail: 'Server error' }, { status: 500 }) : Response.json(saved)
     }
     if (url === '/api/reviews/1/units/7/description') {
       const response = answer()
@@ -205,6 +205,12 @@ describe('AI description on a unit card', () => {
 
     expect(await screen.findByText('tax')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Describe' })).toBeNull()
+  })
+
+  it('still offers Describe when the stored descriptions cannot be read', async () => {
+    renderCard({ stored: null })
+
+    expect(await screen.findByRole('button', { name: 'Describe' })).toBeEnabled()
   })
 
   it('can collapse the description', async () => {
