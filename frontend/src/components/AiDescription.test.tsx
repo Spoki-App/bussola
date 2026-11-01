@@ -72,7 +72,7 @@ function renderCard({ ai = AI, stored = [], describe = () => Promise.resolve(Res
     if (url === '/api/reviews/1/units/7/description') {
       return describe()
     }
-    if (url === '/api/reviews/1/units/7/description/cancel') {
+    if (url.startsWith('/api/ai/calls/')) {
       return Promise.resolve(Response.json({ cancelled: true }))
     }
     return new Promise<Response>(() => undefined)
@@ -114,7 +114,7 @@ describe('AI description on a unit card', () => {
     expect(screen.getByText('High impact')).toBeInTheDocument()
     expect(screen.getByText(': Changes what customers pay.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Describe' })).toBeNull()
-    expect(posted(fetchMock, '/api/reviews/1/units/7/description')).toEqual([{ target: AI.target, regenerate: false }])
+    expect(posted(fetchMock, '/api/reviews/1/units/7/description')).toEqual([{ target: AI.target, regenerate: false, call_id: expect.stringMatching(/^[0-9a-f]{32}$/) as unknown }])
   })
 
   it('shows the loading state and can cancel the call', async () => {
@@ -125,7 +125,8 @@ describe('AI description on a unit card', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
     await waitFor(() => { expect(screen.queryByRole('status')).toBeNull() })
-    expect(posted(fetchMock, '/api/reviews/1/units/7/description/cancel')).toHaveLength(1)
+    const [describeRequest] = posted(fetchMock, '/api/reviews/1/units/7/description') as { call_id: string }[]
+    expect(fetchMock.mock.calls.map(([url]) => url)).toContain(`/api/ai/calls/${describeRequest.call_id}/cancel`)
     expect(screen.getByRole('button', { name: 'Describe' })).toBeEnabled()
   })
 
@@ -146,7 +147,7 @@ describe('AI description on a unit card', () => {
 
     expect(await screen.findByText('Applies a tax.')).toBeInTheDocument()
     expect(screen.queryByText('outdated')).toBeNull()
-    expect(posted(fetchMock, '/api/reviews/1/units/7/description')).toEqual([{ target: AI.target, regenerate: true }])
+    expect(posted(fetchMock, '/api/reviews/1/units/7/description')).toEqual([{ target: AI.target, regenerate: true, call_id: expect.stringMatching(/^[0-9a-f]{32}$/) as unknown }])
   })
 
   it('can collapse the description', async () => {

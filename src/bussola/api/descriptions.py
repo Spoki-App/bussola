@@ -4,9 +4,9 @@ from fastapi import APIRouter, Request
 
 from bussola.ai.settings import load_ai_settings, require_target
 from bussola.api.deps import ContextDep, repo_of, resolve_revision, snapshot_of
-from bussola.api.schemas import CancelOut, DescribeUnitIn, UnitDescriptionOut
+from bussola.api.schemas import DescribeUnitIn, UnitDescriptionOut
 from bussola.api.state import app_state
-from bussola.review.descriptions import DESCRIBE_UNIT, Impact, change_hash, describe_unit, is_outdated, stored_descriptions
+from bussola.review.descriptions import Impact, change_hash, describe_unit, is_outdated, stored_descriptions
 from bussola.storage.models import UnitDescription
 
 router = APIRouter(tags=["descriptions"])
@@ -27,7 +27,7 @@ def describe(context: ContextDep, unit_id: int, body: DescribeUnitIn, request: R
     settings = require_target(load_ai_settings(state.settings.config_file, Path(repo_of(context).path)), body.target)
     provider = state.ai_factory(settings)
     context.store.commit()
-    with state.ai_calls.start((DESCRIBE_UNIT.name, unit_id)) as cancellation:
+    with state.ai_calls.start(body.call_id) as cancellation:
         insight = describe_unit(snapshot, provider, state.ai_cache, cancellation, regenerate=body.regenerate)
     saved = context.store.descriptions.save(
         UnitDescription(
@@ -46,12 +46,6 @@ def describe(context: ContextDep, unit_id: int, body: DescribeUnitIn, request: R
     )
     context.store.commit()
     return _description_out(unit_id, saved, outdated=False)
-
-
-@router.post("/reviews/{review_id}/units/{unit_id}/description/cancel")
-def cancel_description(context: ContextDep, unit_id: int, request: Request) -> CancelOut:
-    snapshot_of(context, unit_id)
-    return CancelOut(cancelled=app_state(request).ai_calls.cancel((DESCRIBE_UNIT.name, unit_id)))
 
 
 def _description_out(unit_id: int, description: UnitDescription, outdated: bool) -> UnitDescriptionOut:

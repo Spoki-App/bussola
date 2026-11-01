@@ -1,14 +1,16 @@
 from dataclasses import asdict, replace
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import APIRouter, Request
+from fastapi import Path as PathParameter
 
 from bussola.ai.base import AiError, AiProvider, Cancellation
 from bussola.ai.config import AiSettings
 from bussola.ai.connection import CONNECTION_TIMEOUT_SECONDS, check_connection
 from bussola.ai.settings import load_ai_settings
 from bussola.api.deps import RepoDep
-from bussola.api.schemas import AiStatusOut, AiTestOut
+from bussola.api.schemas import MAX_CALL_ID_LENGTH, AiStatusOut, AiTestOut, CancelOut
 from bussola.api.state import AppState, app_state
 
 router = APIRouter(tags=["ai"])
@@ -33,6 +35,11 @@ def test_ai(request: Request) -> AiTestOut:
         return state.ai_factory(replace(settings, timeout=min(settings.timeout, CONNECTION_TIMEOUT_SECONDS)))
 
     return AiTestOut(**asdict(check_connection(connect, Cancellation())))
+
+
+@router.post("/ai/calls/{call_id}/cancel")
+def cancel_call(call_id: Annotated[str, PathParameter(max_length=MAX_CALL_ID_LENGTH)], request: Request) -> CancelOut:
+    return CancelOut(cancelled=app_state(request).ai_calls.cancel(call_id))
 
 
 def _status(state: AppState, repo_root: Path | None) -> AiStatusOut:

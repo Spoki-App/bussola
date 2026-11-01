@@ -20,6 +20,7 @@ from bussola.storage.models import (
 )
 
 SNAPSHOT_TEXT_COLUMNS = (UnitSnapshot.base_text, UnitSnapshot.head_text, UnitSnapshot.base_lines, UnitSnapshot.head_lines)
+DESCRIPTION_KEY = ("review_id", "path", "kind", "qualified_name", "change_hash")
 
 
 class _SqlRepository:
@@ -237,18 +238,11 @@ class SqlDescriptionRepository(_SqlRepository):
         return list(self._session.scalars(query))
 
     def save(self, description: UnitDescription) -> UnitDescription:
-        query = select(UnitDescription).where(
-            UnitDescription.review_id == description.review_id,
-            UnitDescription.path == description.path,
-            UnitDescription.kind == description.kind,
-            UnitDescription.qualified_name == description.qualified_name,
-            UnitDescription.change_hash == description.change_hash,
-        )
-        replaced = self._session.scalar(query)
-        if replaced is not None:
-            self._session.delete(replaced)
-            self._session.flush()
-        return self._add(description)
+        values = {column.name: getattr(description, column.name) for column in UnitDescription.__table__.columns if column.name != "id"}
+        replaced = {name: value for name, value in values.items() if name not in DESCRIPTION_KEY}
+        statement = insert(UnitDescription).values(**values).on_conflict_do_update(index_elements=list(DESCRIPTION_KEY), set_=replaced)
+        with self._session.begin_nested():
+            return self._session.scalars(statement.returning(UnitDescription), execution_options={"populate_existing": True}).one()
 
 
 class Store:

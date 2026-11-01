@@ -7,6 +7,7 @@ const descriptionsKey = (reviewId: number, revisionId: number) => ['descriptions
 
 interface DescribeRequest {
   target: string
+  call_id: string
   regenerate: boolean
 }
 
@@ -27,15 +28,13 @@ export function useDescribeUnit(reviewId: number, unit: Unit) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (request: DescribeRequest) => postJson<UnitDescription>(unitPath(reviewId, unit), request),
-    onSuccess: (described) => {
-      client.setQueryData<UnitDescription[]>(descriptionsKey(reviewId, unit.revision_id), (descriptions = []) => [
+    onSuccess: async (described) => {
+      const queryKey = descriptionsKey(reviewId, unit.revision_id)
+      await client.cancelQueries({ queryKey })
+      client.setQueryData<UnitDescription[]>(queryKey, (descriptions = []) => [
         ...descriptions.filter((description) => description.unit_id !== described.unit_id),
         described,
       ])
     },
   })
-}
-
-export function useCancelDescription(reviewId: number, unit: Unit) {
-  return useMutation({ mutationFn: () => postJson<{ cancelled: boolean }>(`${unitPath(reviewId, unit)}/cancel`) })
 }

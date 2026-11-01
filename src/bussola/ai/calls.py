@@ -1,34 +1,41 @@
 import threading
-from collections.abc import Generator, Hashable
+from collections import OrderedDict
+from collections.abc import Generator
 from contextlib import contextmanager
 
-from bussola.ai.base import Cancellation
+from bussola.ai.base import AiCancelledError, Cancellation
+
+MAX_EARLY_CANCELS = 1000
 
 
 class RunningCalls:
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._running: dict[Hashable, Cancellation] = {}
+        self._running: dict[str, Cancellation] = {}
+        self._cancelled_early: OrderedDict[str, None] = OrderedDict()
 
     @contextmanager
-    def start(self, key: Hashable) -> Generator[Cancellation]:
+    def start(self, call_id: str) -> Generator[Cancellation]:
         cancellation = Cancellation()
         with self._lock:
-            previous = self._running.get(key)
-            self._running[key] = cancellation
-        if previous is not None:
-            previous.cancel()
+            if call_id in self._cancelled_early:
+                del self._cancelled_early[call_id]
+                raise AiCancelledError("Cancelled")
+            self._running[call_id] = cancellation
         try:
             yield cancellation
         finally:
             with self._lock:
-                if self._running.get(key) is cancellation:
-                    del self._running[key]
+                if self._running.get(call_id) is cancellation:
+                    del self._running[call_id]
 
-    def cancel(self, key: Hashable) -> bool:
+    def cancel(self, call_id: str) -> bool:
         with self._lock:
-            cancellation = self._running.pop(key, None)
-        if cancellation is None:
-            return False
+            cancellation = self._running.pop(call_id, None)
+            if cancellation is None:
+                self._cancelled_early[call_id] = None
+                while len(self._cancelled_early) > MAX_EARLY_CANCELS:
+                    self._cancelled_early.popitem(last=False)
+                return False
         cancellation.cancel()
         return True

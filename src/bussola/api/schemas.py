@@ -12,6 +12,7 @@ from bussola.review.states import ApprovalAction, UnitState
 from bussola.review.thread_types import ThreadScope, ThreadStatus
 
 MAX_THREAD_LINES = 500
+MAX_CALL_ID_LENGTH = 100
 
 LineRangeIn = Annotated[tuple[int, int], Field(description="Inclusive file line range")]
 
@@ -442,6 +443,7 @@ class AiTestOut(BaseModel):
 
 class DescribeUnitIn(BaseModel):
     target: str = Field(min_length=1)
+    call_id: str = Field(min_length=1, max_length=MAX_CALL_ID_LENGTH)
     regenerate: bool = False
 
 
