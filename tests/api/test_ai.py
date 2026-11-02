@@ -8,10 +8,8 @@ from bussola.ai.connection import CONNECTION_TIMEOUT_SECONDS
 from bussola.ai.runner import DEFAULT_MAX_TOKENS
 from bussola.app import create_app
 from bussola.config import AppSettings
-from tests.ai.fakes import FakeProvider, fake_factory
+from tests.ai.fakes import ANTHROPIC_CONFIG, FakeProvider, fake_factory
 from tests.gitrepo import GitFixture
-
-ANTHROPIC = '[ai]\nprovider = "anthropic"\n'
 
 
 @pytest.fixture
@@ -39,7 +37,7 @@ def test_without_a_provider_ai_is_off(data_dir: Path, config_file: Path) -> None
 
 
 def test_the_status_names_the_provider_model_and_key_variable(data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    write(config_file, ANTHROPIC)
+    write(config_file, ANTHROPIC_CONFIG)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-secret")
 
     status = client(data_dir, config_file).get("/api/ai").json()
@@ -59,7 +57,7 @@ def test_the_status_names_the_provider_model_and_key_variable(data_dir: Path, co
 
 
 def test_a_missing_key_is_shown_as_a_problem(data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    write(config_file, ANTHROPIC)
+    write(config_file, ANTHROPIC_CONFIG)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
     status = client(data_dir, config_file).get("/api/ai").json()
@@ -79,7 +77,7 @@ def test_an_invalid_configuration_turns_ai_off_with_the_reason(data_dir: Path, c
 
 
 def test_a_repository_can_turn_ai_off_in_its_bussola_toml(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
-    write(config_file, ANTHROPIC)
+    write(config_file, ANTHROPIC_CONFIG)
     git_repo.commit({".bussola.toml": '[ai]\nprovider = "none"\n'}, "turn ai off")
     api = client(data_dir, config_file, FakeProvider({"ok": True}))
     repo = api.post("/api/repos", json={"path": str(git_repo.root)}).json()
@@ -97,7 +95,7 @@ def test_an_invalid_ai_section_in_a_repository_does_not_break_its_reviews(git_re
     git_repo.commit({".bussola.toml": '[ai]\nprovider = "ollama"\n', "app.py": "def total():\n    return 1\n"}, "change")
     git_repo.git("checkout", "-q", "main")
     git_repo.write({".bussola.toml": '[ai]\nprovider = "ollama"\n'})
-    write(config_file, ANTHROPIC)
+    write(config_file, ANTHROPIC_CONFIG)
     api = client(data_dir, config_file)
     repo = api.post("/api/repos", json={"path": str(git_repo.root)}).json()
 
@@ -121,7 +119,7 @@ def test_a_config_file_that_is_not_utf8_is_reported(data_dir: Path, config_file:
 
 
 def test_test_connection_asks_the_provider_for_a_tiny_structured_answer(data_dir: Path, config_file: Path) -> None:
-    write(config_file, ANTHROPIC)
+    write(config_file, ANTHROPIC_CONFIG)
     provider = FakeProvider({"ok": True})
 
     result = client(data_dir, config_file, provider).post("/api/ai/test").json()
@@ -134,7 +132,7 @@ def test_test_connection_asks_the_provider_for_a_tiny_structured_answer(data_dir
 
 
 def test_test_connection_fails_when_the_model_does_not_answer_ok(data_dir: Path, config_file: Path) -> None:
-    write(config_file, ANTHROPIC)
+    write(config_file, ANTHROPIC_CONFIG)
 
     result = client(data_dir, config_file, FakeProvider({"ok": False})).post("/api/ai/test").json()
 
@@ -153,7 +151,7 @@ def test_test_connection_waits_at_most_two_minutes(data_dir: Path, config_file: 
 
 
 def test_test_connection_reports_a_failure(data_dir: Path, config_file: Path) -> None:
-    write(config_file, ANTHROPIC)
+    write(config_file, ANTHROPIC_CONFIG)
     provider = FakeProvider(AiProviderError("Cannot reach https://api.anthropic.com/v1/messages: timed out"))
 
     result = client(data_dir, config_file, provider).post("/api/ai/test").json()
@@ -169,7 +167,7 @@ def test_test_connection_without_a_provider_says_so(data_dir: Path, config_file:
 
 
 def test_the_key_never_reaches_the_database_or_the_api(data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    write(config_file, ANTHROPIC)
+    write(config_file, ANTHROPIC_CONFIG)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-very-secret")
     api = client(data_dir, config_file, FakeProvider({"ok": True}))
 
@@ -180,7 +178,7 @@ def test_the_key_never_reaches_the_database_or_the_api(data_dir: Path, config_fi
 
 
 def test_test_connection_reports_an_unexpected_error(data_dir: Path, config_file: Path) -> None:
-    write(config_file, ANTHROPIC)
+    write(config_file, ANTHROPIC_CONFIG)
 
     result = client(data_dir, config_file, FakeProvider(OSError("No space left on device"))).post("/api/ai/test").json()
 

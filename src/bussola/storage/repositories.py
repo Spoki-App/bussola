@@ -15,10 +15,12 @@ from bussola.storage.models import (
     RowApproval,
     Thread,
     ThreadAnchor,
+    UnitDescription,
     UnitSnapshot,
 )
 
 SNAPSHOT_TEXT_COLUMNS = (UnitSnapshot.base_text, UnitSnapshot.head_text, UnitSnapshot.base_lines, UnitSnapshot.head_lines)
+DESCRIPTION_KEY = ("review_id", "path", "kind", "qualified_name", "change_hash")
 
 
 class _SqlRepository:
@@ -230,6 +232,21 @@ class SqlForgeRepository(_SqlRepository):
         return merged
 
 
+class SqlDescriptionRepository(_SqlRepository):
+    def descriptions(self, review_id: int) -> list[UnitDescription]:
+        query = select(UnitDescription).where(UnitDescription.review_id == review_id).order_by(UnitDescription.created_at, UnitDescription.id)
+        return list(self._session.scalars(query))
+
+    def save(self, description: UnitDescription) -> UnitDescription:
+        values = {column.name: getattr(description, column.name) for column in UnitDescription.__table__.columns if column.name != "id"}
+        replaced = {name: value for name, value in values.items() if name not in DESCRIPTION_KEY}
+        statement = insert(UnitDescription).values(**values).on_conflict_do_update(index_elements=list(DESCRIPTION_KEY), set_=replaced)
+        with self._session.begin_nested():
+            self._session.execute(statement)
+        query = select(UnitDescription).where(*(getattr(UnitDescription, name) == values[name] for name in DESCRIPTION_KEY))
+        return self._session.scalars(query, execution_options={"populate_existing": True}).one()
+
+
 class Store:
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -237,6 +254,7 @@ class Store:
         self.approvals = SqlApprovalRepository(session)
         self.threads = SqlThreadRepository(session)
         self.forge = SqlForgeRepository(session)
+        self.descriptions = SqlDescriptionRepository(session)
 
     def commit(self) -> None:
         self.session.commit()

@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from bussola.ai.base import AiCancelledError, AiOutputError, AiTimeoutError, Cancellation, run_cancellable
 from bussola.ai.runner import AiCacheKey, AiRunner, AiTask, instructions_hash, output_schema, parse_output
-from bussola.storage.ai_cache import SqlAiCache
+from bussola.storage.ai_cache import DatabaseAiCache, SqlAiCache
 from bussola.storage.database import Database
 from tests.ai.fakes import FakeProvider
 
@@ -312,3 +312,26 @@ def test_the_provider_max_tokens_can_also_raise_the_budget() -> None:
     AiRunner(provider).run(RATE, "code", Cancellation())
 
     assert provider.requests[0].max_tokens == 32000
+
+
+def test_refresh_asks_again_and_replaces_the_cached_result(tmp_path: Path) -> None:
+    provider = FakeProvider(GOOD, {"impact": "low", "reason": "Only a rename"})
+    with Database.open(tmp_path).session() as session:
+        runner = AiRunner(provider, SqlAiCache(session))
+
+        runner.run(RATE, "code", Cancellation(), content_hash="hash")
+        refreshed = runner.run(RATE, "code", Cancellation(), content_hash="hash", refresh=True)
+        cached = runner.run(RATE, "code", Cancellation(), content_hash="hash")
+
+    assert len(provider.requests) == 2
+    assert refreshed == cached == Rating(impact="low", reason="Only a rename")
+
+
+def test_the_database_cache_keeps_results_across_sessions(tmp_path: Path) -> None:
+    database = Database.open(tmp_path)
+    provider = FakeProvider(GOOD)
+
+    AiRunner(provider, DatabaseAiCache(database)).run(RATE, "code", Cancellation(), content_hash="hash")
+    AiRunner(provider, DatabaseAiCache(Database.open(tmp_path))).run(RATE, "code", Cancellation(), content_hash="hash")
+
+    assert len(provider.requests) == 1

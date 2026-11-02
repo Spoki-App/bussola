@@ -296,3 +296,17 @@ export interface AiTestResult {
   message: string
   elapsed_ms: number
 }
+
+export type Impact = 'low' | 'medium' | 'high'
+
+export interface UnitDescription {
+  unit_id: number
+  description: string
+  impact: Impact
+  impact_reason: string
+  provider: string
+  provider_label: string
+  model: string | null
+  created_at: string
+  outdated: boolean
+}

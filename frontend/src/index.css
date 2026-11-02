@@ -520,7 +520,7 @@ textarea {
   font-size: 12px;
 }
 
-.label.threads.warn {
+.label.warn {
   color: var(--warning);
   font-weight: 600;
 }
@@ -2075,6 +2075,32 @@ button.danger {
   max-height: 420px;
   overflow: hidden;
   mask-image: linear-gradient(to bottom, black 70%, transparent);
+}
+
+.ai-description {
+  width: auto;
+  margin: 8px 12px;
+  padding: 6px 12px 8px;
+}
+
+.ai-description-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-description .diff-note {
+  padding: 4px 0;
+}
+
+.pr-description-body.stale {
+  opacity: 0.6;
+}
+
+.ai-impact {
+  margin: 4px 0 0;
+  font-size: 13px;
 }
 
 .code-font-panel input:not([type='checkbox']) {

@@ -38,6 +38,8 @@ FAILED_CHECK_SECONDS = 60.0
 FINISH_WAIT_SECONDS = 5.0
 NESTED_SESSION_ENV = frozenset({"CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SSE_PORT"})
 READ_CHUNK_BYTES = 64 * 1024
+SIGN_IN_PROBLEMS = ("authenticate", "logged in", "oauth", "api key")
+SIGN_IN_HINT = "Run claude in a terminal and sign in again with /login."
 EXIT_POLL_SECONDS = 0.05
 
 
@@ -108,6 +110,13 @@ def _check_version(executable: str) -> tuple[str | None, bool]:
     return f"This version of Claude Code has no {REQUIRED_FLAG}. Update it with claude update.", True
 
 
+def _cli_error(message: str) -> str:
+    lowered = message.lower()
+    if "/login" in lowered or not any(problem in lowered for problem in SIGN_IN_PROBLEMS):
+        return f"Claude Code: {message}"
+    return f"Claude Code: {message.rstrip('.')}. {SIGN_IN_HINT}"
+
+
 class ClaudeCodeProvider:
     name: str = ProviderName.CLAUDE_CODE
     label = PROVIDER_LABELS[ProviderName.CLAUDE_CODE]
@@ -126,7 +135,7 @@ class ClaudeCodeProvider:
             detail = (stderr or stdout).strip()[-MAX_ERROR_LENGTH:]
             raise AiProviderError(f"claude exited with code {returncode}: {detail}" if returncode else "claude did not answer with JSON")
         if envelope.get("is_error") or returncode:
-            raise AiProviderError(f"Claude Code: {str(envelope.get('result') or 'request failed')[:MAX_ERROR_LENGTH]}")
+            raise AiProviderError(_cli_error(str(envelope.get("result") or "request failed")[:MAX_ERROR_LENGTH]))
         structured = envelope.get("structured_output")
         if structured is not None:
             return json.dumps(structured)

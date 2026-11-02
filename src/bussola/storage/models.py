@@ -240,3 +240,22 @@ class AiResult(Base):
     content_hash: Mapped[str] = mapped_column(primary_key=True)
     result: Mapped[dict[str, Any]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+
+
+class UnitDescription(Base):
+    __tablename__ = "unit_descriptions"
+    __table_args__ = (UniqueConstraint("review_id", "path", "kind", "qualified_name", "change_hash"),)
+
+    review_id: Mapped[int] = mapped_column(ForeignKey("reviews.id"), index=True)
+    path: Mapped[str] = mapped_column()
+    kind: Mapped[str] = mapped_column()
+    qualified_name: Mapped[str] = mapped_column()
+    change_hash: Mapped[str] = mapped_column()
+    description: Mapped[str] = mapped_column()
+    impact: Mapped[str] = mapped_column()
+    impact_reason: Mapped[str] = mapped_column()
+    provider: Mapped[str] = mapped_column()
+    provider_label: Mapped[str] = mapped_column()
+    model: Mapped[str | None] = mapped_column()
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)

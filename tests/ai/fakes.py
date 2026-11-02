@@ -8,6 +8,8 @@ from bussola.ai.config import AiSettings
 
 type Answer = str | dict[str, Any] | Exception
 
+ANTHROPIC_CONFIG = '[ai]\nprovider = "anthropic"\n'
+
 
 class FakeProvider:
     name = "fake"

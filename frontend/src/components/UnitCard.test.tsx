@@ -48,7 +48,7 @@ describe('UnitCard', () => {
     const client = new QueryClient()
     const card = (state: UnitState) => (
       <QueryClientProvider client={client}>
-        <UnitCard reviewId={1} unit={unit(state)} focused={false} onFocus={() => undefined} register={() => undefined} />
+        <UnitCard reviewId={1} repoId={1} unit={unit(state)} focused={false} onFocus={() => undefined} register={() => undefined} />
       </QueryClientProvider>
     )
     const { rerender } = render(card('changed'))
@@ -69,7 +69,7 @@ describe('UnitCard', () => {
       const view = render(
         <QueryClientProvider client={new QueryClient()}>
           <LinkScrollContext value={link}>
-            <UnitCard reviewId={1} unit={unit('approved')} focused={false} onFocus={() => undefined} register={() => undefined} />
+            <UnitCard reviewId={1} repoId={1} unit={unit('approved')} focused={false} onFocus={() => undefined} register={() => undefined} />
           </LinkScrollContext>
         </QueryClientProvider>,
       )
@@ -90,7 +90,7 @@ describe('UnitCard', () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <LinkScrollContext value={link}>
-          <UnitCard reviewId={1} unit={unit('changed')} focused={false} onFocus={() => undefined} register={() => undefined} />
+          <UnitCard reviewId={1} repoId={1} unit={unit('changed')} focused={false} onFocus={() => undefined} register={() => undefined} />
         </LinkScrollContext>
       </QueryClientProvider>,
     )
@@ -107,7 +107,7 @@ describe('UnitCard', () => {
     const card = (makeLink: ReturnType<typeof reviewLinkMaker>, overrides: Partial<Unit>) => (
       <QueryClientProvider client={client}>
         <ReviewLinkContext value={makeLink}>
-          <UnitCard reviewId={1} unit={unit('approved', overrides)} focused={false} onFocus={() => undefined} register={() => undefined} />
+          <UnitCard reviewId={1} repoId={1} unit={unit('approved', overrides)} focused={false} onFocus={() => undefined} register={() => undefined} />
         </ReviewLinkContext>
       </QueryClientProvider>
     )
@@ -127,7 +127,7 @@ describe('UnitCard', () => {
     const client = new QueryClient()
     const card = (overrides: Partial<Unit>) => (
       <QueryClientProvider client={client}>
-        <UnitCard reviewId={1} unit={unit('approved', overrides)} focused={false} onFocus={() => undefined} register={() => undefined} />
+        <UnitCard reviewId={1} repoId={1} unit={unit('approved', overrides)} focused={false} onFocus={() => undefined} register={() => undefined} />
       </QueryClientProvider>
     )
     const { container, rerender } = render(card({ kind: 'method', module: 'shop.billing.invoices', qualified_name: 'InvoiceService.create' }))
@@ -147,7 +147,7 @@ describe('UnitCard', () => {
     const client = new QueryClient()
     const card = (target?: { unitId: number; line: number; side: 'head' | 'base' }) => (
       <QueryClientProvider client={client}>
-        <UnitCard reviewId={1} unit={unit('approved')} focused={false} onFocus={() => undefined} register={() => undefined} navigationTarget={target} />
+        <UnitCard reviewId={1} repoId={1} unit={unit('approved')} focused={false} onFocus={() => undefined} register={() => undefined} navigationTarget={target} />
       </QueryClientProvider>
     )
     const { rerender } = render(card())
@@ -155,7 +155,7 @@ describe('UnitCard', () => {
 
     rerender(card({ unitId: 1, line: 3, side: 'head' }))
     expect(disclosure()).toHaveAttribute('aria-expanded', 'true')
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/reviews/1/units/1/diff'])
+    expect(fetchMock.mock.calls.map(([url]) => url).filter((url) => url.includes('/diff'))).toEqual(['/api/reviews/1/units/1/diff'])
 
     rerender(card({ unitId: 1, line: 3, side: 'base' }))
     expect(fetchMock.mock.calls.map(([url]) => url).at(-1)).toBe('/api/reviews/1/units/1/diff?mode=base')

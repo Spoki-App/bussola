@@ -4,6 +4,7 @@ from typing import Annotated
 from pydantic import BaseModel, Field, model_validator
 
 from bussola.navigation.navigator import Origin, Resolver, TargetRole
+from bussola.review.descriptions import Impact
 from bussola.review.diffs import DiffMode
 from bussola.review.rows import LineChange, Side
 from bussola.review.scope import ChangeType
@@ -11,6 +12,7 @@ from bussola.review.states import ApprovalAction, UnitState
 from bussola.review.thread_types import ThreadScope, ThreadStatus
 
 MAX_THREAD_LINES = 500
+MAX_CALL_ID_LENGTH = 100
 
 LineRangeIn = Annotated[tuple[int, int], Field(description="Inclusive file line range")]
 
@@ -437,3 +439,25 @@ class AiTestOut(BaseModel):
     ok: bool
     message: str
     elapsed_ms: int
+
+
+class DescribeUnitIn(BaseModel):
+    target: str = Field(min_length=1)
+    call_id: str = Field(min_length=1, max_length=MAX_CALL_ID_LENGTH)
+    regenerate: bool = False
+
+
+class UnitDescriptionOut(BaseModel):
+    unit_id: int
+    description: str
+    impact: Impact
+    impact_reason: str
+    provider: str
+    provider_label: str
+    model: str | None
+    created_at: datetime
+    outdated: bool
+
+
+class CancelOut(BaseModel):
+    cancelled: bool

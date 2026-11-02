@@ -63,9 +63,9 @@ class AiRunner:
         self.provider = provider
         self._cache = cache
 
-    def run[T: BaseModel](self, task: AiTask[T], prompt: str, cancellation: Cancellation, content_hash: str | None = None) -> T:
+    def run[T: BaseModel](self, task: AiTask[T], prompt: str, cancellation: Cancellation, content_hash: str | None = None, *, refresh: bool = False) -> T:
         key = self._key(task, content_hash)
-        cached = self._cached(task, key)
+        cached = None if refresh else self._cached(task, key)
         if cached is not None:
             return cached
         request = AiRequest(task.name, task.system, prompt, output_schema(task.output), self.provider.max_tokens or task.max_tokens)

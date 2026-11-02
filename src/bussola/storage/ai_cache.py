@@ -5,6 +5,7 @@ from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
 from bussola.ai.runner import AiCacheKey
+from bussola.storage.database import Database
 from bussola.storage.models import AiResult, utcnow
 
 
@@ -36,3 +37,17 @@ class SqlAiCache:
         statement = insert(AiResult).values(**values, content_hash=key.content_hash, result=result, created_at=utcnow())
         with self._session.begin_nested():
             self._session.execute(statement.on_conflict_do_update(index_elements=[*values, "content_hash"], set_={"result": result, "created_at": utcnow()}))
+
+
+class DatabaseAiCache:
+    def __init__(self, database: Database) -> None:
+        self._database = database
+
+    def get(self, key: AiCacheKey) -> dict[str, Any] | None:
+        with self._database.session() as session:
+            return SqlAiCache(session).get(key)
+
+    def put(self, key: AiCacheKey, result: dict[str, Any]) -> None:
+        with self._database.session() as session:
+            SqlAiCache(session).put(key, result)
+            session.commit()
