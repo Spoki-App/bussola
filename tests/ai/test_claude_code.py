@@ -109,6 +109,25 @@ def test_an_error_reported_by_the_cli_is_raised(fake_claude: FakeClaude) -> None
         provider().complete(REQUEST, Cancellation())
 
 
+def test_an_expired_sign_in_says_how_to_sign_in_again(fake_claude: FakeClaude) -> None:
+    expired = "Failed to authenticate: OAuth session expired and could not be refreshed"
+    fake_claude.answer({"type": "result", "is_error": True, "result": expired}, exit_code=1)
+
+    with pytest.raises(AiProviderError) as raised:
+        provider().complete(REQUEST, Cancellation())
+
+    assert str(raised.value) == f"Claude Code: {expired}. Run claude in a terminal and sign in again with /login."
+
+
+def test_a_cli_error_unrelated_to_sign_in_gets_no_sign_in_hint(fake_claude: FakeClaude) -> None:
+    fake_claude.answer({"type": "result", "is_error": True, "result": "Prompt is too long"}, exit_code=1)
+
+    with pytest.raises(AiProviderError) as raised:
+        provider().complete(REQUEST, Cancellation())
+
+    assert str(raised.value) == "Claude Code: Prompt is too long"
+
+
 def test_a_crash_of_the_cli_reports_its_output(fake_claude: FakeClaude) -> None:
     fake_claude.answer("", exit_code=2, stderr="unknown option --json-schema")
 
