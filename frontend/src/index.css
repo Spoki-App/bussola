@@ -104,6 +104,7 @@
     --diff-code-delete-edit-background-color: rgba(255, 99, 105, 0.34);
     --diff-code-selected-background-color: rgba(138, 171, 255, 0.25);
     --diff-gutter-selected-background-color: rgba(138, 171, 255, 0.35);
+    --diff-selection-background-color: rgba(138, 171, 255, 0.4);
   }
 
   .markdown-alert-important {
