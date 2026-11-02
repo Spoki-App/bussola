@@ -379,10 +379,25 @@ interface FileHeaderProps {
   actions?: ReactNode
 }
 
+const FILE_HEADER_HEIGHT = '--file-header-height'
+
 function FileHeader({ reviewId, path, oldPath, complete, actions }: FileHeaderProps) {
   const approve = useApprove(reviewId)
+  const header = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const element = header.current
+    const section = element?.parentElement
+    if (!element || !section) {
+      return undefined
+    }
+    const measure = new ResizeObserver(() => {
+      section.style.setProperty(FILE_HEADER_HEIGHT, `${String(element.offsetHeight)}px`)
+    })
+    measure.observe(element)
+    return () => { measure.disconnect() }
+  }, [])
   return (
-    <div className="file-header">
+    <div ref={header} className="file-header">
       <h2>
         {oldPath && <span className="muted">{`${oldPath} → `}</span>}
         {path}

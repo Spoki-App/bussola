@@ -98,3 +98,21 @@ test('a pull request link of an unknown repository opens the add repository flow
   await expect(page.getByRole('dialog', { name: 'Add a repository' })).toBeVisible()
   await expect(page.getByLabel('Filter repositories')).toHaveValue('no-such-repository')
 })
+
+test('the header of an open unit stays below the file header while its diff scrolls past', async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 260 })
+  await page.goto(`/?token=${E2E_TOKEN}`)
+  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  const card = page.locator('article.unit-card', { hasText: 'total' })
+  await card.getByRole('button', { name: 'Expand unit' }).click()
+  await expect(card.getByTestId('thread')).toBeVisible()
+  const fileHeader = page.locator('.file-header').first()
+
+  await card.evaluate((element) => { window.scrollBy(0, element.getBoundingClientRect().top - 20) })
+
+  const fileHeaderBox = await fileHeader.boundingBox()
+  const unitHeaderBox = await card.locator('.unit-header').boundingBox()
+  const cardBox = await card.boundingBox()
+  expect(cardBox && fileHeaderBox && cardBox.y < fileHeaderBox.y + fileHeaderBox.height).toBe(true)
+  expect(unitHeaderBox?.y).toBeCloseTo((fileHeaderBox?.y ?? 0) + (fileHeaderBox?.height ?? 0), 0)
+})
