@@ -2142,6 +2142,12 @@ button.danger {
   min-width: 200px;
 }
 
+.ai-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .ai-details {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);

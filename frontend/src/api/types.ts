@@ -291,6 +291,20 @@ export interface AiStatus {
   target: string | null
 }
 
+export interface AiConfigFields {
+  provider: string | null
+  model: string | null
+  endpoint: string | null
+  api_key_env: string | null
+  timeout: number | null
+  max_tokens: number | null
+}
+
+export interface AiConfig extends AiConfigFields {
+  config_file: string | null
+  problem: string | null
+}
+
 export interface AiTestResult {
   ok: boolean
   message: string

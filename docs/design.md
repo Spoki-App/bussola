@@ -182,7 +182,7 @@ Results are cached in `ai_results`, keyed by task, prompt version, a hash of the
 
 ### Configuration
 
-The user configuration (`config.toml`, `[ai]`) sets `provider`, `model`, `endpoint`, `timeout`, `api_key_env` and `max_tokens`, and alone decides where code is sent. `provider = "none"` turns AI off. The `[ai]` section of `.bussola.toml` may only be `provider = "none"`, which turns AI off for that repository; anything else there is reported as a configuration problem. The repository is read only when the user chose a provider, so a cloned repository cannot turn AI on.
+The user configuration (`config.toml`, `[ai]`) sets `provider`, `model`, `endpoint`, `timeout`, `api_key_env` and `max_tokens`, and alone decides where code is sent. `provider = "none"` turns AI off. **Settings** writes this section through `PUT /ai/config`: it writes only the values that differ from the defaults, reads the text back to check it loads to the same settings, and replaces the file atomically (through a symlink, the file it points to), so comments in it are lost. The `[ai]` section of `.bussola.toml` may only be `provider = "none"`, which turns AI off for that repository; anything else there is reported as a configuration problem. The repository is read only when the user chose a provider, so a cloned repository cannot turn AI on.
 
 Why the repository is limited: `.bussola.toml` arrives with the clone, so it is written by whoever wrote the repository, including the author of a pull request under review, and must be treated as untrusted. If it could pick the provider, the model or the endpoint, a repository could send the code being reviewed, and with it the user's key, to a server of its choice, or spend the user's credit or subscription on a provider or model the user never chose. Turning AI off is the only choice that sends nothing anywhere, so it is the only one a repository can make. This is narrower than the per-repository override of provider, model and endpoint described in issue #16, on purpose.
 
@@ -193,6 +193,8 @@ Keys are read from the environment at each call: the variable named by `api_key_
 ```
 GET    /ai                                     provider of the user configuration: label, model, endpoint, key variable and whether it is set, problem
 GET    /repos/{repo_id}/ai                     the same with the repository's .bussola.toml applied
+GET    /ai/config                              the [ai] section of the user configuration as written, or the problem that keeps it from loading
+PUT    /ai/config                              validate and write the [ai] section of the user configuration; keys are refused, only api_key_env is accepted
 POST   /ai/test                                send a fixed prompt with a one-field schema to the user's provider
 ```
 

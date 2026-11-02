@@ -13,7 +13,7 @@ export function SettingsButton() {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <button type="button" aria-haspopup="dialog" aria-expanded={open} title="Open a pull request, add a repository, choose the code font, the diff layout and line wrap, and check the AI provider" onClick={() => { setOpen(true) }}>
+      <button type="button" aria-haspopup="dialog" aria-expanded={open} title="Open a pull request, add a repository, choose the code font, the diff layout and line wrap, and choose the AI provider" onClick={() => { setOpen(true) }}>
         Settings
       </button>
       {open && <SettingsModal onClose={() => { setOpen(false) }} />}

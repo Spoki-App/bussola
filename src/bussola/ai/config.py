@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 import tomllib
 import urllib.parse
 from dataclasses import dataclass
@@ -103,6 +104,18 @@ def load_user_config(path: Path | None) -> UserConfig:
         return UserConfig.model_validate(tomllib.loads(path.read_text(encoding="utf-8")))
     except (OSError, ValueError) as error:
         raise AiNotConfiguredError(f"Invalid configuration in {path}: {describe_config_error(error)}") from error
+
+
+def save_user_ai_config(path: Path, ai: UserAiConfig) -> None:
+    values = ai.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
+    text = "\n".join(["[ai]", *(f"{name} = {json.dumps(value, ensure_ascii=False)}" for name, value in values.items())]) + "\n"
+    if UserConfig.model_validate(tomllib.loads(text)).ai != ai:
+        raise ValueError("these values cannot be written as TOML")
+    target = path.resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=target.parent, prefix=f".{target.name}.", delete=False) as handle:
+        handle.write(text)
+    Path(handle.name).replace(target)
 
 
 def describe_config_error(error: Exception) -> str:

@@ -6,12 +6,13 @@ from fastapi import APIRouter, Request
 from fastapi import Path as PathParameter
 
 from bussola.ai.base import AiError, AiProvider, Cancellation
-from bussola.ai.config import AiSettings
+from bussola.ai.config import AiSettings, UserAiConfig, describe_config_error, load_user_config, save_user_ai_config
 from bussola.ai.connection import CONNECTION_TIMEOUT_SECONDS, check_connection
 from bussola.ai.settings import load_ai_settings
 from bussola.api.deps import RepoDep
-from bussola.api.schemas import MAX_CALL_ID_LENGTH, AiStatusOut, AiTestOut, CancelOut
+from bussola.api.schemas import MAX_CALL_ID_LENGTH, AiConfigIn, AiConfigOut, AiStatusOut, AiTestOut, CancelOut
 from bussola.api.state import AppState, app_state
+from bussola.errors import ConflictError, InvalidRequestError
 
 router = APIRouter(tags=["ai"])
 
@@ -24,6 +25,32 @@ def get_ai(request: Request) -> AiStatusOut:
 @router.get("/repos/{repo_id}/ai")
 def get_repo_ai(repo: RepoDep, request: Request) -> AiStatusOut:
     return _status(app_state(request), Path(repo.path))
+
+
+@router.get("/ai/config")
+def get_ai_config(request: Request) -> AiConfigOut:
+    config_file = app_state(request).settings.config_file
+    shown = str(config_file) if config_file else None
+    try:
+        ai = load_user_config(config_file).ai
+    except AiError as error:
+        return AiConfigOut(config_file=shown, problem=str(error))
+    return AiConfigOut(**ai.model_dump(mode="json"), config_file=shown)
+
+
+@router.put("/ai/config")
+def put_ai_config(body: AiConfigIn, request: Request) -> AiStatusOut:
+    state = app_state(request)
+    config_file = state.settings.config_file
+    if config_file is None:
+        raise ConflictError("bussola was started without a configuration file, so the AI settings cannot be saved")
+    try:
+        save_user_ai_config(config_file, UserAiConfig.model_validate(body.model_dump(exclude_none=True)))
+    except OSError as error:
+        raise ConflictError(f"Could not save {config_file}: {error}") from error
+    except ValueError as error:
+        raise InvalidRequestError(describe_config_error(error)) from error
+    return _status(state, None)
 
 
 @router.post("/ai/test")

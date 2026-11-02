@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from bussola.navigation.navigator import Origin, Resolver, TargetRole
 from bussola.review.descriptions import Impact
@@ -433,6 +433,33 @@ class AiStatusOut(BaseModel):
     problem: str | None = None
     config_file: str | None = None
     target: str | None = None
+
+
+class AiConfigIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str | None = None
+    model: str | None = None
+    endpoint: str | None = None
+    api_key_env: str | None = None
+    timeout: float | None = None
+    max_tokens: int | None = None
+
+    @field_validator("provider", "model", "endpoint", "api_key_env")
+    @classmethod
+    def blank_is_unset(cls, value: str | None) -> str | None:
+        return None if value is None else value.strip() or None
+
+
+class AiConfigOut(BaseModel):
+    provider: str | None = None
+    model: str | None = None
+    endpoint: str | None = None
+    api_key_env: str | None = None
+    timeout: float | None = None
+    max_tokens: int | None = None
+    config_file: str | None = None
+    problem: str | None = None
 
 
 class AiTestOut(BaseModel):

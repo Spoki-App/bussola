@@ -183,3 +183,94 @@ def test_test_connection_reports_an_unexpected_error(data_dir: Path, config_file
     result = client(data_dir, config_file, FakeProvider(OSError("No space left on device"))).post("/api/ai/test").json()
 
     assert (result["ok"], result["message"]) == (False, "No space left on device")
+
+
+def test_saving_a_provider_writes_the_ai_section_and_takes_effect_at_once(data_dir: Path, config_file: Path) -> None:
+    api = client(data_dir, config_file)
+
+    status = api.put("/api/ai/config", json={"provider": "openai-compatible", "endpoint": "http://localhost:11434/v1", "model": "qwen2.5-coder"}).json()
+
+    assert config_file.read_text() == '[ai]\nprovider = "openai-compatible"\nmodel = "qwen2.5-coder"\nendpoint = "http://localhost:11434/v1"\n'
+    assert (status["configured"], status["model"], status["endpoint"]) == (True, "qwen2.5-coder", "http://localhost:11434/v1")
+    assert api.get("/api/ai").json()["target"] == status["target"]
+
+
+def test_the_saved_settings_are_read_back_as_written(data_dir: Path, config_file: Path) -> None:
+    write(config_file, '[ai]\nprovider = "anthropic"\napi_key_env = "WORK_KEY"\ntimeout = 120\n')
+
+    config = client(data_dir, config_file).get("/api/ai/config").json()
+
+    assert config == {
+        "provider": "anthropic",
+        "model": None,
+        "endpoint": None,
+        "api_key_env": "WORK_KEY",
+        "timeout": 120,
+        "max_tokens": None,
+        "config_file": str(config_file),
+        "problem": None,
+    }
+
+
+def test_blank_fields_and_default_values_are_left_out_of_the_file(data_dir: Path, config_file: Path) -> None:
+    client(data_dir, config_file).put("/api/ai/config", json={"provider": "claude-code", "model": "  ", "endpoint": "", "timeout": 600})
+
+    assert config_file.read_text() == '[ai]\nprovider = "claude-code"\n'
+
+
+def test_turning_ai_off_from_settings_keeps_it_off(data_dir: Path, config_file: Path) -> None:
+    write(config_file, ANTHROPIC_CONFIG)
+
+    status = client(data_dir, config_file).put("/api/ai/config", json={"provider": "none"}).json()
+
+    assert status["configured"] is False
+    assert config_file.read_text() == '[ai]\nprovider = "none"\n'
+
+
+def test_invalid_settings_are_refused_and_the_file_is_left_alone(data_dir: Path, config_file: Path) -> None:
+    write(config_file, ANTHROPIC_CONFIG)
+
+    response = client(data_dir, config_file).put("/api/ai/config", json={"provider": "openai-compatible", "endpoint": "localhost:11434"})
+
+    assert response.status_code == 400
+    assert "endpoint must start with http:// or https://" in response.json()["detail"]
+    assert config_file.read_text() == ANTHROPIC_CONFIG
+
+
+def test_a_key_cannot_be_saved_from_settings(data_dir: Path, config_file: Path) -> None:
+    response = client(data_dir, config_file).put("/api/ai/config", json={"provider": "anthropic", "api_key": "sk-very-secret"})
+
+    assert response.status_code == 422
+    assert not config_file.exists()
+
+
+def test_an_invalid_file_is_reported_and_can_be_replaced_from_settings(data_dir: Path, config_file: Path) -> None:
+    write(config_file, '[ai]\nprovider = "nope"\n')
+    api = client(data_dir, config_file)
+
+    assert api.get("/api/ai/config").json()["problem"].startswith(f"Invalid configuration in {config_file}")
+
+    status = api.put("/api/ai/config", json={"provider": "claude-code"}).json()
+
+    assert status["configured"] is True
+    assert api.get("/api/ai/config").json()["provider"] == "claude-code"
+
+
+def test_saving_through_a_symlinked_file_keeps_the_link(data_dir: Path, config_file: Path, tmp_path: Path) -> None:
+    real = tmp_path / "dotfiles" / "bussola.toml"
+    write(real, ANTHROPIC_CONFIG)
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_file.symlink_to(real)
+
+    client(data_dir, config_file).put("/api/ai/config", json={"provider": "claude-code"})
+
+    assert config_file.is_symlink()
+    assert real.read_text() == '[ai]\nprovider = "claude-code"\n'
+
+
+def test_settings_cannot_be_saved_without_a_configuration_file(data_dir: Path) -> None:
+    settings = AppSettings(data_dir=data_dir, static_dir=data_dir / "static")
+
+    response = TestClient(create_app(settings)).put("/api/ai/config", json={"provider": "claude-code"})
+
+    assert response.status_code == 409
