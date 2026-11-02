@@ -22,6 +22,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Fixed
 
+- Unit cards no longer scroll on their own when the mouse wheel is over them. The button that copies a link to a line stuck out one pixel below the last line, which gave each card a vertical scrollbar.
 - Text selected in the diff is readable in dark mode. It was shown on the light blue selection background of the light theme.
 - **Approve file** no longer skips units whose content matches a unit already approved in another file, such as test classes with the same header. They were taken for approvals moved from that file and left as New.
 - The first requests after starting with a new database no longer fail with a server error when several arrive at once and all try to add the same reviewer.
