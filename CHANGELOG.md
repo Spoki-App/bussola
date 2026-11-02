@@ -7,6 +7,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 ### Added
 
 - **Describe** on each unit card asks the AI provider, in one call, what the unit does, what the change does to it and how much impact the change has (Low, Medium or High, with a one-line reason). The description is shown above the diff as Markdown, labelled with the provider and model, kept per unit version, marked outdated when a new revision changes the unit, and can be regenerated or cancelled while it runs ([#17](https://github.com/Spoki-App/bussola/issues/17)).
+- The header of an open unit stays visible below the file header while you scroll through its diff, so its name and **Approve** stay at hand.
 - Pluggable AI provider for the upcoming AI features: Claude Code CLI, Anthropic API or an OpenAI-compatible endpoint (Ollama, LM Studio), chosen in the `[ai]` section of the user configuration. A repository's `.bussola.toml` can only turn AI off; it can never turn AI on or choose where code is sent, because it arrives with the clone. Keys come only from environment variables. **Settings** shows the active provider and model and can test the connection. The building blocks for the AI actions are in place: an action button that stays hidden until a provider is configured and names the provider before code is first sent, schema-validated answers, timeouts and cancellation, batches with progress, and a result cache keyed by content hash, prompt version, system prompt and schema, and model ([#16](https://github.com/Spoki-App/bussola/issues/16)).
 - Go to definition and find usages with Cmd+click (Ctrl+click on Linux and Windows) for Python, TypeScript/TSX, JavaScript and Go: a single result in the review scrolls to its line, others open in a list and, outside the review, in a window showing the file at the reviewed commit. A tree-sitter index of the repository works with nothing installed, and basedpyright, pyright, typescript-language-server or gopls are used when found on `PATH` ([#13](https://github.com/Spoki-App/bussola/issues/13)).
 - Diff layout setting: split, unified or automatic, in **Settings** and in the review bar. Automatic splits units that rewrite lines when the window is at least as wide as a threshold set in **Settings** ([#10](https://github.com/Spoki-App/bussola/issues/10)).
@@ -22,6 +23,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Fixed
 
+- Text selected in the diff is readable in dark mode. It was shown on the light blue selection background of the light theme.
 - **Approve file** no longer skips units whose content matches a unit already approved in another file, such as test classes with the same header. They were taken for approvals moved from that file and left as New.
 - The first requests after starting with a new database no longer fail with a server error when several arrive at once and all try to add the same reviewer.
 - Comments on the whole review, including pull request comments and review summaries imported from GitHub, no longer have a Resolve button and no longer count as open threads, as on GitHub.
