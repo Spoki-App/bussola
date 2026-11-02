@@ -1186,7 +1186,7 @@ button.copy-link.failed {
 
 .diff .line-link {
   position: absolute;
-  top: 1px;
+  top: 0;
   left: 2px;
   opacity: 0;
 }
