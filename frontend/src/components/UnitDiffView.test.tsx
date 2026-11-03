@@ -140,6 +140,15 @@ describe('UnitDiffView layout', () => {
     expect(cellsOf(codeCell(table, '    a = 0'))[3]).toHaveTextContent('a = 0')
   })
 
+  it('marks the lines that only change indentation, not the new ones', () => {
+    const rows = [header, row('added', null, 1, '    try:'), row('removed', 1, null, '    a = 0'), row('added', null, 2, '        a = 0')]
+    chooseLayout('split')
+    const table = view({ rows })
+
+    expect(codeCell(table, '        a = 0').closest('tr')).toHaveClass('row-reindented-old', 'row-reindented-new')
+    expect(codeCell(table, '    try:').closest('tr')).not.toHaveClass('row-reindented-new')
+  })
+
   it('keeps removed lines before added lines in unified view', () => {
     const rows = [header, row('removed', 1, null, '    a = 0'), row('added', null, 1, '    a = 1'), row('removed', 2, null, '    b = 0'), row('added', null, 2, '    b = 1')]
     chooseLayout('unified')

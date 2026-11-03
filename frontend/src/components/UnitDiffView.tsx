@@ -5,7 +5,7 @@ import 'react-diff-view/style/index.css'
 import type { DiffRow, UnitDiff } from '../api/types'
 import { useViewType } from '../hooks/useDiffLayout'
 import { columnAt, isNavigationClick, type ScreenPoint } from '../review/codeNavigation'
-import { collapsedUnified, segmentRows, unifiedOrder, type Segment } from '../review/collapse'
+import { collapsedUnified, reindentedRows, segmentRows, unifiedOrder, type Segment } from '../review/collapse'
 import { diffTokens, languageFor } from '../review/highlight'
 import { isSelectable, rowKey } from '../review/selection'
 import { ReviewLinkContext } from '../review/reviewLink'
@@ -102,11 +102,18 @@ function gutterSide(row: DiffRow): GutterSide {
   return row.change === 'removed' ? 'old' : 'new'
 }
 
-function rowClasses(row: DiffRow | undefined, highlighted: ReadonlySet<string> | undefined, targetRow: DiffRow | undefined): string[] {
+interface RowMarks {
+  highlighted: ReadonlySet<string> | undefined
+  reindented: ReadonlySet<DiffRow>
+  targetRow: DiffRow | undefined
+}
+
+function rowClasses(row: DiffRow | undefined, { highlighted, reindented, targetRow }: RowMarks): string[] {
   if (!row) {
     return []
   }
   return [
+    ...(reindented.has(row) ? ['row-reindented'] : []),
     ...(row.approved ? ['row-approved'] : []),
     ...(row.placeholder ? ['row-placeholder'] : []),
     ...(highlighted?.has(rowKey(row)) ? ['row-commented'] : []),
@@ -114,12 +121,12 @@ function rowClasses(row: DiffRow | undefined, highlighted: ReadonlySet<string> |
   ]
 }
 
-function lineClasses(rows: (DiffRow | undefined)[], highlighted: ReadonlySet<string> | undefined, targetRow: DiffRow | undefined): string[] {
+function lineClasses(rows: (DiffRow | undefined)[], marks: RowMarks): string[] {
   const [oldRow, newRow] = rows
   if (rows.length === 2 && oldRow !== newRow) {
-    return [...rowClasses(oldRow, highlighted, targetRow).map((name) => `${name}-old`), ...rowClasses(newRow, highlighted, targetRow).map((name) => `${name}-new`)]
+    return [...rowClasses(oldRow, marks).map((name) => `${name}-old`), ...rowClasses(newRow, marks).map((name) => `${name}-new`)]
   }
-  return rowClasses(oldRow, highlighted, targetRow)
+  return rowClasses(oldRow, marks)
 }
 
 function targetPosition(rows: DiffRow[], target: TargetLine | undefined): number {
@@ -180,6 +187,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const rows = useMemo(() => (viewType === 'split' ? diff.rows : unifiedOrder(diff.rows)), [diff.rows, viewType])
   const index = useMemo(() => buildIndex(diff.rows), [diff.rows])
+  const reindented = useMemo(() => new Set(reindentedRows(diff.rows)), [diff.rows])
   const widgetMap = widgets ? widgets(index.changeKeyOf) : undefined
   const pinnedKeys = Object.keys(widgetMap ?? {}).join(',')
   const targetIndex = targetPosition(rows, target)
@@ -222,7 +230,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       className={selectable ? 'diff selectable' : 'diff'}
       generateLineClassName={({ changes, defaultGenerate }) => {
         const rows = (changes as (ChangeData | null)[]).map(index.rowOf)
-        return [defaultGenerate(), ...lineClasses(rows, highlighted, targetRow)].join(' ')
+        return [defaultGenerate(), ...lineClasses(rows, { highlighted, reindented, targetRow })].join(' ')
       }}
       renderGutter={({ change, side }) => {
         const row = index.rowOf(change)

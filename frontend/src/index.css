@@ -1301,6 +1301,12 @@ button.copy-link.failed {
   cursor: pointer;
 }
 
+.diff :where(.row-reindented) .diff-code:where(:not(.diff-code-selected)),
+.diff :where(.row-reindented-old) .diff-code-delete:where(:not(.diff-code-selected)),
+.diff :where(.row-reindented-new) .diff-code-insert:where(:not(.diff-code-selected)) {
+  background-color: var(--bg);
+}
+
 .diff .row-approved td,
 .diff .row-approved-old :is(.diff-gutter-delete, .diff-code-delete),
 .diff .row-approved-new :is(.diff-gutter-insert, .diff-code-insert) {

@@ -20,7 +20,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Changed
 
-- Lines are matched ignoring spaces, so code moved into a new block stays next to its old version in split view, with only the indentation it gained or lost highlighted, instead of showing as a block removed and a different block added.
+- Lines are matched ignoring spaces, so code moved into a new block stays next to its old version in split view, on a plain background with only the indentation it gained or lost highlighted, so the lines really added or removed stand out, instead of showing as a block removed and a different block added.
 - The unit filter, the search box and the diff layout switch sit at the top of the **Files** bar, so they stay visible while you scroll the units. With the **Files** bar hidden they are above the units.
 - Allow tree-sitter 0.26. Syntax tree positions are read as plain tuples, because the `Point.row` and `Point.column` properties in tree-sitter 0.26.0 drop a reference on every read and crash the process on files longer than 256 lines.
 

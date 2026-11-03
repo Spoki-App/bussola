@@ -61,6 +61,17 @@ export function unifiedOrder(rows: DiffRow[]): DiffRow[] {
   return [...ordered, ...added]
 }
 
+function withoutSpaces(text: string): string {
+  return text.replace(/\s/g, '')
+}
+
+export function reindentedRows(rows: DiffRow[]): DiffRow[] {
+  return rows.flatMap((row, position) => {
+    const next = rows.at(position + 1)
+    return row.change === 'removed' && next?.change === 'added' && withoutSpaces(row.text) === withoutSpaces(next.text) ? [row, next] : []
+  })
+}
+
 export function collapsedUnified(fileHeader: string, rows: DiffRow[], segments: Segment[]): string {
   const hunks = segments.flatMap((segment) => (segment.kind === 'rows' ? [hunkText(rows, segment.start, segment.end)] : []))
   return `${[fileHeader, ...hunks].join('\n')}\n`
