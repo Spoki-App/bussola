@@ -62,9 +62,9 @@ describe('code navigation helpers', () => {
     ])
   })
 
-  it('jumps directly only to a single target that is part of the review', () => {
+  it('opens a single target directly, in the review or not', () => {
     expect(directTarget(result([target('definition', 'lib.py', 1, 4)]))?.unit_id).toBe(4)
-    expect(directTarget(result([target('definition', 'lib.py', 1)]))).toBeNull()
+    expect(directTarget(result([target('definition', 'lib.py', 1)]))?.path).toBe('lib.py')
     expect(directTarget(result([target('definition', 'lib.py', 1, 4), target('definition', 'other.py', 1, 5)]))).toBeNull()
   })
 

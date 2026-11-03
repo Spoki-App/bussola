@@ -124,7 +124,7 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
             setHint(newHint)
           }
           const direct = directTarget(result)
-          if (result.symbol === null || (direct && inPage(direct))) {
+          if (result.symbol === null || direct) {
             setPopup(null)
             if (direct) {
               reveal(direct)
@@ -139,7 +139,7 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
           }
         })
     },
-    [reviewId, revisionId, reveal, inPage],
+    [reviewId, revisionId, reveal],
   )
 
   const element = (

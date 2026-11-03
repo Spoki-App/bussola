@@ -110,7 +110,7 @@ Click a line number to start a thread on that line. To comment on several lines,
 Cmd+click (Ctrl+click on Linux and Windows) a name in a diff to navigate, as in IntelliJ, in Python, TypeScript/TSX, JavaScript and Go files:
 
 - On a call or any other use of a name, bussola looks for its definition. On the name of a function, method, class or module level variable where it is defined, it lists its usages.
-- When there is exactly one result and it is part of the review, the page scrolls to that unit and highlights the line.
+- When there is exactly one result, it opens directly: if it is part of the review the page scrolls to that unit and highlights the line, otherwise the file opens in a window as described below.
 - Otherwise a list opens next to the pointer: definitions first, then usages grouped by file, each with its line and a preview, and results inside the review marked **in review**. Use the arrow keys, Enter and Esc.
 - A result outside the review opens the file at the reviewed commit in a window, highlighted and scrolled to the line, with a link to the file on GitHub when the branch has a GitHub remote. Cmd/Ctrl+click works there too, and **Back** returns along the chain.
 

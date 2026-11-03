@@ -90,7 +90,7 @@ export function groupTargets(targets: NavigationTarget[]): TargetGroups {
 
 export function directTarget(result: NavigationResult): NavigationTarget | null {
   const [only] = result.targets
-  return result.targets.length === 1 && only.unit_id !== null ? only : null
+  return result.targets.length === 1 ? only : null
 }
 
 function wording(result: NavigationResult): { title: string; empty: string } {

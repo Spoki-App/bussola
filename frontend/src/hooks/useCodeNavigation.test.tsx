@@ -141,11 +141,11 @@ describe('useCodeNavigation', () => {
   })
 
   it('opens targets outside the review in a modal with nested navigation, a back control and a GitHub link', async () => {
-    serve((params) => (params.get('path') === 'lib.py' ? found([target('cart.py', 1, null, 'usage'), target('cart.py', 5, null, 'usage')], { origin: 'definition' }) : found([target('lib.py', 1, null)])))
+    serve((params) => (params.get('path') === 'lib.py' ? found([target('cart.py', 1, null, 'usage'), target('cart.py', 5, null, 'usage')], { origin: 'definition' }) : found([target('lib.py', 1, null), target('other/lib.py', 3, null)])))
     renderHarness()
 
     const popup = await screen.findByRole('dialog', { name: 'Definitions of price' })
-    fireEvent.click(within(popup).getByRole('button', { name: /lib\.py:1/ }))
+    fireEvent.click(within(popup).getByRole('button', { name: /^lib\.py:1/ }))
 
     const modal = await screen.findByRole('dialog', { name: 'lib.py:1' })
     expect(await within(modal).findByRole('region', { name: 'Source of lib.py' })).toHaveTextContent('def price(item):')
@@ -167,11 +167,20 @@ describe('useCodeNavigation', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('opens a single definition outside the review straight in the modal', async () => {
+    serve(() => found([target('lib.py', 1, null)]))
+    renderHarness()
+
+    const modal = await screen.findByRole('dialog', { name: 'lib.py:1' })
+    expect(await within(modal).findByRole('region', { name: 'Source of lib.py' })).toHaveTextContent('def price(item):')
+    expect(screen.queryByRole('dialog', { name: 'Definitions of price' })).not.toBeInTheDocument()
+  })
+
   it('a single in-review target found from the modal closes it and jumps to the unit', async () => {
     serve((params) => (params.get('path') === 'lib.py' ? found([target('lib.py', 5, 4)]) : found([target('lib.py', 1, null)])))
     renderHarness()
 
-    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Definitions of price' })).getByRole('button', { name: /lib\.py:1/ }))
+    await screen.findByRole('dialog', { name: 'lib.py:1' })
     await screen.findAllByText((_, element) => element?.tagName === 'CODE' && element.textContent === 'def price(item):')
     cmdClickInModal('def price(item):', 'item')
 

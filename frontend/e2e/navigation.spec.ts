@@ -83,17 +83,9 @@ test('Cmd/Ctrl+click jumps to code in the review and opens the rest in a modal',
   await expect(total.locator('tr[class*="row-target"]')).toContainText('def total(items):')
 
   await navigateFrom(page, total.locator('td.diff-code', { hasText: 'sum(tidy' }), 'tidy')
-  const popup = page.getByRole('dialog', { name: 'Definitions of tidy' })
-  await expect(popup).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(popup).toBeHidden()
-
-  await navigateFrom(page, total.locator('td.diff-code', { hasText: 'sum(tidy' }), 'tidy')
-  await expect(popup.getByRole('button', { name: /helpers\.py:1/ })).toBeFocused()
-  await page.keyboard.press('Enter')
-
   const modal = page.getByRole('dialog', { name: 'helpers.py:1' })
   await expect(modal.locator('.source-line.target')).toContainText('def tidy(items):')
+  await expect(page.getByRole('dialog', { name: 'Definitions of tidy' })).toHaveCount(0)
   await expect(modal.getByRole('button', { name: 'Back' })).toBeDisabled()
 
   await navigateFrom(page, modal.locator('.source-line.target code'), 'tidy')
