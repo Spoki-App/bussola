@@ -179,16 +179,14 @@ pre,
   overflow-wrap: anywhere;
 }
 
-:root:not([data-diff-wrap='off']) .diff .line-indent,
-.diff.diff-split .line-indent {
+:root:not([data-diff-wrap='off']) .diff .line-indent {
   float: left;
   max-width: 50%;
   overflow: hidden;
   white-space: pre;
 }
 
-:root:not([data-diff-wrap='off']) .diff .line-body,
-.diff.diff-split .line-body {
+:root:not([data-diff-wrap='off']) .diff .line-body {
   display: flow-root;
 }
 
@@ -200,6 +198,47 @@ pre,
 
 :root[data-diff-wrap='off'] .diff-unified .diff-code {
   white-space: pre;
+}
+
+:root[data-diff-wrap='off'] .diff-split .diff-code {
+  white-space: pre;
+  overflow: hidden;
+}
+
+:root[data-diff-wrap='off'] .diff-split .diff-line > .diff-code:nth-child(2) {
+  text-indent: calc(-1 * var(--scroll-old, 0px));
+}
+
+:root[data-diff-wrap='off'] .diff-split .diff-line > .diff-code:nth-child(4) {
+  text-indent: calc(-1 * var(--scroll-new, 0px));
+}
+
+.split-scrollbars {
+  position: sticky;
+  bottom: 0;
+  height: 10px;
+}
+
+.split-scrollbar {
+  position: absolute;
+  bottom: 0;
+  height: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--bg);
+}
+
+.split-scrollbar > div {
+  height: 1px;
+}
+
+.split-scrollbar::-webkit-scrollbar {
+  height: 8px;
+}
+
+.split-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: var(--border-strong);
 }
 
 :root[data-diff-wrap='off'] .diff-unified .diff-widget-content {
@@ -1029,10 +1068,6 @@ textarea {
   transform: translateY(calc(-100% - 8px));
 }
 
-.unit-card:has(.diff-split) .unit-tools {
-  display: none;
-}
-
 .unit-card:hover .wrap-toggle,
 .wrap-toggle:focus-visible {
   opacity: 1;
@@ -1131,6 +1166,10 @@ textarea {
 
 :root[data-diff-wrap='off'] .unit-body:has(> .diff-unified) {
   container-type: inline-size;
+}
+
+.unit-body:has(> .split-scroll) {
+  overflow-x: visible;
 }
 
 .class-group > .unit-card {

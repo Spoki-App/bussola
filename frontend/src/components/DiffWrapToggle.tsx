@@ -1,6 +1,6 @@
 import { setDiffWrap, useDiffWrap } from '../settings/diffWrap'
 
-const WRAP_TITLE = 'Wrap long lines in the diff. Continuation lines keep the indentation of their line and have no line number. Split view always wraps.'
+const WRAP_TITLE = 'Wrap long lines in the diff. Continuation lines keep the indentation of their line and have no line number. In split view each side then scrolls sideways on its own.'
 
 export function DiffWrapCheckbox() {
   const wrap = useDiffWrap()

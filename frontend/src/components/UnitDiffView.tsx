@@ -11,7 +11,9 @@ import { isSelectable, rowKey } from '../review/selection'
 import { ReviewLinkContext } from '../review/reviewLink'
 import { plural } from '../review/text'
 import { hasModification } from '../settings/diffLayout'
+import { useDiffWrap } from '../settings/diffWrap'
 import { CopyLinkButton } from './CopyLinkButton'
+import { SplitScroll } from './SplitScroll'
 
 const PLACEHOLDER_GUTTER = '⋯'
 const FILE_HEADER_LINES = 3
@@ -156,6 +158,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
   const dragging = useRef(false)
   const endSelection = useRef(onLineSelectEnd)
   const makeLink = useContext(ReviewLinkContext)
+  const wrap = useDiffWrap()
 
   useEffect(() => {
     endSelection.current = onLineSelectEnd
@@ -210,7 +213,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
     })
     .map(getChangeKey)
 
-  return (
+  const view = (
     <Diff
       viewType={viewType}
       diffType={file.type}
@@ -277,4 +280,5 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       {(hunks) => renderSegments(segments, hunks, (id) => { setExpanded(new Set([...expanded, id])) })}
     </Diff>
   )
+  return viewType === 'split' && !wrap ? <SplitScroll>{view}</SplitScroll> : view
 }

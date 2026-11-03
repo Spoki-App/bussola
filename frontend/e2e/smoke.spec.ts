@@ -134,17 +134,13 @@ test('the unit filters sit in the files bar, and above the units while it is hid
   await expect(search).toHaveValue('total')
 })
 
-test('the wrap button shows on an open unit under the mouse and turns line wrap off and on, but not in split view', async ({ page }) => {
+test('the wrap button of an open unit turns line wrap off and on, and split view then scrolls each side on its own', async ({ page }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
   await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
   const layout = page.getByRole('complementary', { name: 'Files' }).getByRole('tablist', { name: 'Diff layout' })
   const card = page.locator('article.unit-card', { hasText: 'total' })
   await card.getByRole('button', { name: 'Expand unit' }).click()
   const wrap = card.getByRole('button', { name: 'Wrap long lines' })
-
-  await layout.getByRole('tab', { name: 'Split' }).click()
-  await expect(card.locator('table.diff-split')).toBeVisible()
-  await expect(wrap).toHaveCount(0)
 
   await layout.getByRole('tab', { name: 'Unified' }).click()
   await card.hover()
@@ -155,6 +151,12 @@ test('the wrap button shows on an open unit under the mouse and turns line wrap 
   await expect(page.locator('html')).toHaveAttribute('data-diff-wrap', 'off')
   await expect(wrap).toHaveAttribute('aria-pressed', 'false')
 
+  await layout.getByRole('tab', { name: 'Split' }).click()
+  await expect(card.locator('.split-scroll table.diff-split')).toBeVisible()
+  await expect(card.locator('table.diff-split td.diff-code').first()).toHaveCSS('white-space', 'pre')
+
+  await card.hover()
   await wrap.click()
   await expect(page.locator('html')).toHaveAttribute('data-diff-wrap', 'on')
+  await expect(card.locator('.split-scroll')).toHaveCount(0)
 })
