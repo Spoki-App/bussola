@@ -1,4 +1,5 @@
 import type { DiffRow, LineRange } from '../api/types'
+import { unifiedOrder } from './collapse'
 
 export interface SelectionRanges {
   head_range: LineRange | null
@@ -13,7 +14,8 @@ export function isSelectable(row: DiffRow): boolean {
   return row.change !== 'context' && row.row_hash !== null && !row.approved
 }
 
-export function selectRange(rows: DiffRow[], anchorKey: string, focusKey: string): Set<string> {
+export function selectRange(diffRows: DiffRow[], anchorKey: string, focusKey: string): Set<string> {
+  const rows = unifiedOrder(diffRows)
   const keys = rows.map(rowKey)
   const anchor = keys.indexOf(anchorKey)
   const focus = keys.indexOf(focusKey)

@@ -5,7 +5,7 @@ import 'react-diff-view/style/index.css'
 import type { DiffRow, UnitDiff } from '../api/types'
 import { useViewType } from '../hooks/useDiffLayout'
 import { columnAt, isNavigationClick, type ScreenPoint } from '../review/codeNavigation'
-import { collapsedUnified, segmentRows, type Segment } from '../review/collapse'
+import { collapsedUnified, segmentRows, unifiedOrder, type Segment } from '../review/collapse'
 import { diffTokens, languageFor } from '../review/highlight'
 import { isSelectable, rowKey } from '../review/selection'
 import { ReviewLinkContext } from '../review/reviewLink'
@@ -178,21 +178,19 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
   }, [])
 
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
+  const rows = useMemo(() => (viewType === 'split' ? diff.rows : unifiedOrder(diff.rows)), [diff.rows, viewType])
   const index = useMemo(() => buildIndex(diff.rows), [diff.rows])
   const widgetMap = widgets ? widgets(index.changeKeyOf) : undefined
   const pinnedKeys = Object.keys(widgetMap ?? {}).join(',')
-  const targetIndex = targetPosition(diff.rows, target)
+  const targetIndex = targetPosition(rows, target)
   const segments = useMemo(() => {
     const keys = new Set(pinnedKeys.split(','))
-    const pinned = new Set(diff.rows.flatMap((row, position) => (keys.has(index.changeKeyOf(row) ?? '') || position === targetIndex ? [position] : [])))
-    return segmentRows(diff.rows, expanded, pinned)
-  }, [diff.rows, expanded, index, pinnedKeys, targetIndex])
-  const targetRow = targetIndex < 0 ? undefined : diff.rows[targetIndex]
+    const pinned = new Set(rows.flatMap((row, position) => (keys.has(index.changeKeyOf(row) ?? '') || position === targetIndex ? [position] : [])))
+    return segmentRows(rows, expanded, pinned)
+  }, [rows, expanded, index, pinnedKeys, targetIndex])
+  const targetRow = targetIndex < 0 ? undefined : rows[targetIndex]
   const header = diff.unified.split('\n').slice(0, FILE_HEADER_LINES).join('\n')
-  const file = useMemo(
-    () => parseDiff(collapsedUnified(header, diff.rows, segments), viewType === 'split' ? { nearbySequences: 'zip' } : {})[0],
-    [header, diff.rows, segments, viewType],
-  )
+  const file = useMemo(() => parseDiff(collapsedUnified(header, rows, segments))[0], [header, rows, segments])
   const tokens = useMemo(() => {
     const whole: Segment[] = diff.rows.length > 0 ? [{ kind: 'rows', start: 0, end: diff.rows.length - 1 }] : []
     return diffTokens(parseDiff(collapsedUnified(header, diff.rows, whole))[0]?.hunks ?? [], languageFor(path))

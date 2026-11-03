@@ -1,5 +1,5 @@
 import DiffMatchPatch, { type Diff } from 'diff-match-patch'
-import { isDelete, isInsert, isNormal, pickRanges, type ChangeData, type HunkData, type RangeTokenNode, type TokenizeEnhancer } from 'react-diff-view'
+import { isDelete, isInsert, pickRanges, type ChangeData, type HunkData, type RangeTokenNode, type TokenizeEnhancer } from 'react-diff-view'
 
 const MIN_SIMILARITY = 0.4
 const WORD = /\w+|\s+|[^\w\s]/g
@@ -8,16 +8,26 @@ const matcher = new DiffMatchPatch()
 
 type ChangedLine = ChangeData & { lineNumber: number }
 
-function changeBlocks(changes: ChangeData[]): ChangeData[][] {
-  const blocks: ChangeData[][] = [[]]
-  for (const change of changes) {
-    if (isNormal(change)) {
-      blocks.push([])
-    } else {
-      blocks[blocks.length - 1].push(change)
-    }
+function pairedLines(changes: ChangeData[]): [ChangedLine, ChangedLine][] {
+  return changes.flatMap((change, position) => {
+    const next = changes.at(position + 1)
+    return isDelete(change) && next && isInsert(next) ? [[change, next]] : []
+  })
+}
+
+function indentOf(text: string): string {
+  return text.slice(0, text.length - text.trimStart().length)
+}
+
+function indentEdits(removed: ChangedLine, added: ChangedLine): [RangeTokenNode[], RangeTokenNode[]] {
+  const before = indentOf(removed.content)
+  const after = indentOf(added.content)
+  let shared = 0
+  while (shared < Math.min(before.length, after.length) && before[shared] === after[shared]) {
+    shared += 1
   }
-  return blocks.filter((block) => block.length > 0)
+  const range = (lineNumber: number, indent: string) => (indent.length > shared ? [{ type: 'edit', lineNumber, start: shared, length: indent.length - shared }] : [])
+  return [range(removed.lineNumber, before), range(added.lineNumber, after)]
 }
 
 function sideRanges(diffs: Diff[], side: number, lineNumber: number): RangeTokenNode[] {
@@ -53,6 +63,9 @@ function wordDiff(before: string, after: string): Diff[] {
 }
 
 function lineEdits(removed: ChangedLine, added: ChangedLine): [RangeTokenNode[], RangeTokenNode[]] {
+  if (removed.content.trimStart() === added.content.trimStart()) {
+    return indentEdits(removed, added)
+  }
   const diffs = wordDiff(removed.content, added.content)
   const shared = diffs.filter(([operation]) => operation === DiffMatchPatch.DIFF_EQUAL).reduce((total, [, text]) => total + visibleLength(text), 0)
   const similarity = (2 * shared) / (visibleLength(removed.content) + visibleLength(added.content))
@@ -63,13 +76,7 @@ function lineEdits(removed: ChangedLine, added: ChangedLine): [RangeTokenNode[],
 }
 
 export function markChangedWords(hunks: HunkData[]): TokenizeEnhancer {
-  const pairs = hunks
-    .flatMap((hunk) => changeBlocks(hunk.changes))
-    .flatMap((block) => {
-      const removed = block.filter(isDelete)
-      const added = block.filter(isInsert)
-      return removed.slice(0, added.length).map((line, position) => lineEdits(line, added[position]))
-    })
+  const pairs = hunks.flatMap((hunk) => pairedLines(hunk.changes)).map(([removed, added]) => lineEdits(removed, added))
   return pickRanges(
     pairs.flatMap(([oldRanges]) => oldRanges),
     pairs.flatMap(([, newRanges]) => newRanges),

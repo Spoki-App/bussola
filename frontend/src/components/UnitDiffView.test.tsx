@@ -123,7 +123,7 @@ describe('UnitDiffView layout', () => {
   })
 
   it('pairs each removed line with its replacement in a multi-line rewrite', () => {
-    const rows = [header, row('removed', 1, null, '    a = 0'), row('removed', 2, null, '    b = 0'), row('added', null, 1, '    a = 1'), row('added', null, 2, '    b = 1')]
+    const rows = [header, row('removed', 1, null, '    a = 0'), row('added', null, 1, '    a = 1'), row('removed', 2, null, '    b = 0'), row('added', null, 2, '    b = 1')]
     chooseLayout('split')
     const table = view({ rows })
 
@@ -131,8 +131,17 @@ describe('UnitDiffView layout', () => {
     expect(cellsOf(codeCell(table, '    b = 0'))[3]).toHaveTextContent('b = 1')
   })
 
+  it('keeps a removed line alone when the next lines only change indentation', () => {
+    const rows = [header, row('removed', 1, null, '    gone()'), row('removed', 2, null, '    a = 0'), row('added', null, 1, '        a = 0')]
+    chooseLayout('split')
+    const table = view({ rows })
+
+    expect(cellsOf(codeCell(table, '    gone()'))[3]).toBeEmptyDOMElement()
+    expect(cellsOf(codeCell(table, '    a = 0'))[3]).toHaveTextContent('a = 0')
+  })
+
   it('keeps removed lines before added lines in unified view', () => {
-    const rows = [header, row('removed', 1, null, '    a = 0'), row('removed', 2, null, '    b = 0'), row('added', null, 1, '    a = 1'), row('added', null, 2, '    b = 1')]
+    const rows = [header, row('removed', 1, null, '    a = 0'), row('added', null, 1, '    a = 1'), row('removed', 2, null, '    b = 0'), row('added', null, 2, '    b = 1')]
     chooseLayout('unified')
     const table = view({ rows })
 

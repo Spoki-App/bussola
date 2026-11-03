@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from enum import StrEnum
+from itertools import zip_longest
 
 from bussola.storage.models import UnitSnapshot
 from bussola.units.model import UnitKind
@@ -89,15 +90,22 @@ def _content_key(old: Sequence[str], new: Sequence[str]) -> tuple[int, int, str]
 
 
 def _compute_diff_lines(old: Sequence[str], new: Sequence[str]) -> tuple[DiffLine, ...]:
-    matcher = SequenceMatcher(None, [line.rstrip() for line in old], [line.rstrip() for line in new], autojunk=False)
+    matcher = SequenceMatcher(None, [_without_spaces(line) for line in old], [_without_spaces(line) for line in new], autojunk=False)
     result: list[DiffLine] = []
     for tag, old_start, old_end, new_start, new_end in matcher.get_opcodes():
-        if tag == "equal":
-            result.extend(DiffLine(LineChange.CONTEXT, old_start + step, new_start + step, new[new_start + step]) for step in range(new_end - new_start))
-            continue
-        result.extend(DiffLine(LineChange.REMOVED, index, None, old[index]) for index in range(old_start, old_end))
-        result.extend(DiffLine(LineChange.ADDED, None, index, new[index]) for index in range(new_start, new_end))
+        for old_index, new_index in zip_longest(range(old_start, old_end), range(new_start, new_end)):
+            if tag == "equal" and old[old_index].rstrip() == new[new_index].rstrip():
+                result.append(DiffLine(LineChange.CONTEXT, old_index, new_index, new[new_index]))
+                continue
+            if old_index is not None:
+                result.append(DiffLine(LineChange.REMOVED, old_index, None, old[old_index]))
+            if new_index is not None:
+                result.append(DiffLine(LineChange.ADDED, None, new_index, new[new_index]))
     return tuple(result)
+
+
+def _without_spaces(line: str) -> str:
+    return "".join(line.split())
 
 
 def changed_rows(base: Sequence[str], head: Sequence[str], lines: Sequence[DiffLine] | None = None) -> list[ChangedRow]:

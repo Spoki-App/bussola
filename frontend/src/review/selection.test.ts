@@ -29,6 +29,12 @@ describe('selectRange', () => {
     expect([...forward]).toEqual([rowKey(rows[1]), rowKey(rows[2]), rowKey(rows[4])])
     expect(backward).toEqual(forward)
   })
+
+  it('selects removed lines without the added lines paired with them', () => {
+    const paired = [row('removed', 0, null), row('added', null, 0), row('removed', 1, null), row('added', null, 1)]
+
+    expect([...selectRange(paired, rowKey(paired[0]), rowKey(paired[2]))]).toEqual([rowKey(paired[0]), rowKey(paired[2])])
+  })
 })
 
 describe('selectionRanges', () => {

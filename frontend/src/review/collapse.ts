@@ -44,6 +44,23 @@ export function hunkText(rows: DiffRow[], start: number, end: number): string {
   return [header, ...slice.map((row) => PREFIXES[row.change] + row.text)].join('\n')
 }
 
+export function unifiedOrder(rows: DiffRow[]): DiffRow[] {
+  const ordered: DiffRow[] = []
+  let added: DiffRow[] = []
+  for (const row of rows) {
+    if (row.change === 'added') {
+      added.push(row)
+      continue
+    }
+    if (row.change === 'context') {
+      ordered.push(...added)
+      added = []
+    }
+    ordered.push(row)
+  }
+  return [...ordered, ...added]
+}
+
 export function collapsedUnified(fileHeader: string, rows: DiffRow[], segments: Segment[]): string {
   const hunks = segments.flatMap((segment) => (segment.kind === 'rows' ? [hunkText(rows, segment.start, segment.end)] : []))
   return `${[fileHeader, ...hunks].join('\n')}\n`

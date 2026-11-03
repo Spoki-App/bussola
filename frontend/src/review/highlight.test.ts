@@ -86,8 +86,8 @@ describe('diffTokens', () => {
       '+++ b/x.py',
       '@@ -1,2 +1,2 @@',
       '-if len(specs) == 1 and declaration.start_point.row == specs[0].start_point.row:',
-      '-    name_node = specs[0].child_by_field_name("name")',
       '+if len(specs) == 1 and start_row(declaration) == start_row(specs[0]):',
+      '-    name_node = specs[0].child_by_field_name("name")',
       '+    return build(totally, different, things)',
       '',
     ].join('\n')
@@ -95,6 +95,14 @@ describe('diffTokens', () => {
 
     expect(tokens?.old.map(markedRuns)).toEqual([['.start_point.row', '.start_point.row'], []])
     expect(tokens?.new.map(markedRuns)).toEqual([['start_row(', ')', 'start_row(', ')'], []])
+  })
+
+  it('marks only the added indentation of a line that moved into a block', () => {
+    const diff = ['--- a/x.py', '+++ b/x.py', '@@ -1,1 +1,1 @@', '-    load(page)', '+        load(page)', ''].join('\n')
+    const tokens = diffTokens(parseDiff(diff)[0].hunks, 'python')
+
+    expect(tokens?.old.map(markedRuns)).toEqual([[]])
+    expect(tokens?.new.map(markedRuns)).toEqual([['    ']])
   })
 
   it('marks changed words without syntax colours when the language is unknown', () => {
