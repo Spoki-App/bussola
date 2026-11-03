@@ -5,18 +5,17 @@ import { diffTokens, languageFor } from './highlight'
 
 const UNIFIED = ['--- a/app.py', '+++ b/app.py', '@@ -1,3 +1,3 @@', ' def total(items):', '-    """Old', '+    """New', '     docstring"""', ''].join('\n')
 
-function markedRuns(line: TokenNode[]): string[] {
-  const runs: string[] = []
-  let open = false
+function textRuns(line: TokenNode[]): { value: string; marked: boolean }[] {
+  const runs: { value: string; marked: boolean }[] = []
   const visit = (node: TokenNode, inside: boolean) => {
     if (node.type === 'text') {
       const { value } = node as TextNode
-      if (inside && open) {
-        runs[runs.length - 1] += value
-      } else if (inside) {
-        runs.push(value)
+      const last = runs.at(-1)
+      if (last?.marked === inside) {
+        last.value += value
+      } else {
+        runs.push({ value, marked: inside })
       }
-      open = inside
       return
     }
     for (const child of (node as { children?: TokenNode[] }).children ?? []) {
@@ -27,6 +26,16 @@ function markedRuns(line: TokenNode[]): string[] {
     visit(node, false)
   }
   return runs
+}
+
+function markedRuns(line: TokenNode[]): string[] {
+  return textRuns(line).flatMap((run) => (run.marked ? [run.value] : []))
+}
+
+function bracketed(line: TokenNode[]): string {
+  return textRuns(line)
+    .map((run) => (run.marked ? `[${run.value}]` : run.value))
+    .join('')
 }
 
 describe('languageFor', () => {
@@ -97,12 +106,12 @@ describe('diffTokens', () => {
     expect(tokens?.new.map(markedRuns)).toEqual([['start_row(', ')', 'start_row(', ')'], ['return build(totally, different, things)']])
   })
 
-  it('marks only the added indentation of a line that moved into a block', () => {
+  it('marks only the added indentation of a line that moved into a block, at the start of the line', () => {
     const diff = ['--- a/x.py', '+++ b/x.py', '@@ -1,1 +1,1 @@', '-    load(page)', '+        load(page)', ''].join('\n')
-    const tokens = diffTokens(parseDiff(diff)[0].hunks, 'python')
+    const tokens = diffTokens(parseDiff(diff)[0].hunks, null)
 
     expect(tokens?.old.map(markedRuns)).toEqual([[]])
-    expect(tokens?.new.map(markedRuns)).toEqual([['    ']])
+    expect(tokens?.new.map(bracketed)).toEqual(['[    ]    load(page)'])
   })
 
   it('marks the whole text of lines with no counterpart next to lines that only moved', () => {

@@ -33,7 +33,7 @@ function indentEdits(removed: ChangedLine, added: ChangedLine): Edits {
   while (shared < Math.min(before.length, after.length) && before[shared] === after[shared]) {
     shared += 1
   }
-  const range = (lineNumber: number, indent: string) => (indent.length > shared ? [{ type: 'edit', lineNumber, start: shared, length: indent.length - shared }] : [])
+  const range = (lineNumber: number, indent: string) => (indent.length > shared ? [{ type: 'edit', lineNumber, start: 0, length: indent.length - shared }] : [])
   return [range(removed.lineNumber, before), range(added.lineNumber, after)]
 }
 
