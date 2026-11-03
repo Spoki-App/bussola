@@ -20,13 +20,14 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Changed
 
-- Lines are matched ignoring spaces, so code moved into a new block stays next to its old version in split view, on a plain background with only the indentation it gained or lost highlighted, so the lines really added or removed stand out, instead of showing as a block removed and a different block added.
+- Lines are matched ignoring spaces, so code moved into a new block stays next to its old version in split view, with only the indentation it gained or lost highlighted, instead of showing as a block removed and a different block added. In such a block the lines added or removed with no counterpart are highlighted in full.
 - The unit filter, the search box and the diff layout switch sit at the top of the **Files** bar, so they stay visible while you scroll the units. With the **Files** bar hidden they are above the units.
 - Allow tree-sitter 0.26. Syntax tree positions are read as plain tuples, because the `Point.row` and `Point.column` properties in tree-sitter 0.26.0 drop a reference on every read and crash the process on files longer than 256 lines.
 
 ### Fixed
 
 - Unit cards no longer scroll on their own when the mouse wheel is over them. The button that copies a link to a line stuck out one pixel below the last line, which gave each card a vertical scrollbar.
+- Added and removed lines and changed words use the dark theme colors in dark mode. The light theme colors were applied instead and were hard to see.
 - Text selected in the diff is readable in dark mode. It was shown on the light blue selection background of the light theme.
 - **Approve file** no longer skips units whose content matches a unit already approved in another file, such as test classes with the same header. They were taken for approvals moved from that file and left as New.
 - The first requests after starting with a new database no longer fail with a server error when several arrive at once and all try to add the same reviewer.

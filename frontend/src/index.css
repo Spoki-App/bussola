@@ -93,7 +93,7 @@
     --hl-deletion: #ffd0d0;
   }
 
-  .diff {
+  :root .diff {
     --diff-background-color: var(--bg);
     --diff-text-color: var(--text);
     --diff-gutter-insert-background-color: rgba(60, 199, 156, 0.2);
@@ -1299,12 +1299,6 @@ button.copy-link.failed {
 .diff.selectable .diff-code-insert,
 .diff.selectable .diff-code-delete {
   cursor: pointer;
-}
-
-.diff :where(.row-reindented) .diff-code:where(:not(.diff-code-selected)),
-.diff :where(.row-reindented-old) .diff-code-delete:where(:not(.diff-code-selected)),
-.diff :where(.row-reindented-new) .diff-code-insert:where(:not(.diff-code-selected)) {
-  background-color: var(--bg);
 }
 
 .diff .row-approved td,

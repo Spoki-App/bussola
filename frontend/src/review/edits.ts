@@ -1,5 +1,5 @@
 import DiffMatchPatch, { type Diff } from 'diff-match-patch'
-import { isDelete, isInsert, pickRanges, type ChangeData, type HunkData, type RangeTokenNode, type TokenizeEnhancer } from 'react-diff-view'
+import { isDelete, isInsert, isNormal, pickRanges, type ChangeData, type HunkData, type RangeTokenNode, type TokenizeEnhancer } from 'react-diff-view'
 
 const MIN_SIMILARITY = 0.4
 const WORD = /\w+|\s+|[^\w\s]/g
@@ -8,18 +8,25 @@ const matcher = new DiffMatchPatch()
 
 type ChangedLine = ChangeData & { lineNumber: number }
 
-function pairedLines(changes: ChangeData[]): [ChangedLine, ChangedLine][] {
-  return changes.flatMap((change, position) => {
-    const next = changes.at(position + 1)
-    return isDelete(change) && next && isInsert(next) ? [[change, next]] : []
-  })
+type Edits = [RangeTokenNode[], RangeTokenNode[]]
+
+function changeRuns(changes: ChangeData[]): ChangeData[][] {
+  const runs: ChangeData[][] = [[]]
+  for (const change of changes) {
+    if (isNormal(change)) {
+      runs.push([])
+    } else {
+      runs[runs.length - 1].push(change)
+    }
+  }
+  return runs.filter((run) => run.length > 0)
 }
 
 function indentOf(text: string): string {
   return text.slice(0, text.length - text.trimStart().length)
 }
 
-function indentEdits(removed: ChangedLine, added: ChangedLine): [RangeTokenNode[], RangeTokenNode[]] {
+function indentEdits(removed: ChangedLine, added: ChangedLine): Edits {
   const before = indentOf(removed.content)
   const after = indentOf(added.content)
   let shared = 0
@@ -62,7 +69,13 @@ function wordDiff(before: string, after: string): Diff[] {
   return matcher.diff_main(encodedBefore, encodedAfter, false).map(([operation, codes]) => [operation, Array.from({ length: codes.length }, (_, position) => words[codes.charCodeAt(position) - 1]).join('')])
 }
 
-function lineEdits(removed: ChangedLine, added: ChangedLine): [RangeTokenNode[], RangeTokenNode[]] {
+function wholeLine(line: ChangedLine): RangeTokenNode[] {
+  const start = indentOf(line.content).length
+  const length = line.content.trimEnd().length - start
+  return length > 0 ? [{ type: 'edit', lineNumber: line.lineNumber, start, length }] : []
+}
+
+function lineEdits(removed: ChangedLine, added: ChangedLine): Edits | null {
   if (removed.content.trimStart() === added.content.trimStart()) {
     return indentEdits(removed, added)
   }
@@ -70,15 +83,38 @@ function lineEdits(removed: ChangedLine, added: ChangedLine): [RangeTokenNode[],
   const shared = diffs.filter(([operation]) => operation === DiffMatchPatch.DIFF_EQUAL).reduce((total, [, text]) => total + visibleLength(text), 0)
   const similarity = (2 * shared) / (visibleLength(removed.content) + visibleLength(added.content))
   if (diffs.length <= 1 || similarity < MIN_SIMILARITY) {
-    return [[], []]
+    return null
   }
   return [sideRanges(diffs, DiffMatchPatch.DIFF_DELETE, removed.lineNumber), sideRanges(diffs, DiffMatchPatch.DIFF_INSERT, added.lineNumber)]
 }
 
+function runEdits(run: ChangeData[]): Edits {
+  const edits: Edits = [[], []]
+  const modified = new Set<ChangeData>()
+  run.forEach((change, position) => {
+    const next = run.at(position + 1)
+    const lines = isDelete(change) && next && isInsert(next) ? lineEdits(change, next) : null
+    if (lines) {
+      edits[0].push(...lines[0])
+      edits[1].push(...lines[1])
+      modified.add(change).add(next as ChangeData)
+    }
+  })
+  if (modified.size === 0) {
+    return edits
+  }
+  for (const change of run) {
+    if (!modified.has(change) && (isDelete(change) || isInsert(change))) {
+      edits[isDelete(change) ? 0 : 1].push(...wholeLine(change))
+    }
+  }
+  return edits
+}
+
 export function markChangedWords(hunks: HunkData[]): TokenizeEnhancer {
-  const pairs = hunks.flatMap((hunk) => pairedLines(hunk.changes)).map(([removed, added]) => lineEdits(removed, added))
+  const edits = hunks.flatMap((hunk) => changeRuns(hunk.changes)).map(runEdits)
   return pickRanges(
-    pairs.flatMap(([oldRanges]) => oldRanges),
-    pairs.flatMap(([, newRanges]) => newRanges),
+    edits.flatMap(([oldRanges]) => oldRanges),
+    edits.flatMap(([, newRanges]) => newRanges),
   )
 }

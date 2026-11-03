@@ -93,8 +93,8 @@ describe('diffTokens', () => {
     ].join('\n')
     const tokens = diffTokens(parseDiff(diff)[0].hunks, 'python')
 
-    expect(tokens?.old.map(markedRuns)).toEqual([['.start_point.row', '.start_point.row'], []])
-    expect(tokens?.new.map(markedRuns)).toEqual([['start_row(', ')', 'start_row(', ')'], []])
+    expect(tokens?.old.map(markedRuns)).toEqual([['.start_point.row', '.start_point.row'], ['name_node = specs[0].child_by_field_name("name")']])
+    expect(tokens?.new.map(markedRuns)).toEqual([['start_row(', ')', 'start_row(', ')'], ['return build(totally, different, things)']])
   })
 
   it('marks only the added indentation of a line that moved into a block', () => {
@@ -103,6 +103,33 @@ describe('diffTokens', () => {
 
     expect(tokens?.old.map(markedRuns)).toEqual([[]])
     expect(tokens?.new.map(markedRuns)).toEqual([['    ']])
+  })
+
+  it('marks the whole text of lines with no counterpart next to lines that only moved', () => {
+    const diff = [
+      '--- a/x.py',
+      '+++ b/x.py',
+      '@@ -1,3 +1,4 @@',
+      '-for page in pages:',
+      '+try:',
+      '-    load(page)',
+      '+        load(page)',
+      '+    finally:',
+      '-log()',
+      '',
+    ].join('\n')
+    const tokens = diffTokens(parseDiff(diff)[0].hunks, 'python')
+
+    expect(tokens?.old.map(markedRuns)).toEqual([['for page in pages:'], [], ['log()']])
+    expect(tokens?.new.map(markedRuns)).toEqual([['try:'], ['    '], ['finally:']])
+  })
+
+  it('leaves added lines unmarked when no line in their block was modified', () => {
+    const diff = ['--- a/x.py', '+++ b/x.py', '@@ -1,1 +1,2 @@', '-old_name()', '+brand_new(thing)', '+    another()', ''].join('\n')
+    const tokens = diffTokens(parseDiff(diff)[0].hunks, 'python')
+
+    expect(tokens?.old.map(markedRuns)).toEqual([[]])
+    expect(tokens?.new.map(markedRuns)).toEqual([[], []])
   })
 
   it('marks changed words without syntax colours when the language is unknown', () => {
