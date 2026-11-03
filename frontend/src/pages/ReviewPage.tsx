@@ -256,6 +256,21 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const data = review.data
   const percent = progressPercent(data)
 
+  const unitControls = (
+    <div className="unit-controls">
+      <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
+      <input
+        type="search"
+        className="unit-search"
+        aria-label="Find units by module, name or path"
+        placeholder="Find by module, name or path"
+        value={query}
+        onChange={(event) => { setQuery(event.target.value) }}
+      />
+      <DiffLayoutSwitch />
+    </div>
+  )
+
   return (
     <div className="review-page">
       <ReviewHeader review={data} />
@@ -275,20 +290,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
               {data.open_threads > 0 && <li className="legend-threads">{plural(data.open_threads, 'open thread')}</li>}
             </ul>
           </div>
-          <div className="summary-controls">
-            <div className="unit-filters">
-              <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
-              <input
-                type="search"
-                className="unit-search"
-                aria-label="Find units by module, name or path"
-                placeholder="Find by module, name or path"
-                value={query}
-                onChange={(event) => { setQuery(event.target.value) }}
-              />
-            </div>
-            <DiffLayoutSwitch />
-          </div>
+          {filesHidden && unitControls}
           <div className="summary-row">
             <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines. Cmd or Ctrl+click a name to go to its definition or list its usages.</p>
             <div className="summary-actions">
@@ -311,9 +313,12 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                 {!filesHidden && <span>Files</span>}
               </button>
               {!filesHidden && (
-                <div id="file-tree">
-                  <FileTree nodes={fileTree} activePath={focusedUnit?.path} onSelect={(path) => { scrollToElement(`file-${path}`) }} />
-                </div>
+                <>
+                  {unitControls}
+                  <div id="file-tree">
+                    <FileTree nodes={fileTree} activePath={focusedUnit?.path} onSelect={(path) => { scrollToElement(`file-${path}`) }} />
+                  </div>
+                </>
               )}
             </aside>
             <main className="units">

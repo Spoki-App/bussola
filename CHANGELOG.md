@@ -20,6 +20,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Changed
 
+- The unit filter, the search box and the diff layout switch sit at the top of the **Files** bar, so they stay visible while you scroll the units. With the **Files** bar hidden they are above the units.
 - Allow tree-sitter 0.26. Syntax tree positions are read as plain tuples, because the `Point.row` and `Point.column` properties in tree-sitter 0.26.0 drop a reference on every read and crash the process on files longer than 256 lines.
 
 ### Fixed

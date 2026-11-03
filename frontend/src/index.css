@@ -677,17 +677,8 @@ textarea {
   margin: 0;
 }
 
-.summary-controls {
+.unit-controls {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.unit-filters {
-  display: flex;
-  flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
@@ -696,6 +687,25 @@ textarea {
 .unit-search {
   flex: 0 1 320px;
   min-width: 0;
+}
+
+.sidebar .unit-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 0 6px 12px;
+}
+
+.sidebar .segmented {
+  display: flex;
+}
+
+.sidebar .segmented button {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-inline: 4px;
+  white-space: normal;
+  line-height: 1.2;
 }
 
 .course-summary {

@@ -116,3 +116,20 @@ test('the header of an open unit stays below the file header while its diff scro
   expect(cardBox && fileHeaderBox && cardBox.y < fileHeaderBox.y + fileHeaderBox.height).toBe(true)
   expect(unitHeaderBox?.y).toBeCloseTo((fileHeaderBox?.y ?? 0) + (fileHeaderBox?.height ?? 0), 0)
 })
+
+test('the unit filters sit in the files bar, and above the units while it is hidden', async ({ page }) => {
+  await page.goto(`/?token=${E2E_TOKEN}`)
+  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  const sidebar = page.getByRole('complementary', { name: 'Files' })
+  const search = page.getByRole('searchbox', { name: 'Find units by module, name or path' })
+
+  await expect(sidebar.getByRole('tablist', { name: 'Filter units' })).toBeVisible()
+  await expect(sidebar.getByRole('tablist', { name: 'Diff layout' })).toBeVisible()
+  await search.fill('total')
+
+  await sidebar.getByRole('button', { name: 'Files' }).click()
+
+  await expect(sidebar.getByRole('tablist', { name: 'Filter units' })).toHaveCount(0)
+  await expect(page.locator('.review-summary').getByRole('tablist', { name: 'Filter units' })).toBeVisible()
+  await expect(search).toHaveValue('total')
+})
