@@ -133,3 +133,22 @@ test('the unit filters sit in the files bar, and above the units while it is hid
   await expect(page.locator('.review-summary').getByRole('tablist', { name: 'Filter units' })).toBeVisible()
   await expect(search).toHaveValue('total')
 })
+
+test('the wrap button shows on an open unit under the mouse and turns line wrap off and on', async ({ page }) => {
+  await page.goto(`/?token=${E2E_TOKEN}`)
+  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  const card = page.locator('article.unit-card', { hasText: 'total' })
+  await card.getByRole('button', { name: 'Expand unit' }).click()
+  const wrap = card.getByRole('button', { name: 'Wrap long lines' })
+
+  await card.hover()
+  await expect(wrap).toHaveCSS('opacity', '1')
+  await expect(wrap).toHaveAttribute('aria-pressed', 'true')
+
+  await wrap.click()
+  await expect(page.locator('html')).toHaveAttribute('data-diff-wrap', 'off')
+  await expect(wrap).toHaveAttribute('aria-pressed', 'false')
+
+  await wrap.click()
+  await expect(page.locator('html')).toHaveAttribute('data-diff-wrap', 'on')
+})

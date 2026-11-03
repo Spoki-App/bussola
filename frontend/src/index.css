@@ -179,35 +179,33 @@ pre,
   overflow-wrap: anywhere;
 }
 
-:root:not([data-diff-wrap='off']) .diff .line-indent,
-.diff.diff-split .line-indent {
+:root:not([data-diff-wrap='off']) .diff .line-indent {
   float: left;
   max-width: 50%;
   overflow: hidden;
   white-space: pre;
 }
 
-:root:not([data-diff-wrap='off']) .diff .line-body,
-.diff.diff-split .line-body {
+:root:not([data-diff-wrap='off']) .diff .line-body {
   display: flow-root;
 }
 
-:root[data-diff-wrap='off'] .diff.diff-unified {
+:root[data-diff-wrap='off'] .diff {
   width: max-content;
   min-width: 100%;
   table-layout: auto;
 }
 
-:root[data-diff-wrap='off'] .diff-unified .diff-code {
+:root[data-diff-wrap='off'] .diff .diff-code {
   white-space: pre;
 }
 
-:root[data-diff-wrap='off'] .diff-unified .diff-widget-content {
+:root[data-diff-wrap='off'] .diff .diff-widget-content {
   padding: 0;
 }
 
-:root[data-diff-wrap='off'] .diff-unified .diff-widget-content > *,
-:root[data-diff-wrap='off'] .diff-unified .gap-button {
+:root[data-diff-wrap='off'] .diff .diff-widget-content > *,
+:root[data-diff-wrap='off'] .diff .gap-button {
   position: sticky;
   left: 0;
   width: 100cqi;
@@ -800,12 +798,6 @@ textarea {
   gap: 8px;
 }
 
-button.toggle[aria-pressed='true'] {
-  border-color: var(--accent);
-  background: var(--info-bg);
-  color: var(--accent);
-}
-
 @media (max-width: 1100px) {
   .review-layout,
   .review-layout.with-panel {
@@ -1012,6 +1004,50 @@ button.toggle[aria-pressed='true'] {
   scroll-margin-top: calc(var(--file-header-height, 48px) + 8px);
 }
 
+.unit-tools {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  height: 0;
+  pointer-events: none;
+}
+
+.wrap-toggle {
+  min-height: 0;
+  margin: 0 8px;
+  padding: 4px;
+  border-color: var(--border);
+  background: var(--bg-subtle);
+  color: var(--muted);
+  box-shadow: var(--shadow-lift);
+  opacity: 0;
+  pointer-events: auto;
+  transform: translateY(calc(-100% - 8px));
+}
+
+.unit-card:hover .wrap-toggle,
+.wrap-toggle:focus-visible {
+  opacity: 1;
+}
+
+.wrap-toggle[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.wrap-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .unit-card.focused {
   border-color: var(--focus);
   border-left-color: var(--state, var(--focus));
@@ -1087,7 +1123,7 @@ button.toggle[aria-pressed='true'] {
   overflow-x: auto;
 }
 
-:root[data-diff-wrap='off'] .unit-body:has(> .diff-unified) {
+:root[data-diff-wrap='off'] .unit-body:has(> .diff) {
   container-type: inline-size;
 }
 

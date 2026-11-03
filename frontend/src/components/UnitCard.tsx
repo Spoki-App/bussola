@@ -13,6 +13,7 @@ import { AiActionButton } from './AiActionButton'
 import { AiDescription } from './AiDescription'
 import { ErrorNote, KindBadge, StateBadge } from './Badges'
 import { CopyLinkButton } from './CopyLinkButton'
+import { DiffWrapButton } from './DiffWrapToggle'
 import { ImagePreview } from './ImagePreview'
 import { QualifiedName } from './QualifiedName'
 import { UnitDiffView, type GutterSide, type TargetLine } from './UnitDiffView'
@@ -258,6 +259,11 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
               widgets={renderWidgets ? (changeKeyOf) => renderWidgets(unit, diff.data, changeKeyOf) : undefined}
             />
           )}
+        </div>
+      )}
+      {expanded && diff.data && !diff.data.binary && (
+        <div className="unit-tools">
+          <DiffWrapButton />
         </div>
       )}
     </article>

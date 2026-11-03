@@ -10,7 +10,7 @@ describe('line wrap toggles', () => {
     window.localStorage.clear()
   })
 
-  it('keeps the Settings checkbox and the review bar button in sync and remembers the choice', () => {
+  it('keeps the Settings checkbox and the button on the units in sync and remembers the choice', () => {
     render(
       <>
         <DiffWrapCheckbox />
@@ -18,7 +18,7 @@ describe('line wrap toggles', () => {
       </>,
     )
     const checkbox = screen.getByRole('checkbox', { name: 'Wrap long lines' })
-    const button = screen.getByRole('button', { name: 'Wrap lines' })
+    const button = screen.getByRole('button', { name: 'Wrap long lines' })
     expect(checkbox).toBeChecked()
     expect(button).toHaveAttribute('aria-pressed', 'true')
 
@@ -41,7 +41,7 @@ describe('line wrap toggles', () => {
     window.localStorage.setItem('bussola.diffWrap', 'false')
     act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'bussola.diffWrap', newValue: 'false' })) })
 
-    expect(screen.getByRole('button', { name: 'Wrap lines' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Wrap long lines' })).toHaveAttribute('aria-pressed', 'false')
     expect(document.documentElement.dataset.diffWrap).toBe('off')
   })
 })
