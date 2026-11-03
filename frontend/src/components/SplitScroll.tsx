@@ -68,11 +68,8 @@ export function SplitScroll({ children }: { children: ReactNode }) {
       if (!bar || delta === 0) {
         return
       }
-      const before = bar.scrollLeft
+      event.preventDefault()
       bar.scrollLeft += delta
-      if (bar.scrollLeft !== before) {
-        event.preventDefault()
-      }
     }
     const observer = new ResizeObserver(measure)
     observer.observe(table)

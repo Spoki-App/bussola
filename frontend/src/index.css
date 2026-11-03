@@ -202,7 +202,7 @@ pre,
 
 :root[data-diff-wrap='off'] .diff-split .diff-code {
   white-space: pre;
-  overflow: hidden;
+  overflow: clip;
 }
 
 :root[data-diff-wrap='off'] .diff-split .diff-line > .diff-code:nth-child(2) {
