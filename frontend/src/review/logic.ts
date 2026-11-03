@@ -1,4 +1,5 @@
 import type { Review, Unit, UnitFilter, UnitState } from '../api/types'
+import { readStored, writeStored } from '../settings/storage'
 
 export const STATE_LABELS: Record<UnitState, string> = {
   approved: 'Approved',
@@ -15,6 +16,21 @@ export const FILTER_LABELS: Record<UnitFilter, string> = {
   all: 'All',
   todo: 'To review',
   since_last: 'Since my last review',
+}
+
+const UNIT_FILTER_KEY = 'bussola.unitFilter'
+
+function isUnitFilter(value: unknown): value is UnitFilter {
+  return typeof value === 'string' && Object.hasOwn(FILTER_LABELS, value)
+}
+
+export function loadUnitFilter(): UnitFilter {
+  const stored = readStored(UNIT_FILTER_KEY)
+  return isUnitFilter(stored) ? stored : 'all'
+}
+
+export function saveUnitFilter(filter: UnitFilter): void {
+  writeStored(UNIT_FILTER_KEY, filter)
 }
 
 export interface FileGroup {

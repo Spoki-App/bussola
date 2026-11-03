@@ -134,6 +134,20 @@ test('the unit filters sit in the files bar, and above the units while it is hid
   await expect(search).toHaveValue('total')
 })
 
+test('the unit filter and the diff layout are kept after a reload and in a new tab', async ({ page, context }) => {
+  await page.goto(`/?token=${E2E_TOKEN}`)
+  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  const sidebar = (on: typeof page) => on.getByRole('complementary', { name: 'Files' })
+  await sidebar(page).getByRole('tablist', { name: 'Filter units' }).getByRole('tab', { name: 'To review' }).click()
+  await sidebar(page).getByRole('tablist', { name: 'Diff layout' }).getByRole('tab', { name: 'Unified' }).click()
+
+  for (const view of [page, await context.newPage()]) {
+    await (view === page ? view.reload() : view.goto(page.url()))
+    await expect(sidebar(view).getByRole('tablist', { name: 'Filter units' }).getByRole('tab', { name: 'To review' })).toHaveAttribute('aria-selected', 'true')
+    await expect(sidebar(view).getByRole('tablist', { name: 'Diff layout' }).getByRole('tab', { name: 'Unified' })).toHaveAttribute('aria-selected', 'true')
+  }
+})
+
 test('the wrap button of an open unit turns line wrap off and on, and split view then scrolls each side on its own', async ({ page }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
   await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()

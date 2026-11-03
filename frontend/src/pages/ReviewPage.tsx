@@ -35,7 +35,7 @@ import { ReviewLinkContext, reviewLinkMaker } from '../review/reviewLink'
 import { buildUnitTree } from '../review/unitTree'
 import { searchGroups } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
-import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, focusedPosition, groupByFile, nextTodoIndex, progressPercent, shortSha } from '../review/logic'
+import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, focusedPosition, groupByFile, loadUnitFilter, nextTodoIndex, progressPercent, saveUnitFilter, shortSha } from '../review/logic'
 import { plural } from '../review/text'
 import { Segmented } from '../components/Segmented'
 
@@ -144,7 +144,7 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
 
 export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const review = useReview(reviewId)
-  const [filter, setFilter] = useState<UnitFilter>('all')
+  const [filter, setFilter] = useState<UnitFilter>(loadUnitFilter)
   const revisionId = review.data?.latest_revision?.id
   const units = useUnits(reviewId, revisionId, filter)
   const [query, setQuery] = useState('')
@@ -257,7 +257,15 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
 
   const unitControls = (
     <div className="unit-controls">
-      <Segmented label="Filter units" labels={FILTER_LABELS} value={filter} onChange={setFilter} />
+      <Segmented
+        label="Filter units"
+        labels={FILTER_LABELS}
+        value={filter}
+        onChange={(chosen) => {
+          setFilter(chosen)
+          saveUnitFilter(chosen)
+        }}
+      />
       <input
         type="search"
         className="unit-search"

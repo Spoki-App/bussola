@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Unit, UnitState } from '../api/types'
-import { focusedPosition, groupByFile, nextTodoIndex, progressPercent, unitTitle } from './logic'
+import { focusedPosition, groupByFile, loadUnitFilter, nextTodoIndex, progressPercent, saveUnitFilter, unitTitle } from './logic'
 
 function unit(id: number, path: string, state: UnitState, qualifiedName = `f${String(id)}`): Unit {
   return {
@@ -82,5 +82,16 @@ describe('progressPercent and titles', () => {
 
   it('names module units', () => {
     expect(unitTitle(unit(1, 'a.py', 'new', ''))).toBe('Module code')
+  })
+})
+
+describe('unit filter', () => {
+  it('remembers the chosen filter and falls back to all', () => {
+    window.localStorage.clear()
+    expect(loadUnitFilter()).toBe('all')
+    saveUnitFilter('since_last')
+    expect(loadUnitFilter()).toBe('since_last')
+    window.localStorage.setItem('bussola.unitFilter', 'bogus')
+    expect(loadUnitFilter()).toBe('all')
   })
 })
