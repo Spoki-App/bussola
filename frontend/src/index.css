@@ -179,33 +179,35 @@ pre,
   overflow-wrap: anywhere;
 }
 
-:root:not([data-diff-wrap='off']) .diff .line-indent {
+:root:not([data-diff-wrap='off']) .diff .line-indent,
+.diff.diff-split .line-indent {
   float: left;
   max-width: 50%;
   overflow: hidden;
   white-space: pre;
 }
 
-:root:not([data-diff-wrap='off']) .diff .line-body {
+:root:not([data-diff-wrap='off']) .diff .line-body,
+.diff.diff-split .line-body {
   display: flow-root;
 }
 
-:root[data-diff-wrap='off'] .diff {
+:root[data-diff-wrap='off'] .diff.diff-unified {
   width: max-content;
   min-width: 100%;
   table-layout: auto;
 }
 
-:root[data-diff-wrap='off'] .diff .diff-code {
+:root[data-diff-wrap='off'] .diff-unified .diff-code {
   white-space: pre;
 }
 
-:root[data-diff-wrap='off'] .diff .diff-widget-content {
+:root[data-diff-wrap='off'] .diff-unified .diff-widget-content {
   padding: 0;
 }
 
-:root[data-diff-wrap='off'] .diff .diff-widget-content > *,
-:root[data-diff-wrap='off'] .diff .gap-button {
+:root[data-diff-wrap='off'] .diff-unified .diff-widget-content > *,
+:root[data-diff-wrap='off'] .diff-unified .gap-button {
   position: sticky;
   left: 0;
   width: 100cqi;
@@ -1027,6 +1029,10 @@ textarea {
   transform: translateY(calc(-100% - 8px));
 }
 
+.unit-card:has(.diff-split) .unit-tools {
+  display: none;
+}
+
 .unit-card:hover .wrap-toggle,
 .wrap-toggle:focus-visible {
   opacity: 1;
@@ -1123,7 +1129,7 @@ textarea {
   overflow-x: auto;
 }
 
-:root[data-diff-wrap='off'] .unit-body:has(> .diff) {
+:root[data-diff-wrap='off'] .unit-body:has(> .diff-unified) {
   container-type: inline-size;
 }
 
