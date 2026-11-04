@@ -2370,30 +2370,12 @@ button.danger {
   }
 }
 
-.label.impact {
-  padding: 0 6px;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: help;
+.impact-high {
+  --state: var(--danger);
+  --state-bg: var(--danger-bg);
 }
 
-.label.impact-high {
-  color: var(--danger);
-}
-
-.label.impact-medium {
-  color: var(--warning);
-}
-
-.label.impact.outdated {
-  border-style: dashed;
-  opacity: 0.75;
-}
-
-.impact-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.impact-medium {
+  --state: var(--amber);
+  --state-bg: var(--amber-bg);
 }

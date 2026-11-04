@@ -237,15 +237,12 @@ class SqlDescriptionRepository(_SqlRepository):
         query = select(UnitDescription).where(UnitDescription.review_id == review_id).order_by(UnitDescription.created_at, UnitDescription.id)
         return list(self._session.scalars(query))
 
-    def save(self, description: UnitDescription, *, replace: bool = True) -> UnitDescription:
+    def save(self, description: UnitDescription) -> UnitDescription:
         values = {column.name: getattr(description, column.name) for column in UnitDescription.__table__.columns if column.name != "id"}
-        replaced = {name: value for name, value in values.items() if name not in DESCRIPTION_KEY}
         inserted = insert(UnitDescription).values(**values)
-        statement = (
-            inserted.on_conflict_do_update(index_elements=list(DESCRIPTION_KEY), set_=replaced)
-            if replace
-            else inserted.on_conflict_do_nothing(index_elements=list(DESCRIPTION_KEY))
-        )
+        replaced = {name: value for name, value in values.items() if name not in DESCRIPTION_KEY}
+        replaced["description"] = func.coalesce(inserted.excluded.description, UnitDescription.description)
+        statement = inserted.on_conflict_do_update(index_elements=list(DESCRIPTION_KEY), set_=replaced)
         with self._session.begin_nested():
             self._session.execute(statement)
         query = select(UnitDescription).where(*(getattr(UnitDescription, name) == values[name] for name in DESCRIPTION_KEY))

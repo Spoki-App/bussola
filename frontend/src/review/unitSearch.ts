@@ -12,10 +12,6 @@ export function matchesUnitQuery(unit: Unit, query: string): boolean {
   return matchesWords([unit.path, unit.old_path ?? '', name].join('\n'), query)
 }
 
-export function searchGroups(groups: FileGroup[], query: string): FileGroup[] {
-  return filterGroups(groups, (unit) => matchesUnitQuery(unit, query))
-}
-
 export function filterGroups(groups: FileGroup[], keep: (unit: Unit) => boolean): FileGroup[] {
   return groups.map((group) => ({ ...group, units: filterFile(group.units, keep) })).filter((group) => group.units.length > 0)
 }

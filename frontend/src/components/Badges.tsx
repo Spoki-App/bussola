@@ -12,7 +12,7 @@ export function StateBadge({ state }: { state: UnitState }) {
 export function ImpactBadge({ rating }: { rating: UnitDescription }) {
   const { impact, impact_reason: reason, outdated } = rating
   return (
-    <span className={`label impact impact-${impact}${outdated ? ' outdated' : ''}`} title={outdated ? `${reason} (outdated: the unit changed since it was rated)` : reason}>
+    <span className={`badge impact-${impact}`} title={outdated ? `${reason} (outdated: the unit changed since it was rated)` : reason}>
       {`${IMPACT_LABELS[impact]} impact${outdated ? ', outdated' : ''}`}
     </span>
   )

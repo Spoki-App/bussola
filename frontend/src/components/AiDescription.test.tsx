@@ -225,7 +225,7 @@ describe('AI description on a unit card', () => {
   it('shows the impact as a badge with the reason as its tooltip', async () => {
     renderCard({ stored: [DESCRIBED] })
 
-    const badge = await screen.findByText('High impact', { selector: '.label' })
+    const badge = await screen.findByText('High impact', { selector: '.badge' })
 
     expect(badge).toHaveAttribute('title', 'Changes what customers pay.')
   })

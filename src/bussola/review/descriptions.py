@@ -7,8 +7,10 @@ from typing import Annotated
 from pydantic import AfterValidator, BaseModel, Field, field_validator
 
 from bussola.ai.base import AiProvider, Cancellation
+from bussola.ai.batch import BatchResult, run_batch
 from bussola.ai.runner import AiCache, AiRunner, AiTask
 from bussola.errors import InvalidRequestError
+from bussola.review.context import ReviewContext
 from bussola.review.keys import KeyTuple, key_of
 from bussola.review.rows import is_binary
 from bussola.storage.models import UnitDescription, UnitSnapshot
@@ -134,10 +136,41 @@ def rate_impact(snapshot: UnitSnapshot, provider: AiProvider, cache: AiCache | N
     return _ask(AiRunner(provider, cache), RATE_IMPACT, snapshot, cancellation)
 
 
-def unrated(snapshots: Iterable[UnitSnapshot], descriptions: Iterable[UnitDescription]) -> list[UnitSnapshot]:
-    snapshots = list(snapshots)
+def rate_units(
+    context: ReviewContext, snapshots: list[UnitSnapshot], provider: AiProvider, cache: AiCache | None, cancellation: Cancellation
+) -> BatchResult[int, None]:
+    pending = {snapshot.id: snapshot for snapshot in unrated(snapshots, context.store.descriptions.descriptions(context.review.id))}
+    context.store.commit()
+
+    def rate(unit_id: int) -> None:
+        snapshot = pending[unit_id]
+        context.store.descriptions.save(description_row(context, snapshot, provider, rate_impact(snapshot, provider, cache, cancellation), None))
+        context.store.commit()
+
+    return run_batch(list(pending), rate, cancellation)
+
+
+def unrated(snapshots: list[UnitSnapshot], descriptions: Iterable[UnitDescription]) -> list[UnitSnapshot]:
     found = stored_descriptions(snapshots, descriptions)
     return [snapshot for snapshot in snapshots if not is_binary(snapshot) and (snapshot.id not in found or is_outdated(found[snapshot.id], snapshot))]
+
+
+def description_row(
+    context: ReviewContext, snapshot: UnitSnapshot, provider: AiProvider, rating: ImpactRating | UnitInsight, description: str | None
+) -> UnitDescription:
+    return UnitDescription(
+        review_id=context.review.id,
+        path=snapshot.path,
+        kind=snapshot.kind,
+        qualified_name=snapshot.qualified_name,
+        change_hash=change_hash(snapshot),
+        description=description,
+        impact=rating.impact,
+        impact_reason=rating.impact_reason,
+        provider=provider.name,
+        provider_label=provider.label,
+        model=provider.model,
+    )
 
 
 def _ask[T: BaseModel](runner: AiRunner, task: AiTask[T], snapshot: UnitSnapshot, cancellation: Cancellation, *, refresh: bool = False) -> T:

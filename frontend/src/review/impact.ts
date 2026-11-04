@@ -6,19 +6,11 @@ export const IMPACT_LABELS: Record<Impact, string> = { low: 'Low', medium: 'Medi
 
 export type ImpactFilter = 'all' | Impact | 'unrated'
 
-export const IMPACT_FILTER_LABELS: Record<ImpactFilter, string> = {
-  all: 'Any impact',
-  high: 'High impact',
-  medium: 'Medium impact',
-  low: 'Low impact',
-  unrated: 'Not rated',
-}
+export const IMPACT_FILTER_LABELS: Record<ImpactFilter, string> = { all: 'Any', high: 'High', medium: 'Medium', low: 'Low', unrated: 'Not rated' }
 
 export type UnitOrder = 'files' | 'impact'
 
-export const UNIT_ORDER_LABELS: Record<UnitOrder, string> = { files: 'File order', impact: 'Highest impact first' }
-
-export type Ratings = ReadonlyMap<number, UnitDescription>
+export const UNIT_ORDER_LABELS: Record<UnitOrder, string> = { files: 'By file', impact: 'By impact' }
 
 const RANKS: Record<Impact, number> = { high: 3, medium: 2, low: 1 }
 
@@ -29,7 +21,7 @@ export function matchesImpact(rating: UnitDescription | undefined, filter: Impac
   return filter === 'unrated' ? rating === undefined : rating?.impact === filter
 }
 
-export function byImpact(groups: FileGroup[], ratings: Ratings): FileGroup[] {
+export function byImpact(groups: FileGroup[], ratings: ReadonlyMap<number, UnitDescription>): FileGroup[] {
   const rank = (unit: Unit | undefined) => {
     const rating = unit && ratings.get(unit.id)
     return rating ? RANKS[rating.impact] : 0
