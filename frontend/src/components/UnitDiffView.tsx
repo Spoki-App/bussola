@@ -5,7 +5,7 @@ import 'react-diff-view/style/index.css'
 import type { DiffRow, UnitDiff } from '../api/types'
 import { useViewType } from '../hooks/useDiffLayout'
 import { useSymbolLink } from '../hooks/useSymbolLink'
-import { columnAt, isNavigationClick, type ScreenPoint } from '../review/codeNavigation'
+import { isNavigationClick, navigationColumn, type ScreenPoint } from '../review/codeNavigation'
 import { collapsedUnified, segmentRows, unifiedOrder, type Segment } from '../review/collapse'
 import { diffTokens, languageFor } from '../review/highlight'
 import { isSelectable, rowKey } from '../review/selection'
@@ -274,7 +274,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
         onClick: ({ change, side }, event: MouseEvent<HTMLElement>) => {
           const row = index.rowOf(change)
           if (onNavigate && isNavigationClick(event)) {
-            const column = columnAt(event.currentTarget, event.clientX, event.clientY)
+            const column = navigationColumn(event.currentTarget, event.clientX, event.clientY)
             if (row && column !== null) {
               onNavigate(row, side ?? gutterSide(row), column, { x: event.clientX, y: event.clientY })
             }

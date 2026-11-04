@@ -16,9 +16,12 @@ export interface UnitTarget {
   side: Side
 }
 
-interface ModifierClick {
+interface ModifierKeys {
   metaKey: boolean
   ctrlKey: boolean
+}
+
+interface ModifierClick extends ModifierKeys {
   button: number
 }
 
@@ -52,8 +55,12 @@ const CODE_CLASS = 'hljs-subst'
 const SYMBOL_CHAR = /[\p{L}\p{N}_$]/u
 const SYMBOL_START = /[\p{L}_$]/u
 
+export function hasNavigationModifier(event: ModifierKeys): boolean {
+  return event.metaKey || event.ctrlKey
+}
+
 export function isNavigationClick(event: ModifierClick): boolean {
-  return event.button === 0 && (event.metaKey || event.ctrlKey)
+  return event.button === 0 && hasNavigationModifier(event)
 }
 
 function caretAt(x: number, y: number): { node: Node; offset: number } | null {
@@ -76,12 +83,13 @@ export function textOffset(container: Node, node: Node, offset: number): number 
   return range.toString().length
 }
 
-export function columnAt(container: Element, x: number, y: number): number | null {
+function caretIn(container: Element, x: number, y: number): { node: Node; column: number } | null {
   const caret = caretAt(x, y)
-  if (!caret || !container.contains(caret.node)) {
-    return null
-  }
-  return textOffset(container, caret.node, caret.offset)
+  return caret && container.contains(caret.node) ? { node: caret.node, column: textOffset(container, caret.node, caret.offset) } : null
+}
+
+export function columnAt(container: Element, x: number, y: number): number | null {
+  return caretIn(container, x, y)?.column ?? null
 }
 
 export function symbolSpan(text: string, offset: number): SymbolSpan | null {
@@ -107,18 +115,19 @@ export function isSymbolToken(classesInnermostFirst: string[]): boolean {
 
 function classesAround(container: Element, node: Node): string[] {
   const classes: string[] = []
-  for (let element = node.parentElement; element && element !== container && container.contains(element); element = element.parentElement) {
+  for (let element = node.parentElement; element && element !== container; element = element.parentElement) {
     classes.push(...[...element.classList].reverse())
   }
   return classes
 }
 
 export function symbolAt(container: Element, x: number, y: number): SymbolSpan | null {
-  const caret = caretAt(x, y)
-  if (!caret || !container.contains(caret.node) || !isSymbolToken(classesAround(container, caret.node))) {
-    return null
-  }
-  return symbolSpan(container.textContent, textOffset(container, caret.node, caret.offset))
+  const caret = caretIn(container, x, y)
+  return caret && isSymbolToken(classesAround(container, caret.node)) ? symbolSpan(container.textContent, caret.column) : null
+}
+
+export function navigationColumn(container: Element, x: number, y: number): number | null {
+  return symbolAt(container, x, y)?.start ?? columnAt(container, x, y)
 }
 
 export function rangeOf(container: Element, span: SymbolSpan): Range | null {

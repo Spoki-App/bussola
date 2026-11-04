@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 
-import { rangeOf, symbolAt, type SymbolSpan } from '../review/codeNavigation'
+import { hasNavigationModifier, rangeOf, symbolAt, type SymbolSpan } from '../review/codeNavigation'
 
 export const LINK_NAME = 'navigation-link'
 export const CHECK_DELAY_MS = 80
@@ -29,10 +29,6 @@ interface Pointer {
 interface Hovered {
   code: Element
   start: number
-}
-
-function hasModifier(event: { metaKey: boolean; ctrlKey: boolean }): boolean {
-  return event.metaKey || event.ctrlKey
 }
 
 function supportsHighlights(): boolean {
@@ -95,35 +91,37 @@ export function useSymbolLink(): SymbolLink {
     [clear],
   )
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (pointer.current) {
-        update(hasModifier(event))
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('keyup', onKey)
-    window.addEventListener('blur', clear)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('keyup', onKey)
-      window.removeEventListener('blur', clear)
-      clear()
-    }
-  }, [update, clear])
-
-  const hover = useCallback(
-    (event: PointerState, code: Element, check: SymbolCheck) => {
-      pointer.current = { code, x: event.clientX, y: event.clientY, check }
-      update(hasModifier(event))
+  const onKey = useCallback(
+    (event: KeyboardEvent) => {
+      update(hasNavigationModifier(event))
     },
     [update],
   )
 
+  const hover = useCallback(
+    (event: PointerState, code: Element, check: SymbolCheck) => {
+      if (!pointer.current) {
+        window.addEventListener('keydown', onKey)
+        window.addEventListener('keyup', onKey)
+        window.addEventListener('blur', clear)
+      }
+      pointer.current = { code, x: event.clientX, y: event.clientY, check }
+      update(hasNavigationModifier(event))
+    },
+    [onKey, update, clear],
+  )
+
   const leave = useCallback(() => {
-    pointer.current = null
+    if (pointer.current) {
+      pointer.current = null
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onKey)
+      window.removeEventListener('blur', clear)
+    }
     clear()
-  }, [clear])
+  }, [onKey, clear])
+
+  useEffect(() => leave, [leave])
 
   return { hover, leave }
 }

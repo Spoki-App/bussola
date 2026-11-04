@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, renderHook, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { NavigationResult, NavigationTarget, SourceFile } from '../api/navigation'
@@ -262,7 +262,7 @@ describe('useCodeNavigation', () => {
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 })
   })
 
-  it('asks once per symbol whether it can navigate, and asks again while the index was not ready', async () => {
+  it('asks once per symbol whether it can navigate, asks again while the index was not ready, and reuses the answer on click', async () => {
     let ready = false
     const requests = serve((params) => (params.get('column') === '4' ? found([], { ready }) : found(params.get('line') === '5' ? [target('lib.py', 1, 4)] : [])))
     const { result } = renderHook(() => useCodeNavigation(1, 9, () => true), {
@@ -279,6 +279,10 @@ describe('useCodeNavigation', () => {
     expect(await ask(5, 4)).toBe(false)
 
     expect(requests.map((params) => `${params.get('line') ?? ''}:${params.get('column') ?? ''}`)).toEqual(['5:11', '6:11', '5:4', '5:4'])
+
+    act(() => { result.current.navigate({ path: 'cart.py', side: 'head', line: 5, column: 11, point: { x: 0, y: 0 } }) })
+    await waitFor(() => { expect(result.current.target).toEqual({ unitId: 4, line: 1, side: 'head' }) })
+    expect(requests).toHaveLength(4)
   })
 
   it('closes the list on a click outside it but not on a click on its padding', async () => {

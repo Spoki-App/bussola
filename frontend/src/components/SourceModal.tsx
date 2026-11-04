@@ -4,7 +4,7 @@ import { describeError } from '../api/client'
 import { useSourceFile, type CodeLocation, type NavigationRequest } from '../api/navigation'
 import { useModalDialog } from '../hooks/useModalDialog'
 import { useSymbolLink } from '../hooks/useSymbolLink'
-import { columnAt, isNavigationClick, type NavigationClick } from '../review/codeNavigation'
+import { isNavigationClick, navigationColumn, type NavigationClick } from '../review/codeNavigation'
 import { sourceLines, type SourceLine } from '../review/sourceLines'
 import { ErrorNote } from './Badges'
 import { ExternalLink } from './ExternalLink'
@@ -70,7 +70,7 @@ export function SourceModal({ reviewId, revisionId, stack, onBack, onClose, onNa
   }
   const onClick = (event: MouseEvent<HTMLElement>) => {
     const clicked = isNavigationClick(event) ? codeAt(event) : null
-    const column = clicked ? columnAt(clicked.code, event.clientX, event.clientY) : null
+    const column = clicked ? navigationColumn(clicked.code, event.clientX, event.clientY) : null
     if (clicked && column !== null) {
       onNavigate({ path: location.path, side: location.side, line: clicked.line, column, point: { x: event.clientX, y: event.clientY } })
     }

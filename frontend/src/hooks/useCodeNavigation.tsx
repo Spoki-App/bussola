@@ -1,7 +1,8 @@
+import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
-import { fetchNavigation, prepareNavigation, usePrepareNavigation, type CodeLocation, type NavigationRequest, type NavigationResult, type NavigationTarget, type ServerHint } from '../api/navigation'
+import { navigationQuery, prepareNavigation, usePrepareNavigation, type CodeLocation, type NavigationRequest, type NavigationResult, type NavigationTarget, type ServerHint } from '../api/navigation'
 import { directTarget, isNavigable, type NavigationClick, type ScreenPoint, type UnitTarget } from '../review/codeNavigation'
 import { readStored, writeStored } from '../settings/storage'
 import { NavigationPopup, type PopupState } from '../components/NavigationPopup'
@@ -27,8 +28,9 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function resolveNavigation(reviewId: number, revisionId: number | undefined, request: NavigationRequest, current: () => boolean, onBuilding: () => void): Promise<NavigationResult | null> {
-  const first = await fetchNavigation(reviewId, revisionId, request)
+async function resolveNavigation(queryClient: QueryClient, reviewId: number, revisionId: number | undefined, request: NavigationRequest, current: () => boolean, onBuilding: () => void): Promise<NavigationResult | null> {
+  const lookUp = () => queryClient.query(navigationQuery(reviewId, revisionId, request))
+  const first = await lookUp()
   if (first.ready || !current()) {
     return current() ? first : null
   }
@@ -39,7 +41,7 @@ async function resolveNavigation(reviewId: number, revisionId: number | undefine
     }
     await delay(BUILDING_POLL_MS)
   }
-  const result = await fetchNavigation(reviewId, revisionId, request)
+  const result = await lookUp()
   return current() ? result : null
 }
 
@@ -53,6 +55,7 @@ function takeHint(hint: ServerHint | null): ServerHint | null {
 
 export function useCodeNavigation(reviewId: number, revisionId: number | undefined, hasUnit: (unitId: number) => boolean): CodeNavigation {
   usePrepareNavigation(reviewId, revisionId)
+  const queryClient = useQueryClient()
   const unitShown = useRef(hasUnit)
   useEffect(() => {
     unitShown.current = hasUnit
@@ -76,23 +79,9 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
     [inPage],
   )
 
-  const navigable = useRef(new Map<string, Promise<boolean>>())
   const canNavigate = useCallback(
-    (request: NavigationRequest) => {
-      const key = JSON.stringify([reviewId, revisionId, request.side, request.path, request.line, request.column])
-      const known = navigable.current.get(key)
-      if (known) {
-        return known
-      }
-      const forget = () => {
-        navigable.current.delete(key)
-        return false
-      }
-      const answer = fetchNavigation(reviewId, revisionId, request).then((result) => (result.ready ? isNavigable(result) : forget()), forget)
-      navigable.current.set(key, answer)
-      return answer
-    },
-    [reviewId, revisionId],
+    (request: NavigationRequest) => queryClient.query(navigationQuery(reviewId, revisionId, request)).then(isNavigable, () => false),
+    [queryClient, reviewId, revisionId],
   )
 
   const closePopup = useCallback(() => {
@@ -107,7 +96,7 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
       const current = () => latest.current === id
       const { point, ...request } = click
       setPopup({ point, state: { status: 'loading', building: false } })
-      resolveNavigation(reviewId, revisionId, request, current, () => {
+      resolveNavigation(queryClient, reviewId, revisionId, request, current, () => {
         setPopup({ point, state: { status: 'loading', building: true } })
       })
         .then((result) => {
@@ -134,7 +123,7 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
           }
         })
     },
-    [reviewId, revisionId, reveal],
+    [queryClient, reviewId, revisionId, reveal],
   )
 
   const element = (

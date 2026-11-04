@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { queryOptions, useQuery } from '@tanstack/react-query'
 
 import { getJson, postJson } from './client'
 import type { Side } from './types'
@@ -63,13 +63,20 @@ export function fetchNavigation(reviewId: number, revisionId: number | undefined
   return getJson<NavigationResult>(`/reviews/${String(reviewId)}/navigation?${query(revisionId, request.side, extra)}`)
 }
 
+export function navigationQuery(reviewId: number, revisionId: number | undefined, request: NavigationRequest) {
+  return queryOptions({
+    queryKey: ['navigation', reviewId, revisionId, request.side, request.path, request.line, request.column],
+    queryFn: () => fetchNavigation(reviewId, revisionId, request),
+    staleTime: (query) => (query.state.data?.ready ? INDEX_STALE_MS : 0),
+  })
+}
+
 export function usePrepareNavigation(reviewId: number, revisionId: number | undefined) {
   return useQuery({
     queryKey: ['navigation-index', reviewId, revisionId],
     queryFn: () => prepareNavigation(reviewId, revisionId, 'head'),
     enabled: revisionId !== undefined,
     staleTime: INDEX_STALE_MS,
-    retry: false,
   })
 }
 

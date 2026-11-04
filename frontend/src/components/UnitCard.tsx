@@ -162,17 +162,21 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
     return { path: base ? (unit.old_path ?? unit.path) : unit.path, side: base ? 'base' : 'head', line, column }
   }
 
-  const navigateFrom = (row: DiffRow, side: GutterSide, column: number, point: ScreenPoint) => {
-    const request = requestFrom(row, side, column)
-    if (onNavigate && request) {
-      onNavigate({ ...request, point })
-    }
-  }
+  const navigateFrom =
+    onNavigate &&
+    ((row: DiffRow, side: GutterSide, column: number, point: ScreenPoint) => {
+      const request = requestFrom(row, side, column)
+      if (request) {
+        onNavigate({ ...request, point })
+      }
+    })
 
-  const canNavigateFrom = (row: DiffRow, side: GutterSide, column: number) => {
-    const request = requestFrom(row, side, column)
-    return canNavigate && request ? canNavigate(request) : Promise.resolve(false)
-  }
+  const canNavigateFrom =
+    canNavigate &&
+    ((row: DiffRow, side: GutterSide, column: number) => {
+      const request = requestFrom(row, side, column)
+      return request ? canNavigate(request) : Promise.resolve(false)
+    })
 
   const onRowClick = (row: DiffRow, extend: boolean) => {
     const key = rowKey(row)
@@ -269,8 +273,8 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
               onLineNumberClick={onComment ? (row, side, extend) => { onComment({ unit, row, side, mode: diff.data.mode, extend, selecting: true }) } : undefined}
               onLineSelectEnd={onCommentSelectEnd}
               highlighted={highlightRows?.(unit, diff.data)}
-              onNavigate={onNavigate ? navigateFrom : undefined}
-              canNavigate={canNavigate ? canNavigateFrom : undefined}
+              onNavigate={navigateFrom}
+              canNavigate={canNavigateFrom}
               target={targetLine(navigationTarget, linkedLine)}
               widgets={renderWidgets ? (changeKeyOf) => renderWidgets(unit, diff.data, changeKeyOf) : undefined}
             />
