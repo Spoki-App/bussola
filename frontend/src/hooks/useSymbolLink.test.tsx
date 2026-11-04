@@ -2,17 +2,8 @@ import { act, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { clearCaret, placeCaret } from '../test/caret'
+import { highlightedText, installHighlights } from '../test/highlights'
 import { CHECK_DELAY_MS, LINK_NAME, useSymbolLink, type SymbolCheck } from './useSymbolLink'
-
-class FakeHighlight {
-  ranges: Range[]
-
-  constructor(...ranges: Range[]) {
-    this.ranges = ranges
-  }
-}
-
-const highlights = new Map<string, FakeHighlight>()
 
 function Harness({ check }: { check: SymbolCheck }) {
   const link = useSymbolLink()
@@ -45,7 +36,7 @@ function setup(navigable: (column: number) => boolean = () => true) {
     pointAt(word)
     fireEvent.mouseMove(code, { clientX: 1, clientY: 1, ...modifier })
   }
-  const underlined = () => (code.classList.contains(LINK_NAME) ? (highlights.get(LINK_NAME)?.ranges[0].toString() ?? '') : null)
+  const underlined = () => (code.classList.contains(LINK_NAME) ? (highlightedText(LINK_NAME) ?? '') : null)
   const settle = () => act(() => vi.advanceTimersByTimeAsync(CHECK_DELAY_MS))
   return { check, code, move, underlined, settle }
 }
@@ -53,9 +44,7 @@ function setup(navigable: (column: number) => boolean = () => true) {
 describe('useSymbolLink', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    highlights.clear()
-    vi.stubGlobal('CSS', { highlights })
-    vi.stubGlobal('Highlight', FakeHighlight)
+    installHighlights()
   })
 
   afterEach(() => {
@@ -130,7 +119,7 @@ describe('useSymbolLink', () => {
 
     fireEvent.keyUp(window, { key: 'Meta', metaKey: false })
     expect(underlined()).toBeNull()
-    expect(highlights.has(LINK_NAME)).toBe(false)
+    expect(highlightedText(LINK_NAME)).toBeNull()
   })
 
   it('removes the underline when the pointer leaves the code or the window loses focus', async () => {

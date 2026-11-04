@@ -2,7 +2,7 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
-import { navigationQuery, prepareNavigation, usePrepareNavigation, type CodeLocation, type NavigationRequest, type NavigationResult, type NavigationTarget, type ServerHint } from '../api/navigation'
+import { UNSETTLED_ANSWER_MS, navigationQuery, prepareNavigation, usePrepareNavigation, type CodeLocation, type NavigationRequest, type NavigationResult, type NavigationTarget, type ServerHint } from '../api/navigation'
 import { directTarget, isNavigable, type NavigationClick, type ScreenPoint, type UnitTarget } from '../review/codeNavigation'
 import { readStored, writeStored } from '../settings/storage'
 import { NavigationPopup, type PopupState } from '../components/NavigationPopup'
@@ -29,8 +29,7 @@ function delay(ms: number): Promise<void> {
 }
 
 async function resolveNavigation(queryClient: QueryClient, reviewId: number, revisionId: number | undefined, request: NavigationRequest, current: () => boolean, onBuilding: () => void): Promise<NavigationResult | null> {
-  const lookUp = () => queryClient.query(navigationQuery(reviewId, revisionId, request))
-  const first = await lookUp()
+  const first = await queryClient.query(navigationQuery(reviewId, revisionId, request))
   if (first.ready || !current()) {
     return current() ? first : null
   }
@@ -41,7 +40,7 @@ async function resolveNavigation(queryClient: QueryClient, reviewId: number, rev
     }
     await delay(BUILDING_POLL_MS)
   }
-  const result = await lookUp()
+  const result = await queryClient.query({ ...navigationQuery(reviewId, revisionId, request), staleTime: 0 })
   return current() ? result : null
 }
 
@@ -80,7 +79,14 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
   )
 
   const canNavigate = useCallback(
-    (request: NavigationRequest) => queryClient.query(navigationQuery(reviewId, revisionId, request)).then(isNavigable, () => false),
+    (request: NavigationRequest) => {
+      const query = navigationQuery(reviewId, revisionId, request)
+      const state = queryClient.getQueryState(query.queryKey)
+      if (state?.status === 'error' && Date.now() - state.errorUpdatedAt < UNSETTLED_ANSWER_MS) {
+        return Promise.resolve(false)
+      }
+      return queryClient.query(query).then(isNavigable, () => false)
+    },
     [queryClient, reviewId, revisionId],
   )
 

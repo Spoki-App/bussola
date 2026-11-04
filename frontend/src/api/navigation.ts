@@ -49,6 +49,7 @@ export interface NavigationRequest extends CodeLocation {
 }
 
 const INDEX_STALE_MS = Number.POSITIVE_INFINITY
+export const UNSETTLED_ANSWER_MS = 2000
 
 function query(revisionId: number | undefined, side: Side, extra: Record<string, string> = {}): string {
   return new URLSearchParams({ side, ...extra, ...(revisionId === undefined ? {} : { revision_id: String(revisionId) }) }).toString()
@@ -67,7 +68,7 @@ export function navigationQuery(reviewId: number, revisionId: number | undefined
   return queryOptions({
     queryKey: ['navigation', reviewId, revisionId, request.side, request.path, request.line, request.column],
     queryFn: () => fetchNavigation(reviewId, revisionId, request),
-    staleTime: (query) => (query.state.data?.ready ? INDEX_STALE_MS : 0),
+    staleTime: (query) => (query.state.data?.ready ? INDEX_STALE_MS : UNSETTLED_ANSWER_MS),
   })
 }
 
@@ -77,6 +78,7 @@ export function usePrepareNavigation(reviewId: number, revisionId: number | unde
     queryFn: () => prepareNavigation(reviewId, revisionId, 'head'),
     enabled: revisionId !== undefined,
     staleTime: INDEX_STALE_MS,
+    retry: false,
   })
 }
 
