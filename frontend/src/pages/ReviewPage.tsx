@@ -32,6 +32,7 @@ import {
   type PendingLink,
 } from '../review/linkFocus'
 import { ReviewLinkContext, reviewLinkMaker } from '../review/reviewLink'
+import { reviewDocumentTitle } from '../review/reviewName'
 import { buildUnitTree } from '../review/unitTree'
 import { searchGroups } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
@@ -87,9 +88,10 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
 
   return (
     <header className="review-header">
+      <title>{reviewDocumentTitle(review)}</title>
       <div className="review-title">
         <Link to="/" className="crumb">
-          {review.repo_path.split('/').at(-1)}
+          {review.repo_name}
         </Link>
         <h1>
           <ReviewTitle review={review} />
