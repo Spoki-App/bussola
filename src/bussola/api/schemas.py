@@ -468,15 +468,18 @@ class AiTestOut(BaseModel):
     elapsed_ms: int
 
 
-class DescribeUnitIn(BaseModel):
+class AiCallIn(BaseModel):
     target: str = Field(min_length=1)
     call_id: str = Field(min_length=1, max_length=MAX_CALL_ID_LENGTH)
+
+
+class DescribeUnitIn(AiCallIn):
     regenerate: bool = False
 
 
 class UnitDescriptionOut(BaseModel):
     unit_id: int
-    description: str
+    description: str | None
     impact: Impact
     impact_reason: str
     provider: str
@@ -484,6 +487,13 @@ class UnitDescriptionOut(BaseModel):
     model: str | None
     created_at: datetime
     outdated: bool
+
+
+class RateImpactOut(BaseModel):
+    rated: int
+    failed: int
+    cancelled: bool
+    error: str | None
 
 
 class CancelOut(BaseModel):

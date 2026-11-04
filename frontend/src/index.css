@@ -2369,3 +2369,31 @@ button.danger {
     flex-wrap: wrap;
   }
 }
+
+.label.impact {
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.label.impact-high {
+  color: var(--danger);
+}
+
+.label.impact-medium {
+  color: var(--warning);
+}
+
+.label.impact.outdated {
+  border-style: dashed;
+  opacity: 0.75;
+}
+
+.impact-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

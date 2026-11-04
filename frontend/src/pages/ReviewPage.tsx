@@ -1,6 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
+import { useDescriptions } from '../api/descriptions'
 import { useSync } from '../api/forge'
 import { useApprove, useFinishReview, useReview, useUnits } from '../api/hooks'
 import type { DiffRow, ReviewDetail, SyncResult, Unit, UnitDiff, UnitFilter } from '../api/types'
@@ -12,15 +13,18 @@ import { FileTree } from '../components/FileTree'
 import { GitHubSyncStatus } from '../components/GitHubSyncStatus'
 import { LinkPullRequest } from '../components/LinkPullRequest'
 import { PullRequestDescription } from '../components/PullRequestDescription'
+import { RateImpact } from '../components/RateImpact'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { SyncSummary } from '../components/SyncSummary'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
 import { UnitTree } from '../components/UnitTree'
 import { useCodeNavigation } from '../hooks/useCodeNavigation'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { useRateImpact } from '../hooks/useRateImpact'
 import { Link } from '../Link'
 import { navigate } from '../navigation'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
+import { IMPACT_FILTER_LABELS, UNIT_ORDER_LABELS, byImpact, matchesImpact, type ImpactFilter, type UnitOrder } from '../review/impact'
 import {
   LinkScrollContext,
   createLinkScroll,
@@ -33,7 +37,7 @@ import {
 } from '../review/linkFocus'
 import { ReviewLinkContext, reviewLinkMaker } from '../review/reviewLink'
 import { buildUnitTree } from '../review/unitTree'
-import { searchGroups } from '../review/unitSearch'
+import { filterGroups, matchesUnitQuery } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
 import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, focusedPosition, groupByFile, loadUnitFilter, nextTodoIndex, progressPercent, saveUnitFilter, shortSha } from '../review/logic'
 import { plural } from '../review/text'
@@ -149,9 +153,20 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const units = useUnits(reviewId, revisionId, filter)
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query)
+  const [impactFilter, setImpactFilter] = useState<ImpactFilter>('all')
+  const [order, setOrder] = useState<UnitOrder>('files')
+  const rating = useRateImpact(reviewId)
+  const descriptions = useDescriptions(reviewId, revisionId, rating.pending)
+  const ratings = useMemo(() => new Map((descriptions.data ?? []).map((description) => [description.unit_id, description])), [descriptions.data])
   const fileGroups = useMemo(() => groupByFile(units.data ?? []), [units.data])
-  const fileTree = useMemo(() => buildFileTree(searchGroups(fileGroups, deferredQuery)), [fileGroups, deferredQuery])
-  const groups = useMemo(() => filesInOrder(fileTree).map((group) => ({ ...group, tree: buildUnitTree(group.units) })), [fileTree])
+  const fileTree = useMemo(
+    () => buildFileTree(filterGroups(fileGroups, (unit) => matchesUnitQuery(unit, deferredQuery) && matchesImpact(ratings.get(unit.id), impactFilter))),
+    [fileGroups, deferredQuery, ratings, impactFilter],
+  )
+  const groups = useMemo(() => {
+    const files = filesInOrder(fileTree)
+    return (order === 'impact' ? byImpact(files, ratings) : files).map((group) => ({ ...group, tree: buildUnitTree(group.units) }))
+  }, [fileTree, order, ratings])
   const unitList = useMemo(() => groups.flatMap((group) => group.units), [groups])
   const shownUnits = useMemo(() => new Set(unitList.map((unit) => unit.id)), [unitList])
   const navigation = useCodeNavigation(reviewId, revisionId, (unitId) => shownUnits.has(unitId))
@@ -176,9 +191,10 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     setAppliedLink(null)
     setFilter('all')
     setQuery('')
+    setImpactFilter('all')
   }
   const linkPending = link !== undefined && !linkIsNew && appliedLink === null
-  const viewChanged = filter !== 'all' || query !== ''
+  const viewChanged = filter !== 'all' || query !== '' || impactFilter !== 'all'
   const unitsUnavailable = review.isError || units.isError || review.data?.latest_revision === null
   const resolveLink = () => (link?.ready && units.data && !units.isPlaceholderData ? link.resolve(units.data) : undefined)
   const linkedTarget = !linkPending ? undefined : viewChanged || unitsUnavailable ? null : resolveLink()
@@ -274,6 +290,12 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
         value={query}
         onChange={(event) => { setQuery(event.target.value) }}
       />
+      {(ratings.size > 0 || impactFilter !== 'all' || order !== 'files') && (
+        <div className="impact-controls">
+          <Choice label="Filter units by impact" labels={IMPACT_FILTER_LABELS} value={impactFilter} onChange={setImpactFilter} />
+          <Choice label="Order units" labels={UNIT_ORDER_LABELS} value={order} onChange={setOrder} />
+        </div>
+      )}
       <DiffLayoutSwitch />
     </div>
   )
@@ -301,6 +323,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           <div className="summary-row">
             <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines. Cmd or Ctrl+click a name to go to its definition or list its usages.</p>
             <div className="summary-actions">
+              <RateImpact repoId={data.repo_id} rating={rating} />
               {extensions.sidePanel && (
                 <button type="button" aria-pressed={panelOpen} onClick={() => { setPanelOpen(!panelOpen) }}>
                   {panelOpen ? `Hide ${extensions.sidePanel.label}` : `Show ${extensions.sidePanel.label}`}
@@ -369,9 +392,28 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
 
 function emptyMessage(filter: UnitFilter, query: string, total: number): string {
   if (total > 0) {
-    return `No units match "${query.trim()}".`
+    return query.trim() ? `No units match "${query.trim()}".` : 'No units have this impact.'
   }
   return filter === 'all' ? 'No changes between the branches.' : 'Nothing to review here.'
+}
+
+interface ChoiceProps<T extends string> {
+  label: string
+  labels: Record<T, string>
+  value: T
+  onChange: (value: T) => void
+}
+
+function Choice<T extends string>({ label, labels, value, onChange }: ChoiceProps<T>) {
+  return (
+    <select aria-label={label} value={value} onChange={(event) => { onChange(event.target.value as T) }}>
+      {(Object.keys(labels) as T[]).map((option) => (
+        <option key={option} value={option}>
+          {labels[option]}
+        </option>
+      ))}
+    </select>
+  )
 }
 
 function SidebarIcon() {

@@ -229,6 +229,10 @@ With a provider configured, each unit card has a **Describe** button. One reques
 
 Descriptions are kept per review for each version of a unit, so they are there when you open the review again. When a new revision changes a unit, its description is marked **outdated** until you press **Regenerate**; units that did not change keep theirs, also when their file is renamed. **Regenerate** asks the provider again and replaces the description. Binary files cannot be described.
 
+### AI impact rating
+
+The impact rating shows on the unit card as a **Low**, **Medium** or **High impact** badge, with its one-line reason in the tooltip. **Rate impact** on the review page rates every unit that has no current rating in one batch, one request per unit, skipping units already rated or described; the badges appear as the ratings arrive, and **Cancel** stops the batch and keeps what was rated. Once units are rated, the unit controls can show only units of one impact (or the ones not rated yet) and order the units with the highest impact first. Ratings are kept per unit version like descriptions: when a new revision changes a unit its badge is marked outdated, and the next **Rate impact** or **Describe** rates it again.
+
 ### What leaves your machine
 
 - Nothing, while no provider is configured.

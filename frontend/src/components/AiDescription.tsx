@@ -1,13 +1,11 @@
 import { useState } from 'react'
 
 import { describeError } from '../api/client'
-import type { Impact } from '../api/types'
 import type { AiDescriptionState } from '../hooks/useAiDescription'
+import { IMPACT_LABELS } from '../review/impact'
 import { AiActionButton } from './AiActionButton'
 import { ErrorNote } from './Badges'
 import { Markdown } from './Markdown'
-
-const IMPACT_LABELS: Record<Impact, string> = { low: 'Low', medium: 'Medium', high: 'High' }
 
 interface Props {
   repoId: number

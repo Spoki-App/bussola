@@ -13,11 +13,15 @@ export function matchesUnitQuery(unit: Unit, query: string): boolean {
 }
 
 export function searchGroups(groups: FileGroup[], query: string): FileGroup[] {
-  return groups.map((group) => ({ ...group, units: searchFile(group.units, query) })).filter((group) => group.units.length > 0)
+  return filterGroups(groups, (unit) => matchesUnitQuery(unit, query))
 }
 
-function searchFile(units: Unit[], query: string): Unit[] {
-  const matched = new Set(units.filter((unit) => matchesUnitQuery(unit, query)))
+export function filterGroups(groups: FileGroup[], keep: (unit: Unit) => boolean): FileGroup[] {
+  return groups.map((group) => ({ ...group, units: filterFile(group.units, keep) })).filter((group) => group.units.length > 0)
+}
+
+function filterFile(units: Unit[], keep: (unit: Unit) => boolean): Unit[] {
+  const matched = new Set(units.filter(keep))
   const parents = new Set([...matched].flatMap((unit) => ancestors(unit.qualified_name)))
   return units.filter((unit) => matched.has(unit) || parents.has(unit.qualified_name))
 }

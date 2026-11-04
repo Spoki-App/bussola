@@ -1,4 +1,5 @@
-import type { UnitState } from '../api/types'
+import type { UnitDescription, UnitState } from '../api/types'
+import { IMPACT_LABELS } from '../review/impact'
 import { STATE_LABELS } from '../review/logic'
 
 const COURSE_ORDER: UnitState[] = ['approved', 'approved_moved', 'partial', 'changed', 'removed', 'new']
@@ -6,6 +7,15 @@ const TICK_LIMIT = 80
 
 export function StateBadge({ state }: { state: UnitState }) {
   return <span className={`badge state-${state}`}>{STATE_LABELS[state]}</span>
+}
+
+export function ImpactBadge({ rating }: { rating: UnitDescription }) {
+  const { impact, impact_reason: reason, outdated } = rating
+  return (
+    <span className={`label impact impact-${impact}${outdated ? ' outdated' : ''}`} title={outdated ? `${reason} (outdated: the unit changed since it was rated)` : reason}>
+      {`${IMPACT_LABELS[impact]} impact${outdated ? ', outdated' : ''}`}
+    </span>
+  )
 }
 
 export function KindBadge({ kind }: { kind: string }) {
