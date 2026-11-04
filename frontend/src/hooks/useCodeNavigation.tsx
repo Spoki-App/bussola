@@ -1,8 +1,9 @@
+import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
-import { fetchNavigation, prepareNavigation, usePrepareNavigation, type CodeLocation, type NavigationRequest, type NavigationResult, type NavigationTarget, type ServerHint } from '../api/navigation'
-import { directTarget, type NavigationClick, type ScreenPoint, type UnitTarget } from '../review/codeNavigation'
+import { UNSETTLED_ANSWER_MS, navigationQuery, prepareNavigation, usePrepareNavigation, type CodeLocation, type NavigationRequest, type NavigationResult, type NavigationTarget, type ServerHint } from '../api/navigation'
+import { directTarget, isNavigable, type NavigationClick, type ScreenPoint, type UnitTarget } from '../review/codeNavigation'
 import { readStored, writeStored } from '../settings/storage'
 import { NavigationPopup, type PopupState } from '../components/NavigationPopup'
 import { ServerHintNote } from '../components/ServerHintNote'
@@ -10,11 +11,10 @@ import { SourceModal } from '../components/SourceModal'
 
 const BUILDING_POLL_MS = 400
 const HINT_KEY_PREFIX = 'bussola.serverHint.'
-const MODIFIER_CLASS = 'navigation-modifier'
-const MODIFIER_KEYS = new Set(['Meta', 'Control'])
 
 export interface CodeNavigation {
   navigate: (click: NavigationClick) => void
+  canNavigate: (request: NavigationRequest) => Promise<boolean>
   target: UnitTarget | null
   element: ReactNode
 }
@@ -28,8 +28,8 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function resolveNavigation(reviewId: number, revisionId: number | undefined, request: NavigationRequest, current: () => boolean, onBuilding: () => void): Promise<NavigationResult | null> {
-  const first = await fetchNavigation(reviewId, revisionId, request)
+async function resolveNavigation(queryClient: QueryClient, reviewId: number, revisionId: number | undefined, request: NavigationRequest, current: () => boolean, onBuilding: () => void): Promise<NavigationResult | null> {
+  const first = await queryClient.query(navigationQuery(reviewId, revisionId, request))
   if (first.ready || !current()) {
     return current() ? first : null
   }
@@ -40,7 +40,7 @@ async function resolveNavigation(reviewId: number, revisionId: number | undefine
     }
     await delay(BUILDING_POLL_MS)
   }
-  const result = await fetchNavigation(reviewId, revisionId, request)
+  const result = await queryClient.query({ ...navigationQuery(reviewId, revisionId, request), staleTime: 0 })
   return current() ? result : null
 }
 
@@ -52,35 +52,13 @@ function takeHint(hint: ServerHint | null): ServerHint | null {
   return hint
 }
 
-function useModifierCursor() {
-  useEffect(() => {
-    const update = (event: KeyboardEvent) => {
-      if (MODIFIER_KEYS.has(event.key)) {
-        document.body.classList.toggle(MODIFIER_CLASS, event.type === 'keydown')
-      }
-    }
-    const clear = () => {
-      document.body.classList.remove(MODIFIER_CLASS)
-    }
-    window.addEventListener('keydown', update)
-    window.addEventListener('keyup', update)
-    window.addEventListener('blur', clear)
-    return () => {
-      window.removeEventListener('keydown', update)
-      window.removeEventListener('keyup', update)
-      window.removeEventListener('blur', clear)
-      clear()
-    }
-  }, [])
-}
-
 export function useCodeNavigation(reviewId: number, revisionId: number | undefined, hasUnit: (unitId: number) => boolean): CodeNavigation {
   usePrepareNavigation(reviewId, revisionId)
+  const queryClient = useQueryClient()
   const unitShown = useRef(hasUnit)
   useEffect(() => {
     unitShown.current = hasUnit
   })
-  useModifierCursor()
   const [popup, setPopup] = useState<Popup | null>(null)
   const [stack, setStack] = useState<CodeLocation[]>([])
   const [target, setTarget] = useState<UnitTarget | null>(null)
@@ -100,6 +78,18 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
     [inPage],
   )
 
+  const canNavigate = useCallback(
+    (request: NavigationRequest) => {
+      const query = navigationQuery(reviewId, revisionId, request)
+      const state = queryClient.getQueryState(query.queryKey)
+      if (state?.status === 'error' && Date.now() - state.errorUpdatedAt < UNSETTLED_ANSWER_MS) {
+        return Promise.resolve(false)
+      }
+      return queryClient.query(query).then(isNavigable, () => false)
+    },
+    [queryClient, reviewId, revisionId],
+  )
+
   const closePopup = useCallback(() => {
     latest.current += 1
     setPopup(null)
@@ -112,7 +102,7 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
       const current = () => latest.current === id
       const { point, ...request } = click
       setPopup({ point, state: { status: 'loading', building: false } })
-      resolveNavigation(reviewId, revisionId, request, current, () => {
+      resolveNavigation(queryClient, reviewId, revisionId, request, current, () => {
         setPopup({ point, state: { status: 'loading', building: true } })
       })
         .then((result) => {
@@ -139,7 +129,7 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
           }
         })
     },
-    [reviewId, revisionId, reveal],
+    [queryClient, reviewId, revisionId, reveal],
   )
 
   const element = (
@@ -152,6 +142,7 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
           onBack={() => { setStack((current) => current.slice(0, -1)) }}
           onClose={() => { setStack([]) }}
           onNavigate={navigate}
+          canNavigate={canNavigate}
         />
       )}
       {popup && (
@@ -169,5 +160,5 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
     </>
   )
 
-  return { navigate, target, element }
+  return { navigate, canNavigate, target, element }
 }

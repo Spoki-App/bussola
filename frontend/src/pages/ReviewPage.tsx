@@ -377,6 +377,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                         renderWidgets={extensions.renderWidgets}
                         highlightRows={extensions.highlightRows}
                         onNavigate={navigation.navigate}
+                        canNavigate={navigation.canNavigate}
                         navigationTarget={navigation.target?.unitId === unit.id ? navigation.target : undefined}
                         linkedLine={linkedTargetNow?.unitId === unit.id ? linkedTargetNow.line : undefined}
                       />

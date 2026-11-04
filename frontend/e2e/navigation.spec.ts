@@ -40,8 +40,8 @@ function createRepository(): string {
   return repo
 }
 
-async function navigateFrom(page: Page, container: Locator, word: string) {
-  const point = await container.evaluate((element, target) => {
+function pointOn(container: Locator, word: string) {
+  return container.evaluate((element, target) => {
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const index = (node.textContent ?? '').indexOf(target)
@@ -55,6 +55,18 @@ async function navigateFrom(page: Page, container: Locator, word: string) {
     }
     throw new Error(`No ${target} in ${element.textContent}`)
   }, word)
+}
+
+function underlined(page: Page) {
+  return page.evaluate(() => {
+    const highlight = CSS.highlights.get('navigation-link')
+    const range = highlight ? [...highlight][0] : undefined
+    return range instanceof Range ? range.toString() : null
+  })
+}
+
+async function navigateFrom(page: Page, container: Locator, word: string) {
+  const point = await pointOn(container, word)
   await page.keyboard.down('ControlOrMeta')
   await page.mouse.click(point.x, point.y)
   await page.keyboard.up('ControlOrMeta')
@@ -68,7 +80,7 @@ test.afterAll(() => {
   rmSync(root, { recursive: true, force: true })
 })
 
-test('Cmd/Ctrl+click jumps to code in the review and opens the rest in a modal', async ({ page }) => {
+test('Cmd/Ctrl underlines navigable names, and Cmd/Ctrl+click jumps to code in the review and opens the rest in a modal', async ({ page }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
   const repo = await page.request.post('/api/repos', { data: { path: createRepository() } })
   const { id: repoId } = (await repo.json()) as { id: number }
@@ -79,7 +91,24 @@ test('Cmd/Ctrl+click jumps to code in the review and opens the rest in a modal',
   const unitCard = (name: string) => page.locator('article.unit-card').filter({ has: page.locator('.unit-header', { hasText: name }) })
   const average = unitCard('average')
   const total = unitCard('total')
-  await navigateFrom(page, average.locator('td.diff-code', { hasText: 'total(items) /' }), 'total')
+  const averageLine = average.locator('td.diff-code', { hasText: 'total(items) /' })
+
+  const symbol = await pointOn(averageLine, 'total')
+  await page.mouse.move(symbol.x, symbol.y)
+  await page.keyboard.down('ControlOrMeta')
+  await expect(averageLine).toHaveClass(/navigation-link/)
+  await expect.poll(() => underlined(page)).toBe('total')
+  const keyword = await pointOn(averageLine, 'return')
+  await page.mouse.move(keyword.x, keyword.y)
+  await expect(averageLine).not.toHaveClass(/navigation-link/)
+  expect(await underlined(page)).toBeNull()
+  await page.mouse.move(symbol.x, symbol.y)
+  await expect(averageLine).toHaveClass(/navigation-link/)
+  await page.keyboard.up('ControlOrMeta')
+  await expect(averageLine).not.toHaveClass(/navigation-link/)
+  expect(await underlined(page)).toBeNull()
+
+  await navigateFrom(page, averageLine, 'total')
   await expect(total.locator('tr[class*="row-target"]')).toContainText('def total(items):')
 
   await navigateFrom(page, total.locator('td.diff-code', { hasText: 'sum(tidy' }), 'tidy')
@@ -88,7 +117,16 @@ test('Cmd/Ctrl+click jumps to code in the review and opens the rest in a modal',
   await expect(page.getByRole('dialog', { name: 'Definitions of tidy' })).toHaveCount(0)
   await expect(modal.getByRole('button', { name: 'Back' })).toBeDisabled()
 
-  await navigateFrom(page, modal.locator('.source-line.target code'), 'tidy')
+  const modalLine = modal.locator('.source-line.target code')
+  const definition = await pointOn(modalLine, 'tidy')
+  await page.mouse.move(definition.x, definition.y)
+  await page.keyboard.down('ControlOrMeta')
+  await expect(modalLine).toHaveClass(/navigation-link/)
+  await expect.poll(() => underlined(page)).toBe('tidy')
+  await page.keyboard.up('ControlOrMeta')
+  await expect(modalLine).not.toHaveClass(/navigation-link/)
+
+  await navigateFrom(page, modalLine, 'tidy')
   await expect(modal).toBeHidden()
   await expect(total.locator('tr[class*="row-target"]')).toContainText('return sum(tidy(items))')
 })

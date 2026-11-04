@@ -4,7 +4,8 @@ import 'react-diff-view/style/index.css'
 
 import type { DiffRow, UnitDiff } from '../api/types'
 import { useViewType } from '../hooks/useDiffLayout'
-import { columnAt, isNavigationClick, type ScreenPoint } from '../review/codeNavigation'
+import { useSymbolLink } from '../hooks/useSymbolLink'
+import { isNavigationClick, navigationColumn, type ScreenPoint } from '../review/codeNavigation'
 import { collapsedUnified, segmentRows, unifiedOrder, type Segment } from '../review/collapse'
 import { diffTokens, languageFor } from '../review/highlight'
 import { isSelectable, rowKey } from '../review/selection'
@@ -36,6 +37,7 @@ interface Props {
   highlighted?: ReadonlySet<string>
   widgets?: (rowFor: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   onNavigate?: (row: DiffRow, side: GutterSide, column: number, point: ScreenPoint) => void
+  canNavigate?: (row: DiffRow, side: GutterSide, column: number) => Promise<boolean>
   target?: TargetLine
 }
 
@@ -152,13 +154,14 @@ function renderSegments(segments: Segment[], hunks: HunkData[], expand: (id: str
   })
 }
 
-export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted, onNavigate, target }: Props) {
+export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted, onNavigate, canNavigate, target }: Props) {
   const modified = useMemo(() => hasModification(diff.rows), [diff.rows])
   const viewType = useViewType(modified)
   const dragging = useRef(false)
   const endSelection = useRef(onLineSelectEnd)
   const makeLink = useContext(ReviewLinkContext)
   const wrap = useDiffWrap()
+  const link = useSymbolLink()
 
   useEffect(() => {
     endSelection.current = onLineSelectEnd
@@ -255,6 +258,14 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
         },
       }}
       codeEvents={{
+        onMouseMove: ({ change, side }, event: MouseEvent<HTMLElement>) => {
+          const row = index.rowOf(change)
+          if (row && canNavigate) {
+            const rowSide = side ?? gutterSide(row)
+            link.hover(event, event.currentTarget, (column) => canNavigate(row, rowSide, column))
+          }
+        },
+        onMouseLeave: link.leave,
         onMouseDown: (_, event: MouseEvent<HTMLElement>) => {
           if (onNavigate && isNavigationClick(event)) {
             event.preventDefault()
@@ -263,7 +274,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
         onClick: ({ change, side }, event: MouseEvent<HTMLElement>) => {
           const row = index.rowOf(change)
           if (onNavigate && isNavigationClick(event)) {
-            const column = columnAt(event.currentTarget, event.clientX, event.clientY)
+            const column = navigationColumn(event.currentTarget, event.clientX, event.clientY)
             if (row && column !== null) {
               onNavigate(row, side ?? gutterSide(row), column, { x: event.clientX, y: event.clientY })
             }

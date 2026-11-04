@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { NavigationResult, NavigationTarget } from '../api/navigation'
 import { clearCaret, placeCaret } from '../test/caret'
-import { columnAt, directTarget, emptyMessage, groupTargets, isNavigationClick, textOffset, titleOf } from './codeNavigation'
+import { columnAt, directTarget, emptyMessage, groupTargets, isNavigable, isNavigationClick, isSymbolToken, rangeOf, symbolAt, symbolSpan, textOffset, titleOf } from './codeNavigation'
 
 function target(role: NavigationTarget['role'], path: string, line: number, unitId: number | null = null): NavigationTarget {
   return { role, path, line, column: 0, preview: `line ${String(line)}`, side: 'head', unit_id: unitId }
@@ -50,6 +50,55 @@ describe('code navigation helpers', () => {
     expect(columnAt(cell, 10, 10)).toBe('return p'.length)
     placeCaret(elsewhere, 1)
     expect(columnAt(cell, 10, 10)).toBeNull()
+  })
+
+  it('finds the symbol around an offset, including at its end, and nothing on punctuation or numbers', () => {
+    const line = 'total = price_2(item.$cost) + 42'
+
+    expect(symbolSpan(line, 0)).toEqual({ start: 0, end: 5 })
+    expect(symbolSpan(line, 5)).toEqual({ start: 0, end: 5 })
+    expect(symbolSpan(line, line.indexOf('_2') + 1)).toEqual({ start: 8, end: 15 })
+    expect(symbolSpan(line, line.indexOf('$cost') + 2)).toEqual({ start: 21, end: 26 })
+    expect(symbolSpan(line, line.indexOf('=') + 1)).toBeNull()
+    expect(symbolSpan(line, line.indexOf('42') + 1)).toBeNull()
+    expect(symbolSpan('', 0)).toBeNull()
+  })
+
+  it('classifies keywords, strings, comments and punctuation as not symbols, but code inside interpolations as symbols', () => {
+    expect(isSymbolToken([])).toBe(true)
+    expect(isSymbolToken(['hljs-title', 'function_'])).toBe(true)
+    expect(isSymbolToken(['hljs-keyword'])).toBe(false)
+    expect(isSymbolToken(['hljs-string'])).toBe(false)
+    expect(isSymbolToken(['hljs-doctag', 'hljs-comment'])).toBe(false)
+    expect(isSymbolToken(['hljs-punctuation'])).toBe(false)
+    expect(isSymbolToken(['hljs-subst', 'hljs-string'])).toBe(true)
+    expect(isSymbolToken(['hljs-keyword', 'hljs-subst', 'hljs-string'])).toBe(false)
+  })
+
+  it('finds the symbol under the pointer only in code tokens', () => {
+    const cell = document.createElement('td')
+    cell.innerHTML = '<span class="hljs-keyword">return</span> pri<mark>ce</mark>(<span class="hljs-string">"item"</span>, <span class="hljs-string hljs-subst">count</span>)'
+    document.body.append(cell)
+    const [keyword, mark, string, interpolation] = cell.querySelectorAll('span, mark')
+
+    placeCaret(mark.firstChild as Text, 1)
+    const span = symbolAt(cell, 0, 0)
+    expect(span).toEqual({ start: 7, end: 12 })
+    expect(span && rangeOf(cell, span)?.toString()).toBe('price')
+
+    placeCaret(keyword.firstChild as Text, 2)
+    expect(symbolAt(cell, 0, 0)).toBeNull()
+    placeCaret(string.firstChild as Text, 2)
+    expect(symbolAt(cell, 0, 0)).toBeNull()
+    placeCaret(interpolation.firstChild as Text, 2)
+    expect(symbolAt(cell, 0, 0)).toEqual({ start: 21, end: 26 })
+  })
+
+  it('is navigable only when the index is ready and the symbol has targets', () => {
+    expect(isNavigable(result([target('definition', 'lib.py', 1)]))).toBe(true)
+    expect(isNavigable(result([]))).toBe(false)
+    expect(isNavigable({ ...result([target('definition', 'lib.py', 1)]), symbol: null })).toBe(false)
+    expect(isNavigable({ ...result([target('definition', 'lib.py', 1)]), ready: false })).toBe(false)
   })
 
   it('lists definitions first, then usages grouped by file in their order', () => {

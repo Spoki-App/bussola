@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { queryOptions, useQuery } from '@tanstack/react-query'
 
 import { getJson, postJson } from './client'
 import type { Side } from './types'
@@ -49,6 +49,7 @@ export interface NavigationRequest extends CodeLocation {
 }
 
 const INDEX_STALE_MS = Number.POSITIVE_INFINITY
+export const UNSETTLED_ANSWER_MS = 2000
 
 function query(revisionId: number | undefined, side: Side, extra: Record<string, string> = {}): string {
   return new URLSearchParams({ side, ...extra, ...(revisionId === undefined ? {} : { revision_id: String(revisionId) }) }).toString()
@@ -61,6 +62,14 @@ export function prepareNavigation(reviewId: number, revisionId: number | undefin
 export function fetchNavigation(reviewId: number, revisionId: number | undefined, request: NavigationRequest): Promise<NavigationResult> {
   const extra = { path: request.path, line: String(request.line), column: String(request.column) }
   return getJson<NavigationResult>(`/reviews/${String(reviewId)}/navigation?${query(revisionId, request.side, extra)}`)
+}
+
+export function navigationQuery(reviewId: number, revisionId: number | undefined, request: NavigationRequest) {
+  return queryOptions({
+    queryKey: ['navigation', reviewId, revisionId, request.side, request.path, request.line, request.column],
+    queryFn: () => fetchNavigation(reviewId, revisionId, request),
+    staleTime: (query) => (query.state.data?.ready ? INDEX_STALE_MS : UNSETTLED_ANSWER_MS),
+  })
 }
 
 export function usePrepareNavigation(reviewId: number, revisionId: number | undefined) {

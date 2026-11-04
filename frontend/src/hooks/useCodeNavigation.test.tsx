@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { NavigationResult, NavigationTarget, SourceFile } from '../api/navigation'
+import { UNSETTLED_ANSWER_MS, type NavigationResult, type NavigationTarget, type SourceFile } from '../api/navigation'
 import { clearCaret, placeCaret } from '../test/caret'
 import { useCodeNavigation } from './useCodeNavigation'
 
@@ -98,6 +98,7 @@ describe('useCodeNavigation', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
     clearCaret()
   })
@@ -202,7 +203,8 @@ describe('useCodeNavigation', () => {
     renderHarness()
 
     expect(await screen.findByText(/Indexing the repository/)).toBeInTheDocument()
-    expect(await screen.findByRole('dialog', { name: 'Definitions of price' }, { timeout: 2000 })).toBeInTheDocument()
+    const popup = await screen.findByRole('dialog', { name: 'Definitions of price' }, { timeout: 2000 })
+    expect(within(popup).getAllByRole('button')).toHaveLength(2)
   })
 
   it('says when nothing is found', async () => {
@@ -260,6 +262,44 @@ describe('useCodeNavigation', () => {
     expect(popup.style.top).toBe('74px')
     expect(popup.style.maxHeight).toBe('58px')
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 })
+  })
+
+  it('asks once per symbol whether it can navigate, keeps not-ready and failed answers briefly, and reuses the answer on click', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    let ready = false
+    const requests = serve((params) => {
+      if (params.get('line') === '7') {
+        throw new Error('server down')
+      }
+      if (params.get('column') === '4') {
+        return found(ready ? [target('lib.py', 1, 4)] : [], { ready })
+      }
+      return found(params.get('line') === '5' ? [target('lib.py', 1, 4)] : [])
+    })
+    const { result } = renderHook(() => useCodeNavigation(1, 9, () => true), {
+      wrapper: ({ children }) => <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>,
+    })
+    const ask = (line: number, column: number) => result.current.canNavigate({ path: 'cart.py', side: 'head', line, column })
+
+    expect(await ask(5, 11)).toBe(true)
+    expect(await ask(5, 11)).toBe(true)
+    expect(await ask(6, 11)).toBe(false)
+    expect(await ask(5, 4)).toBe(false)
+    ready = true
+    expect(await ask(5, 4)).toBe(false)
+    expect(await ask(7, 11)).toBe(false)
+    expect(await ask(7, 11)).toBe(false)
+    vi.setSystemTime(Date.now() + UNSETTLED_ANSWER_MS)
+    expect(await ask(5, 4)).toBe(true)
+    expect(await ask(7, 11)).toBe(false)
+    expect(await ask(5, 4)).toBe(true)
+
+    const asked = () => requests.map((params) => `${params.get('line') ?? ''}:${params.get('column') ?? ''}`)
+    expect(asked()).toEqual(['5:11', '6:11', '5:4', '7:11', '5:4', '7:11'])
+
+    act(() => { result.current.navigate({ path: 'cart.py', side: 'head', line: 5, column: 11, point: { x: 0, y: 0 } }) })
+    await waitFor(() => { expect(result.current.target).toEqual({ unitId: 4, line: 1, side: 'head' }) })
+    expect(requests).toHaveLength(6)
   })
 
   it('closes the list on a click outside it but not on a click on its padding', async () => {

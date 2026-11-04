@@ -296,7 +296,7 @@ describe('UnitDiffView navigation', () => {
   it.each([
     ['metaKey', 'unified'],
     ['ctrlKey', 'split'],
-  ] as const)('reports the row, side and column of a %s click in %s view instead of selecting', (modifier, layout) => {
+  ] as const)('reports the row, side and the column where the name starts of a %s click in %s view instead of selecting', (modifier, layout) => {
     chooseLayout(layout)
     const onRowClick = vi.fn()
     const onNavigate = vi.fn()
@@ -308,7 +308,7 @@ describe('UnitDiffView navigation', () => {
     fireEvent.click(cell, { button: 0, [modifier]: true, clientX: 30, clientY: 40 })
 
     expect(onRowClick).not.toHaveBeenCalled()
-    expect(onNavigate).toHaveBeenCalledWith(added, 'new', 12, { x: 30, y: 40 })
+    expect(onNavigate).toHaveBeenCalledWith(added, 'new', 11, { x: 30, y: 40 })
   })
 
   it('reports the old side of a removed line', () => {
