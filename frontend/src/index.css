@@ -2369,3 +2369,13 @@ button.danger {
     flex-wrap: wrap;
   }
 }
+
+.impact-high {
+  --state: var(--danger);
+  --state-bg: var(--danger-bg);
+}
+
+.impact-medium {
+  --state: var(--amber);
+  --state-bg: var(--amber-bg);
+}

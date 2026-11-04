@@ -251,7 +251,7 @@ class UnitDescription(Base):
     kind: Mapped[str] = mapped_column()
     qualified_name: Mapped[str] = mapped_column()
     change_hash: Mapped[str] = mapped_column()
-    description: Mapped[str] = mapped_column()
+    description: Mapped[str | None] = mapped_column()
     impact: Mapped[str] = mapped_column()
     impact_reason: Mapped[str] = mapped_column()
     provider: Mapped[str] = mapped_column()

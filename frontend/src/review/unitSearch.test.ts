@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Unit } from '../api/types'
 import type { FileGroup } from './logic'
-import { fullName, matchesUnitQuery, searchGroups } from './unitSearch'
+import { filterGroups, fullName, matchesUnitQuery } from './unitSearch'
 
 function unit(path: string, module: string | null, qualifiedName: string, oldPath: string | null = null, id = 1): Unit {
   return {
@@ -69,7 +69,7 @@ describe('matchesUnitQuery', () => {
   })
 })
 
-describe('searchGroups', () => {
+describe('filterGroups', () => {
   const cart = 'src/shop/cart.py'
   const units = [
     unit(cart, 'shop.cart', 'Cart', null, 1),
@@ -84,14 +84,14 @@ describe('searchGroups', () => {
   }
 
   it('keeps the classes around a matching method so it is not shown as a stand-in', () => {
-    expect(names(searchGroups([group], 'total'))).toEqual(['Cart', 'Cart.total'])
-    expect(names(searchGroups([group], 'price'))).toEqual(['Cart', 'Cart.Line.price'])
+    expect(names(filterGroups([group], (candidate) => matchesUnitQuery(candidate, 'total')))).toEqual(['Cart', 'Cart.total'])
+    expect(names(filterGroups([group], (candidate) => matchesUnitQuery(candidate, 'price')))).toEqual(['Cart', 'Cart.Line.price'])
   })
 
   it('keeps the counts of the whole file and drops files without matches', () => {
     const other: FileGroup = { path: 'web/app.ts', oldPath: null, units: [unit('web/app.ts', 'web/app', 'run', null, 5)], todo: 1, complete: false }
 
-    const found = searchGroups([group, other], 'helper')
+    const found = filterGroups([group, other], (candidate) => matchesUnitQuery(candidate, 'helper'))
 
     expect(found.map((file) => [file.path, file.todo, file.complete])).toEqual([[cart, 4, false]])
   })

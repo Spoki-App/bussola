@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Unit } from '../api/types'
-import { buildUnitTree, lastSegment, parentName, type UnitNode } from './unitTree'
+import { buildUnitTree, lastSegment, parentName, unitsInOrder, type UnitNode } from './unitTree'
 
 function unit(id: number, kind: string, qualifiedName: string): Unit {
   return {
@@ -84,5 +84,13 @@ describe('buildUnitTree', () => {
     const tree = buildUnitTree([unit(1, 'method', 'Outer.Inner.load'), unit(2, 'class', 'Outer')])
 
     expect(shape(tree)).toEqual([{ class: 'Outer', own: true, children: [{ class: 'Outer.Inner', own: false, children: ['Outer.Inner.load'] }] }])
+  })
+})
+
+describe('unitsInOrder', () => {
+  it('lists the units in the order the tree shows them, each class before its methods', () => {
+    const units = [unit(1, 'method', 'Cart.total'), unit(2, 'function', 'helper'), unit(3, 'method', 'Cart.other'), unit(4, 'class', 'Cart')]
+
+    expect(unitsInOrder(buildUnitTree(units)).map((item) => item.id)).toEqual([4, 1, 3, 2])
   })
 })

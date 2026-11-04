@@ -315,7 +315,7 @@ export type Impact = 'low' | 'medium' | 'high'
 
 export interface UnitDescription {
   unit_id: number
-  description: string
+  description: string | null
   impact: Impact
   impact_reason: string
   provider: string
@@ -323,4 +323,13 @@ export interface UnitDescription {
   model: string | null
   created_at: string
   outdated: boolean
+}
+
+export type DescribedUnit = UnitDescription & { description: string }
+
+export interface RateImpactResult {
+  rated: number
+  failed: number
+  cancelled: boolean
+  error: string | null
 }

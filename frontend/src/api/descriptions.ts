@@ -1,13 +1,18 @@
 import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { getJson, postJson } from './client'
-import type { Unit, UnitDescription } from './types'
+import type { RateImpactResult, Unit, UnitDescription } from './types'
 
-const descriptionsKey = (reviewId: number, revisionId: number) => ['descriptions', reviewId, revisionId] as const
+const RATING_POLL_MS = 2000
 
-interface DescribeRequest {
+const descriptionsKey = (reviewId: number, revisionId?: number) => ['descriptions', reviewId, ...(revisionId === undefined ? [] : [revisionId])] as const
+
+interface AiCall {
   target: string
   call_id: string
+}
+
+interface DescribeRequest extends AiCall {
   regenerate: boolean
 }
 
@@ -15,12 +20,22 @@ function unitPath(reviewId: number, unit: Unit) {
   return `/reviews/${String(reviewId)}/units/${String(unit.id)}/description`
 }
 
+function descriptionsQuery(reviewId: number, revisionId: number) {
+  return {
+    queryKey: descriptionsKey(reviewId, revisionId),
+    queryFn: () => getJson<UnitDescription[]>(`/reviews/${String(reviewId)}/descriptions?revision_id=${String(revisionId)}`),
+    retry: false,
+  }
+}
+
+export function useDescriptions(reviewId: number, revisionId: number | undefined, poll: boolean) {
+  return useQuery({ ...descriptionsQuery(reviewId, revisionId ?? 0), enabled: revisionId !== undefined, refetchInterval: poll ? RATING_POLL_MS : false })
+}
+
 export function useUnitDescription(reviewId: number, unit: Unit) {
   return useQuery({
-    queryKey: descriptionsKey(reviewId, unit.revision_id),
-    queryFn: () => getJson<UnitDescription[]>(`/reviews/${String(reviewId)}/descriptions?revision_id=${String(unit.revision_id)}`),
+    ...descriptionsQuery(reviewId, unit.revision_id),
     select: (descriptions) => descriptions.find((description) => description.unit_id === unit.id) ?? null,
-    retry: false,
   })
 }
 
@@ -45,5 +60,23 @@ export function usePendingDescribeCalls(reviewId: number, unit: Unit): string[] 
   return useMutationState({
     filters: { mutationKey: describeKey(reviewId, unit), status: 'pending' },
     select: (mutation) => (mutation.state.variables as DescribeRequest).call_id,
+  })
+}
+
+const rateKey = (reviewId: number) => ['rate-impact', reviewId] as const
+
+export function useRateUnits(reviewId: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationKey: rateKey(reviewId),
+    mutationFn: (request: AiCall) => postJson<RateImpactResult>(`/reviews/${String(reviewId)}/impact`, request),
+    onSettled: () => client.invalidateQueries({ queryKey: descriptionsKey(reviewId) }),
+  })
+}
+
+export function usePendingRateCalls(reviewId: number): string[] {
+  return useMutationState({
+    filters: { mutationKey: rateKey(reviewId), status: 'pending' },
+    select: (mutation) => (mutation.state.variables as AiCall).call_id,
   })
 }

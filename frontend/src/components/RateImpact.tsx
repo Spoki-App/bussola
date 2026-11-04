@@ -1,0 +1,36 @@
+import { describeError } from '../api/client'
+import type { RateImpactState } from '../hooks/useRateImpact'
+import { ratingSummary } from '../review/impact'
+import { AiActionButton } from './AiActionButton'
+import { ErrorNote } from './Badges'
+
+interface Props {
+  repoId: number
+  rating: RateImpactState
+}
+
+export function RateImpact({ repoId, rating }: Props) {
+  if (rating.pending) {
+    return (
+      <>
+        <span className="muted" role="status">
+          Rating the impact of each unit...
+        </span>
+        <button type="button" onClick={rating.cancel}>
+          Cancel
+        </button>
+      </>
+    )
+  }
+  return (
+    <>
+      {rating.result && (
+        <span className="muted" role="status">
+          {ratingSummary(rating.result)}
+        </span>
+      )}
+      {rating.error && <ErrorNote message={describeError(rating.error)} />}
+      <AiActionButton repoId={repoId} label="Rate impact" title="Ask the AI provider to rate the impact of each unit that has no current rating" onRun={rating.run} />
+    </>
+  )
+}

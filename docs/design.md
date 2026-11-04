@@ -206,8 +206,11 @@ The UI shows AI buttons only when the repository's provider is configured, disab
 
 Each call carries a `call_id` chosen by the browser and is registered in `RunningCalls` under it. Cancelling sets its `Cancellation`, which stops the provider call, and the request answers 409 `Cancelled`. A cancel that arrives before its call is registered is remembered (the last 1000), and that call then answers 409 `Cancelled` without contacting the provider.
 
+`POST /reviews/{review_id}/impact` rates in one batch (`run_batch`) every unit of the latest revision whose found row is missing or outdated, binary files excepted, with the `rate_impact` task: the same prompt as `describe_unit` with a schema of only `impact` and `impact_reason`. It is the first step the AI review (#19) will run. Each rating is stored as soon as it arrives, in a `unit_descriptions` row with no description, and every save keeps the stored description when the new row has none (`COALESCE`), so a rating never erases a description saved meanwhile; **Describe** later fills in the description of the same row. `rate_units` takes a `ReviewContext`, so the AI review can run it without going through HTTP. The batch answers with how many units were rated and failed, whether it was cancelled, and the error that stopped it or the first one. Ratings already stored stay when the batch is cancelled or stopped. Because the latest row of a unit wins, rating a changed unit hides its outdated description.
+
 ```
-GET    /reviews/{review_id}/descriptions?revision_id=      stored descriptions of the units of a revision (latest by default), with outdated
+GET    /reviews/{review_id}/descriptions?revision_id=      stored descriptions and ratings of the units of a revision (latest by default), with outdated; description is null for a rating alone
 POST   /reviews/{review_id}/units/{unit_id}/description    {target, call_id, regenerate}: describe and rate the unit, store and return it
+POST   /reviews/{review_id}/impact                          {target, call_id}: rate every unit without a current rating, as a batch; {rated, failed, cancelled, error}
 POST   /ai/calls/{call_id}/cancel                           cancel an AI call, running or not yet started; {cancelled} is true when a running call was stopped
 ```

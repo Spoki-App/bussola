@@ -11,7 +11,7 @@ import { useAiDescription } from '../hooks/useAiDescription'
 import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
 import { AiActionButton } from './AiActionButton'
 import { AiDescription } from './AiDescription'
-import { ErrorNote, KindBadge, StateBadge } from './Badges'
+import { ErrorNote, ImpactBadge, KindBadge, StateBadge } from './Badges'
 import { CopyLinkButton } from './CopyLinkButton'
 import { DiffWrapButton } from './DiffWrapToggle'
 import { ImagePreview } from './ImagePreview'
@@ -188,6 +188,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
         <QualifiedName module={unit.qualified_name ? unit.module : null} name={unitTitle(unit)} />
         {makeLink && unit.head_start !== null && <CopyLinkButton link={makeLink({ path: unit.path, line: unit.head_start })} label="Copy link to this unit" className="icon" />}
         <StateBadge state={unit.state} />
+        {ai.rating && <ImpactBadge rating={ai.rating} />}
         {unit.change_type !== 'modified' && <span className="label">{unit.change_type}</span>}
         {unit.base_changed && <span className="label" title="The base changed since you approved this unit">base changed</span>}
         {unit.rows_total > 0 && <span className="label">{`${String(unit.rows_approved)}/${String(unit.rows_total)} lines approved`}</span>}

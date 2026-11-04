@@ -239,8 +239,10 @@ class SqlDescriptionRepository(_SqlRepository):
 
     def save(self, description: UnitDescription) -> UnitDescription:
         values = {column.name: getattr(description, column.name) for column in UnitDescription.__table__.columns if column.name != "id"}
+        inserted = insert(UnitDescription).values(**values)
         replaced = {name: value for name, value in values.items() if name not in DESCRIPTION_KEY}
-        statement = insert(UnitDescription).values(**values).on_conflict_do_update(index_elements=list(DESCRIPTION_KEY), set_=replaced)
+        replaced["description"] = func.coalesce(inserted.excluded.description, UnitDescription.description)
+        statement = inserted.on_conflict_do_update(index_elements=list(DESCRIPTION_KEY), set_=replaced)
         with self._session.begin_nested():
             self._session.execute(statement)
         query = select(UnitDescription).where(*(getattr(UnitDescription, name) == values[name] for name in DESCRIPTION_KEY))

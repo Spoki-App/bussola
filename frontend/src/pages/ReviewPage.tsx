@@ -1,9 +1,10 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
+import { useDescriptions } from '../api/descriptions'
 import { useSync } from '../api/forge'
 import { useApprove, useFinishReview, useReview, useUnits } from '../api/hooks'
-import type { DiffRow, ReviewDetail, SyncResult, Unit, UnitDiff, UnitFilter } from '../api/types'
+import type { DiffRow, ReviewDetail, SyncResult, Unit, UnitDescription, UnitDiff, UnitFilter } from '../api/types'
 import { CourseStrip, ErrorNote } from '../components/Badges'
 import { CopyLinkButton } from '../components/CopyLinkButton'
 import { DiffLayoutSwitch } from '../components/DiffLayoutPanel'
@@ -12,15 +13,18 @@ import { FileTree } from '../components/FileTree'
 import { GitHubSyncStatus } from '../components/GitHubSyncStatus'
 import { LinkPullRequest } from '../components/LinkPullRequest'
 import { PullRequestDescription } from '../components/PullRequestDescription'
+import { RateImpact } from '../components/RateImpact'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { SyncSummary } from '../components/SyncSummary'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
 import { UnitTree } from '../components/UnitTree'
 import { useCodeNavigation } from '../hooks/useCodeNavigation'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { useRateImpact } from '../hooks/useRateImpact'
 import { Link } from '../Link'
 import { navigate } from '../navigation'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
+import { IMPACT_FILTER_LABELS, UNIT_ORDER_LABELS, byImpact, matchesImpact, type ImpactFilter, type UnitOrder } from '../review/impact'
 import {
   LinkScrollContext,
   createLinkScroll,
@@ -33,8 +37,8 @@ import {
 } from '../review/linkFocus'
 import { ReviewLinkContext, reviewLinkMaker } from '../review/reviewLink'
 import { reviewDocumentTitle } from '../review/reviewName'
-import { buildUnitTree } from '../review/unitTree'
-import { searchGroups } from '../review/unitSearch'
+import { buildUnitTree, unitsInOrder } from '../review/unitTree'
+import { filterGroups, matchesUnitQuery } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
 import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, focusedPosition, groupByFile, loadUnitFilter, nextTodoIndex, progressPercent, saveUnitFilter, shortSha } from '../review/logic'
 import { plural } from '../review/text'
@@ -56,6 +60,7 @@ interface Props {
 }
 
 const WIDE_LAYOUT_PX = 1400
+const NO_RATINGS: ReadonlyMap<number, UnitDescription> = new Map()
 const FILES_HIDDEN_KEY = 'bussola.filesHidden'
 
 const SYNC_TITLE =
@@ -151,10 +156,22 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const units = useUnits(reviewId, revisionId, filter)
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query)
+  const [impactFilter, setImpactFilter] = useState<ImpactFilter>('all')
+  const [order, setOrder] = useState<UnitOrder>('files')
+  const rating = useRateImpact(reviewId)
+  const descriptions = useDescriptions(reviewId, revisionId, rating.pending)
+  const ratings = useMemo(() => new Map((descriptions.data ?? []).map((description) => [description.unit_id, description])), [descriptions.data])
+  const ratingsInUse = impactFilter !== 'all' || order === 'impact' ? ratings : NO_RATINGS
   const fileGroups = useMemo(() => groupByFile(units.data ?? []), [units.data])
-  const fileTree = useMemo(() => buildFileTree(searchGroups(fileGroups, deferredQuery)), [fileGroups, deferredQuery])
-  const groups = useMemo(() => filesInOrder(fileTree).map((group) => ({ ...group, tree: buildUnitTree(group.units) })), [fileTree])
-  const unitList = useMemo(() => groups.flatMap((group) => group.units), [groups])
+  const fileTree = useMemo(
+    () => buildFileTree(filterGroups(fileGroups, (unit) => matchesUnitQuery(unit, deferredQuery) && matchesImpact(ratingsInUse.get(unit.id), impactFilter))),
+    [fileGroups, deferredQuery, ratingsInUse, impactFilter],
+  )
+  const groups = useMemo(() => {
+    const files = filesInOrder(fileTree)
+    return (order === 'impact' ? byImpact(files, ratingsInUse) : files).map((group) => ({ ...group, tree: buildUnitTree(group.units) }))
+  }, [fileTree, order, ratingsInUse])
+  const unitList = useMemo(() => groups.flatMap((group) => unitsInOrder(group.tree)), [groups])
   const shownUnits = useMemo(() => new Set(unitList.map((unit) => unit.id)), [unitList])
   const navigation = useCodeNavigation(reviewId, revisionId, (unitId) => shownUnits.has(unitId))
   const [focusedId, setFocusedId] = useState<number | null>(null)
@@ -178,9 +195,10 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     setAppliedLink(null)
     setFilter('all')
     setQuery('')
+    setImpactFilter('all')
   }
   const linkPending = link !== undefined && !linkIsNew && appliedLink === null
-  const viewChanged = filter !== 'all' || query !== ''
+  const viewChanged = filter !== 'all' || query !== '' || impactFilter !== 'all'
   const unitsUnavailable = review.isError || units.isError || review.data?.latest_revision === null
   const resolveLink = () => (link?.ready && units.data && !units.isPlaceholderData ? link.resolve(units.data) : undefined)
   const linkedTarget = !linkPending ? undefined : viewChanged || unitsUnavailable ? null : resolveLink()
@@ -276,6 +294,12 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
         value={query}
         onChange={(event) => { setQuery(event.target.value) }}
       />
+      {(ratings.size > 0 || impactFilter !== 'all' || order !== 'files') && (
+        <>
+          <Segmented label="Filter units by impact" labels={IMPACT_FILTER_LABELS} value={impactFilter} onChange={setImpactFilter} />
+          <Segmented label="Order units" labels={UNIT_ORDER_LABELS} value={order} onChange={setOrder} />
+        </>
+      )}
       <DiffLayoutSwitch />
     </div>
   )
@@ -303,6 +327,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           <div className="summary-row">
             <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines. Cmd or Ctrl+click a name to go to its definition or list its usages.</p>
             <div className="summary-actions">
+              <RateImpact repoId={data.repo_id} rating={rating} />
               {extensions.sidePanel && (
                 <button type="button" aria-pressed={panelOpen} onClick={() => { setPanelOpen(!panelOpen) }}>
                   {panelOpen ? `Hide ${extensions.sidePanel.label}` : `Show ${extensions.sidePanel.label}`}
@@ -331,7 +356,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
             </aside>
             <main className="units">
               {units.error && <ErrorNote message={describeError(units.error)} />}
-              {units.data && unitList.length === 0 && <p className="muted">{emptyMessage(filter, deferredQuery, units.data.length)}</p>}
+              {units.data && unitList.length === 0 && <p className="muted">{emptyMessage(filter, deferredQuery, impactFilter, units.data.length)}</p>}
               {groups.map((group) => (
                 <section key={group.path} id={`file-${group.path}`} className="file-section">
                   <FileHeader reviewId={reviewId} path={group.path} oldPath={group.oldPath} complete={group.complete} actions={extensions.fileActions?.(group.path)} />
@@ -369,9 +394,9 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   )
 }
 
-function emptyMessage(filter: UnitFilter, query: string, total: number): string {
+function emptyMessage(filter: UnitFilter, query: string, impactFilter: ImpactFilter, total: number): string {
   if (total > 0) {
-    return `No units match "${query.trim()}".`
+    return impactFilter === 'all' || query.trim() ? `No units match "${query.trim()}".` : 'No units have this impact.'
   }
   return filter === 'all' ? 'No changes between the branches.' : 'Nothing to review here.'
 }

@@ -12,12 +12,12 @@ export function matchesUnitQuery(unit: Unit, query: string): boolean {
   return matchesWords([unit.path, unit.old_path ?? '', name].join('\n'), query)
 }
 
-export function searchGroups(groups: FileGroup[], query: string): FileGroup[] {
-  return groups.map((group) => ({ ...group, units: searchFile(group.units, query) })).filter((group) => group.units.length > 0)
+export function filterGroups(groups: FileGroup[], keep: (unit: Unit) => boolean): FileGroup[] {
+  return groups.map((group) => ({ ...group, units: filterFile(group.units, keep) })).filter((group) => group.units.length > 0)
 }
 
-function searchFile(units: Unit[], query: string): Unit[] {
-  const matched = new Set(units.filter((unit) => matchesUnitQuery(unit, query)))
+function filterFile(units: Unit[], keep: (unit: Unit) => boolean): Unit[] {
+  const matched = new Set(units.filter(keep))
   const parents = new Set([...matched].flatMap((unit) => ancestors(unit.qualified_name)))
   return units.filter((unit) => matched.has(unit) || parents.has(unit.qualified_name))
 }
