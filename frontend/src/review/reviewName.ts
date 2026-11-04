@@ -1,7 +1,7 @@
 import type { Review, ReviewPullRequest } from '../api/types'
 
 export function pullRequestTitle(pull: ReviewPullRequest): string {
-  return pull.title ?? 'Pull request'
+  return pull.title?.trim() || 'Pull request'
 }
 
 export function reviewDocumentTitle(review: Pick<Review, 'repo_name' | 'head_ref' | 'pull_request'>): string {

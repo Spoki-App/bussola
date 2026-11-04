@@ -32,8 +32,12 @@ from bussola.storage.models import Approval, ForgeLink, Repo, Revision, RowAppro
 from bussola.units.model import UnitKind
 
 
+def repo_name(repo: Repo) -> str:
+    return Path(repo.path).name or repo.path
+
+
 def repo_out(repo: Repo) -> RepoOut:
-    return RepoOut(id=repo.id, path=repo.path, name=Path(repo.path).name, missing=not Path(repo.path).is_dir())
+    return RepoOut(id=repo.id, path=repo.path, name=repo_name(repo), missing=not Path(repo.path).is_dir())
 
 
 def revision_out(revision: Revision) -> RevisionOut:
@@ -59,7 +63,7 @@ def review_summary_out(data: ReviewData, repo: Repo) -> ReviewOut:
         id=review.id,
         repo_id=repo.id,
         repo_path=repo.path,
-        repo_name=Path(repo.path).name,
+        repo_name=repo_name(repo),
         head_ref=review.head_ref,
         base_ref=review.base_ref,
         latest_revision=revision_out(data.latest) if data.latest else None,

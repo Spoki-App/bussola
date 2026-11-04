@@ -14,8 +14,8 @@ describe('reviewDocumentTitle', () => {
     expect(reviewDocumentTitle(review)).toBe('bussola#34 feat: AI description and impact rating of a unit, on demand')
   })
 
-  it('falls back to a generic label when the pull request has no title yet', () => {
-    expect(reviewDocumentTitle({ repo_name: 'bussola', head_ref: 'x', pull_request: pull(7, null) })).toBe('bussola#7 Pull request')
+  it.each([null, '', '  '])('falls back to a generic label when the pull request title is %j', (title) => {
+    expect(reviewDocumentTitle({ repo_name: 'bussola', head_ref: 'x', pull_request: pull(7, title) })).toBe('bussola#7 Pull request')
   })
 
   it('names a branch review by project and branch', () => {
