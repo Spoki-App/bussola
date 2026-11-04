@@ -174,3 +174,14 @@ test('the wrap button of an open unit turns line wrap off and on, and split view
   await expect(page.locator('html')).toHaveAttribute('data-diff-wrap', 'on')
   await expect(card.locator('.split-scroll')).toHaveCount(0)
 })
+
+test('the window title names the open review and goes back to bussola elsewhere', async ({ page }) => {
+  await page.goto(`/?token=${E2E_TOKEN}`)
+  await expect(page).toHaveTitle('bussola')
+
+  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  await expect(page).toHaveTitle('demo feature')
+
+  await page.getByRole('link', { name: 'demo', exact: true }).click()
+  await expect(page).toHaveTitle('bussola')
+})

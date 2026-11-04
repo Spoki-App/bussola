@@ -72,6 +72,7 @@ class ReviewOut(BaseModel):
     id: int
     repo_id: int
     repo_path: str
+    repo_name: str
     head_ref: str
     base_ref: str
     latest_revision: RevisionOut | None

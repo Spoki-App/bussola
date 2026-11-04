@@ -7,7 +7,7 @@ function review(state: string | null, linked = true): Review {
   return {
     id: 1,
     repo_id: 1,
-    repo_path: '/repo',
+    repo_name: 'repo',
     head_ref: 'feature',
     base_ref: 'main',
     latest_revision: null,

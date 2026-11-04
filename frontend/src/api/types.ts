@@ -36,7 +36,7 @@ export interface Revision {
 export interface Review {
   id: number
   repo_id: number
-  repo_path: string
+  repo_name: string
   head_ref: string
   base_ref: string
   latest_revision: Revision | null
