@@ -37,7 +37,7 @@ export function ratingSummary(result: RateImpactResult): string {
     return `Cancelled, ${rated}`
   }
   if (result.rated === 0 && result.failed === 0) {
-    return 'Every unit already has a current impact rating.'
+    return 'No unit needed a new impact rating.'
   }
   return result.failed === 0 ? rated : `${rated} ${plural(result.failed, 'unit')} could not be rated: ${result.error ?? 'unknown error'}`
 }

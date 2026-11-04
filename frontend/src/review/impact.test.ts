@@ -54,7 +54,7 @@ describe('ratingSummary', () => {
   it('says how many units were rated, failed or skipped', () => {
     expect(ratingSummary({ rated: 3, failed: 0, cancelled: false, error: null })).toBe('3 units rated.')
     expect(ratingSummary({ rated: 1, failed: 2, cancelled: false, error: 'Timed out' })).toBe('1 unit rated. 2 units could not be rated: Timed out')
-    expect(ratingSummary({ rated: 0, failed: 0, cancelled: false, error: null })).toBe('Every unit already has a current impact rating.')
+    expect(ratingSummary({ rated: 0, failed: 0, cancelled: false, error: null })).toBe('No unit needed a new impact rating.')
     expect(ratingSummary({ rated: 2, failed: 0, cancelled: true, error: null })).toBe('Cancelled, 2 units rated.')
   })
 })
