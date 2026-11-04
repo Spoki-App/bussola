@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { fetchNavigation, prepareNavigation, usePrepareNavigation, type CodeLocation, type NavigationRequest, type NavigationResult, type NavigationTarget, type ServerHint } from '../api/navigation'
-import { directTarget, type NavigationClick, type ScreenPoint, type UnitTarget } from '../review/codeNavigation'
+import { directTarget, isNavigable, type NavigationClick, type ScreenPoint, type UnitTarget } from '../review/codeNavigation'
 import { readStored, writeStored } from '../settings/storage'
 import { NavigationPopup, type PopupState } from '../components/NavigationPopup'
 import { ServerHintNote } from '../components/ServerHintNote'
@@ -10,11 +10,10 @@ import { SourceModal } from '../components/SourceModal'
 
 const BUILDING_POLL_MS = 400
 const HINT_KEY_PREFIX = 'bussola.serverHint.'
-const MODIFIER_CLASS = 'navigation-modifier'
-const MODIFIER_KEYS = new Set(['Meta', 'Control'])
 
 export interface CodeNavigation {
   navigate: (click: NavigationClick) => void
+  canNavigate: (request: NavigationRequest) => Promise<boolean>
   target: UnitTarget | null
   element: ReactNode
 }
@@ -52,35 +51,12 @@ function takeHint(hint: ServerHint | null): ServerHint | null {
   return hint
 }
 
-function useModifierCursor() {
-  useEffect(() => {
-    const update = (event: KeyboardEvent) => {
-      if (MODIFIER_KEYS.has(event.key)) {
-        document.body.classList.toggle(MODIFIER_CLASS, event.type === 'keydown')
-      }
-    }
-    const clear = () => {
-      document.body.classList.remove(MODIFIER_CLASS)
-    }
-    window.addEventListener('keydown', update)
-    window.addEventListener('keyup', update)
-    window.addEventListener('blur', clear)
-    return () => {
-      window.removeEventListener('keydown', update)
-      window.removeEventListener('keyup', update)
-      window.removeEventListener('blur', clear)
-      clear()
-    }
-  }, [])
-}
-
 export function useCodeNavigation(reviewId: number, revisionId: number | undefined, hasUnit: (unitId: number) => boolean): CodeNavigation {
   usePrepareNavigation(reviewId, revisionId)
   const unitShown = useRef(hasUnit)
   useEffect(() => {
     unitShown.current = hasUnit
   })
-  useModifierCursor()
   const [popup, setPopup] = useState<Popup | null>(null)
   const [stack, setStack] = useState<CodeLocation[]>([])
   const [target, setTarget] = useState<UnitTarget | null>(null)
@@ -98,6 +74,25 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
       setStack((current) => [...current, { path: found.path, line: found.line, side: found.side }])
     },
     [inPage],
+  )
+
+  const navigable = useRef(new Map<string, Promise<boolean>>())
+  const canNavigate = useCallback(
+    (request: NavigationRequest) => {
+      const key = JSON.stringify([reviewId, revisionId, request.side, request.path, request.line, request.column])
+      const known = navigable.current.get(key)
+      if (known) {
+        return known
+      }
+      const forget = () => {
+        navigable.current.delete(key)
+        return false
+      }
+      const answer = fetchNavigation(reviewId, revisionId, request).then((result) => (result.ready ? isNavigable(result) : forget()), forget)
+      navigable.current.set(key, answer)
+      return answer
+    },
+    [reviewId, revisionId],
   )
 
   const closePopup = useCallback(() => {
@@ -152,6 +147,7 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
           onBack={() => { setStack((current) => current.slice(0, -1)) }}
           onClose={() => { setStack([]) }}
           onNavigate={navigate}
+          canNavigate={canNavigate}
         />
       )}
       {popup && (
@@ -169,5 +165,5 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
     </>
   )
 
-  return { navigate, target, element }
+  return { navigate, canNavigate, target, element }
 }

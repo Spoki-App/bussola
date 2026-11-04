@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, renderHook, screen, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { NavigationResult, NavigationTarget, SourceFile } from '../api/navigation'
@@ -260,6 +260,25 @@ describe('useCodeNavigation', () => {
     expect(popup.style.top).toBe('74px')
     expect(popup.style.maxHeight).toBe('58px')
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 })
+  })
+
+  it('asks once per symbol whether it can navigate, and asks again while the index was not ready', async () => {
+    let ready = false
+    const requests = serve((params) => (params.get('column') === '4' ? found([], { ready }) : found(params.get('line') === '5' ? [target('lib.py', 1, 4)] : [])))
+    const { result } = renderHook(() => useCodeNavigation(1, 9, () => true), {
+      wrapper: ({ children }) => <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>,
+    })
+    const ask = (line: number, column: number) => result.current.canNavigate({ path: 'cart.py', side: 'head', line, column })
+
+    expect(await ask(5, 11)).toBe(true)
+    expect(await ask(5, 11)).toBe(true)
+    expect(await ask(6, 11)).toBe(false)
+    expect(await ask(5, 4)).toBe(false)
+    ready = true
+    expect(await ask(5, 4)).toBe(false)
+    expect(await ask(5, 4)).toBe(false)
+
+    expect(requests.map((params) => `${params.get('line') ?? ''}:${params.get('column') ?? ''}`)).toEqual(['5:11', '6:11', '5:4', '5:4'])
   })
 
   it('closes the list on a click outside it but not on a click on its padding', async () => {

@@ -3,6 +3,7 @@ import { memo, useContext, useEffect, useState, type ReactNode } from 'react'
 import { describeError } from '../api/client'
 import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/hooks'
 import type { DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
+import type { NavigationRequest } from '../api/navigation'
 import type { NavigationClick, ScreenPoint, UnitTarget } from '../review/codeNavigation'
 import { TARGET_ROW_SELECTOR, unitElementId, useLinkedScroll } from '../review/linkFocus'
 import { unitTitle } from '../review/logic'
@@ -44,6 +45,7 @@ interface Props {
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
   onNavigate?: (click: NavigationClick) => void
+  canNavigate?: (request: NavigationRequest) => Promise<boolean>
   navigationTarget?: UnitTarget
   linkedLine?: number
 }
@@ -59,7 +61,7 @@ function targetLine(target: UnitTarget | undefined, linkedLine: number | undefin
   return linkedLine === undefined ? undefined : { side: 'new', line: linkedLine }
 }
 
-export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, onNavigate, navigationTarget, linkedLine }: Props) {
+export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, onNavigate, canNavigate, navigationTarget, linkedLine }: Props) {
   const todo = unit.todo
   const [expanded, setExpanded] = useState(todo)
   const [wasTodo, setWasTodo] = useState(todo)
@@ -151,13 +153,25 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
     element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [navigationTarget, diffLoaded, onFocus, unit.id, linkedRef])
 
-  const navigateFrom = (row: DiffRow, side: GutterSide, column: number, point: ScreenPoint) => {
+  const requestFrom = (row: DiffRow, side: GutterSide, column: number): NavigationRequest | null => {
     const base = side === 'old'
     const line = base ? row.old_line : row.new_line
-    if (!onNavigate || line === null || (base && diff.data?.mode !== 'base')) {
-      return
+    if (line === null || (base && diff.data?.mode !== 'base')) {
+      return null
     }
-    onNavigate({ path: base ? (unit.old_path ?? unit.path) : unit.path, side: base ? 'base' : 'head', line, column, point })
+    return { path: base ? (unit.old_path ?? unit.path) : unit.path, side: base ? 'base' : 'head', line, column }
+  }
+
+  const navigateFrom = (row: DiffRow, side: GutterSide, column: number, point: ScreenPoint) => {
+    const request = requestFrom(row, side, column)
+    if (onNavigate && request) {
+      onNavigate({ ...request, point })
+    }
+  }
+
+  const canNavigateFrom = (row: DiffRow, side: GutterSide, column: number) => {
+    const request = requestFrom(row, side, column)
+    return canNavigate && request ? canNavigate(request) : Promise.resolve(false)
   }
 
   const onRowClick = (row: DiffRow, extend: boolean) => {
@@ -256,6 +270,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
               onLineSelectEnd={onCommentSelectEnd}
               highlighted={highlightRows?.(unit, diff.data)}
               onNavigate={onNavigate ? navigateFrom : undefined}
+              canNavigate={canNavigate ? canNavigateFrom : undefined}
               target={targetLine(navigationTarget, linkedLine)}
               widgets={renderWidgets ? (changeKeyOf) => renderWidgets(unit, diff.data, changeKeyOf) : undefined}
             />

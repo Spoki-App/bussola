@@ -1359,9 +1359,12 @@ button.copy-link.failed {
   box-shadow: inset 3px 0 0 var(--amber);
 }
 
-.navigation-modifier .diff .diff-code,
-.navigation-modifier .source-line code {
+.navigation-link {
   cursor: pointer;
+}
+
+::highlight(navigation-link) {
+  text-decoration: underline;
 }
 
 .navigation-popup {
