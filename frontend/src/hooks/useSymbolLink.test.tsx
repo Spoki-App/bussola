@@ -79,6 +79,21 @@ describe('useSymbolLink', () => {
     expect(check).toHaveBeenCalledWith('return '.length)
   })
 
+  it('asks again about a symbol that was not navigable yet when the pointer moves on it', async () => {
+    let indexed = false
+    const { check, move, underlined, settle } = setup(() => indexed)
+    move('price')
+    await settle()
+    expect(underlined()).toBeNull()
+
+    indexed = true
+    move('rice')
+    await settle()
+
+    expect(underlined()).toBe('price')
+    expect(check).toHaveBeenCalledTimes(2)
+  })
+
   it('follows the pointer to another symbol and asks again only after the pointer rests', async () => {
     const { check, move, underlined, settle } = setup()
     move('price')

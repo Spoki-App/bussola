@@ -82,8 +82,13 @@ export function useSymbolLink(): SymbolLink {
       hovered.current = current
       timer.current = window.setTimeout(() => {
         void at.check(span.start).then((navigable) => {
-          if (navigable && hovered.current === current) {
+          if (hovered.current !== current) {
+            return
+          }
+          if (navigable) {
             showLink(at.code, span)
+          } else {
+            hovered.current = null
           }
         })
       }, CHECK_DELAY_MS)
