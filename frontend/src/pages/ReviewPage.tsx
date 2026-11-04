@@ -36,7 +36,7 @@ import {
   type PendingLink,
 } from '../review/linkFocus'
 import { ReviewLinkContext, reviewLinkMaker } from '../review/reviewLink'
-import { buildUnitTree } from '../review/unitTree'
+import { buildUnitTree, unitsInOrder } from '../review/unitTree'
 import { filterGroups, matchesUnitQuery } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
 import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, focusedPosition, groupByFile, loadUnitFilter, nextTodoIndex, progressPercent, saveUnitFilter, shortSha } from '../review/logic'
@@ -169,7 +169,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     const files = filesInOrder(fileTree)
     return (order === 'impact' ? byImpact(files, ratingsInUse) : files).map((group) => ({ ...group, tree: buildUnitTree(group.units) }))
   }, [fileTree, order, ratingsInUse])
-  const unitList = useMemo(() => groups.flatMap((group) => group.units), [groups])
+  const unitList = useMemo(() => groups.flatMap((group) => unitsInOrder(group.tree)), [groups])
   const shownUnits = useMemo(() => new Set(unitList.map((unit) => unit.id)), [unitList])
   const navigation = useCodeNavigation(reviewId, revisionId, (unitId) => shownUnits.has(unitId))
   const [focusedId, setFocusedId] = useState<number | null>(null)

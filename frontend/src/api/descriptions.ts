@@ -63,10 +63,20 @@ export function usePendingDescribeCalls(reviewId: number, unit: Unit): string[] 
   })
 }
 
+const rateKey = (reviewId: number) => ['rate-impact', reviewId] as const
+
 export function useRateUnits(reviewId: number) {
   const client = useQueryClient()
   return useMutation({
+    mutationKey: rateKey(reviewId),
     mutationFn: (request: AiCall) => postJson<RateImpactResult>(`/reviews/${String(reviewId)}/impact`, request),
     onSettled: () => client.invalidateQueries({ queryKey: descriptionsKey(reviewId) }),
+  })
+}
+
+export function usePendingRateCalls(reviewId: number): string[] {
+  return useMutationState({
+    filters: { mutationKey: rateKey(reviewId), status: 'pending' },
+    select: (mutation) => (mutation.state.variables as AiCall).call_id,
   })
 }

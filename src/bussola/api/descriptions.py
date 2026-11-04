@@ -2,7 +2,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, Request
 
-from bussola.ai.base import AiProvider
+from bussola.ai.base import AiCancelledError, AiProvider
+from bussola.ai.batch import BatchResult
 from bussola.ai.settings import load_ai_settings, require_target
 from bussola.api.deps import ContextDep, repo_of, resolve_revision, snapshot_of
 from bussola.api.schemas import AiCallIn, DescribeUnitIn, RateImpactOut, UnitDescriptionOut
@@ -40,8 +41,11 @@ def rate_all(context: ContextDep, body: AiCallIn, request: Request) -> RateImpac
     state = app_state(request)
     provider = _provider(state, context, body.target)
     snapshots = context.store.reviews.snapshots(resolve_revision(context, None).id)
-    with state.ai_calls.start(body.call_id) as cancellation:
-        outcome = rate_units(context, snapshots, provider, state.ai_cache, cancellation)
+    try:
+        with state.ai_calls.start(body.call_id) as cancellation:
+            outcome = rate_units(context, snapshots, provider, state.ai_cache, cancellation)
+    except AiCancelledError:
+        outcome = BatchResult[int, None](cancelled=True)
     return RateImpactOut(
         rated=len(outcome.results),
         failed=len(outcome.errors),

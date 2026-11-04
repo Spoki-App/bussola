@@ -79,6 +79,10 @@ export function buildUnitTree(units: Unit[]): UnitNode[] {
   return roots
 }
 
+export function unitsInOrder(nodes: UnitNode[]): Unit[] {
+  return nodes.flatMap((node) => (node.kind === 'unit' ? [node.unit] : [...(node.unit ? [node.unit] : []), ...unitsInOrder(node.children)]))
+}
+
 export function lastSegment(qualifiedName: string): string {
   const parent = parentName(qualifiedName)
   return parent ? qualifiedName.slice(parent.length + 1) : qualifiedName

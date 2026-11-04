@@ -1,5 +1,5 @@
 import { newCallId, useCancelAiCall } from '../api/ai'
-import { useRateUnits } from '../api/descriptions'
+import { usePendingRateCalls, useRateUnits } from '../api/descriptions'
 import type { RateImpactResult } from '../api/types'
 
 export interface RateImpactState {
@@ -12,9 +12,10 @@ export interface RateImpactState {
 
 export function useRateImpact(reviewId: number): RateImpactState {
   const rate = useRateUnits(reviewId)
+  const running = usePendingRateCalls(reviewId)
   const cancelCall = useCancelAiCall()
   return {
-    pending: rate.isPending,
+    pending: running.length > 0,
     result: rate.data ?? null,
     error: rate.error ?? cancelCall.error,
     run: (target) => {
@@ -22,8 +23,8 @@ export function useRateImpact(reviewId: number): RateImpactState {
       rate.mutate({ target, call_id: newCallId() })
     },
     cancel: () => {
-      if (rate.variables) {
-        cancelCall.mutate(rate.variables.call_id)
+      for (const callId of running) {
+        cancelCall.mutate(callId)
       }
     },
   }

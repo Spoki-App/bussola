@@ -2,11 +2,14 @@ import re
 import threading
 import time
 import uuid
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from bussola.ai.base import AiProviderError, AiUnreachableError
+from bussola.storage.database import Database
+from bussola.storage.repositories import Store
 from tests.ai.fakes import ANTHROPIC_CONFIG, FakeProvider, fake_factory
 from tests.apiclient import ApiClient, Json
 from tests.gitrepo import GitFixture
@@ -418,3 +421,30 @@ def test_binary_files_are_not_rated_in_a_batch(git_repo: GitFixture, data_dir: P
 
     assert rate(api, review_id)["rated"] == 0
     assert provider.requests == []
+
+
+def test_a_batch_cancelled_before_it_starts_reports_a_cancelled_result(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    provider = FakeProvider(RATING)
+    api = ai_client(billing, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    assert api.call("POST", "/ai/calls/early-batch/cancel") == {"cancelled": False}
+
+    assert rate(api, review_id, call_id="early-batch") == {"rated": 0, "failed": 0, "cancelled": True, "error": None}
+    assert provider.requests == []
+
+
+def test_a_rating_saved_over_a_description_keeps_the_description(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    api = ai_client(billing, data_dir, config_file, FakeProvider(INSIGHT))
+    review_id = api.start_review()
+    unit_id = api.unit(review_id, "app.py::total")["id"]
+    describe(api, review_id, "app.py::total")
+
+    with Database.open(data_dir).session() as session:
+        store = Store(session)
+        described = store.descriptions.descriptions(review_id)[0]
+        store.descriptions.save(replace(described, description=None, impact="low", impact_reason="Only a rename."))
+        store.commit()
+
+    stored = descriptions(api, review_id)[unit_id]
+    assert (stored["description"], stored["impact"], stored["impact_reason"]) == (INSIGHT["description"], "low", "Only a rename.")

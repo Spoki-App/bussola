@@ -36,12 +36,13 @@ function renderRating(answer: () => Promise<Response>) {
   })
   vi.stubGlobal('fetch', fetchMock)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(
+  const page = (key: string) => (
     <QueryClientProvider client={client}>
-      <Harness />
-    </QueryClientProvider>,
+      <Harness key={key} />
+    </QueryClientProvider>
   )
-  return fetchMock
+  const view = render(page('first'))
+  return Object.assign(fetchMock, { remount: () => { view.rerender(page('second')) } })
 }
 
 describe('Rate impact', () => {
@@ -80,5 +81,19 @@ describe('Rate impact', () => {
     await waitFor(() => { expect(fetchMock.mock.calls.some(([url]) => url.startsWith('/api/ai/calls/'))).toBe(true) })
     finish(Response.json({ rated: 1, failed: 0, cancelled: true, error: null }))
     expect(await screen.findByText('Cancelled, 1 unit rated.')).toBeInTheDocument()
+  })
+
+  it('still shows a running batch and its Cancel after the page is mounted again', async () => {
+    const fetchMock = renderRating(() => new Promise<Response>(() => undefined))
+    fireEvent.click(await screen.findByRole('button', { name: 'Rate impact' }))
+    await screen.findByRole('status')
+
+    fetchMock.remount()
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Rating the impact of each unit...')
+    expect(screen.queryByRole('button', { name: 'Rate impact' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => { expect(fetchMock.mock.calls.some(([url]) => url.startsWith('/api/ai/calls/'))).toBe(true) })
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/reviews/1/impact')).toHaveLength(1)
   })
 })
