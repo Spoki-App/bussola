@@ -36,7 +36,7 @@ import { buildUnitTree } from '../review/unitTree'
 import { searchGroups } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
 import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, focusedPosition, groupByFile, loadUnitFilter, nextTodoIndex, progressPercent, saveUnitFilter, shortSha } from '../review/logic'
-import { plural } from '../review/text'
+import { plural, projectName, reviewDocumentTitle } from '../review/text'
 import { Segmented } from '../components/Segmented'
 
 export interface ReviewExtensions {
@@ -87,9 +87,10 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
 
   return (
     <header className="review-header">
+      <title>{reviewDocumentTitle(review)}</title>
       <div className="review-title">
         <Link to="/" className="crumb">
-          {review.repo_path.split('/').at(-1)}
+          {projectName(review.repo_path)}
         </Link>
         <h1>
           <ReviewTitle review={review} />
