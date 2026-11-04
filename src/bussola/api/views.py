@@ -59,6 +59,7 @@ def review_summary_out(data: ReviewData, repo: Repo) -> ReviewOut:
         id=review.id,
         repo_id=repo.id,
         repo_path=repo.path,
+        repo_name=Path(repo.path).name,
         head_ref=review.head_ref,
         base_ref=review.base_ref,
         latest_revision=revision_out(data.latest) if data.latest else None,

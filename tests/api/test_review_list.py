@@ -62,3 +62,14 @@ def test_a_diff_reads_only_its_own_approved_text(api: ApiClient, git_repo: GitFi
     assert diff["mode"] == "approved"
     assert len(texts) == 1
     assert "WHERE approvals.id" in texts[0]
+
+
+def test_a_review_names_its_repository_as_the_repository_list_does(api: ApiClient, git_repo: GitFixture) -> None:
+    git_repo.commit({"app.py": "def total():\n    return 0\n"})
+    git_repo.branch("feature")
+    git_repo.commit({"app.py": "def total():\n    return 1\n"})
+    review = api.start_review()
+
+    names = {repo["name"] for repo in api.call("GET", "/repos")}
+
+    assert names == {api.call("GET", f"/reviews/{review}")["repo_name"]} == {api.git.root.name}

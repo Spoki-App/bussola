@@ -32,11 +32,12 @@ import {
   type PendingLink,
 } from '../review/linkFocus'
 import { ReviewLinkContext, reviewLinkMaker } from '../review/reviewLink'
+import { reviewDocumentTitle } from '../review/reviewName'
 import { buildUnitTree } from '../review/unitTree'
 import { searchGroups } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
 import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, focusedPosition, groupByFile, loadUnitFilter, nextTodoIndex, progressPercent, saveUnitFilter, shortSha } from '../review/logic'
-import { plural, projectName, reviewDocumentTitle } from '../review/text'
+import { plural } from '../review/text'
 import { Segmented } from '../components/Segmented'
 
 export interface ReviewExtensions {
@@ -90,7 +91,7 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
       <title>{reviewDocumentTitle(review)}</title>
       <div className="review-title">
         <Link to="/" className="crumb">
-          {projectName(review.repo_path)}
+          {review.repo_name}
         </Link>
         <h1>
           <ReviewTitle review={review} />
