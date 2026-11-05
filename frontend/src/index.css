@@ -2379,7 +2379,8 @@ button.danger {
   background: var(--warning-bg);
 }
 
-.notice p {
+.theme-panel .notice p,
+.theme-colors-panel .notice p {
   margin: 0;
 }
 
