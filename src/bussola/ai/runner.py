@@ -3,6 +3,7 @@ import functools
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
@@ -40,6 +41,8 @@ class AiTask[T: BaseModel]:
     system: str
     output: type[T]
     max_tokens: int = DEFAULT_MAX_TOKENS
+    instructions: str = ""
+    setting: str | None = None
 
 
 @dataclass(frozen=True)
@@ -59,20 +62,25 @@ class AiCache(Protocol):
 
 
 class AiRunner:
-    def __init__(self, provider: AiProvider, cache: AiCache | None = None, tools: ToolRunner | None = None) -> None:
+    def __init__(self, provider: AiProvider, cache: AiCache | None = None, tools: ToolRunner | None = None, prompts: Mapping[str, str] | None = None) -> None:
         self.provider = provider
         self._cache = cache
         self._tools = tools
+        self._prompts = prompts or {}
 
     def with_tools(self, tools: ToolRunner) -> "AiRunner":
-        return AiRunner(self.provider, self._cache, tools)
+        return AiRunner(self.provider, self._cache, tools, self._prompts)
+
+    def system(self, task: AiTask[Any]) -> str:
+        custom = self._prompts.get(task.setting) if task.setting else None
+        return task.system + (task.instructions if custom is None else custom)
 
     def run[T: BaseModel](self, task: AiTask[T], prompt: str, cancellation: Cancellation, content_hash: str | None = None, *, refresh: bool = False) -> T:
         key = self._key(task, content_hash)
         cached = None if refresh else self._cached(task, key)
         if cached is not None:
             return cached
-        request = AiRequest(task.name, task.system, prompt, output_schema(task.output), self.provider.max_tokens or task.max_tokens, self._tools)
+        request = AiRequest(task.name, self.system(task), prompt, output_schema(task.output), self.provider.max_tokens or task.max_tokens, self._tools)
         result = parse_output(self.provider.complete(request, cancellation), task.output)
         if key is not None and self._cache is not None:
             with contextlib.suppress(Exception):
@@ -82,7 +90,15 @@ class AiRunner:
     def _key(self, task: AiTask[Any], content_hash: str | None) -> AiCacheKey | None:
         if content_hash is None or self._cache is None or self.provider.model is None:
             return None
-        return AiCacheKey(task.name, task.version, instructions_hash(task), self.provider.name, self.provider.model, self.provider.endpoint or "", content_hash)
+        return AiCacheKey(
+            task.name,
+            task.version,
+            instructions_hash(self.system(task), task.output),
+            self.provider.name,
+            self.provider.model,
+            self.provider.endpoint or "",
+            content_hash,
+        )
 
     def _cached[T: BaseModel](self, task: AiTask[T], key: AiCacheKey | None) -> T | None:
         stored = None
@@ -97,8 +113,8 @@ class AiRunner:
             return None
 
 
-def instructions_hash(task: AiTask[Any]) -> str:
-    instructions = json.dumps([task.system, output_schema(task.output)], sort_keys=True)
+def instructions_hash(system: str, output: type[BaseModel]) -> str:
+    instructions = json.dumps([system, output_schema(output)], sort_keys=True)
     return hashlib.sha256(instructions.encode()).hexdigest()
 
 

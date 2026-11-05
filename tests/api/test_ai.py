@@ -274,3 +274,46 @@ def test_settings_cannot_be_saved_without_a_configuration_file(data_dir: Path) -
     response = TestClient(create_app(settings)).put("/api/ai/config", json={"provider": "claude-code"})
 
     assert response.status_code == 409
+
+
+def test_the_prompts_start_from_the_defaults(data_dir: Path, config_file: Path) -> None:
+    prompts = client(data_dir, config_file).get("/api/ai/prompts").json()
+
+    assert [(prompt["key"], prompt["title"], prompt["custom"]) for prompt in prompts["prompts"]] == [
+        ("describe", "Describe", None),
+        ("impact", "Rate impact", None),
+        ("review", "AI review", None),
+    ]
+    assert prompts["prompts"][2]["default"].startswith("Report only problems that deserve the author's attention")
+    assert prompts["config_file"] == str(config_file)
+
+
+def test_custom_prompts_are_saved_under_ai_prompts_and_the_default_text_is_not(data_dir: Path, config_file: Path) -> None:
+    write(config_file, ANTHROPIC_CONFIG)
+    api = client(data_dir, config_file)
+    default = api.get("/api/ai/prompts").json()["prompts"][1]["default"]
+
+    saved = api.put("/api/ai/prompts", json={"review": "Focus on security.\nWrite in Italian.", "impact": default, "describe": "  "}).json()
+
+    assert [prompt["custom"] for prompt in saved["prompts"]] == [None, None, "Focus on security.\nWrite in Italian."]
+    assert config_file.read_text() == "[ai]\nprovider = \"anthropic\"\n\n[ai.prompts]\nreview = '''\nFocus on security.\nWrite in Italian.'''\n"
+
+
+def test_saving_the_provider_keeps_the_prompts(data_dir: Path, config_file: Path) -> None:
+    write(config_file, ANTHROPIC_CONFIG)
+    api = client(data_dir, config_file)
+    api.put("/api/ai/prompts", json={"review": "Focus on security."})
+
+    api.put("/api/ai/config", json={"provider": "claude-code"})
+
+    assert api.get("/api/ai/prompts").json()["prompts"][2]["custom"] == "Focus on security."
+    assert api.get("/api/ai").json()["provider"] == "claude-code"
+
+
+def test_prompts_cannot_be_saved_over_a_broken_configuration(data_dir: Path, config_file: Path) -> None:
+    write(config_file, "[ai]\nprovider = 'unknown'\n")
+
+    response = client(data_dir, config_file).put("/api/ai/prompts", json={"review": "Focus on security."})
+
+    assert response.status_code == 409
+    assert response.json()["detail"].startswith("Fix the configuration file before changing the prompts")

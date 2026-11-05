@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request
 
 from bussola.ai.base import AiCancelledError, AiProvider
 from bussola.ai.batch import BatchResult
+from bussola.ai.config import load_user_config
 from bussola.ai.runner import AiRunner
 from bussola.ai.settings import load_ai_settings, require_target
 from bussola.api.deps import ContextDep, repo_of, resolve_revision, snapshot_of
@@ -31,7 +32,7 @@ def describe(context: ContextDep, unit_id: int, body: DescribeUnitIn, request: R
     provider = ai_provider(state, context, body.target)
     context.store.commit()
     with state.ai_calls.start(body.call_id) as cancellation:
-        insight = describe_unit(snapshot, provider, state.ai_cache, cancellation, regenerate=body.regenerate)
+        insight = describe_unit(snapshot, ai_runner(state, provider), cancellation, regenerate=body.regenerate)
     saved = context.store.descriptions.save(description_row(context, snapshot, provider, insight, insight.description))
     context.store.commit()
     return _description_out(unit_id, saved, outdated=False)
@@ -44,7 +45,7 @@ def rate_all(context: ContextDep, body: AiCallIn, request: Request) -> RateImpac
     snapshots = context.store.reviews.snapshots(resolve_revision(context, None).id)
     try:
         with state.ai_calls.start(body.call_id) as cancellation:
-            outcome = rate_units(context, snapshots, AiRunner(provider, state.ai_cache), cancellation)
+            outcome = rate_units(context, snapshots, ai_runner(state, provider), cancellation)
     except AiCancelledError:
         outcome = BatchResult[int, None](cancelled=True)
     return RateImpactOut(
@@ -53,6 +54,10 @@ def rate_all(context: ContextDep, body: AiCallIn, request: Request) -> RateImpac
         cancelled=outcome.cancelled,
         error=outcome.stopped_by or next(iter(outcome.errors.values()), None),
     )
+
+
+def ai_runner(state: AppState, provider: AiProvider) -> AiRunner:
+    return AiRunner(provider, state.ai_cache, prompts=load_user_config(state.settings.config_file).ai.prompts.custom())
 
 
 def ai_provider(state: AppState, context: ReviewContext, target: str) -> AiProvider:

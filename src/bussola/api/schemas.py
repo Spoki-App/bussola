@@ -465,6 +465,27 @@ class AiConfigOut(BaseModel):
     problem: str | None = None
 
 
+class AiPromptOut(BaseModel):
+    key: str
+    title: str
+    default: str
+    custom: str | None
+
+
+class AiPromptsOut(BaseModel):
+    prompts: list[AiPromptOut]
+    config_file: str | None = None
+    problem: str | None = None
+
+
+class AiPromptsIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    describe: str | None = None
+    impact: str | None = None
+    review: str | None = None
+
+
 class AiTestOut(BaseModel):
     ok: bool
     message: str

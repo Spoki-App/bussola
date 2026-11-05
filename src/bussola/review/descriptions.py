@@ -9,7 +9,7 @@ from pydantic import AfterValidator, BaseModel, Field, field_validator
 
 from bussola.ai.base import AiProvider, Cancellation
 from bussola.ai.batch import BatchProgress, BatchResult, run_batch
-from bussola.ai.runner import AiCache, AiRunner, AiTask
+from bussola.ai.runner import AiRunner, AiTask
 from bussola.errors import InvalidRequestError
 from bussola.review.context import ReviewContext
 from bussola.review.keys import KeyTuple, key_of
@@ -86,12 +86,10 @@ UNIT_KINDS = "a function, method, class, type, module-level code or a whole file
 DESCRIBE_UNIT = AiTask(
     name="describe_unit",
     version=1,
-    system="You help a code reviewer understand one unit of a change: "
-    + UNIT_KINDS
-    + CODE_UNDER_REVIEW.format(verb="describe")
-    + DESCRIPTION_RULES
-    + IMPACT_SCALE,
+    system="You help a code reviewer understand one unit of a change: " + UNIT_KINDS + CODE_UNDER_REVIEW.format(verb="describe"),
     output=UnitInsight,
+    instructions=DESCRIPTION_RULES + IMPACT_SCALE,
+    setting="describe",
 )
 
 RATING_INPUT = (
@@ -107,9 +105,10 @@ RATE_IMPACTS = AiTask(
     version=1,
     system="You help a code reviewer decide where to look first by rating the impact of the change to each unit of a pull request. A unit is "
     + UNIT_KINDS
-    + RATING_INPUT
-    + IMPACT_SCALE,
+    + RATING_INPUT,
     output=ImpactRatings,
+    instructions=IMPACT_SCALE,
+    setting="impact",
 )
 MAX_RATING_GROUP_CHARACTERS = 100_000
 RATING_ID = "unit-{}"
@@ -142,10 +141,10 @@ def is_outdated(description: UnitDescription, snapshot: UnitSnapshot) -> bool:
     return description.change_hash != change_hash(snapshot)
 
 
-def describe_unit(snapshot: UnitSnapshot, provider: AiProvider, cache: AiCache | None, cancellation: Cancellation, *, regenerate: bool = False) -> UnitInsight:
+def describe_unit(snapshot: UnitSnapshot, runner: AiRunner, cancellation: Cancellation, *, regenerate: bool = False) -> UnitInsight:
     if is_binary(snapshot):
         raise InvalidRequestError("Binary files cannot be described")
-    return _ask(AiRunner(provider, cache), DESCRIBE_UNIT, snapshot, cancellation, refresh=regenerate)
+    return _ask(runner, DESCRIBE_UNIT, snapshot, cancellation, refresh=regenerate)
 
 
 def rate_units(

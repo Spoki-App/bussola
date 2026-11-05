@@ -398,3 +398,18 @@ export interface AiReviewRunDetail extends AiReviewRun {
   rating: { rated: number; failed: string[]; error: string | null } | null
   parts: AiReviewPart[]
 }
+
+export type AiPromptKey = 'describe' | 'impact' | 'review'
+
+export interface AiPrompt {
+  key: AiPromptKey
+  title: string
+  default: string
+  custom: string | null
+}
+
+export interface AiPrompts {
+  prompts: AiPrompt[]
+  config_file: string | null
+  problem: string | null
+}

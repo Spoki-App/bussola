@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { navigate } from '../navigation'
 import { AddRepoForm } from './AddRepoForm'
 import { AiPanel } from './AiPanel'
+import { AiPromptsPanel } from './AiPromptsPanel'
 import { CodeFontPanel } from './CodeFontPanel'
 import { DiffLayoutPanel } from './DiffLayoutPanel'
 import { DiffWrapCheckbox } from './DiffWrapToggle'
@@ -60,6 +61,10 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
       <section aria-labelledby="settings-ai">
         <h3 id="settings-ai">AI</h3>
         <AiPanel />
+      </section>
+      <section aria-labelledby="settings-ai-prompts">
+        <h3 id="settings-ai-prompts">AI prompts</h3>
+        <AiPromptsPanel />
       </section>
     </dialog>
   )

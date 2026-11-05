@@ -87,12 +87,10 @@ REVIEW_RULES = (
 REVIEW_PULL_REQUEST = AiTask(
     name="review_pull_request",
     version=2,
-    system="You are a careful code reviewer. You review a pull request through the units it changes: "
-    + UNIT_KINDS
-    + REVIEW_INPUT
-    + REVIEW_TOOLS
-    + REVIEW_RULES,
+    system="You are a careful code reviewer. You review a pull request through the units it changes: " + UNIT_KINDS + REVIEW_INPUT + REVIEW_TOOLS,
     output=ReviewFindings,
+    instructions=REVIEW_RULES,
+    setting="review",
 )
 
 

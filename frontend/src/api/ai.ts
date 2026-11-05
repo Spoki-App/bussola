@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { getJson, postJson, putJson } from './client'
-import type { AiConfig, AiConfigFields, AiStatus, AiTestResult } from './types'
+import type { AiConfig, AiConfigFields, AiPromptKey, AiPrompts, AiStatus, AiTestResult } from './types'
 
 export const aiKey = (repoId?: number) => ['ai', repoId ?? null] as const
 
@@ -41,4 +41,18 @@ export function newCallId(): string {
 
 export function useCancelAiCall() {
   return useMutation({ mutationFn: (callId: string) => postJson<{ cancelled: boolean }>(`/ai/calls/${encodeURIComponent(callId)}/cancel`) })
+}
+
+const aiPromptsKey = ['ai-prompts'] as const
+
+export function useAiPrompts() {
+  return useQuery({ queryKey: aiPromptsKey, queryFn: () => getJson<AiPrompts>('/ai/prompts'), retry: false })
+}
+
+export function useSaveAiPrompts() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (prompts: Record<AiPromptKey, string>) => putJson<AiPrompts>('/ai/prompts', prompts),
+    onSuccess: (saved) => { client.setQueryData(aiPromptsKey, saved) },
+  })
 }

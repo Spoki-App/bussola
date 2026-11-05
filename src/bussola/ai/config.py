@@ -18,6 +18,9 @@ CONFIG_FILE = "config.toml"
 DEFAULT_TIMEOUT_SECONDS = 600.0
 MAX_TIMEOUT_SECONDS = 3600.0
 HTTP_SCHEMES = ("http://", "https://")
+MAX_PROMPT_CHARACTERS = 20_000
+MULTILINE_LITERAL = "'''"
+SPACE = 32
 
 
 class ProviderName(StrEnum):
@@ -37,6 +40,22 @@ DEFAULT_ENDPOINTS = {ProviderName.ANTHROPIC: "https://api.anthropic.com"}
 DEFAULT_KEY_ENV = {ProviderName.ANTHROPIC: "ANTHROPIC_API_KEY"}
 
 
+class AiPrompts(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    describe: str | None = Field(default=None, max_length=MAX_PROMPT_CHARACTERS)
+    impact: str | None = Field(default=None, max_length=MAX_PROMPT_CHARACTERS)
+    review: str | None = Field(default=None, max_length=MAX_PROMPT_CHARACTERS)
+
+    @field_validator("describe", "impact", "review")
+    @classmethod
+    def _blank_is_default(cls, text: str | None) -> str | None:
+        return text if text is None or text.strip() else None
+
+    def custom(self) -> dict[str, str]:
+        return {name: text for name, text in self.model_dump().items() if text is not None}
+
+
 class UserAiConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -46,6 +65,7 @@ class UserAiConfig(BaseModel):
     timeout: float = Field(default=DEFAULT_TIMEOUT_SECONDS, gt=0, le=MAX_TIMEOUT_SECONDS)
     api_key_env: str | None = None
     max_tokens: int | None = Field(default=None, gt=0)
+    prompts: AiPrompts = AiPrompts()
 
     @field_validator("endpoint")
     @classmethod
@@ -107,8 +127,12 @@ def load_user_config(path: Path | None) -> UserConfig:
 
 
 def save_user_ai_config(path: Path, ai: UserAiConfig) -> None:
-    values = ai.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
-    text = "\n".join(["[ai]", *(f"{name} = {json.dumps(value, ensure_ascii=False)}" for name, value in values.items())]) + "\n"
+    values = ai.model_dump(mode="json", exclude_none=True, exclude_defaults=True, exclude={"prompts"})
+    lines = ["[ai]", *(f"{name} = {json.dumps(value, ensure_ascii=False)}" for name, value in values.items())]
+    prompts = ai.prompts.custom()
+    if prompts:
+        lines += ["", "[ai.prompts]", *(f"{name} = {_toml_text(text)}" for name, text in prompts.items())]
+    text = "\n".join(lines) + "\n"
     if UserConfig.model_validate(tomllib.loads(text)).ai != ai:
         raise ValueError("these values cannot be written as TOML")
     target = path.resolve()
@@ -116,6 +140,12 @@ def save_user_ai_config(path: Path, ai: UserAiConfig) -> None:
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=target.parent, prefix=f".{target.name}.", delete=False) as handle:
         handle.write(text)
     Path(handle.name).replace(target)
+
+
+def _toml_text(text: str) -> str:
+    if MULTILINE_LITERAL in text or any(ord(character) < SPACE and character not in "\t\n" for character in text) or "\r" in text:
+        return json.dumps(text, ensure_ascii=False)
+    return f"{MULTILINE_LITERAL}\n{text}{MULTILINE_LITERAL}"
 
 
 def describe_config_error(error: Exception) -> str:

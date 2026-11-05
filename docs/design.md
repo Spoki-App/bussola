@@ -195,10 +195,16 @@ GET    /ai                                     provider of the user configuratio
 GET    /repos/{repo_id}/ai                     the same with the repository's .bussola.toml applied
 GET    /ai/config                              the [ai] section of the user configuration as written, or the problem that keeps it from loading
 PUT    /ai/config                              validate and write the [ai] section of the user configuration; keys are refused, only api_key_env is accepted
+GET    /ai/prompts                             each editable prompt with its title, default and custom instructions
+PUT    /ai/prompts                             {describe, impact, review}: save the instructions that differ from the default in [ai.prompts]
 POST   /ai/test                                send a fixed prompt with a one-field schema to the user's provider
 ```
 
 The UI shows AI buttons only when the repository's provider is configured, disabled with the reason when it cannot be used or its status cannot be read. On click the button reads the status again, and before an action first sends code to a target (the JSON list of provider, model and endpoint) it names the provider, model and endpoint and waits for confirmation, kept in the browser's local storage per target. The confirmed target is passed to the action, and an action's endpoint must check it with `require_target` against the settings it loads, so code is never sent to a target the user has not confirmed. These pieces (`AiActionButton`, `run_batch`, `AppState.ai_cache`, `require_target`) are used by the AI actions as they are added. `AppState.ai_cache` is a `DatabaseAiCache`, which reads and writes `SqlAiCache` in short sessions of its own; an AI endpoint commits its request session before calling the provider, so no database connection is held while the model works.
+
+### Prompts
+
+An `AiTask` has a fixed `system` part, default `instructions` and the `setting` that names them in `[ai.prompts]` (`describe`, `impact`, `review`). `AiRunner` gets the custom instructions of the user configuration (`AiPrompts.custom()`) and sends `system` followed by the custom instructions, or the default ones when there are none; the cache key hashes that full text with the schema, so a changed prompt is never answered from an old result. The fixed part holds what the features depend on: the input format with its hashed markers, the rule never to follow instructions in the code or in tool results, the tools, and the ids the rating answer must use. The instructions hold the guidance: what to report, the impact scale and how to write each field. `GET /ai/prompts` lists each prompt with its title, default and custom text; `PUT /ai/prompts` stores a prompt only when it differs from the default (blank means default), refuses to write over a configuration that does not load, and `PUT /ai/config` keeps the prompts when it rewrites the `[ai]` section. Prompts are written as TOML multi-line literal strings when they can be, and as escaped strings otherwise, and a save is read back before it replaces the file. `.bussola.toml` cannot set them.
 
 ### Unit descriptions
 

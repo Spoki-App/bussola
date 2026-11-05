@@ -2367,6 +2367,39 @@ button.danger {
   min-width: 200px;
 }
 
+.ai-prompt summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 550;
+}
+
+.ai-prompt summary::before {
+  content: '▸';
+  color: var(--muted);
+}
+
+.ai-prompt[open] summary::before {
+  content: '▾';
+}
+
+.ai-prompt[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-prompt textarea {
+  width: 100%;
+  min-height: 180px;
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
 .ai-form-actions {
   display: flex;
   align-items: center;
