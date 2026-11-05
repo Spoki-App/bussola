@@ -264,3 +264,13 @@ def test_only_installed_library_files_can_be_read(tmp_path: Path) -> None:
     assert not is_library_file(tmp_path / "secret.py", tmp_path)
     assert not is_library_file(tmp_path / "node_modules" / ".." / "secret.py", tmp_path)
     assert not is_library_file(tmp_path / "node_modules" / "missing.js", tmp_path)
+
+
+def test_a_python_environment_linked_from_outside_the_repository_is_not_served(tmp_path: Path) -> None:
+    project, outside = tmp_path / "project", tmp_path / "home"
+    (outside / "notes").mkdir(parents=True)
+    (outside / "notes" / "secret.py").write_text("token = 1\n")
+    project.mkdir()
+    (project / ".venv").symlink_to(outside)
+
+    assert not is_library_file(project / ".venv" / "notes" / "secret.py", project)

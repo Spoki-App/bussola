@@ -160,9 +160,10 @@ def is_library_file(path: Path, root: Path) -> bool:
 
 
 def _library_roots(root: Path) -> list[Path]:
-    candidates = [root / environment for environment in PYTHON_ENVIRONMENTS]
-    candidates += [path for path in (_go_root(), _go_module_cache()) if path is not None]
-    return [candidate.resolve() for candidate in candidates if candidate.is_dir()]
+    project = root.resolve()
+    environments = [resolved for environment in PYTHON_ENVIRONMENTS if (resolved := (root / environment).resolve()).is_relative_to(project)]
+    go = [path.resolve() for path in (_go_root(), _go_module_cache()) if path is not None]
+    return [candidate for candidate in environments + go if candidate.is_dir()]
 
 
 def _chain(links: dict[str, Link], node: Node) -> list[str] | None:
