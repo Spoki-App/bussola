@@ -69,6 +69,11 @@ REVIEW_TOOLS = (
     "Use them when a problem may depend on code you cannot see, such as the callers of a function whose signature, return value or "
     "behaviour changed, or the definition of something a changed line relies on. Do not use them for what you can already see.\n\n"
 )
+SUMMARY_LINKS = (
+    "To point the reviewer at a line in the summary, write a Markdown link to #after:PATH:N for line N of PATH in the new version or "
+    "#before:PATH:N for line N of PATH in the old version, such as [the new check](#after:app/billing.py:80): the reviewer clicks it to see "
+    "that line.\n\n"
+)
 REVIEW_RULES = (
     "Report only problems that deserve the author's attention: bugs, logic errors, missing error handling, security issues, data loss, "
     "race conditions, broken edge cases and inconsistencies with the rest of the change or with the pull request description. "
@@ -81,13 +86,18 @@ REVIEW_RULES = (
     "removes. start_line and end_line: the line numbers shown before the code on that side, the same number for a single line. "
     "body: GitHub-flavored Markdown for the author, short and concrete: what is wrong, why it matters and how to fix it.\n\n"
     "summary: GitHub-flavored Markdown for the reviewer, a few sentences without a title: what you checked, what you looked up with "
-    "the tools and what you found there, and why the change looks correct or what the findings have in common. Do not repeat the findings."
+    "the tools and what you found there, and why the change looks correct or what the findings have in common. Do not repeat the findings. "
+    "When you mention a specific line, link to it."
 )
 
 REVIEW_PULL_REQUEST = AiTask(
     name="review_pull_request",
     version=2,
-    system="You are a careful code reviewer. You review a pull request through the units it changes: " + UNIT_KINDS + REVIEW_INPUT + REVIEW_TOOLS,
+    system="You are a careful code reviewer. You review a pull request through the units it changes: "
+    + UNIT_KINDS
+    + REVIEW_INPUT
+    + REVIEW_TOOLS
+    + SUMMARY_LINKS,
     output=ReviewFindings,
     instructions=REVIEW_RULES,
     setting="review",

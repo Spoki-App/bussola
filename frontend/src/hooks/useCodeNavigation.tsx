@@ -12,8 +12,11 @@ import { SourceModal } from '../components/SourceModal'
 const BUILDING_POLL_MS = 400
 const HINT_KEY_PREFIX = 'bussola.serverHint.'
 
+export type CodeTarget = Pick<NavigationTarget, 'path' | 'line' | 'side' | 'unit_id'>
+
 export interface CodeNavigation {
   navigate: (click: NavigationClick) => void
+  show: (target: CodeTarget) => void
   canNavigate: (request: NavigationRequest) => Promise<boolean>
   target: UnitTarget | null
   element: ReactNode
@@ -64,10 +67,10 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
   const [target, setTarget] = useState<UnitTarget | null>(null)
   const [hint, setHint] = useState<ServerHint | null>(null)
   const latest = useRef(0)
-  const inPage = useCallback((found: NavigationTarget): found is NavigationTarget & { unit_id: number } => found.unit_id !== null && unitShown.current(found.unit_id), [])
+  const inPage = useCallback((found: CodeTarget): found is CodeTarget & { unit_id: number } => found.unit_id !== null && unitShown.current(found.unit_id), [])
 
   const reveal = useCallback(
-    (found: NavigationTarget) => {
+    (found: CodeTarget) => {
       if (inPage(found)) {
         setStack([])
         setTarget({ unitId: found.unit_id, line: found.line, side: found.side })
@@ -160,5 +163,5 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
     </>
   )
 
-  return { navigate, canNavigate, target, element }
+  return { navigate, show: reveal, canNavigate, target, element }
 }

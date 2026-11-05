@@ -594,6 +594,14 @@ class AiReviewRatingOut(BaseModel):
     error: str | None
 
 
+class AiReviewLinkOut(BaseModel):
+    path: str
+    side: Side
+    line: int
+    unit_id: int | None
+
+
 class AiReviewRunDetailOut(AiReviewRunOut):
     rating: AiReviewRatingOut | None
     parts: list[AiReviewPartOut]
+    links: list[AiReviewLinkOut]

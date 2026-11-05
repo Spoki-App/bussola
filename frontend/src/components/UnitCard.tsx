@@ -157,11 +157,14 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
   }, [navigationTarget, diffLoaded, onFocus, unit.id, linkedRef])
 
   const showLine = useCallback((link: LineLink) => {
+    if (link.path !== undefined && link.path !== unit.path) {
+      return
+    }
     setLineLink({ ...link })
     if (link.side === 'base') {
       setMode('base')
     }
-  }, [])
+  }, [unit.path])
   useEffect(() => {
     if (lineLink) {
       linkedRef.current?.querySelector(TARGET_ROW_SELECTOR)?.scrollIntoView({ behavior: 'smooth', block: 'center' })

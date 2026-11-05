@@ -9,7 +9,7 @@ import remarkGfm from 'remark-gfm'
 
 import { remarkAlerts } from '../markdown/alerts'
 import { imageSource } from '../markdown/assets'
-import { lineLinkOf, type LineLink } from '../markdown/lineLinks'
+import { lineLinkLabel, lineLinkOf, type LineLink } from '../markdown/lineLinks'
 import { remarkGitHubReferences } from '../markdown/references'
 import { ExternalLink } from './ExternalLink'
 import { MermaidDiagram } from './MermaidDiagram'
@@ -67,7 +67,7 @@ function withLineLinks(base: Components, onLineLink: (link: LineLink) => void): 
       if (!link) {
         return <Anchor href={href}>{children}</Anchor>
       }
-      const label = `Show ${link.side === 'base' ? 'old' : 'new'} line ${String(link.line)} in the diff`
+      const label = lineLinkLabel(link)
       return (
         <a
           href={href}

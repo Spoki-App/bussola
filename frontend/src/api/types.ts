@@ -394,9 +394,17 @@ export interface AiReviewPart {
   error: string | null
 }
 
+export interface AiReviewLink {
+  path: string
+  side: Side
+  line: number
+  unit_id: number | null
+}
+
 export interface AiReviewRunDetail extends AiReviewRun {
   rating: { rated: number; failed: string[]; error: string | null } | null
   parts: AiReviewPart[]
+  links: AiReviewLink[]
 }
 
 export type AiPromptKey = 'describe' | 'impact' | 'review'
