@@ -19,6 +19,14 @@ function categoryButtons() {
   return within(screen.getByRole('navigation', { name: 'Setting categories' })).queryAllByRole('button')
 }
 
+function search(value: string) {
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search settings' }), { target: { value } })
+}
+
+function press(key: string) {
+  fireEvent.keyDown(document.activeElement ?? document.body, { key })
+}
+
 function shownSettings() {
   return within(screen.getByRole('dialog')).queryAllByRole('region').filter((region) => region.classList.contains('setting')).map((region) => region.querySelector('h4')?.textContent)
 }
@@ -64,50 +72,54 @@ describe('SettingsButton', () => {
     const [first] = categoryButtons()
     first.focus()
 
-    fireEvent.keyDown(first, { key: 'ArrowDown' })
+    press('ArrowDown')
     expect(screen.getByRole('button', { name: 'Repositories' })).toHaveFocus()
     expect(shownSettings()).toEqual(['Add repository'])
 
-    fireEvent.keyDown(document.activeElement ?? first, { key: 'End' })
+    press('End')
     expect(screen.getByRole('button', { name: 'AI' })).toHaveFocus()
     expect(shownSettings()).toEqual(['AI provider', 'AI prompts'])
 
-    fireEvent.keyDown(document.activeElement ?? first, { key: 'ArrowDown' })
+    press('ArrowDown')
     expect(screen.getByRole('button', { name: 'AI' })).toHaveFocus()
 
-    fireEvent.keyDown(document.activeElement ?? first, { key: 'ArrowUp' })
+    press('ArrowUp')
     expect(screen.getByRole('button', { name: 'Diff' })).toHaveFocus()
     expect(shownSettings()).toEqual(['Diff layout', 'Line wrap'])
 
-    fireEvent.keyDown(document.activeElement ?? first, { key: 'Home' })
+    press('Home')
     expect(screen.getByRole('button', { name: 'Pull requests' })).toHaveFocus()
   })
 
   it('searches names and descriptions across categories and highlights the matches', () => {
     const dialog = openSettings()
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search settings' }), { target: { value: 'WRAP' } })
+    search('WRAP')
     expect(shownSettings()).toEqual(['Line wrap'])
     expect(categoryButtons().map((button) => button.textContent)).toEqual(['Diff'])
-    expect(Array.from(dialog.querySelectorAll('mark'), (mark) => mark.textContent)).toEqual(['wrap', 'Wrap'])
+    expect(Array.from(dialog.querySelectorAll('.setting:not([hidden]) mark'), (mark) => mark.textContent)).toEqual(['wrap', 'Wrap'])
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search settings' }), { target: { value: 'model' } })
+    search('model')
     expect(shownSettings()).toEqual(['AI provider', 'AI prompts'])
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search settings' }), { target: { value: 'font' } })
+    search('font')
     expect(shownSettings()).toEqual(['Code font'])
     expect(categoryButtons().map((button) => button.textContent)).toEqual(['Appearance'])
+
+    search('diff wrap')
+    expect(shownSettings()).toEqual(['Line wrap'])
+    expect(Array.from(dialog.querySelectorAll('.setting:not([hidden]) mark'), (mark) => mark.textContent)).toEqual(['wrap', 'Wrap', 'diff'])
   })
 
   it('says so when no setting matches the search', () => {
     openSettings()
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search settings' }), { target: { value: 'nothing like this' } })
+    search('nothing like this')
     expect(shownSettings()).toEqual([])
     expect(categoryButtons()).toEqual([])
     expect(screen.getByText('No settings match "nothing like this".')).toBeInTheDocument()
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search settings' }), { target: { value: '' } })
+    search('')
     expect(shownSettings()).toEqual(['Open pull request'])
   })
 

@@ -2345,10 +2345,6 @@ button.danger {
   height: min(720px, calc(100vh - 64px));
 }
 
-.settings-search {
-  width: 100%;
-}
-
 .settings-body {
   flex: 1;
   min-height: 0;
