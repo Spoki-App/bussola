@@ -54,7 +54,7 @@ export function AiReview({ reviewId, repoId, review, onShowLine }: Props) {
         <AiActionButton
           repoId={repoId}
           label="AI review"
-          title="Ask the AI provider to review each unit changed since the last AI review, the highest impact first, and add what it finds as threads"
+          title="Ask the AI provider to review each unit changed since the last AI review, with the whole pull request in view, rate their impact and add what it finds as threads"
           onRun={(target) => { review.run(target) }}
         />
       )}
