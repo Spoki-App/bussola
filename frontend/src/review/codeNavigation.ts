@@ -1,4 +1,4 @@
-import type { NavigationRequest, NavigationResult, NavigationTarget } from '../api/navigation'
+import type { Documentation, NavigationRequest, NavigationResult, NavigationTarget } from '../api/navigation'
 import type { Side } from '../api/types'
 
 export interface ScreenPoint {
@@ -151,7 +151,7 @@ export function rangeOf(container: Element, span: SymbolSpan): Range | null {
 }
 
 export function isNavigable(result: NavigationResult): boolean {
-  return result.ready && result.symbol !== null && result.targets.length > 0
+  return result.ready && result.symbol !== null && (result.targets.length > 0 || result.documentation !== null)
 }
 
 export function groupTargets(targets: NavigationTarget[]): TargetGroups {
@@ -185,5 +185,9 @@ export function emptyMessage(result: NavigationResult): string {
 }
 
 export function titleOf(result: NavigationResult): string {
-  return wording(result).title
+  return result.documentation?.qualified_name ?? wording(result).title
+}
+
+export function missingDocumentation(documentation: Documentation): string | null {
+  return documentation.text ? null : `No documentation found for ${documentation.qualified_name}.`
 }

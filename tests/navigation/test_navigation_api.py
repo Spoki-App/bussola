@@ -81,7 +81,7 @@ def test_clicking_outside_a_name_finds_nothing(nav_api: ApiClient, git_repo: Git
 
     result = nav_api.call("GET", f"/reviews/{review}/navigation?path=shop/cart.py&line=2&column=0")
 
-    assert result == {"ready": True, "symbol": None, "origin": None, "resolver": "tree-sitter", "targets": [], "server_hint": None}
+    assert result == {"ready": True, "symbol": None, "origin": None, "resolver": "tree-sitter", "targets": [], "server_hint": None, "documentation": None}
 
 
 def test_the_index_can_be_prepared_ahead_of_the_first_click(nav_api: ApiClient, git_repo: GitFixture) -> None:
@@ -161,3 +161,69 @@ def test_a_file_too_large_to_show_is_refused(nav_api: ApiClient, git_repo: GitFi
     review = start(git_repo, nav_api)
 
     nav_api.call("GET", f"/reviews/{review}/source?path=data.py", 400)
+
+
+VIEWS = "from django.shortcuts import render\n\n\ndef page(request):\n    return render(request)\n"
+
+
+def start_views(git_repo: GitFixture, api: ApiClient) -> int:
+    git_repo.commit({"shop/prices.py": PRICES})
+    git_repo.branch("feature")
+    git_repo.commit({"shop/views.py": VIEWS})
+    return api.start_review()
+
+
+def click_views(api: ApiClient, review: int) -> Json:
+    column = VIEWS.split("\n")[4].index("render") + 1
+    return wait_for(lambda: api.call("GET", f"/reviews/{review}/navigation?path=shop/views.py&line=5&column={column}"), lambda result: result["ready"])
+
+
+def install_django(git_repo: GitFixture) -> str:
+    site = git_repo.root / ".venv" / "lib" / "python3.12" / "site-packages"
+    git_repo.write(
+        {
+            ".venv/lib/python3.12/site-packages/django/__init__.py": "",
+            ".venv/lib/python3.12/site-packages/django/shortcuts.py": "def render(request):\n    pass\n",
+            ".venv/lib/python3.12/site-packages/Django-5.1.dist-info/METADATA": "Metadata-Version: 2.1\nName: Django\nVersion: 5.1\nHome-page: https://www.djangoproject.com/\n",
+            ".venv/lib/python3.12/site-packages/Django-5.1.dist-info/top_level.txt": "django\n",
+        }
+    )
+    return str(site / "django" / "shortcuts.py")
+
+
+def test_an_external_name_without_a_language_server_shows_its_package_and_link(nav_api: ApiClient, git_repo: GitFixture) -> None:
+    review = start_views(git_repo, nav_api)
+    shortcuts = install_django(git_repo)
+
+    result = click_views(nav_api, review)
+
+    assert (result["symbol"], result["origin"], result["resolver"], result["targets"]) == ("render", "reference", "tree-sitter", [])
+    assert result["documentation"] == {
+        "qualified_name": "django.shortcuts.render",
+        "package": "Django",
+        "version": "5.1",
+        "url": "https://www.djangoproject.com/",
+        "text": None,
+        "source": {"path": shortcuts, "line": 1},
+    }
+    assert nav_api.call("GET", f"/reviews/{review}/library-source?path={shortcuts}") == {"path": shortcuts, "text": "def render(request):\n    pass\n"}
+
+
+def test_an_external_name_shows_the_language_server_hover(nav_api: ApiClient, git_repo: GitFixture, servers: LanguageServerPath) -> None:
+    hover = "```python\ndef render(request, template_name) -> HttpResponse\n```\n---\nReturn an HttpResponse."
+    servers.install("basedpyright-langserver", hover=hover)
+    review = start_views(git_repo, nav_api)
+
+    result = wait_for(lambda: click_views(nav_api, review), lambda result: result["resolver"] == "language-server")
+
+    assert result["documentation"]["text"] == hover
+    assert (result["documentation"]["package"], result["documentation"]["url"]) == ("django", "https://pypi.org/project/django/")
+    request = next(message for message in servers.messages() if message.get("method") == "textDocument/hover")
+    assert request["params"]["position"] == {"line": 4, "character": 11}
+
+
+def test_only_installed_library_files_are_served(nav_api: ApiClient, git_repo: GitFixture) -> None:
+    review = start_views(git_repo, nav_api)
+
+    nav_api.call("GET", f"/reviews/{review}/library-source?path={git_repo.root / 'shop' / 'views.py'}", 404)
+    nav_api.call("GET", f"/reviews/{review}/library-source?path=shop/views.py", 404)

@@ -111,7 +111,7 @@ def language_for(path: str) -> SourceLanguage | None:
 def file_symbols(language: SourceLanguage, source: bytes) -> FileSymbols:
     definitions: list[Symbol] = []
     used: set[str] = set()
-    for symbol in _symbols(language, _parse(language, source)):
+    for symbol in _symbols(language, parse(language, source)):
         if symbol.definition:
             definitions.append(symbol)
         else:
@@ -121,21 +121,25 @@ def file_symbols(language: SourceLanguage, source: bytes) -> FileSymbols:
 
 def references(language: SourceLanguage, source: bytes, name: str) -> list[Symbol]:
     wanted = name.encode()
-    return [_symbol(language, node) for node in _identifiers(language, _parse(language, source)) if node.text == wanted and not language.is_definition(node)]
+    return [_symbol(language, node) for node in _identifiers(language, parse(language, source)) if node.text == wanted and not language.is_definition(node)]
 
 
 def symbol_at(language: SourceLanguage, source: bytes, row: int, column: int) -> Symbol | None:
-    root = _parse(language, source).root_node
+    node = identifier_at(language, parse(language, source), row, column)
+    return _symbol(language, node) if node is not None else None
+
+
+def identifier_at(language: SourceLanguage, tree: Tree, row: int, column: int) -> Node | None:
     for candidate in (column, column - 1):
         if candidate < 0:
             continue
-        node = root.descendant_for_point_range((row, candidate), (row, candidate))
+        node = tree.root_node.descendant_for_point_range((row, candidate), (row, candidate))
         if node is not None and node.type in language.identifiers and node.start_point[0] == row:
-            return _symbol(language, node)
+            return node
     return None
 
 
-def _parse(language: SourceLanguage, source: bytes) -> Tree:
+def parse(language: SourceLanguage, source: bytes) -> Tree:
     return Parser(language.grammar).parse(source)
 
 
@@ -144,7 +148,7 @@ def _symbols(language: SourceLanguage, tree: Tree) -> Iterator[Symbol]:
 
 
 def _identifiers(language: SourceLanguage, tree: Tree) -> Iterator[Node]:
-    return (node for node in _nodes(tree) if node.type in language.identifiers and node.start_point[0] == node.end_point[0])
+    return (node for node in nodes(tree.root_node) if node.type in language.identifiers and node.start_point[0] == node.end_point[0])
 
 
 def _symbol(language: SourceLanguage, node: Node) -> Symbol:
@@ -152,8 +156,8 @@ def _symbol(language: SourceLanguage, node: Node) -> Symbol:
     return Symbol(node_text(node), row, start, language.is_definition(node))
 
 
-def _nodes(tree: Tree) -> Iterator[Node]:
-    cursor = tree.walk()
+def nodes(root: Node) -> Iterator[Node]:
+    cursor = root.walk()
     while True:
         if cursor.node is not None:
             yield cursor.node

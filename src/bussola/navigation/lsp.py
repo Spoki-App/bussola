@@ -172,12 +172,17 @@ class LanguageServerSession:
     def references(self, path: str, row: int, character: int) -> list[ServerLocation]:
         return self._locate("textDocument/references", path, row, character, {"context": {"includeDeclaration": False}})
 
+    def hover(self, path: str, row: int, character: int) -> str | None:
+        self._open(path)
+        result = self._client.request("textDocument/hover", _position_params(self._uri(path), row, character), REQUEST_TIMEOUT_SECONDS)
+        return _hover_text(_as_object(result).get("contents")) or None
+
     def close(self) -> None:
         self._client.close()
 
     def _locate(self, method: str, path: str, row: int, character: int, extra: dict[str, Any]) -> list[ServerLocation]:
         self._open(path)
-        params = {"textDocument": {"uri": self._uri(path)}, "position": {"line": row, "character": character}, **extra}
+        params = {**_position_params(self._uri(path), row, character), **extra}
         result = self._client.request(method, params, REQUEST_TIMEOUT_SECONDS)
         items = cast(list[Any], result) if isinstance(result, list) else [result]
         return [location for item in items if (location := self._location(_as_object(item))) is not None]
@@ -218,6 +223,25 @@ def _as_object(value: Any) -> dict[str, Any]:
     return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
+def _position_params(uri: str, row: int, character: int) -> dict[str, Any]:
+    return {"textDocument": {"uri": uri}, "position": {"line": row, "character": character}}
+
+
+def _hover_text(contents: Any) -> str:
+    if isinstance(contents, str):
+        return contents.strip()
+    if isinstance(contents, list):
+        return "\n\n".join(text for item in cast(list[Any], contents) if (text := _hover_text(item)))
+    item = _as_object(contents)
+    value = item.get("value")
+    if not isinstance(value, str) or not value.strip():
+        return ""
+    language = item.get("language")
+    if isinstance(language, str):
+        return f"```{language}\n{value.strip()}\n```"
+    return value.strip() if item.get("kind") == "markdown" else f"```text\n{value.strip()}\n```"
+
+
 def _initialize_params(root: Path, options: dict[str, Any]) -> dict[str, Any]:
     return {
         "processId": os.getpid(),
@@ -226,7 +250,12 @@ def _initialize_params(root: Path, options: dict[str, Any]) -> dict[str, Any]:
         "rootPath": str(root),
         "workspaceFolders": [{"uri": root.as_uri(), "name": root.name}],
         "capabilities": {
-            "textDocument": {"definition": {"linkSupport": True}, "references": {}, "synchronization": {"didSave": False}},
+            "textDocument": {
+                "definition": {"linkSupport": True},
+                "references": {},
+                "hover": {"contentFormat": ["markdown", "plaintext"]},
+                "synchronization": {"didSave": False},
+            },
             "workspace": {"configuration": True, "workspaceFolders": True},
         },
     }

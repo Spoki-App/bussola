@@ -63,20 +63,21 @@ export function SourceModal({ reviewId, revisionId, stack, onBack, onClose, onNa
     body.current?.querySelector('.source-line.target')?.scrollIntoView({ block: 'center' })
   }, [lines, location])
 
+  const navigable = !location.library
   const onMouseDown = (event: MouseEvent<HTMLElement>) => {
-    if (isNavigationClick(event)) {
+    if (navigable && isNavigationClick(event)) {
       event.preventDefault()
     }
   }
   const onClick = (event: MouseEvent<HTMLElement>) => {
-    const clicked = isNavigationClick(event) ? codeAt(event) : null
+    const clicked = navigable && isNavigationClick(event) ? codeAt(event) : null
     const column = clicked ? navigationColumn(clicked.code, event.clientX, event.clientY) : null
     if (clicked && column !== null) {
       onNavigate({ path: location.path, side: location.side, line: clicked.line, column, point: { x: event.clientX, y: event.clientY } })
     }
   }
   const onMouseMove = (event: MouseEvent<HTMLElement>) => {
-    const hovered = codeAt(event)
+    const hovered = navigable ? codeAt(event) : null
     if (!hovered) {
       link.leave()
       return
@@ -95,7 +96,8 @@ export function SourceModal({ reviewId, revisionId, stack, onBack, onClose, onNa
           <h2 id="source-dialog-title">
             <code>{`${location.path}:${String(location.line)}`}</code>
           </h2>
-          {location.side === 'base' && <span className="label">base</span>}
+          {location.side === 'base' && !location.library && <span className="label">base</span>}
+          {location.library && <span className="label">installed library</span>}
         </div>
         <div className="source-actions">
           {githubUrl && <ExternalLink href={githubUrl}>View on GitHub</ExternalLink>}

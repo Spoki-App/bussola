@@ -145,6 +145,7 @@ Images attached on GitHub need a signed-in user, so they are loaded through `GET
 POST   /reviews/{id}/navigation/index          start indexing the reviewed commit, returns whether it is ready
 GET    /reviews/{id}/navigation?path=&line=&column=&side=   definitions or usages of the name at that position
 GET    /reviews/{id}/source?path=&side=        a file at the reviewed commit, with its GitHub link
+GET    /reviews/{id}/library-source?path=      a file of a library installed for the repository
 ```
 
 `side=head` resolves at the head of the latest revision, `side=base` at its merge base. Columns are UTF-16 offsets, as in the browser and in LSP.
@@ -154,6 +155,8 @@ The name under the cursor is found by parsing the clicked file with tree-sitter.
 The index lists, per file, its definitions and the names it uses. It is built from `git ls-tree` and `git cat-file` in a background thread, never from the working tree, skips files over 1 MB and the `ignore` globs, and reuses the symbols of unchanged blobs from the indexes kept in memory (the last four commits). Usages are found by parsing again only the files that use the name. While the index is building the endpoint answers `ready: false` and the page polls. Results are capped at 200.
 
 A language server, when one is on `PATH`, is asked first: `textDocument/definition`, or `textDocument/references` without the declaration. It runs in `checkouts/<commit>` in the data directory, extracted with `git archive`, and is started in the background on first use, so the index answers until it is ready. Locations outside the checkout are dropped. A server that does not start, crashes or takes more than five seconds, or an empty answer, falls back to the index. Up to three servers are kept running; the checkouts are removed when a server is dropped and when bussola stops. Each result says which unit of the review contains its line, if any, so the page can scroll to it.
+
+A use of a name imported from outside the repository answers with `documentation` instead of targets. The import is found with tree-sitter in the clicked file: Python `import` and `from ... import`, JavaScript and TypeScript `import` and `require`, Go `import`, followed through attribute, member and selector chains (`os.path.join`, `React.FC`, `http.Request`). It is external when its module is not in the repository: relative and alias (`@/`, `~/`, `#`) specifiers are in the repository, a Go import path is external unless it is under a `module` of a `go.mod` in the repository, and other modules are in the repository when their first name is a folder or file of the same language family at the reviewed commit (only at the top level for the Python standard library and Node.js built-in modules). The language server is asked for `textDocument/hover`, whose contents become the Markdown text. The package, its version and its documentation link come from the environment on disk, never from the network: `dist-info` metadata in `.venv` or `venv` of the repository, `package.json` in the nearest `node_modules`, `require` in `go.mod`. The installed source file and the line of the definition are found in the same places, and in the Go module cache and `GOROOT`; `library-source` serves only files of a supported language under those folders, up to 2 MB.
 
 ## Folder browser
 

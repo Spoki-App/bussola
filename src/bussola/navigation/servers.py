@@ -56,13 +56,16 @@ class LanguageServers:
         self._closed = False
 
     def locate(self, repo: GitRepo, commit: str, spec: ServerSpec, ask: Callable[[LanguageServerSession], list[ServerLocation]]) -> list[ServerLocation]:
+        return self.ask(repo, commit, spec, ask, [])
+
+    def ask[T](self, repo: GitRepo, commit: str, spec: ServerSpec, question: Callable[[LanguageServerSession], T], fallback: T) -> T:
         session = self._session(repo, commit, spec)
         if session is None:
-            return []
+            return fallback
         try:
-            return ask(session)
+            return question(session)
         except (LanguageServerError, OSError):
-            return []
+            return fallback
 
     def checkout(self, commit: str) -> Path:
         return (self._checkouts / commit).resolve()

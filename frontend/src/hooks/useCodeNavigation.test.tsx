@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { UNSETTLED_ANSWER_MS, type NavigationResult, type NavigationTarget, type SourceFile } from '../api/navigation'
+import { UNSETTLED_ANSWER_MS, type Documentation, type NavigationResult, type NavigationTarget, type SourceFile } from '../api/navigation'
 import { clearCaret, placeCaret } from '../test/caret'
 import { useCodeNavigation } from './useCodeNavigation'
 
@@ -11,13 +11,16 @@ type NavigationReply = (params: URLSearchParams) => NavigationResult
 const LIB = 'def price(item):\n    return item.cost\n\n\ndef discount(item):\n    return 0\n'
 const CART = 'from lib import price\n\n\ndef total(items):\n    return price(items)\n'
 const GITHUB = 'https://github.com/acme/widgets/blob/abc123'
+const SHORTCUTS = '/work/.venv/lib/python3.12/site-packages/django/shortcuts.py'
+const SHORTCUTS_SOURCE = 'def render(request, template_name):\n    pass\n'
+const RENDER: Documentation = { qualified_name: 'django.shortcuts.render', package: 'Django', version: '5.1', url: 'https://docs.djangoproject.com/', text: null, source: null }
 
 function target(path: string, line: number, unitId: number | null, role: NavigationTarget['role'] = 'definition'): NavigationTarget {
   return { role, path, line, column: 4, preview: `preview of ${path}:${String(line)}`, side: 'head', unit_id: unitId }
 }
 
 function found(targets: NavigationTarget[], overrides: Partial<NavigationResult> = {}): NavigationResult {
-  return { ready: true, symbol: 'price', origin: 'reference', resolver: 'tree-sitter', targets, server_hint: null, ...overrides }
+  return { ready: true, symbol: 'price', origin: 'reference', resolver: 'tree-sitter', targets, server_hint: null, documentation: null, ...overrides }
 }
 
 function json(body: unknown): Promise<Response> {
@@ -36,6 +39,9 @@ function serve(reply: NavigationReply, prepared: () => boolean = () => true) {
       if (url.pathname.endsWith('/navigation')) {
         requests.push(url.searchParams)
         return json(reply(url.searchParams))
+      }
+      if (url.pathname.endsWith('/library-source')) {
+        return json({ path: url.searchParams.get('path'), text: SHORTCUTS_SOURCE })
       }
       const path = url.searchParams.get('path') ?? ''
       const source: SourceFile = { path, side: 'head', commit: 'abc123', text: path === 'lib.py' ? LIB : CART, url: `${GITHUB}/${path}` }
@@ -313,5 +319,49 @@ describe('useCodeNavigation', () => {
 
     fireEvent.click(popup, { clientX: 700, clientY: 400 })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows the documentation of an external name with its signature, package, version and link, rendered safely', async () => {
+    const text = '```python\ndef render(request, template_name)\n```\n---\nRenders **a template**.<script>window.hacked = true</script><img src="https://example.com/x.png">\n\n![remote](https://example.com/y.png)'
+    serve(() => found([], { documentation: { ...RENDER, text } }))
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'django.shortcuts.render' })
+    expect(within(popup).getByText('Django')).toBeInTheDocument()
+    expect(within(popup).getByText('5.1')).toBeInTheDocument()
+    expect(popup.querySelector('pre code')).toHaveTextContent('def render(request, template_name)')
+    expect(within(popup).getByText('a template').tagName).toBe('STRONG')
+    expect(within(popup).getByRole('link', { name: 'Documentation' })).toHaveAttribute('href', 'https://docs.djangoproject.com/')
+    expect(popup.querySelector('script, img')).toBeNull()
+    expect(within(popup).queryByRole('button', { name: 'Open source' })).not.toBeInTheDocument()
+  })
+
+  it('says when an external name has no documentation instead of doing nothing', async () => {
+    serve(() => found([], { documentation: { ...RENDER, url: null, version: null } }))
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'django.shortcuts.render' })
+    expect(within(popup).getByText('No documentation found for django.shortcuts.render.')).toBeInTheDocument()
+    expect(within(popup).getByText('Django')).toBeInTheDocument()
+    expect(within(popup).queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('opens the installed library source read only from the documentation shown inside the modal, with Back', async () => {
+    serve((params) => (params.get('path') === 'lib.py' ? found([], { documentation: { ...RENDER, source: { path: SHORTCUTS, line: 1 } } }) : found([target('lib.py', 1, null)])))
+    renderHarness()
+
+    await screen.findByRole('dialog', { name: 'lib.py:1' })
+    await screen.findAllByText((_, element) => element?.tagName === 'CODE' && element.textContent === 'def price(item):')
+    cmdClickInModal('def price(item):', 'price')
+    const popup = await screen.findByRole('dialog', { name: 'django.shortcuts.render' })
+    fireEvent.click(within(popup).getByRole('button', { name: 'Open source' }))
+
+    const library = await screen.findByRole('dialog', { name: `${SHORTCUTS}:1` })
+    expect(await within(library).findByRole('region', { name: `Source of ${SHORTCUTS}` })).toHaveTextContent('def render(request, template_name):')
+    expect(within(library).getByText('installed library')).toBeInTheDocument()
+    expect(within(library).queryByRole('link', { name: 'View on GitHub' })).not.toBeInTheDocument()
+
+    fireEvent.click(within(library).getByRole('button', { name: 'Back' }))
+    expect(await screen.findByRole('dialog', { name: 'lib.py:1' })).toBeInTheDocument()
   })
 })

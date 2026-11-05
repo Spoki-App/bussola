@@ -157,6 +157,10 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
             closePopup()
             reveal(chosen)
           }}
+          onOpenSource={(source) => {
+            closePopup()
+            setStack((current) => [...current, { path: source.path, line: source.line, side: 'head', library: true }])
+          }}
         />
       )}
       {hint && !popup && stack.length === 0 && <ServerHintNote hint={hint} onDismiss={() => { setHint(null) }} />}

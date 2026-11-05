@@ -21,6 +21,20 @@ export interface ServerHint {
   install: string
 }
 
+export interface LibrarySource {
+  path: string
+  line: number
+}
+
+export interface Documentation {
+  qualified_name: string
+  package: string
+  version: string | null
+  url: string | null
+  text: string | null
+  source: LibrarySource | null
+}
+
 export interface NavigationResult {
   ready: boolean
   symbol: string | null
@@ -28,6 +42,7 @@ export interface NavigationResult {
   resolver: 'tree-sitter' | 'language-server'
   targets: NavigationTarget[]
   server_hint: ServerHint | null
+  documentation: Documentation | null
 }
 
 export interface SourceFile {
@@ -42,7 +57,10 @@ export interface CodeLocation {
   path: string
   line: number
   side: Side
+  library?: boolean
 }
+
+export type ShownFile = Pick<SourceFile, 'path' | 'text' | 'url'>
 
 export interface NavigationRequest extends CodeLocation {
   column: number
@@ -82,12 +100,17 @@ export function usePrepareNavigation(reviewId: number, revisionId: number | unde
   })
 }
 
+function fetchLibraryFile(reviewId: number, path: string): Promise<ShownFile> {
+  return getJson<Omit<ShownFile, 'url'>>(`/reviews/${String(reviewId)}/library-source?${new URLSearchParams({ path }).toString()}`).then((file) => ({ ...file, url: null }))
+}
+
 export function useSourceFile(reviewId: number, revisionId: number | undefined, location: CodeLocation | undefined) {
   const path = location?.path ?? ''
   const side = location?.side ?? 'head'
-  return useQuery({
-    queryKey: ['source', reviewId, revisionId, side, path],
-    queryFn: () => getJson<SourceFile>(`/reviews/${String(reviewId)}/source?${query(revisionId, side, { path })}`),
+  const library = location?.library ?? false
+  return useQuery<ShownFile>({
+    queryKey: ['source', reviewId, revisionId, side, path, library],
+    queryFn: () => (library ? fetchLibraryFile(reviewId, path) : getJson<SourceFile>(`/reviews/${String(reviewId)}/source?${query(revisionId, side, { path })}`)),
     enabled: location !== undefined,
     staleTime: INDEX_STALE_MS,
   })
