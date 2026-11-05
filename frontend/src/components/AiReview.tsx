@@ -3,6 +3,7 @@ import type { AiReviewState } from '../hooks/useAiReview'
 import { aiReviewCoverage, aiReviewProgress, aiReviewSummary } from '../review/aiReview'
 import { AiActionButton } from './AiActionButton'
 import { ErrorNote } from './Badges'
+import { Spinner } from './Spinner'
 
 interface Props {
   repoId: number
@@ -13,7 +14,8 @@ export function AiReview({ repoId, review }: Props) {
   if (review.running) {
     return (
       <span className="summary-action">
-        <span className="muted" role="status">
+        <span className="muted busy" role="status">
+          <Spinner />
           {aiReviewProgress(review.status)}
         </span>
         <button type="button" onClick={review.cancel}>

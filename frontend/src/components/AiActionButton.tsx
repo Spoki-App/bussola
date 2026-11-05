@@ -6,6 +6,7 @@ import type { AiStatus } from '../api/types'
 import { useModalDialog } from '../hooks/useModalDialog'
 import { hasAiConsent, rememberAiConsent } from '../settings/aiConsent'
 import { ErrorNote } from './Badges'
+import { Spinner } from './Spinner'
 
 interface AiActionButtonProps {
   repoId: number
@@ -19,6 +20,7 @@ export function AiActionButton({ repoId, label, title, disabled = false, onRun }
   const status = useAiStatus(repoId)
   const [asking, setAsking] = useState<AiStatus | null>(null)
   const starting = useRef(false)
+  const [checking, setChecking] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const ai = status.data
   if (status.isError && ai === undefined) {
@@ -37,6 +39,7 @@ export function AiActionButton({ repoId, label, title, disabled = false, onRun }
       return
     }
     starting.current = true
+    setChecking(true)
     setNotice(null)
     try {
       const result = await status.refetch()
@@ -56,11 +59,20 @@ export function AiActionButton({ repoId, label, title, disabled = false, onRun }
       }
     } finally {
       starting.current = false
+      setChecking(false)
     }
   }
   return (
     <>
-      <button type="button" title={ai.problem ?? title} disabled={disabled || ai.problem !== null || ai.target === null} onClick={() => { void start() }}>
+      <button
+        type="button"
+        className={checking ? 'busy' : undefined}
+        title={ai.problem ?? title}
+        aria-busy={checking}
+        disabled={disabled || ai.problem !== null || ai.target === null}
+        onClick={() => { void start() }}
+      >
+        {checking && <Spinner />}
         {label}
       </button>
       {notice && <ErrorNote message={notice} />}

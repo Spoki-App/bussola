@@ -133,3 +133,42 @@ describe('AI review', () => {
     expect(await screen.findByRole('button', { name: 'AI review' }, { timeout: 4000 })).toBeInTheDocument()
   })
 })
+
+describe('AI review start', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    if (AI.target) {
+      rememberAiConsent(AI.target)
+    }
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('shows that it is starting while it checks the provider', async () => {
+    let answer: (response: Response) => void = () => undefined
+    let checks = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url === '/api/repos/3/ai') {
+          checks += 1
+          return checks === 1 ? Promise.resolve(Response.json(AI)) : new Promise<Response>((resolve) => { answer = resolve })
+        }
+        return Promise.resolve(Response.json(url === '/api/reviews/1/ai-review' ? IDLE : []))
+      }),
+    )
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <Harness />
+      </QueryClientProvider>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'AI review' }))
+
+    await waitFor(() => { expect(screen.getByRole('button', { name: 'AI review' })).toHaveAttribute('aria-busy', 'true') })
+    answer(Response.json({ ...AI, configured: false, problem: 'AI is off' }))
+    await waitFor(() => { expect(screen.getByRole('button', { name: 'AI review' })).toHaveAttribute('aria-busy', 'false') })
+  })
+})
