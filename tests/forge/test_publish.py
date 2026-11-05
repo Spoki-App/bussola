@@ -264,7 +264,7 @@ def test_ai_findings_are_published_with_a_marker_naming_the_model(git_repo: GitF
     config_file = tmp_path / "config.toml"
     config_file.write_text(ANTHROPIC_CONFIG)
     rating = {"impact": "high", "impact_reason": "New totals."}
-    findings = {"findings": [{"side": "after", "start_line": 3, "end_line": 3, "body": "`count` is never used."}]}
+    findings = {"findings": [{"path": "app.py", "side": "after", "start_line": 3, "end_line": 3, "body": "`count` is never used."}]}
     api = ApiClient.create(git_repo, data_dir, config_file, fake_factory(FakeProvider(rating, findings)))
     review = setup_review(api, git_repo, fake_gh)
     link(api, review)

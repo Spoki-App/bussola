@@ -4,7 +4,16 @@ import os
 import subprocess
 import sys
 import time
+import urllib.request
 from pathlib import Path
+
+
+def call_mcp(url, method, params, message_id):
+    body = json.dumps({"jsonrpc": "2.0", "id": message_id, "method": method, "params": params}).encode()
+    request = urllib.request.Request(url, body, {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return json.loads(response.read())
+
 
 if "--help" in sys.argv:
     sys.stdout.write("Usage: claude [options]\n  --safe-mode  Start with all customizations disabled\n")
@@ -20,6 +29,15 @@ if os.environ.get("FAKE_CLAUDE_DETACHED_CHILD_PID"):
 if os.environ.get("FAKE_CLAUDE_CHILD_PID"):
     child = subprocess.Popen(["sleep", "60"])
     Path(os.environ["FAKE_CLAUDE_CHILD_PID"]).write_text(str(child.pid))
+if os.environ.get("FAKE_CLAUDE_MCP_CALL"):
+    config = json.loads(sys.argv[sys.argv.index("--mcp-config") + 1])
+    url = next(iter(config["mcpServers"].values()))["url"]
+    answers = [
+        call_mcp(url, "initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "fake", "version": "1"}}, 1),
+        call_mcp(url, "tools/list", {}, 2),
+        call_mcp(url, "tools/call", json.loads(os.environ["FAKE_CLAUDE_MCP_CALL"]), 3),
+    ]
+    Path(os.environ["FAKE_CLAUDE_MCP_LOG"]).write_text(json.dumps(answers))
 time.sleep(float(os.environ.get("FAKE_CLAUDE_SLEEP", "0")))
 sys.stdout.write(os.environ.get("FAKE_CLAUDE_STDOUT", ""))
 sys.stderr.write(os.environ.get("FAKE_CLAUDE_STDERR", ""))

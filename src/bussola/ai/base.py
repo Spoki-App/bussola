@@ -10,6 +10,7 @@ from pydantic import ValidationError
 POLL_SECONDS = 0.05
 WORKER_NAME = "bussola-ai-call"
 MAX_ERROR_LENGTH = 300
+MAX_TOOL_ROUNDS = 60
 
 
 class AiError(Exception):
@@ -49,12 +50,33 @@ class AiTargetChangedError(AiError):
 
 
 @dataclass(frozen=True)
+class ToolDefinition:
+    name: str
+    description: str
+    schema: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ToolOutcome:
+    text: str
+    error: bool = False
+
+
+class ToolRunner(Protocol):
+    @property
+    def definitions(self) -> tuple[ToolDefinition, ...]: ...
+
+    def call(self, name: str, arguments: dict[str, Any]) -> ToolOutcome: ...
+
+
+@dataclass(frozen=True)
 class AiRequest:
     name: str
     system: str
     prompt: str
     schema: dict[str, Any]
     max_tokens: int
+    tools: ToolRunner | None = None
 
 
 class AiProvider(Protocol):

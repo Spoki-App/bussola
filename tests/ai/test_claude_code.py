@@ -2,16 +2,19 @@ import json
 import os
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import threading
 import time
+import urllib.parse
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiProviderError, AiRequest, AiTimeoutError, Cancellation
+from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiProviderError, AiRequest, AiTimeoutError, Cancellation, ToolDefinition, ToolOutcome
 from bussola.ai.claude_code import READER_NAME, ClaudeCodeProvider, find_claude
 from bussola.ai.config import AiSettings, ProviderName
 from bussola.ai.providers import build_provider
@@ -319,3 +322,52 @@ def test_the_provider_needs_the_claude_command(monkeypatch: pytest.MonkeyPatch, 
 
     with pytest.raises(AiNotConfiguredError, match="The claude command is not on PATH"):
         build_provider(AiSettings(ProviderName.CLAUDE_CODE))
+
+
+class EchoTools:
+    definitions = (ToolDefinition("read_file", "Lines of a file.", {"type": "object", "properties": {"path": {"type": "string"}}}),)
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    def call(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
+        self.calls.append((name, arguments))
+        return ToolOutcome(f"1: contents of {arguments['path']}")
+
+
+def test_tools_reach_the_cli_as_its_only_mcp_server_without_user_settings(fake_claude: FakeClaude, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_claude.answer({"type": "result", "is_error": False, "result": "", "structured_output": {"findings": []}})
+    monkeypatch.setenv("FAKE_CLAUDE_MCP_CALL", json.dumps({"name": "read_file", "arguments": {"path": "app.py"}}))
+    monkeypatch.setenv("FAKE_CLAUDE_MCP_LOG", str(tmp_path / "mcp.json"))
+    tools = EchoTools()
+
+    answer = provider("claude-opus-5-5").complete(replace(REQUEST, tools=tools), Cancellation())
+
+    assert json.loads(answer) == {"findings": []}
+    assert tools.calls == [("read_file", {"path": "app.py"})]
+    initialized, listed, called = json.loads((tmp_path / "mcp.json").read_text())
+    assert initialized["result"]["protocolVersion"] == "2025-06-18"
+    assert listed["result"]["tools"] == [{"name": "read_file", "description": "Lines of a file.", "inputSchema": tools.definitions[0].schema}]
+    assert called["result"] == {"content": [{"type": "text", "text": "1: contents of app.py"}], "isError": False}
+    args = fake_claude.call()["args"]
+    assert "--safe-mode" not in args
+    assert args[args.index("--setting-sources") + 1] == ""
+    assert args[args.index("--tools") + 1] == ""
+    assert args[args.index("--allowedTools") + 1] == "mcp__bussola__read_file"
+    assert {"--disable-slash-commands", "--strict-mcp-config"} <= set(args)
+    server = json.loads(args[args.index("--mcp-config") + 1])["mcpServers"]["bussola"]
+    assert server["type"] == "http"
+    assert server["url"].startswith("http://127.0.0.1:")
+
+
+def test_the_tool_server_stops_when_the_cli_is_done(fake_claude: FakeClaude) -> None:
+    fake_claude.answer({"type": "result", "is_error": False, "result": "{}"})
+
+    provider().complete(replace(REQUEST, tools=EchoTools()), Cancellation())
+
+    args = fake_claude.call()["args"]
+    url: str = json.loads(args[args.index("--mcp-config") + 1])["mcpServers"]["bussola"]["url"]
+    port = urllib.parse.urlsplit(url).port
+    assert port is not None
+    with pytest.raises(ConnectionRefusedError):
+        socket.create_connection(("127.0.0.1", port), timeout=2)

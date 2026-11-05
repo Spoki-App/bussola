@@ -6,7 +6,7 @@ from typing import Any
 from bussola.ai.base import AiRequest, Cancellation, run_cancellable
 from bussola.ai.config import AiSettings
 
-type Answer = str | dict[str, Any] | Exception
+type Answer = str | dict[str, Any] | Exception | Callable[[AiRequest], str | dict[str, Any]]
 
 ANTHROPIC_CONFIG = '[ai]\nprovider = "anthropic"\n'
 
@@ -32,6 +32,8 @@ class FakeProvider:
             run_cancellable(lambda: threading.Event().wait(self._delay), cancellation, self._timeout)
         if isinstance(answer, Exception):
             raise answer
+        if callable(answer):
+            answer = answer(request)
         return answer if isinstance(answer, str) else json.dumps(answer)
 
 

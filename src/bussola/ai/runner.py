@@ -8,7 +8,7 @@ from typing import Any, Protocol, cast
 
 from pydantic import BaseModel, ValidationError
 
-from bussola.ai.base import AiOutputError, AiProvider, AiRequest, Cancellation, describe_validation_error
+from bussola.ai.base import AiOutputError, AiProvider, AiRequest, Cancellation, ToolRunner, describe_validation_error
 
 DEFAULT_MAX_TOKENS = 16000
 NAME_MAPS = frozenset({"properties", "$defs"})
@@ -59,16 +59,20 @@ class AiCache(Protocol):
 
 
 class AiRunner:
-    def __init__(self, provider: AiProvider, cache: AiCache | None = None) -> None:
+    def __init__(self, provider: AiProvider, cache: AiCache | None = None, tools: ToolRunner | None = None) -> None:
         self.provider = provider
         self._cache = cache
+        self._tools = tools
+
+    def with_tools(self, tools: ToolRunner) -> "AiRunner":
+        return AiRunner(self.provider, self._cache, tools)
 
     def run[T: BaseModel](self, task: AiTask[T], prompt: str, cancellation: Cancellation, content_hash: str | None = None, *, refresh: bool = False) -> T:
         key = self._key(task, content_hash)
         cached = None if refresh else self._cached(task, key)
         if cached is not None:
             return cached
-        request = AiRequest(task.name, task.system, prompt, output_schema(task.output), self.provider.max_tokens or task.max_tokens)
+        request = AiRequest(task.name, task.system, prompt, output_schema(task.output), self.provider.max_tokens or task.max_tokens, self._tools)
         result = parse_output(self.provider.complete(request, cancellation), task.output)
         if key is not None and self._cache is not None:
             with contextlib.suppress(Exception):

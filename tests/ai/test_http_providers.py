@@ -9,6 +9,7 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Generator
+from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -16,6 +17,7 @@ import pytest
 
 from bussola.ai.anthropic_api import API_VERSION, AnthropicProvider
 from bussola.ai.base import (
+    MAX_TOOL_ROUNDS,
     WORKER_NAME,
     AiCancelledError,
     AiNotConfiguredError,
@@ -26,6 +28,8 @@ from bussola.ai.base import (
     AiTimeoutError,
     AiUnreachableError,
     Cancellation,
+    ToolDefinition,
+    ToolOutcome,
 )
 from bussola.ai.config import AiSettings, ProviderName
 from bussola.ai.http import MAX_ATTEMPTS, MAX_RESPONSE_BYTES, bypasses_proxy
@@ -40,6 +44,7 @@ class StubServer:
         self.requests: list[dict[str, Any]] = []
         self.status = 200
         self.body: dict[str, Any] = {}
+        self.queued: list[dict[str, Any]] = []
         self.delay = 0.0
         self.headers: dict[str, str] = {}
         self.before_reply: Callable[[], None] | None = None
@@ -65,7 +70,7 @@ class StubServer:
                 if stub.before_reply is not None:
                     stub.before_reply()
                 stub.release.wait(stub.delay)
-                payload = json.dumps(stub.body).encode()
+                payload = json.dumps(stub.queued.pop(0) if stub.queued else stub.body).encode()
                 self.send_response(stub.status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(payload)))
@@ -498,3 +503,89 @@ def test_an_openai_compatible_provider_needs_an_endpoint_and_a_model() -> None:
         build_provider(AiSettings(ProviderName.OPENAI_COMPATIBLE, model="gpt"))
     with pytest.raises(AiNotConfiguredError, match="Set model"):
         build_provider(AiSettings(ProviderName.OPENAI_COMPATIBLE, endpoint="http://localhost:11434/v1"))
+
+
+class RecordingTools:
+    definitions = (ToolDefinition("find_usages", "Where a name is used.", {"type": "object", "properties": {"name": {"type": "string"}}}),)
+
+    def __init__(self, outcome: ToolOutcome) -> None:
+        self.outcome = outcome
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    def call(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
+        self.calls.append((name, arguments))
+        return self.outcome
+
+
+def test_the_anthropic_api_runs_the_tools_the_model_asks_for_and_sends_back_the_whole_turn(stub: StubServer) -> None:
+    turn = [{"type": "thinking", "thinking": "", "signature": "sig"}, {"type": "tool_use", "id": "toolu_1", "name": "find_usages", "input": {"name": "pay"}}]
+    stub.queued = [{"stop_reason": "tool_use", "content": turn}]
+    stub.reply({"stop_reason": "end_turn", "content": [{"type": "text", "text": '{"findings": []}'}]})
+    tools = RecordingTools(ToolOutcome("app.py:3: pay()"))
+
+    answer = AnthropicProvider("claude-opus-5-5", stub.url, "sk-test", 5.0).complete(replace(REQUEST, tools=tools), Cancellation())
+
+    assert answer == '{"findings": []}'
+    assert tools.calls == [("find_usages", {"name": "pay"})]
+    first, second = (request["json"] for request in stub.requests)
+    assert first["tools"] == [{"name": "find_usages", "description": "Where a name is used.", "input_schema": tools.definitions[0].schema, "strict": True}]
+    assert first["cache_control"] == {"type": "ephemeral"}
+    assert second["messages"] == [
+        {"role": "user", "content": "def pay(): ..."},
+        {"role": "assistant", "content": turn},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_1", "content": "app.py:3: pay()"}]},
+    ]
+
+
+def test_a_failed_tool_is_reported_to_the_anthropic_api_as_an_error(stub: StubServer) -> None:
+    stub.queued = [{"stop_reason": "tool_use", "content": [{"type": "tool_use", "id": "toolu_1", "name": "find_usages", "input": {}}]}]
+    stub.reply({"stop_reason": "end_turn", "content": [{"type": "text", "text": "{}"}]})
+
+    AnthropicProvider("claude-opus-5-5", stub.url, "sk-test", 5.0).complete(
+        replace(REQUEST, tools=RecordingTools(ToolOutcome("No name", error=True))), Cancellation()
+    )
+
+    result = stub.requests[1]["json"]["messages"][-1]["content"][0]
+    assert (result["content"], result["is_error"]) == ("No name", True)
+
+
+def test_a_model_that_never_stops_asking_for_tools_is_an_error(stub: StubServer) -> None:
+    stub.reply({"stop_reason": "tool_use", "content": [{"type": "tool_use", "id": "toolu_1", "name": "find_usages", "input": {}}]})
+
+    with pytest.raises(AiOutputError, match="still asking for tools"):
+        AnthropicProvider("claude-opus-5-5", stub.url, "sk-test", 5.0).complete(replace(REQUEST, tools=RecordingTools(ToolOutcome("x"))), Cancellation())
+
+    assert len(stub.requests) == MAX_TOOL_ROUNDS
+
+
+def test_an_openai_compatible_endpoint_gets_the_tools_and_their_results(stub: StubServer) -> None:
+    call = {"id": "call_1", "type": "function", "function": {"name": "find_usages", "arguments": '{"name": "pay"}'}}
+    stub.queued = [{"choices": [{"finish_reason": "tool_calls", "message": {"role": "assistant", "content": None, "tool_calls": [call]}}]}]
+    stub.reply({"choices": [{"finish_reason": "stop", "message": {"role": "assistant", "content": '{"findings": []}'}}]})
+    tools = RecordingTools(ToolOutcome("app.py:3: pay()"))
+
+    answer = OpenAiCompatibleProvider("qwen2.5-coder", f"{stub.url}/v1", None, 5.0).complete(replace(REQUEST, tools=tools), Cancellation())
+
+    assert answer == '{"findings": []}'
+    assert tools.calls == [("find_usages", {"name": "pay"})]
+    first, second = (request["json"] for request in stub.requests)
+    definition = tools.definitions[0]
+    assert first["tools"] == [
+        {"type": "function", "function": {"name": definition.name, "description": definition.description, "parameters": definition.schema, "strict": True}}
+    ]
+    assert second["messages"][2:] == [
+        {"role": "assistant", "content": None, "tool_calls": [call]},
+        {"role": "tool", "tool_call_id": "call_1", "content": "app.py:3: pay()"},
+    ]
+
+
+def test_tool_arguments_that_are_not_json_are_not_run(stub: StubServer) -> None:
+    call = {"id": "call_1", "type": "function", "function": {"name": "find_usages", "arguments": "{name: pay"}}
+    stub.queued = [{"choices": [{"finish_reason": "tool_calls", "message": {"role": "assistant", "content": None, "tool_calls": [call]}}]}]
+    stub.reply({"choices": [{"finish_reason": "stop", "message": {"role": "assistant", "content": "{}"}}]})
+    tools = RecordingTools(ToolOutcome("x"))
+
+    OpenAiCompatibleProvider("qwen2.5-coder", f"{stub.url}/v1", None, 5.0).complete(replace(REQUEST, tools=tools), Cancellation())
+
+    assert tools.calls == []
+    assert stub.requests[1]["json"]["messages"][-1]["content"] == "Error: The arguments are not a JSON object"

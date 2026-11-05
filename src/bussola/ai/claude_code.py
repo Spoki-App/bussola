@@ -22,16 +22,19 @@ from bussola.ai.base import (
     AiProviderError,
     AiRequest,
     Cancellation,
+    ToolRunner,
     json_object,
     run_cancellable,
 )
 from bussola.ai.config import PROVIDER_LABELS, ProviderName
+from bussola.ai.mcp import serve_tools
 
 CLAUDE = "claude"
 CLAUDE_ENV = {"NO_COLOR": "1"}
 PRIVATE_ENV_PREFIX = "BUSSOLA_"
 PIPE_GRACE_SECONDS = 0.5
 REQUIRED_FLAG = "--safe-mode"
+MCP_SERVER = "bussola"
 READER_NAME = "bussola-claude-output"
 HELP_TIMEOUT_SECONDS = 15.0
 FAILED_CHECK_SECONDS = 60.0
@@ -129,7 +132,12 @@ class ClaudeCodeProvider:
         self._timeout = timeout
 
     def complete(self, request: AiRequest, cancellation: Cancellation) -> str:
-        returncode, stdout, stderr = self._run([self._executable, *self._arguments(request)], request.prompt, cancellation)
+        if request.tools is None:
+            returncode, stdout, stderr = self._run([self._executable, *self._arguments(request)], request.prompt, cancellation)
+        else:
+            with serve_tools(request.tools) as url:
+                command = [self._executable, *self._arguments(request, _tool_arguments(request.tools, url))]
+                returncode, stdout, stderr = self._run(command, request.prompt, cancellation)
         envelope = _envelope(stdout)
         if envelope is None:
             detail = (stderr or stdout).strip()[-MAX_ERROR_LENGTH:]
@@ -144,14 +152,13 @@ class ClaudeCodeProvider:
             raise AiOutputError("Claude Code answered without a result")
         return result
 
-    def _arguments(self, request: AiRequest) -> list[str]:
+    def _arguments(self, request: AiRequest, isolation: list[str] | None = None) -> list[str]:
         arguments = [
             "-p",
             "--output-format",
             "json",
             "--no-session-persistence",
-            REQUIRED_FLAG,
-            "--strict-mcp-config",
+            *(isolation or [REQUIRED_FLAG, "--strict-mcp-config"]),
             "--tools",
             "",
             "--system-prompt",
@@ -180,6 +187,12 @@ class ClaudeCodeProvider:
                 return run_cancellable(lambda: session.exchange(prompt), cancellation, self._timeout)
             finally:
                 session.finish()
+
+
+def _tool_arguments(tools: ToolRunner, url: str) -> list[str]:
+    config = {"mcpServers": {MCP_SERVER: {"type": "http", "url": url}}}
+    allowed = ",".join(f"mcp__{MCP_SERVER}__{tool.name}" for tool in tools.definitions)
+    return ["--setting-sources", "", "--disable-slash-commands", "--strict-mcp-config", "--mcp-config", json.dumps(config), "--allowedTools", allowed]
 
 
 def _claude_environment() -> dict[str, str]:
