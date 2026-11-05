@@ -826,6 +826,14 @@ textarea {
   grid-template-columns: 44px minmax(0, 1fr) 340px;
 }
 
+.review-layout.panel-hidden {
+  grid-template-columns: 280px minmax(0, 1fr) 44px;
+}
+
+.review-layout.files-hidden.panel-hidden {
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+}
+
 .summary-row {
   display: flex;
   flex-wrap: wrap;
@@ -981,6 +989,14 @@ button.busy {
     grid-template-columns: 44px minmax(0, 1fr);
   }
 
+  .review-layout.panel-hidden {
+    grid-template-columns: 200px minmax(0, 1fr) 44px;
+  }
+
+  .review-layout.files-hidden.panel-hidden {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+  }
+
   .review-layout.with-panel .side-panel {
     grid-column: 1 / -1;
     position: static;
@@ -1021,6 +1037,20 @@ button.busy {
 
 .files-hidden .sidebar {
   padding: 12px 6px;
+}
+
+.panel-hidden .side-panel {
+  height: 100vh;
+  padding: 12px 6px;
+}
+
+.panel-hidden .side-panel .sidebar-toggle {
+  flex-direction: column;
+  padding: 6px;
+}
+
+.side-panel-count {
+  font-size: 12px;
 }
 
 .sidebar-toggle {
@@ -2552,8 +2582,17 @@ button.danger {
   .review-layout,
   .review-layout.with-panel,
   .review-layout.files-hidden,
-  .review-layout.files-hidden.with-panel {
+  .review-layout.files-hidden.with-panel,
+  .review-layout.panel-hidden,
+  .review-layout.files-hidden.panel-hidden {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .panel-hidden .side-panel {
+    position: static;
+    height: auto;
+    border-left: none;
+    border-top: 1px solid var(--border);
   }
 
   .sidebar {

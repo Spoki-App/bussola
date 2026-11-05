@@ -102,7 +102,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
         highlightRows,
         renderWidgets,
         fileActions,
-        sidePanel: { label: `conversation (${String(openCount)})`, content: sidePanelContent },
+        sidePanel: { label: 'conversation', count: openCount, content: sidePanelContent },
         link,
       }}
     />

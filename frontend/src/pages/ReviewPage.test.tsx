@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { ReviewDetail, SyncResult } from '../api/types'
-import { ReviewPage } from './ReviewPage'
+import { ReviewPage, type ReviewExtensions } from './ReviewPage'
 
 const revision = { id: 2, number: 1, head_sha: 'b', base_sha: 'a', merge_base_sha: 'a', created_at: '2026-11-04T10:00:00Z' }
 
@@ -85,5 +85,70 @@ describe('ReviewPage window title', () => {
     unmount()
 
     expect(document.title).toBe('bussola')
+  })
+})
+
+describe('ReviewPage conversation panel', () => {
+  const extensions: ReviewExtensions = { sidePanel: { label: 'conversation', count: 2, content: <p>Thread list</p> } }
+
+  function renderPage() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    return render(
+      <QueryClientProvider client={client}>
+        <ReviewPage reviewId={3} extensions={extensions} />
+      </QueryClientProvider>,
+    )
+  }
+
+  beforeEach(() => {
+    window.localStorage.clear()
+    stubServer()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('hides the panel behind a thin bar with the open count and remembers it after a reload', async () => {
+    window.localStorage.setItem('bussola.sidePanelHidden', 'false')
+    const { unmount } = renderPage()
+
+    expect(await screen.findByText('Thread list')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide conversation' }))
+
+    expect(screen.queryByText('Thread list')).not.toBeInTheDocument()
+    const reopen = screen.getByRole('button', { name: 'Show conversation (2 open)' })
+    expect(reopen).toHaveAttribute('aria-expanded', 'false')
+    expect(reopen).toHaveTextContent('2')
+    expect(window.localStorage.getItem('bussola.sidePanelHidden')).toBe('true')
+
+    unmount()
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Show conversation (2 open)' })).toBeInTheDocument()
+    expect(screen.queryByText('Thread list')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show conversation (2 open)' }))
+
+    expect(screen.getByText('Thread list')).toBeInTheDocument()
+    expect(window.localStorage.getItem('bussola.sidePanelHidden')).toBe('false')
+  })
+
+  it('toggles the panel with t, but not while typing', async () => {
+    window.localStorage.setItem('bussola.sidePanelHidden', 'true')
+    renderPage()
+    await screen.findByRole('button', { name: 'Show conversation (2 open)' })
+
+    fireEvent.keyDown(screen.getByRole('searchbox'), { key: 't' })
+    expect(screen.queryByText('Thread list')).not.toBeInTheDocument()
+
+    fireEvent.keyDown(window, { key: 't' })
+    expect(screen.getByText('Thread list')).toBeInTheDocument()
+    expect(window.localStorage.getItem('bussola.sidePanelHidden')).toBe('false')
+
+    fireEvent.keyDown(window, { key: 't' })
+    expect(screen.queryByText('Thread list')).not.toBeInTheDocument()
+    expect(window.localStorage.getItem('bussola.sidePanelHidden')).toBe('true')
   })
 })
