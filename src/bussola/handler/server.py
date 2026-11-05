@@ -21,14 +21,12 @@ from pathlib import Path
 from typing import Any, Protocol
 from urllib.parse import urlencode
 
-import uvicorn
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
-from bussola.config import APP_NAME, DEFAULT_HOST, DEFAULT_PORT
+from bussola.access import API_PATH_PREFIX, INVALID_TOKEN_CODE, TOKEN_ENV, TOKEN_QUERY, host_port, is_ipv6_host, is_local_host, new_token, token_cookie
+from bussola.config import APP_NAME, DATA_DIR_ENV, DEFAULT_HOST, DEFAULT_PORT
 from bussola.errors import DomainError
 from bussola.handler.links import BUSSOLA_MODULE, browser_path, parse_link
-from bussola.security import API_PATH_PREFIX, INVALID_TOKEN_CODE, TOKEN_ENV, TOKEN_QUERY, host_port, is_ipv6_host, is_local_host, new_token, token_cookie
-from bussola.storage.database import DATA_DIR_ENV
 
 SERVERS_DIR = "servers"
 LINK_LOG_FILE = "open-link.log"
@@ -203,33 +201,6 @@ def record_link_error(data_dir: Path, link: str, error: Exception) -> None:
         with os.fdopen(os.open(log, flags, PRIVATE_FILE_MODE), "w", encoding="utf-8") as file:
             log.chmod(PRIVATE_FILE_MODE)
             file.write(f"{datetime.now(UTC).isoformat(timespec='seconds')} {link[:MAX_LOGGED_LINK]!r}: {error}\n")
-
-
-class PublishedServer(uvicorn.Server):
-    def __init__(self, config: uvicorn.Config, data_dir: Path, address: ServerAddress) -> None:
-        super().__init__(config)
-        self.data_dir = data_dir
-        self.address = address
-
-    async def startup(self, sockets: list[socket.socket] | None = None) -> None:
-        await super().startup(sockets)
-        if self.should_exit:
-            return
-        try:
-            publish_server(self.data_dir, self.address)
-        except OSError as error:
-            logger.warning("bussola:// links will not find this server: %s", error)
-
-    async def shutdown(self, sockets: list[socket.socket] | None = None) -> None:
-        with contextlib.suppress(OSError):
-            withdraw_server(self.data_dir, self.address)
-        await super().shutdown(sockets)
-
-
-def run_published(app: Any, data_dir: Path, address: ServerAddress) -> None:
-    config = uvicorn.Config(app, host=address.host, port=address.port, log_level="warning")
-    with contextlib.suppress(KeyboardInterrupt):
-        PublishedServer(config, data_dir, address.reachable()).run()
 
 
 class Process(Protocol):

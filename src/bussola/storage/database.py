@@ -1,9 +1,7 @@
-import os
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
-import platformdirs
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Engine, create_engine, event
@@ -11,17 +9,9 @@ from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import ConnectionPoolEntry
 
-from bussola.config import APP_NAME
-
-DATA_DIR_ENV = "BUSSOLA_DATA_DIR"
 DATABASE_FILE = "bussola.db"
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 SQLITE_PRAGMAS = ("PRAGMA foreign_keys=ON", "PRAGMA journal_mode=WAL", "PRAGMA busy_timeout=5000")
-
-
-def default_data_dir() -> Path:
-    override = os.environ.get(DATA_DIR_ENV)
-    return Path(override) if override else Path(platformdirs.user_data_dir(APP_NAME))
 
 
 def alembic_config(url: str) -> Config:

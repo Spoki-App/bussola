@@ -1,11 +1,14 @@
+import os
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import platformdirs
 from pydantic import BaseModel, ConfigDict
 
 APP_NAME = "bussola"
+DATA_DIR_ENV = "BUSSOLA_DATA_DIR"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 STATIC_DIR = Path(__file__).parent / "static"
@@ -39,3 +42,8 @@ class AppSettings:
     allowed_hosts: frozenset[str] = field(default_factory=frozenset)
     config_file: Path | None = None
     port: int | None = None
+
+
+def default_data_dir() -> Path:
+    override = os.environ.get(DATA_DIR_ENV)
+    return Path(override) if override else Path(platformdirs.user_data_dir(APP_NAME))

@@ -12,9 +12,9 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Protocol
 
+from bussola.config import DATA_DIR_ENV
 from bussola.errors import DomainError
 from bussola.handler.links import BUSSOLA_MODULE, SCHEME
-from bussola.storage.database import DATA_DIR_ENV
 
 WINREG: ModuleType | None = importlib.import_module("winreg") if sys.platform == "win32" else None
 

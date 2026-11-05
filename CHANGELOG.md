@@ -30,6 +30,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Changed
 
+- `bussola://` links start opening the browser in about a fifth of a second instead of half a second: the link handler no longer loads the web server, the database layer and FastAPI just to find the running server. Registered handlers keep working as they are.
 - Lines are matched ignoring spaces, so code moved into a new block stays next to its old version in split view, with only the indentation it gained or lost highlighted at the start of the line, instead of showing as a block removed and a different block added. In such a block the lines added or removed with no counterpart are highlighted in full.
 - Cmd+click with a single result outside the review opens the file in a window at once, instead of a list with one entry.
 - The unit filter (All, To review, Since my last review) is kept in this browser, so a reload or a new tab opens with the last choice, as the diff layout already did.

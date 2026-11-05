@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from typer.testing import CliRunner
 
 from bussola.cli import app
-from bussola.handler import registration, server
+from bussola.handler import registration, server, serving
 from tests.apiclient import ApiClient
 from tests.gitrepo import GitFixture
 
@@ -210,10 +210,10 @@ def test_serve_refuses_port_0() -> None:
 def test_serve_exits_quietly_on_ctrl_c(git_repo: GitFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     git_repo.commit({"a.txt": "a\n"})
 
-    def interrupted(_self: server.PublishedServer) -> None:
+    def interrupted(_self: serving.PublishedServer) -> None:
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(server.PublishedServer, "run", interrupted)
+    monkeypatch.setattr(serving.PublishedServer, "run", interrupted)
 
     result = runner.invoke(app, ["serve", "--no-open", "--repo", str(git_repo.root)])
 

@@ -16,11 +16,11 @@ import pytest
 import uvicorn
 from fastapi import FastAPI
 
+from bussola.access import INVALID_TOKEN_CODE
 from bussola.errors import InvalidRequestError
 from bussola.handler.server import (
     Launcher,
     Probe,
-    PublishedServer,
     ServerAddress,
     ServerStartError,
     port_is_free,
@@ -31,7 +31,7 @@ from bussola.handler.server import (
     start_server,
     withdraw_server,
 )
-from bussola.security import INVALID_TOKEN_CODE
+from bussola.handler.serving import PublishedServer
 
 TOKEN = "secret-token"
 

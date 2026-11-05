@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 from bussola.errors import InvalidRequestError
-from bussola.forge.pulls import parse_pull_request_url
+from bussola.forge.addresses import parse_pull_request_url
 
 SCHEME = "bussola"
 BUSSOLA_MODULE = ("-P", "-m", "bussola")

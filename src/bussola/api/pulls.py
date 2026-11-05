@@ -7,6 +7,7 @@ from bussola.api.schemas import PullRequestLinkIn, PullRequestListOut, PullReque
 from bussola.api.state import app_state
 from bussola.api.views import forge_status_out, pull_request_out, review_detail_out
 from bussola.directories import find_repositories
+from bussola.forge.addresses import parse_pull_request_url
 from bussola.forge.base import ForgeError
 from bussola.forge.pulls import (
     ForgeSession,
@@ -14,7 +15,6 @@ from bussola.forge.pulls import (
     existing_review,
     find_repo_for,
     list_pull_requests,
-    parse_pull_request_url,
     review_pull_request,
 )
 from bussola.forge.review_sync import sync_pull_requests

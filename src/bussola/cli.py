@@ -8,25 +8,26 @@ from typing import Annotated
 
 import typer
 
+from bussola.access import TOKEN_ENV, allowed_hosts_for, is_local_host, new_token
 from bussola.ai.config import default_config_file
 from bussola.app import create_app
-from bussola.config import DEFAULT_HOST, DEFAULT_PORT, AppSettings, load_repo_config
+from bussola.config import DEFAULT_HOST, DEFAULT_PORT, AppSettings, default_data_dir, load_repo_config
 from bussola.errors import DomainError
 from bussola.git import GitError, GitRepo, InvalidRefError
 from bussola.handler import registration
-from bussola.handler.server import Launcher, ServerAddress, record_link_error, run_published
+from bussola.handler.opening import COMMAND, USAGE_ERROR_EXIT_CODE, open_link
+from bussola.handler.server import ServerAddress
+from bussola.handler.serving import run_published
 from bussola.identity import GitConfigIdentity
 from bussola.review.context import ReviewContext
 from bussola.review.overview import unit_views
 from bussola.review.refs import NoBaseBranchError, default_base_ref
 from bussola.review.repos import register_repo
 from bussola.review.revisions import refresh_review
-from bussola.security import TOKEN_ENV, allowed_hosts_for, is_local_host, new_token
-from bussola.storage.database import Database, default_data_dir
+from bussola.storage.database import Database
 from bussola.storage.repositories import Store
 
 BROWSER_OPEN_DELAY_SECONDS = 1.0
-USAGE_ERROR_EXIT_CODE = 2
 SHORT_SHA_LENGTH = 12
 CLI_ERRORS = (GitError, InvalidRefError, NoBaseBranchError, DomainError)
 
@@ -74,20 +75,7 @@ def serve(
     run_published(create_app(settings), settings.data_dir, address)
 
 
-@app.command("open-link")
-def open_link(
-    link: Annotated[str, typer.Argument(help="A bussola:// link")],
-    data_dir: Annotated[Path | None, typer.Option("--data-dir", help="Data folder (default: BUSSOLA_DATA_DIR, then the user data folder)")] = None,
-    search_path: Annotated[str | None, typer.Option("--search-path", hidden=True)] = None,
-) -> None:
-    """Open a bussola:// link, starting the server if it is not running."""
-    data_dir = (data_dir or default_data_dir()).resolve()
-    with _cli_errors():
-        try:
-            Launcher(data_dir, search_path=search_path).open(link)
-        except Exception as error:
-            record_link_error(data_dir, link, error)
-            raise
+app.command(COMMAND)(open_link)
 
 
 @app.command("install-handler")
