@@ -516,5 +516,6 @@ class AiReviewStatusOut(BaseModel):
     phase: AiReviewPhase | None = None
     done: int = 0
     total: int = 0
+    lookups: int = 0
     units: int
     reviewed_units: int

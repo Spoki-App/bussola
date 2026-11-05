@@ -24,7 +24,7 @@ export function useAiReviewStatus(reviewId: number, poll: boolean) {
     queryKey: aiReviewKey(reviewId),
     queryFn: () => getJson<AiReviewStatus>(reviewPath(reviewId)),
     retry: false,
-    refetchInterval: poll ? PROGRESS_POLL_MS : false,
+    refetchInterval: (query) => (poll || query.state.data?.running ? PROGRESS_POLL_MS : false),
   })
 }
 
@@ -51,4 +51,8 @@ export function usePendingAiReviewCalls(reviewId: number): string[] {
     filters: { mutationKey: runKey(reviewId), status: 'pending' },
     select: (mutation) => (mutation.state.variables as AiCall).call_id,
   })
+}
+
+export function useCancelAiReview(reviewId: number) {
+  return useMutation({ mutationFn: () => postJson<{ cancelled: boolean }>(`${reviewPath(reviewId)}/cancel`) })
 }

@@ -20,7 +20,7 @@ const AI: AiStatus = {
   target: '["anthropic", "claude-opus-5-5", "https://api.anthropic.com"]',
 }
 
-const IDLE: AiReviewStatus = { running: false, phase: null, done: 0, total: 0, units: 5, reviewed_units: 0 }
+const IDLE: AiReviewStatus = { running: false, phase: null, done: 0, total: 0, lookups: 0, units: 5, reviewed_units: 0 }
 
 function Harness() {
   return <AiReview repoId={3} review={useAiReview(1)} />
@@ -76,14 +76,14 @@ describe('AI review', () => {
 
   it('shows the progress and can be cancelled, keeping what was found', async () => {
     const request: { finish?: (response: Response) => void; done?: boolean } = {}
-    const running: AiReviewStatus = { running: true, phase: 'reviewing', done: 2, total: 5, units: 5, reviewed_units: 2 }
+    const running: AiReviewStatus = { running: true, phase: 'reviewing', done: 2, total: 5, lookups: 3, units: 5, reviewed_units: 2 }
     const fetchMock = renderReview(
       () => new Promise<Response>((resolve) => { request.finish = resolve }),
       () => (request.finish && !request.done ? running : IDLE),
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'AI review' }))
-    expect(await screen.findByText('AI review: 2 of 5 units reviewed...', undefined, { timeout: 3000 })).toBeInTheDocument()
+    expect(await screen.findByText('AI review: 2 of 5 units reviewed, 3 code lookups so far...', undefined, { timeout: 3000 })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
     await waitFor(() => { expect(fetchMock.mock.calls.some(([url]) => url.startsWith('/api/ai/calls/'))).toBe(true) })
@@ -98,11 +98,20 @@ describe('AI review', () => {
     expect(await screen.findByText('3 of 5 units have an AI review.')).toBeInTheDocument()
   })
 
-  it('shows a review started in another tab without a Cancel it cannot send', async () => {
-    renderReview(() => new Promise<Response>(() => undefined), () => ({ running: true, phase: 'rating', done: 1, total: 5, units: 5, reviewed_units: 0 }))
+  it('follows and cancels a review started in another tab', async () => {
+    let calls = 0
+    const fetchMock = renderReview(
+      () => new Promise<Response>(() => undefined),
+      () => {
+        calls += 1
+        return calls < 3 ? { ...IDLE, running: true, phase: 'rating', done: calls, total: 5 } : IDLE
+      },
+    )
 
     expect(await screen.findByText('Rating the impact first: 1 of 5 units...')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'AI review' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => { expect(fetchMock.mock.calls.some(([url]) => url === '/api/reviews/1/ai-review/cancel')).toBe(true) })
+    expect(await screen.findByRole('button', { name: 'AI review' }, { timeout: 4000 })).toBeInTheDocument()
   })
 })

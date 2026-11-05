@@ -12,21 +12,19 @@ interface Props {
 export function AiReview({ repoId, review }: Props) {
   if (review.running) {
     return (
-      <>
+      <span className="summary-action">
         <span className="muted" role="status">
           {aiReviewProgress(review.status)}
         </span>
-        {review.cancellable && (
-          <button type="button" onClick={review.cancel}>
-            Cancel
-          </button>
-        )}
-      </>
+        <button type="button" onClick={review.cancel}>
+          Cancel
+        </button>
+      </span>
     )
   }
   const note = review.result ? aiReviewSummary(review.result) : aiReviewCoverage(review.status)
   return (
-    <>
+    <span className="summary-action">
       {note && (
         <span className="muted" role="status">
           {note}
@@ -39,6 +37,6 @@ export function AiReview({ repoId, review }: Props) {
         title="Ask the AI provider to review each unit changed since the last AI review, the highest impact first, and add what it finds as threads"
         onRun={review.run}
       />
-    </>
+    </span>
   )
 }

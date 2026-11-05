@@ -35,6 +35,8 @@ PRIVATE_ENV_PREFIX = "BUSSOLA_"
 PIPE_GRACE_SECONDS = 0.5
 REQUIRED_FLAG = "--safe-mode"
 MCP_SERVER = "bussola"
+USER_SETTINGS = "user"
+TOOL_SETTINGS = {"disableAllHooks": True, "claudeMdExcludes": ["**/*"]}
 READER_NAME = "bussola-claude-output"
 HELP_TIMEOUT_SECONDS = 15.0
 FAILED_CHECK_SECONDS = 60.0
@@ -192,7 +194,18 @@ class ClaudeCodeProvider:
 def _tool_arguments(tools: ToolRunner, url: str) -> list[str]:
     config = {"mcpServers": {MCP_SERVER: {"type": "http", "url": url}}}
     allowed = ",".join(f"mcp__{MCP_SERVER}__{tool.name}" for tool in tools.definitions)
-    return ["--setting-sources", "", "--disable-slash-commands", "--strict-mcp-config", "--mcp-config", json.dumps(config), "--allowedTools", allowed]
+    return [
+        "--setting-sources",
+        USER_SETTINGS,
+        "--settings",
+        json.dumps(TOOL_SETTINGS),
+        "--disable-slash-commands",
+        "--strict-mcp-config",
+        "--mcp-config",
+        json.dumps(config),
+        "--allowedTools",
+        allowed,
+    ]
 
 
 def _claude_environment() -> dict[str, str]:

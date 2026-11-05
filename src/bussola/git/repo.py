@@ -1,9 +1,11 @@
 import os
 import subprocess
+import tempfile
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Self
+from typing import IO, Self
 
 from bussola.git.blobs import OBJECT_ID, BlobReader
 from bussola.git.errors import GitError, InvalidRefError
@@ -17,6 +19,7 @@ DEFAULT_REMOTE = "origin"
 LOCAL_PREFIX = "refs/heads/"
 REMOTE_PREFIX = "refs/remotes/"
 SYMBOLIC_HEAD = "/HEAD"
+GREP_FIELDS = 3
 GIT_ENV = {"GIT_TERMINAL_PROMPT": "0", "LC_ALL": "C", "GIT_OPTIONAL_LOCKS": "0"}
 
 
@@ -27,6 +30,19 @@ class ChangeStatus(StrEnum):
     RENAMED = "R"
     COPIED = "C"
     TYPE_CHANGED = "T"
+
+
+@dataclass(frozen=True)
+class GrepMatch:
+    path: str
+    line: int
+    text: str
+
+
+@dataclass(frozen=True)
+class GrepResult:
+    matches: list[GrepMatch]
+    more: bool
 
 
 @dataclass(frozen=True)
@@ -161,6 +177,26 @@ class GitRepo:
             raise InvalidRefError(commit)
         self.run("archive", "--format=tar", f"--output={output}", commit)
 
+    def grep(self, commit: str, text: str, accept: Callable[[str], bool], limit: int) -> GrepResult:
+        args = ["grep", "-n", "-I", "-F", "--null", "-e", text, commit, "--"]
+        matches: list[GrepMatch] = []
+        command = [GIT, *args]
+        with tempfile.TemporaryFile() as errors, subprocess.Popen(command, cwd=self.root, env=_git_env(), stdout=subprocess.PIPE, stderr=errors) as process:
+            try:
+                for match in _grep_matches(process.stdout, f"{commit}:"):
+                    if not accept(match.path):
+                        continue
+                    if len(matches) == limit:
+                        return GrepResult(matches, more=True)
+                    matches.append(match)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+            if process.wait() > 1:
+                errors.seek(0)
+                raise GitError(args, errors.read().decode(errors="replace"))
+        return GrepResult(matches, more=False)
+
     def blob_reader(self) -> BlobReader:
         process = subprocess.Popen([GIT, "cat-file", "--batch"], cwd=self.root, env=_git_env(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         return BlobReader(process)
@@ -203,6 +239,13 @@ def read_git_config_values(cwd: Path, pattern: str) -> dict[str, str]:
         if value.strip():
             values[key] = value.strip()
     return values
+
+
+def _grep_matches(output: IO[bytes] | None, prefix: str) -> Iterator[GrepMatch]:
+    for raw in output or ():
+        fields = raw.decode(errors="replace").rstrip("\n").split("\0", 2)
+        if len(fields) == GREP_FIELDS and fields[1].isdigit():
+            yield GrepMatch(fields[0].removeprefix(prefix), int(fields[1]), fields[2])
 
 
 def _git_env() -> dict[str, str]:

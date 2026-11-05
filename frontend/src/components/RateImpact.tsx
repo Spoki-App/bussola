@@ -12,18 +12,18 @@ interface Props {
 export function RateImpact({ repoId, rating }: Props) {
   if (rating.pending) {
     return (
-      <>
+      <span className="summary-action">
         <span className="muted" role="status">
           Rating the impact of each unit...
         </span>
         <button type="button" onClick={rating.cancel}>
           Cancel
         </button>
-      </>
+      </span>
     )
   }
   return (
-    <>
+    <span className="summary-action">
       {rating.result && (
         <span className="muted" role="status">
           {ratingSummary(rating.result)}
@@ -31,6 +31,6 @@ export function RateImpact({ repoId, rating }: Props) {
       )}
       {rating.error && <ErrorNote message={describeError(rating.error)} />}
       <AiActionButton repoId={repoId} label="Rate impact" title="Ask the AI provider to rate the impact of each unit that has no current rating" onRun={rating.run} />
-    </>
+    </span>
   )
 }

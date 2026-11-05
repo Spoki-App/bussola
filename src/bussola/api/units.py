@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Response
 
-from bussola.api.deps import ContextDep, repo_of, resolve_revision, side_commit, side_path, snapshot_of
+from bussola.api.deps import ContextDep, repo_of, resolve_revision, snapshot_of
 from bussola.api.images import image_response
 from bussola.api.schemas import DiffOut, DiffRowOut, UnitOut
 from bussola.api.views import unit_out
@@ -11,7 +11,7 @@ from bussola.review.keys import key_of
 from bussola.review.modules import ModulePaths
 from bussola.review.overview import UnitFilter, approval_set, unit_views
 from bussola.review.repos import open_repo
-from bussola.review.rows import Side
+from bussola.review.rows import Side, side_commit, side_path
 from bussola.review.states import compute_statuses
 from bussola.review.threads_count import open_thread_counts
 

@@ -19,6 +19,7 @@ from bussola.storage.models import (
     UnitDescription,
     UnitSnapshot,
 )
+from bussola.units.model import UnitKind
 
 SNAPSHOT_TEXT_COLUMNS = (UnitSnapshot.base_text, UnitSnapshot.head_text, UnitSnapshot.base_lines, UnitSnapshot.head_lines)
 CHANGE_KEY = ("review_id", "path", "kind", "qualified_name", "change_hash")
@@ -102,6 +103,12 @@ class SqlReviewRepository(_SqlRepository):
     def snapshot_lines(self, revision_id: int) -> list[UnitSnapshot]:
         query = select(UnitSnapshot).where(UnitSnapshot.revision_id == revision_id).options(defer(UnitSnapshot.base_text), defer(UnitSnapshot.head_text))
         return list(self._session.scalars(query))
+
+    def binary_snapshot_ids(self, revision_id: int) -> set[int]:
+        query = select(UnitSnapshot.id).where(
+            UnitSnapshot.revision_id == revision_id, UnitSnapshot.kind == UnitKind.FILE, UnitSnapshot.base_text.is_(None), UnitSnapshot.head_text.is_(None)
+        )
+        return set(self._session.scalars(query))
 
     def get_snapshot(self, snapshot_id: int) -> UnitSnapshot | None:
         return self._session.get(UnitSnapshot, snapshot_id)

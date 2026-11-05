@@ -335,7 +335,9 @@ class EchoTools:
         return ToolOutcome(f"1: contents of {arguments['path']}")
 
 
-def test_tools_reach_the_cli_as_its_only_mcp_server_without_user_settings(fake_claude: FakeClaude, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_tools_reach_the_cli_as_its_only_mcp_server_without_hooks_or_claude_md(
+    fake_claude: FakeClaude, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     fake_claude.answer({"type": "result", "is_error": False, "result": "", "structured_output": {"findings": []}})
     monkeypatch.setenv("FAKE_CLAUDE_MCP_CALL", json.dumps({"name": "read_file", "arguments": {"path": "app.py"}}))
     monkeypatch.setenv("FAKE_CLAUDE_MCP_LOG", str(tmp_path / "mcp.json"))
@@ -351,7 +353,8 @@ def test_tools_reach_the_cli_as_its_only_mcp_server_without_user_settings(fake_c
     assert called["result"] == {"content": [{"type": "text", "text": "1: contents of app.py"}], "isError": False}
     args = fake_claude.call()["args"]
     assert "--safe-mode" not in args
-    assert args[args.index("--setting-sources") + 1] == ""
+    assert args[args.index("--setting-sources") + 1] == "user"
+    assert json.loads(args[args.index("--settings") + 1]) == {"disableAllHooks": True, "claudeMdExcludes": ["**/*"]}
     assert args[args.index("--tools") + 1] == ""
     assert args[args.index("--allowedTools") + 1] == "mcp__bussola__read_file"
     assert {"--disable-slash-commands", "--strict-mcp-config"} <= set(args)

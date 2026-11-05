@@ -16,19 +16,20 @@ from bussola.ai.runner import AiRunner, AiTask
 from bussola.errors import ConflictError
 from bussola.review.anchoring import selected_lines
 from bussola.review.context import ReviewContext
-from bussola.review.descriptions import UNIT_KINDS, UNIT_NAMES, Impact, change_hash, marked, old_key_of, rate_units, stored_descriptions, unit_prompt
+from bussola.review.descriptions import UNIT_KINDS, Impact, change_hash, marked, old_key_of, rate_units, stored_descriptions, unit_prompt
 from bussola.review.keys import key_of
-from bussola.review.review_tools import ReviewTools, unit_label
+from bussola.review.review_tools import SIDES, ReviewTools, label_of, unit_label
 from bussola.review.rows import Side, is_binary, side_lines
 from bussola.review.thread_types import ThreadScope
-from bussola.review.threads import NewThread, ThreadView, create_thread, thread_views
+from bussola.review.threads import MAX_BODY_LENGTH, NewThread, ThreadView, create_thread, thread_views
 from bussola.storage.models import AiReviewedUnit, Reviewer, Revision, UnitSnapshot
 
 AI_EMAIL_DOMAIN = "ai.bussola.invalid"
 IMPACT_ORDER = {Impact.HIGH: 0, Impact.MEDIUM: 1, Impact.LOW: 2}
 UNRATED_ORDER = IMPACT_ORDER[Impact.MEDIUM]
-SIDES = {"after": Side.HEAD, "before": Side.BASE}
 MAX_GROUP_CHARACTERS = 100_000
+MAX_FINDING_CHARACTERS = MAX_BODY_LENGTH - 1_000
+CLIPPED_FINDING = "\n\n[The rest of this finding was too long to keep.]"
 
 type RaisedKey = tuple[str, str | None, str | None, str | None, int | None, str]
 
@@ -43,9 +44,10 @@ class Finding(BaseModel):
     @field_validator("body")
     @classmethod
     def _trimmed(cls, body: str) -> str:
-        if not body.strip():
+        text = body.strip()
+        if not text:
             raise ValueError("must not be blank")
-        return body.strip()
+        return text if len(text) <= MAX_FINDING_CHARACTERS else text[:MAX_FINDING_CHARACTERS] + CLIPPED_FINDING
 
 
 class ReviewFindings(BaseModel):
@@ -99,6 +101,7 @@ class AiReviewProgress:
     phase: AiReviewPhase
     done: int = 0
     total: int = 0
+    lookups: int = 0
 
 
 @dataclass(frozen=True)
@@ -127,13 +130,15 @@ class RunningReviews:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._progress: dict[int, AiReviewProgress] = {}
+        self._cancellations: dict[int, Cancellation] = {}
 
     @contextmanager
-    def start(self, review_id: int) -> Generator[Callable[[AiReviewProgress], None]]:
+    def start(self, review_id: int, cancellation: Cancellation) -> Generator[Callable[[AiReviewProgress], None]]:
         with self._lock:
             if review_id in self._progress:
                 raise ConflictError("An AI review of this pull request is already running")
             self._progress[review_id] = AiReviewProgress(AiReviewPhase.RATING)
+            self._cancellations[review_id] = cancellation
 
         def report(progress: AiReviewProgress) -> None:
             with self._lock:
@@ -144,30 +149,37 @@ class RunningReviews:
         finally:
             with self._lock:
                 del self._progress[review_id]
+                del self._cancellations[review_id]
 
     def progress(self, review_id: int) -> AiReviewProgress | None:
         with self._lock:
             return self._progress.get(review_id)
 
+    def cancel(self, review_id: int) -> bool:
+        with self._lock:
+            cancellation = self._cancellations.get(review_id)
+        if cancellation is None:
+            return False
+        cancellation.cancel()
+        return True
+
 
 def run_ai_review(job: AiReviewJob) -> AiReviewOutcome:
     context, cancellation = job.context, job.cancellation
-    snapshots, pending = reviewable_units(context, job.revision)
+    snapshots, pending = reviewable_units(context, job.tools.snapshots)
     rating = rate_units(context, snapshots, job.runner, cancellation, lambda progress: job.report(_progress(AiReviewPhase.RATING, progress)))
     if rating.cancelled or rating.stopped_by is not None:
         return AiReviewOutcome(0, 0, len(rating.errors), rating.cancelled, rating.stopped_by)
     groups = review_groups(snapshots, pending, _impacts(context, snapshots))
     done = [0, *accumulate(len(group) for group in groups)]
-    job.report(AiReviewProgress(AiReviewPhase.REVIEWING, 0, len(pending)))
+    progress = _ReviewProgress(job.report, len(pending))
+    progress.reviewed(0)
     if groups:
         job.tools.prepare()
-    reviewer = _GroupReviewer(job, snapshots, ai_reviewer(context, job.runner.provider))
+    reviewer = _GroupReviewer(job, snapshots, ai_reviewer(context, job.runner.provider), progress)
     context.store.commit()
     outcome: BatchResult[int, int] = run_batch(
-        range(len(groups)),
-        lambda index: reviewer.review(groups[index]),
-        cancellation,
-        lambda progress: job.report(AiReviewProgress(AiReviewPhase.REVIEWING, done[progress.done], len(pending))),
+        range(len(groups)), lambda index: reviewer.review(groups[index]), cancellation, lambda batch: progress.reviewed(done[batch.done])
     )
     return AiReviewOutcome(
         reviewed=sum(len(groups[index]) for index in outcome.results),
@@ -178,9 +190,15 @@ def run_ai_review(job: AiReviewJob) -> AiReviewOutcome:
     )
 
 
-def reviewable_units(context: ReviewContext, revision: Revision) -> tuple[list[UnitSnapshot], list[UnitSnapshot]]:
-    snapshots = [snapshot for snapshot in context.store.reviews.snapshots(revision.id) if not is_binary(snapshot)]
-    return snapshots, unreviewed(snapshots, context.store.ai_reviews.reviewed_units(context.review.id))
+def reviewable_units(context: ReviewContext, snapshots: list[UnitSnapshot]) -> tuple[list[UnitSnapshot], list[UnitSnapshot]]:
+    texts = [snapshot for snapshot in snapshots if not is_binary(snapshot)]
+    return texts, unreviewed(texts, context.store.ai_reviews.reviewed_units(context.review.id))
+
+
+def ai_review_coverage(context: ReviewContext, revision: Revision) -> tuple[int, int]:
+    binary = context.store.reviews.binary_snapshot_ids(revision.id)
+    units = [snapshot for snapshot in context.store.reviews.snapshots(revision.id, texts=False) if snapshot.id not in binary]
+    return len(units), len(units) - len(unreviewed(units, context.store.ai_reviews.reviewed_units(context.review.id)))
 
 
 def unreviewed(snapshots: list[UnitSnapshot], reviewed: Iterable[AiReviewedUnit]) -> list[UnitSnapshot]:
@@ -230,19 +248,46 @@ def review_prompt(group: list[UnitSnapshot], snapshots: list[UnitSnapshot], revi
     return "\n".join(lines)
 
 
+class _ReviewProgress:
+    def __init__(self, report: Callable[[AiReviewProgress], None], total: int) -> None:
+        self._report = report
+        self._total = total
+        self._done = 0
+        self._lookups = 0
+        self._lock = threading.Lock()
+
+    def reviewed(self, done: int) -> None:
+        with self._lock:
+            self._done = done
+            self._report(AiReviewProgress(AiReviewPhase.REVIEWING, self._done, self._total, self._lookups))
+
+    def looked_up(self) -> None:
+        with self._lock:
+            self._lookups += 1
+            self._report(AiReviewProgress(AiReviewPhase.REVIEWING, self._done, self._total, self._lookups))
+
+
 @dataclass(frozen=True)
 class _GroupReviewer:
     job: AiReviewJob
     snapshots: list[UnitSnapshot]
     author: Reviewer
+    progress: _ReviewProgress
 
     def review(self, group: list[UnitSnapshot]) -> int:
-        context, revision, provider = self.job.context, self.job.revision, self.job.runner.provider
+        context, revision = self.job.context, self.job.revision
         views = [view for view in thread_views(context, revision) if any(comment.deleted_at is None for comment in view.comments)]
-        toolbox = self.job.tools.toolbox()
+        toolbox = self.job.tools.toolbox(self.progress.looked_up)
         prompt = review_prompt(group, self.snapshots, revision, _pull_request_text(context), views)
         content_hash = hashlib.sha256(f"{prompt}\0{toolbox.fingerprint()}".encode()).hexdigest()
         findings = self.job.runner.with_tools(toolbox).run(REVIEW_PULL_REQUEST, prompt, self.job.cancellation, content_hash).findings
+        with context.store.session.begin_nested():
+            created = self._save(group, findings, views)
+        context.store.commit()
+        return created
+
+    def _save(self, group: list[UnitSnapshot], findings: list[Finding], views: list[ThreadView]) -> int:
+        context, provider = self.job.context, self.job.runner.provider
         raised = {_raised_key(view) for view in views}
         ai_context = replace(context, reviewer=self.author)
         per_unit: Counter[int] = Counter()
@@ -252,7 +297,7 @@ class _GroupReviewer:
             key = _request_key(request)
             if key in raised:
                 continue
-            create_thread(ai_context, revision, request)
+            create_thread(ai_context, self.job.revision, request)
             raised.add(key)
             created += 1
             if request.snapshot is not None:
@@ -269,34 +314,27 @@ class _GroupReviewer:
                 provider.model,
             )
             context.store.ai_reviews.save_reviewed_unit(reviewed)
-        context.store.commit()
         return created
 
 
 def place_finding(finding: Finding, group: list[UnitSnapshot], snapshots: list[UnitSnapshot]) -> NewThread:
     focus = {snapshot.id for snapshot in group}
+    named = [snapshot for snapshot in snapshots if finding.path in {snapshot.path, snapshot.old_path}]
     for side in (SIDES[finding.side], Side.BASE if SIDES[finding.side] == Side.HEAD else Side.HEAD):
-        candidates = [snapshot for snapshot in snapshots if _side_path(snapshot, side) == finding.path and side_lines(snapshot, side)]
+        candidates = [snapshot for snapshot in named if side_lines(snapshot, side)]
         if candidates:
             snapshot = min(candidates, key=lambda snapshot: (_distance(snapshot, side, finding.start_line), snapshot.id not in focus))
             numbers = [line.file_line for line in side_lines(snapshot, side)]
             first, last = sorted((_nearest(numbers, finding.start_line), _nearest(numbers, finding.end_line)))
             return NewThread(ThreadScope.UNIT, finding.body, snapshot, side=side, line_offset=first, line_count=last - first + 1)
-    changed = next((snapshot.path for snapshot in snapshots if finding.path in {snapshot.path, snapshot.old_path}), None)
-    if changed is not None:
-        return NewThread(ThreadScope.FILE, f"Line {finding.start_line}: {finding.body}", path=changed)
+    if named:
+        return NewThread(ThreadScope.FILE, f"Line {finding.start_line}: {finding.body}", path=named[0].path)
     return NewThread(ThreadScope.REVIEW, f"On `{finding.path}`, line {finding.start_line}:\n\n{finding.body}")
-
-
-def _side_path(snapshot: UnitSnapshot, side: Side) -> str:
-    return snapshot.old_path or snapshot.path if side == Side.BASE else snapshot.path
 
 
 def _distance(snapshot: UnitSnapshot, side: Side, line: int) -> int:
     numbers = [number for unit_line in side_lines(snapshot, side) if (number := unit_line.file_line) is not None]
-    if not numbers:
-        return 1 << 30
-    return 0 if min(numbers) <= line <= max(numbers) else min(abs(line - min(numbers)), abs(line - max(numbers)))
+    return min((abs(line - number) for number in numbers), default=1 << 30)
 
 
 def _nearest(numbers: list[int | None], wanted: int) -> int:
@@ -329,7 +367,7 @@ def _thread_place(view: ThreadView) -> str:
         return "On the whole pull request"
     if thread.scope == ThreadScope.FILE:
         return f"On {thread.path}"
-    unit = f"{thread.path}::{thread.qualified_name or UNIT_NAMES.get(thread.kind or '', thread.kind or '')}"
+    unit = label_of(thread.path, thread.kind, thread.qualified_name)
     side = "before" if thread.side == Side.BASE else "after"
     if view.file_line is None:
         return f"On {unit}, an earlier version, {side}: {selected_lines(thread)[0].strip()}"

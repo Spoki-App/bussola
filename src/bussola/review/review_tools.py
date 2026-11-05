@@ -1,4 +1,5 @@
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
@@ -11,7 +12,7 @@ from bussola.globs import matches_any
 from bussola.navigation.navigator import Click, Navigation, Navigator, Origin, Target
 from bussola.navigation.positions import byte_to_utf16, source_lines
 from bussola.review.descriptions import UNIT_NAMES, unit_prompt
-from bussola.review.rows import Side
+from bussola.review.rows import Side, side_commit
 from bussola.storage.models import Revision, UnitSnapshot
 
 MAX_TOOL_CALLS = 40
@@ -25,7 +26,7 @@ FIND_USAGES = (
     "Give the line of the definition or of any use. Returns path:line and the line of each use."
 )
 SIDES = {"after": Side.HEAD, "before": Side.BASE}
-GREP_LINE = re.compile(r"^[^:]+:(?P<path>.*?):(?P<line>\d+):(?P<text>.*)$")
+IDENTIFIER_BYTE = rb"[A-Za-z0-9_$]"
 
 type SideName = Literal["after", "before"]
 
@@ -54,7 +55,11 @@ class UnitName(BaseModel):
 
 
 def unit_label(snapshot: UnitSnapshot) -> str:
-    return f"{snapshot.path}::{snapshot.qualified_name or UNIT_NAMES.get(snapshot.kind, snapshot.kind)}"
+    return label_of(snapshot.path, snapshot.kind, snapshot.qualified_name)
+
+
+def label_of(path: str | None, kind: str | None, qualified_name: str | None) -> str:
+    return f"{path}::{qualified_name or UNIT_NAMES.get(kind or '', kind or '')}"
 
 
 @dataclass(frozen=True)
@@ -66,7 +71,7 @@ class ReviewTools:
     ignore: tuple[str, ...]
     cancellation: Cancellation
 
-    def toolbox(self) -> Toolbox:
+    def toolbox(self, on_call: Callable[[], None] | None = None) -> Toolbox:
         return Toolbox(
             [
                 AiTool(
@@ -86,11 +91,12 @@ class ReviewTools:
                 AiTool("unit_diff", "One changed unit of the pull request before and after the change, with line numbers.", UnitName, self.unit_diff),
             ],
             MAX_TOOL_CALLS,
+            on_call,
         )
 
     def prepare(self) -> None:
         for side in Side:
-            self.navigator.prepare(self.repo, self._commit(side), self.ignore)
+            self.navigator.prepare(self.repo, side_commit(self.revision, side), self.ignore)
 
     def find_definition(self, location: Location) -> str:
         found = self._navigate(location)
@@ -108,24 +114,26 @@ class ReviewTools:
         return self._targets(found.targets, f"No usages of {location.name} were found.")
 
     def read_file(self, request: FileRange) -> str:
-        lines = self._file(request.path, SIDES[request.side]).splitlines()
+        if request.end_line < request.start_line:
+            raise ToolError("end_line must not be before start_line")
+        lines = self._lines(request.path, SIDES[request.side])
         start = max(request.start_line, 1)
-        end = min(request.end_line, start + MAX_READ_LINES - 1, len(lines))
         if start > len(lines):
             raise ToolError(f"{request.path} has {len(lines)} lines on the {request.side} side")
-        return "\n".join(f"{number}: {lines[number - 1]}" for number in range(start, end + 1))
+        end = min(request.end_line, start + MAX_READ_LINES - 1, len(lines))
+        return "\n".join(f"{number}: {lines[number - 1].decode(errors='replace')}" for number in range(start, end + 1))
 
     def search(self, request: TextSearch) -> str:
         if not request.text.strip():
             raise ToolError("Give some text to look for")
         try:
-            output = self.repo.run("grep", "-n", "-I", "-F", "-e", request.text, self._commit(SIDES[request.side]), "--")
-        except GitError:
+            found = self.repo.grep(side_commit(self.revision, SIDES[request.side]), request.text, self._visible, MAX_SEARCH_RESULTS)
+        except GitError as error:
+            raise ToolError(f"The search failed: {error.stderr.strip() or error}") from error
+        if not found.matches:
             return f"Nothing contains {request.text!r}."
-        found = [match for line in output.decode(errors="replace").splitlines() if (match := GREP_LINE.match(line)) and self._visible(match["path"])]
-        shown = [f"{match['path']}:{match['line']}: {match['text'].strip()}" for match in found[:MAX_SEARCH_RESULTS]]
-        more = len(found) - len(shown)
-        return "\n".join(shown + ([f"... and {more} more"] if more else [])) or f"Nothing contains {request.text!r}."
+        shown = [f"{match.path}:{match.line}: {match.text.strip()}" for match in found.matches]
+        return "\n".join(shown + ([f"Only the first {MAX_SEARCH_RESULTS} are shown; search for something more specific."] if found.more else []))
 
     def unit_diff(self, request: UnitName) -> str:
         snapshot = next((snapshot for snapshot in self.snapshots if unit_label(snapshot) == request.unit), None)
@@ -135,33 +143,36 @@ class ReviewTools:
 
     def _navigate(self, location: Location) -> Navigation:
         side = SIDES[location.side]
-        lines = source_lines(self._file(location.path, side).encode())
+        lines = self._lines(location.path, side)
         if not 1 <= location.line <= len(lines):
             raise ToolError(f"{location.path} has {len(lines)} lines on the {location.side} side")
         line = lines[location.line - 1]
-        start = line.find(location.name.encode())
-        if start < 0:
+        found = re.search(rb"(?<!" + IDENTIFIER_BYTE + rb")" + re.escape(location.name.encode()) + rb"(?!" + IDENTIFIER_BYTE + rb")", line)
+        if found is None:
             raise ToolError(f"Line {location.line} of {location.path} does not contain {location.name}")
-        return self._wait(side, Click(location.path, location.line, byte_to_utf16(line, start)))
+        return self._wait(side, Click(location.path, location.line, byte_to_utf16(line, found.start())))
 
     def _wait(self, side: Side, click: Click) -> Navigation:
+        commit = side_commit(self.revision, side)
+        found = self.navigator.navigate(self.repo, commit, self.ignore, click)
         waited = 0.0
-        while True:
-            found = self.navigator.navigate(self.repo, self._commit(side), self.ignore, click)
-            if found.ready:
-                return found
+        while not found.ready:
             if waited >= INDEX_WAIT_SECONDS:
                 raise ToolError("The code index is still being built. Use search or read_file instead.")
             self.cancellation.sleep(INDEX_POLL_SECONDS)
             waited += INDEX_POLL_SECONDS
+            if self.navigator.prepare(self.repo, commit, self.ignore):
+                found = self.navigator.navigate(self.repo, commit, self.ignore, click)
+        return found
 
-    def _file(self, path: str, side: Side) -> str:
+    def _lines(self, path: str, side: Side) -> list[bytes]:
         if not self._visible(path):
             raise ToolError(f"{path} is excluded from reviews in this repository")
-        data = self.repo.file_at(self._commit(side), path)
+        data = self.repo.file_at(side_commit(self.revision, side), path)
         if data is None:
             raise ToolError(f"{path} does not exist on the {'before' if side == Side.BASE else 'after'} side")
-        return data.decode(errors="replace")
+        lines = source_lines(data)
+        return lines[:-1] if len(lines) > 1 and not lines[-1] else lines
 
     def _targets(self, targets: tuple[Target, ...], empty: str) -> str:
         visible = [target for target in targets if self._visible(target.path)]
@@ -173,6 +184,3 @@ class ReviewTools:
 
     def _visible(self, path: str) -> bool:
         return not matches_any(path, self.ignore)
-
-    def _commit(self, side: Side) -> str:
-        return self.revision.merge_base_sha if side == Side.BASE else self.revision.head_sha

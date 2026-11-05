@@ -31,9 +31,10 @@ class AiTool[T: BaseModel]:
 
 
 class Toolbox:
-    def __init__(self, tools: list[AiTool[Any]], max_calls: int) -> None:
+    def __init__(self, tools: list[AiTool[Any]], max_calls: int, on_call: Callable[[], None] | None = None) -> None:
         self._tools = {tool.name: tool for tool in tools}
         self._max_calls = max_calls
+        self._on_call = on_call
         self._lock = threading.Lock()
         self.calls = 0
 
@@ -48,6 +49,8 @@ class Toolbox:
         with self._lock:
             self.calls += 1
             spent = self.calls > self._max_calls
+        if self._on_call is not None:
+            self._on_call()
         if spent:
             return ToolOutcome(f"No tool calls are left ({self._max_calls} were used). Answer now with what you found.", error=True)
         tool = self._tools.get(name)

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from bussola.forge.base import Conversation, DiffSide, ForgeAdapter, RemoteNote, RemoteThread
-from bussola.forge.publish import body_hash
+from bussola.forge.publish import body_hash, local_body
 from bussola.review.anchoring import anchor_for
 from bussola.review.context import ReviewContext
 from bussola.review.rows import Side, side_lines
@@ -120,7 +120,7 @@ class _Importer:
         comment = self.context.store.threads.get_comment(record.comment_id)
         if comment is None or comment.deleted_at is not None or record.published_body_hash != body_hash(self.context, comment):
             return
-        comment.body, comment.edited_at = note.body, utcnow()
+        comment.body, comment.edited_at = local_body(self.context, comment, note.body), utcnow()
         record.published_body_hash = body_hash(self.context, comment)
         self.changes += 1
 

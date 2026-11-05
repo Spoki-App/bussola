@@ -99,8 +99,20 @@ def render_comment(context: ReviewContext, comment: Comment) -> str:
         return comment.body
     author = context.store.reviews.get_reviewer(comment.author_id)
     if author is not None and author.ai:
-        return f"{comment.body}\n\n<sub>{AI_MARKER} with {author.name}.</sub>"
+        return f"{comment.body}\n\n{_ai_marker(author.name)}"
     return f"**{author.name if author else 'Someone'}:** {comment.body}"
+
+
+def local_body(context: ReviewContext, comment: Comment, published: str) -> str:
+    author = context.store.reviews.get_reviewer(comment.author_id)
+    if comment.author_id == context.reviewer.id or author is None or not author.ai:
+        return published
+    text, marker = published.rstrip(), _ai_marker(author.name)
+    return text.removesuffix(marker).rstrip() if text.endswith(marker) else published
+
+
+def _ai_marker(name: str) -> str:
+    return f"<sub>{AI_MARKER} with {name}.</sub>"
 
 
 def _plan_new_thread(context: ReviewContext, view: ThreadView, comments: list[Comment], ranges: dict[str, LineRanges], plan: PublishPlan) -> None:

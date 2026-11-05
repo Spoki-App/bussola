@@ -4,7 +4,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Query, Request
 
-from bussola.api.deps import ContextDep, repo_of, resolve_revision, side_commit, side_path
+from bussola.api.deps import ContextDep, repo_of, resolve_revision
 from bussola.api.schemas import NavigationIn, NavigationIndexOut, NavigationOut, NavigationTargetOut, RevisionSideIn, ServerHintOut, SourceFileIn, SourceFileOut
 from bussola.api.state import app_state
 from bussola.config import load_repo_config
@@ -13,7 +13,7 @@ from bussola.forge.links import review_repository
 from bussola.navigation.navigator import Click, Navigation, Navigator, Target
 from bussola.review.context import ReviewContext
 from bussola.review.repos import open_repo
-from bussola.review.rows import Side
+from bussola.review.rows import Side, side_commit, side_path
 from bussola.storage.models import Revision, UnitSnapshot
 
 MAX_SOURCE_BYTES = 2_000_000

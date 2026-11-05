@@ -1,3 +1,4 @@
+import json
 import shutil
 import threading
 import time
@@ -7,8 +8,10 @@ from pathlib import Path
 import pytest
 
 from bussola.ai.base import AiRequest, AiUnreachableError, Cancellation, run_cancellable
+from bussola.review.context import ReviewContext
+from bussola.review.threads import NewThread, create_thread
 from bussola.storage.database import Database
-from bussola.storage.models import ForgeLink
+from bussola.storage.models import ForgeLink, Revision, Thread
 from bussola.storage.repositories import Store
 from tests.ai.fakes import ANTHROPIC_CONFIG, Answer, FakeProvider, fake_factory
 from tests.apiclient import ApiClient, Json, comment_on
@@ -162,7 +165,15 @@ def test_running_again_reviews_only_the_units_changed_since_the_last_ai_review(b
 
     assert run(api, review_id)["reviewed"] == 0
     assert len(provider.requests) == 3
-    assert api.call("GET", f"/reviews/{review_id}/ai-review") == {"running": False, "phase": None, "done": 0, "total": 0, "units": 2, "reviewed_units": 2}
+    assert api.call("GET", f"/reviews/{review_id}/ai-review") == {
+        "running": False,
+        "phase": None,
+        "done": 0,
+        "total": 0,
+        "lookups": 0,
+        "units": 2,
+        "reviewed_units": 2,
+    }
 
     billing.commit({"app.py": "def total(items):\n    return round(sum(items) * 1.2, 2)\n\n\ndef name():\n    return 'store'\n"}, "round")
     api.refresh(review_id)
@@ -212,12 +223,13 @@ def test_progress_is_reported_and_cancelling_keeps_the_findings_already_made(
     status = api.call("GET", f"/reviews/{review_id}/ai-review")
     assert (status["running"], status["phase"], status["done"], status["total"]) == (True, "reviewing", 1, 2)
     assert run(api, review_id, 409)["detail"] == "An AI review of this pull request is already running"
-    assert api.call("POST", "/ai/calls/review-1/cancel")["cancelled"] is True
+    assert api.call("POST", f"/reviews/{review_id}/ai-review/cancel")["cancelled"] is True
     running.join(WAIT_SECONDS)
 
     assert answers == [{"reviewed": 1, "findings": 1, "failed": 0, "cancelled": True, "error": None}]
     assert [thread["comments"][0]["body"] for thread in ai_threads(api, review_id)] == ["Hard-coded rate."]
     assert api.call("GET", f"/reviews/{review_id}/ai-review")["running"] is False
+    assert api.call("POST", f"/reviews/{review_id}/ai-review/cancel")["cancelled"] is False
 
 
 def test_an_unreachable_provider_while_rating_stops_before_any_review(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
@@ -242,12 +254,78 @@ def test_ai_threads_can_be_resolved_and_deleted_by_the_reviewer(billing: GitFixt
     assert ai_threads(api, review_id) == []
 
 
+def test_a_finding_in_a_function_stays_on_it_when_the_code_around_it_changed_too(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
+    git_repo.commit({"app.py": "import os\n\nTAX = 1\n\n\ndef total(items):\n    return sum(items)\n\n\nRATE = 1\n"}, "base")
+    git_repo.branch("feature")
+    git_repo.commit({"app.py": "import os\nimport sys\n\nTAX = 2\n\n\ndef total(items):\n    return sum(items) * TAX\n\n\nRATE = 2\n"}, "tax")
+    api = client(git_repo, data_dir, config_file, FakeProvider(HIGH, HIGH, {"findings": [finding(8, "TAX is read before it is set.")]}))
+    review_id = api.start_review()
+
+    run(api, review_id)
+
+    [thread] = ai_threads(api, review_id)
+    assert (thread["qualified_name"], thread["anchor"]["file_line"]) == ("total", 8)
+
+
+def test_a_finding_on_the_old_version_of_a_renamed_file_stays_on_the_old_lines(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
+    git_repo.commit({"billing.py": "def total(items):\n    count = len(items)\n    return sum(items)\n"}, "base")
+    git_repo.branch("feature")
+    git_repo.git("mv", "billing.py", "pricing.py")
+    git_repo.commit({"pricing.py": "def total(items):\n    count = len(items)\n    return sum(items) * 2\n"}, "rename")
+    findings = {"findings": [finding(3, "The old total ignored the rate.", side="before", path="pricing.py")]}
+    api = client(git_repo, data_dir, config_file, FakeProvider(HIGH, findings))
+    review_id = api.start_review()
+
+    run(api, review_id)
+
+    [thread] = ai_threads(api, review_id)
+    assert (thread["side"], thread["line_text"]) == ("base", "    return sum(items)")
+
+
+def test_a_finding_too_long_for_a_comment_is_shortened(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    api = client(billing, data_dir, config_file, FakeProvider(HIGH, LOW, {"findings": [finding(2, "x" * 70_000), finding(6, "Renamed shop.")]}))
+    review_id = api.start_review()
+
+    assert run(api, review_id)["findings"] == 2
+
+    bodies = sorted((thread["comments"][0]["body"] for thread in ai_threads(api, review_id)), key=len)
+    assert bodies[0] == "Renamed shop."
+    assert bodies[1].endswith("[The rest of this finding was too long to keep.]")
+    assert len(bodies[1]) < 65_536
+
+
+def test_a_group_that_fails_while_adding_threads_keeps_none_of_them(
+    billing: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    created: list[str] = []
+
+    def create_then_fail(context: ReviewContext, revision: Revision, request: NewThread) -> Thread:
+        if created:
+            raise RuntimeError("disk full")
+        created.append(request.body)
+        return create_thread(context, revision, request)
+
+    monkeypatch.setattr("bussola.review.ai_review.create_thread", create_then_fail)
+    api = client(billing, data_dir, config_file, FakeProvider(HIGH, LOW, {"findings": [finding(2, "Hard-coded rate."), finding(6, "Renamed shop.")]}))
+    review_id = api.start_review()
+
+    outcome = run(api, review_id)
+
+    assert (outcome["reviewed"], outcome["failed"], outcome["error"]) == (0, 2, "disk full")
+    assert ai_threads(api, review_id) == []
+    assert api.call("GET", f"/reviews/{review_id}/ai-review")["reviewed_units"] == 0
+
+
+SHOP = "from billing import total\n\n\ndef checkout(cart):\n    return total(cart)\n\n\ndef receipt(cart):\n    subtotal = total(cart)\n    return subtotal\n"
+
+
 @pytest.fixture
 def signature_change(git_repo: GitFixture) -> GitFixture:
     git_repo.commit(
         {
             "billing.py": "def total(items):\n    return sum(items)\n",
-            "shop.py": "from billing import total\n\n\ndef checkout(cart):\n    return total(cart)\n",
+            "shop.py": SHOP,
+            "notes.py": "FIRST = 1\n\x0c\nSECOND = 2\n",
             "generated/client.py": "from billing import total\n\nTOTAL = total([])\n",
             ".bussola.toml": 'ignore = ["generated/**"]\n',
         },
@@ -259,7 +337,9 @@ def signature_change(git_repo: GitFixture) -> GitFixture:
 
 
 @pytest.mark.usefixtures("git_only_path")
-def test_the_model_can_follow_the_code_outside_the_pull_request_with_tools(signature_change: GitFixture, data_dir: Path, config_file: Path) -> None:
+def test_the_model_can_follow_the_code_outside_the_pull_request_with_tools(
+    signature_change: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     seen: dict[str, str] = {}
 
     def review(request: AiRequest) -> Json:
@@ -271,14 +351,19 @@ def test_the_model_can_follow_the_code_outside_the_pull_request_with_tools(signa
             "search": ("search", {"text": "total(", "side": "after"}),
             "diff": ("unit_diff", {"unit": "billing.py::total"}),
             "hidden": ("read_file", {"path": "generated/client.py", "side": "after", "start_line": 1, "end_line": 3}),
+            "inside": ("find_definition", {"path": "shop.py", "side": "after", "line": 9, "name": "total"}),
+            "form feed": ("read_file", {"path": "notes.py", "side": "after", "start_line": 3, "end_line": 3}),
+            "backwards": ("read_file", {"path": "shop.py", "side": "after", "start_line": 5, "end_line": 4}),
         }
         for label, (name, arguments) in calls.items():
             seen[label] = request.tools.call(name, arguments).text
+        seen["status"] = json.dumps(api.call("GET", f"/reviews/{review_id}/ai-review"))
         return {"findings": [finding(1, "`shop.py:5` still calls `total` with one argument.", path="billing.py")]}
 
     provider = FakeProvider(HIGH, review)
     api = client(signature_change, data_dir, config_file, provider)
     review_id = api.start_review()
+    monkeypatch.setattr("bussola.review.review_tools.MAX_SEARCH_RESULTS", 1)
 
     assert run(api, review_id)["findings"] == 1
 
@@ -286,8 +371,12 @@ def test_the_model_can_follow_the_code_outside_the_pull_request_with_tools(signa
     assert "generated/client.py" not in seen["usages"]
     assert seen["definition"] == "billing.py:1: def total(items, rate):"
     assert seen["read"] == "4: def checkout(cart):\n5:     return total(cart)"
-    assert "shop.py:5: return total(cart)" in seen["search"]
-    assert "generated/client.py" not in seen["search"]
+    assert seen["search"] == "billing.py:1: def total(items, rate):\nOnly the first 1 are shown; search for something more specific."
+    assert seen["inside"] == "billing.py:1: def total(items, rate):"
+    assert seen["form feed"] == "3: SECOND = 2"
+    assert seen["backwards"] == "end_line must not be before start_line"
+    status = json.loads(seen["status"])
+    assert (status["running"], status["phase"], status["lookups"]) == (True, "reviewing", 9)
     assert "1: def total(items, rate):" in seen["diff"]
     assert seen["hidden"] == "generated/client.py is excluded from reviews in this repository"
     [thread] = ai_threads(api, review_id)

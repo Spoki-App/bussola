@@ -6,7 +6,10 @@ export function aiReviewProgress(status: AiReviewStatus | null): string {
     return 'Starting the AI review...'
   }
   const count = `${String(status.done)} of ${plural(status.total, 'unit')}`
-  return status.phase === 'rating' ? `Rating the impact first: ${count}...` : `AI review: ${count} reviewed...`
+  if (status.phase === 'rating') {
+    return `Rating the impact first: ${count}...`
+  }
+  return status.lookups > 0 ? `AI review: ${count} reviewed, ${plural(status.lookups, 'code lookup')} so far...` : `AI review: ${count} reviewed...`
 }
 
 export function aiReviewSummary(result: AiReviewResult): string {

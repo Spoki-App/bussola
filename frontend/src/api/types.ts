@@ -350,6 +350,7 @@ export interface AiReviewStatus {
   phase: AiReviewPhase | null
   done: number
   total: number
+  lookups: number
   units: number
   reviewed_units: number
 }

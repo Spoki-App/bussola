@@ -6,7 +6,7 @@ from difflib import SequenceMatcher
 from enum import StrEnum
 from itertools import zip_longest
 
-from bussola.storage.models import UnitSnapshot
+from bussola.storage.models import Revision, UnitSnapshot
 from bussola.units.model import UnitKind
 
 ROW_APPROVABLE_KINDS = frozenset({UnitKind.MODULE, UnitKind.FILE})
@@ -52,6 +52,14 @@ class ChangedRow:
 
 def is_binary(snapshot: UnitSnapshot) -> bool:
     return snapshot.kind == UnitKind.FILE and snapshot.base_text is None and snapshot.head_text is None
+
+
+def side_commit(revision: Revision, side: Side) -> str:
+    return revision.merge_base_sha if side == Side.BASE else revision.head_sha
+
+
+def side_path(snapshot: UnitSnapshot, side: Side) -> str:
+    return snapshot.old_path or snapshot.path if side == Side.BASE else snapshot.path
 
 
 def side_lines(snapshot: UnitSnapshot, side: str) -> list[UnitLine]:
