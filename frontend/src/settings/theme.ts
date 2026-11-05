@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
 import { AA_CONTRAST, contrastRatio, parseColor, withAlpha } from './colors'
-import { readStored, writeStored } from './storage'
+import { isRecord, readStored, readStoredJson, writeStored } from './storage'
 import { BUILTIN_PALETTES, COLOR_SLOTS, DERIVED_COLORS, type ThemeType } from './themeMapping'
 import type { ParsedTheme, ThemeColors } from './vscodeTheme'
 
@@ -19,7 +19,7 @@ export interface ThemeState {
 }
 
 export const SYSTEM_THEME = 'system'
-export const BUILTIN_THEMES: Theme[] = [
+const BUILTIN_THEMES: Theme[] = [
   { id: 'light', name: 'Light', type: 'light', colors: {} },
   { id: 'dark', name: 'Dark', type: 'dark', colors: {} },
 ]
@@ -36,19 +36,7 @@ const CONTRAST_PAIRS = [
   ['--accent-text', '--accent', 'Text on accent buttons'],
 ] as const
 
-function readJson(key: string): unknown {
-  try {
-    return JSON.parse(readStored(key) ?? 'null')
-  } catch {
-    return null
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-export function cleanColors(value: unknown): ThemeColors {
+function cleanColors(value: unknown): ThemeColors {
   const colors: ThemeColors = {}
   if (!isRecord(value)) {
     return colors
@@ -70,23 +58,21 @@ function cleanTheme(value: unknown): Theme | null {
 }
 
 export function loadThemeState(): ThemeState {
-  const storedThemes = readJson(THEMES_KEY)
+  const storedThemes = readStoredJson(THEMES_KEY)
   const themes = Array.isArray(storedThemes) ? storedThemes.map(cleanTheme).filter((theme): theme is Theme => theme !== null) : []
-  const storedOverrides = readJson(OVERRIDES_KEY)
+  const storedOverrides = readStoredJson(OVERRIDES_KEY)
   const overrides = isRecord(storedOverrides) ? Object.fromEntries(Object.entries(storedOverrides).map(([id, colors]) => [id, cleanColors(colors)])) : {}
   return { selected: readStored(SELECTED_KEY) ?? SYSTEM_THEME, themes, overrides }
 }
 
-function prefersDark(): boolean {
-  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches
-}
+const darkQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-color-scheme: dark)') : null
 
 export function allThemes(state: ThemeState): Theme[] {
   return [...BUILTIN_THEMES, ...state.themes]
 }
 
-export function activeTheme(state: ThemeState, dark = prefersDark()): Theme {
-  const systemTheme = BUILTIN_THEMES[dark ? 1 : 0]
+export function activeTheme(state: ThemeState): Theme {
+  const systemTheme = BUILTIN_THEMES[darkQuery?.matches ? 1 : 0]
   return state.selected === SYSTEM_THEME ? systemTheme : (allThemes(state).find((theme) => theme.id === state.selected) ?? systemTheme)
 }
 
@@ -109,17 +95,30 @@ export function contrastWarnings(palette: Record<string, string>): string[] {
   })
 }
 
-function applyTheme(state: ThemeState): void {
+export function activePalette(state: ThemeState): { theme: Theme; overrides: ThemeColors; palette: Record<string, string> } {
   const theme = activeTheme(state)
+  const overrides = state.overrides[theme.id] ?? {}
+  return { theme, overrides, palette: resolvePalette(theme, overrides) }
+}
+
+export function isDarkTheme(): boolean {
+  return activeTheme(snapshot()).type === 'dark'
+}
+
+function applyTheme(state: ThemeState): void {
+  const { theme, palette } = activePalette(state)
   const style = document.documentElement.style
-  for (const [variable, value] of Object.entries(resolvePalette(theme, state.overrides[theme.id]))) {
-    style.setProperty(variable, value)
+  for (const [variable, value] of Object.entries(palette)) {
+    if (style.getPropertyValue(variable) !== value) {
+      style.setProperty(variable, value)
+    }
   }
   style.colorScheme = theme.type
 }
 
 const listeners = new Set<() => void>()
 let current: ThemeState | undefined
+let listening = false
 
 function snapshot(): ThemeState {
   current ??= loadThemeState()
@@ -135,9 +134,16 @@ function update(next: ThemeState): void {
 }
 
 function commit(next: ThemeState): void {
-  writeStored(SELECTED_KEY, next.selected)
-  writeStored(THEMES_KEY, JSON.stringify(next.themes))
-  writeStored(OVERRIDES_KEY, JSON.stringify(next.overrides))
+  const previous = snapshot()
+  if (next.selected !== previous.selected) {
+    writeStored(SELECTED_KEY, next.selected)
+  }
+  if (next.themes !== previous.themes) {
+    writeStored(THEMES_KEY, JSON.stringify(next.themes))
+  }
+  if (next.overrides !== previous.overrides) {
+    writeStored(OVERRIDES_KEY, JSON.stringify(next.overrides))
+  }
   update(next)
 }
 
@@ -176,16 +182,18 @@ export function resetOverrides(themeId: string, variable?: string): void {
 
 export function syncTheme(): void {
   update(loadThemeState())
+  if (listening) {
+    return
+  }
+  listening = true
   window.addEventListener('storage', (event) => {
     if (event.key === null || [SELECTED_KEY, THEMES_KEY, OVERRIDES_KEY].includes(event.key)) {
       update(loadThemeState())
     }
   })
-  if (typeof window.matchMedia === 'function') {
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-      update({ ...snapshot() })
-    })
-  }
+  darkQuery?.addEventListener('change', () => {
+    update({ ...snapshot() })
+  })
 }
 
 function subscribe(listener: () => void): () => void {

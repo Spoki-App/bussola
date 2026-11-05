@@ -1,4 +1,4 @@
-export interface Rgba {
+interface Rgba {
   r: number
   g: number
   b: number

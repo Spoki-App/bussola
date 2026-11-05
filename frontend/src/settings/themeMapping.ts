@@ -2,7 +2,7 @@ export type ThemeType = 'light' | 'dark'
 
 export const COLOR_GROUPS = ['Text and background', 'Borders', 'Accents and states', 'Diff', 'Syntax'] as const
 
-export type ColorGroup = (typeof COLOR_GROUPS)[number]
+type ColorGroup = (typeof COLOR_GROUPS)[number]
 
 export interface ColorSlot {
   variable: string
@@ -12,7 +12,7 @@ export interface ColorSlot {
   scopes?: string[]
 }
 
-export interface DerivedColor {
+interface DerivedColor {
   variable: string
   from: string
   alpha?: number
@@ -64,7 +64,6 @@ export const DERIVED_COLORS: DerivedColor[] = [
   { variable: '--info-bg', from: '--accent', alpha: 0.13 },
   { variable: '--diff-selected-gutter', from: '--diff-selected' },
   { variable: '--hl-comment', from: '--muted' },
-  { variable: '--alert-important', from: '--hl-title' },
 ]
 
 export const BUILTIN_PALETTES: Record<ThemeType, Record<string, string>> = {
@@ -103,7 +102,6 @@ export const BUILTIN_PALETTES: Record<ThemeType, Record<string, string>> = {
     '--hl-comment': '#5b6478',
     '--hl-addition': '#116329',
     '--hl-deletion': '#82071e',
-    '--alert-important': '#6a3fc2',
     '--diff-insert': 'rgba(18, 134, 106, 0.08)',
     '--diff-delete': 'rgba(229, 72, 77, 0.08)',
     '--diff-insert-word': 'rgba(18, 134, 106, 0.26)',
@@ -149,7 +147,6 @@ export const BUILTIN_PALETTES: Record<ThemeType, Record<string, string>> = {
     '--hl-comment': '#9aa5bc',
     '--hl-addition': '#b5f0cf',
     '--hl-deletion': '#ffd0d0',
-    '--alert-important': '#c9adff',
     '--diff-insert': 'rgba(60, 199, 156, 0.1)',
     '--diff-delete': 'rgba(255, 99, 105, 0.1)',
     '--diff-insert-word': 'rgba(60, 199, 156, 0.34)',

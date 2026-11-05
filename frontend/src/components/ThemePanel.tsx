@@ -1,6 +1,6 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 
-import { SYSTEM_THEME, activeTheme, addTheme, allThemes, removeTheme, resolvePalette, selectTheme, useThemeState } from '../settings/theme'
+import { SYSTEM_THEME, activePalette, addTheme, allThemes, removeTheme, selectTheme, useThemeState } from '../settings/theme'
 import { exportVscodeTheme, parseVscodeTheme } from '../settings/vscodeTheme'
 
 function download(fileName: string, text: string): void {
@@ -20,8 +20,8 @@ export function ThemePanel() {
   const state = useThemeState()
   const [messages, setMessages] = useState<string[]>([])
   const fileInput = useRef<HTMLInputElement>(null)
-  const theme = activeTheme(state)
-  const imported = state.themes.some((candidate) => candidate.id === state.selected)
+  const { theme, overrides, palette } = activePalette(state)
+  const imported = state.themes.includes(theme)
 
   const importFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -44,9 +44,8 @@ export function ThemePanel() {
   }
 
   const exportTheme = () => {
-    const overrides = state.overrides[theme.id] ?? {}
     const name = Object.keys(overrides).length > 0 ? `${theme.name} (customized)` : theme.name
-    download(fileNameOf(name), exportVscodeTheme(name, theme.type, resolvePalette(theme, overrides)))
+    download(fileNameOf(name), exportVscodeTheme(name, theme.type, palette))
   }
 
   return (
@@ -67,7 +66,7 @@ export function ThemePanel() {
       <input ref={fileInput} hidden aria-label="VS Code theme file" type="file" accept=".json,.jsonc,application/json" onChange={importFile} />
       <p className="muted">Pick the theme file inside a VS Code theme extension, usually in its themes folder. Only its colors are read, and themes stay in this browser.</p>
       {messages.length > 0 && (
-        <div role="status" className="theme-messages">
+        <div role="status" className="notice">
           {messages.map((message) => (
             <p key={message}>{message}</p>
           ))}

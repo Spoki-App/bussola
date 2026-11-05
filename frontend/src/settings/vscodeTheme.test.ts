@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { COLOR_SLOTS } from './themeMapping'
-import { exportVscodeTheme, mapThemeColors, parseVscodeTheme, scopeColor, stripJsonc } from './vscodeTheme'
+import { exportVscodeTheme, mapThemeColors, parseVscodeTheme, stripJsonc } from './vscodeTheme'
 
 const JSONC_THEME = `{
   // Exported from a VS Code extension
@@ -135,7 +135,6 @@ describe('scope mapping', () => {
   })
 
   it('ignores rules without a foreground color', () => {
-    expect(scopeColor([], 'comment')).toBeNull()
     expect(mapThemeColors({}, [rule('comment', '#123456'), { scope: 'comment', settings: { fontStyle: 'italic' } }])['--hl-comment']).toBe('#123456')
   })
 

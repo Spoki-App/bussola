@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { opaqueHex, parseColor } from '../settings/colors'
-import { activeTheme, contrastWarnings, resetOverrides, resolvePalette, setOverride, useThemeState } from '../settings/theme'
+import { activePalette, contrastWarnings, resetOverrides, setOverride, useThemeState } from '../settings/theme'
 import { COLOR_GROUPS, COLOR_SLOTS, type ColorSlot } from '../settings/themeMapping'
 
 interface ColorRowProps {
@@ -72,10 +72,7 @@ function ThemePreview() {
 }
 
 export function ThemeColorsPanel() {
-  const state = useThemeState()
-  const theme = activeTheme(state)
-  const overrides = state.overrides[theme.id] ?? {}
-  const palette = resolvePalette(theme, overrides)
+  const { theme, overrides, palette } = activePalette(useThemeState())
   const warnings = contrastWarnings(palette)
 
   return (
@@ -83,7 +80,7 @@ export function ThemeColorsPanel() {
       <p className="muted">{`Changes apply to ${theme.name} at once and are kept on top of it.`}</p>
       <ThemePreview />
       {warnings.length > 0 && (
-        <div role="alert" className="theme-messages">
+        <div role="alert" className="notice warning">
           {warnings.map((warning) => (
             <p key={warning}>{warning}</p>
           ))}

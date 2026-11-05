@@ -1,4 +1,5 @@
 import { isDark, parseColor } from './colors'
+import { isRecord } from './storage'
 import { COLOR_SLOTS, type ThemeType } from './themeMapping'
 
 export type ThemeColors = Record<string, string>
@@ -17,10 +18,6 @@ interface TokenRule {
 
 const LIGHT_TYPES = new Set(['light', 'hcLight', 'hc-light', 'vs'])
 const DARK_TYPES = new Set(['dark', 'hc', 'hcDark', 'hc-black', 'vs-dark'])
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 function scan(text: string, onCode: (index: number) => number | undefined): string {
   let output = ''
@@ -83,7 +80,7 @@ function tokenRules(tokenColors: unknown): TokenRule[] {
   })
 }
 
-export function scopeColor(rules: TokenRule[], scope: string): string | null {
+function scopeColor(rules: TokenRule[], scope: string): string | null {
   let best: { specificity: number; color: string } | null = null
   for (const rule of rules) {
     for (const selector of rule.selectors) {

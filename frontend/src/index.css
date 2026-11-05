@@ -39,7 +39,6 @@
   --hl-addition: #116329;
   --hl-deletion: #82071e;
   --hl-comment: #5b6478;
-  --alert-important: #6a3fc2;
   --diff-insert: rgba(18, 134, 106, 0.08);
   --diff-delete: rgba(229, 72, 77, 0.08);
   --diff-insert-word: rgba(18, 134, 106, 0.26);
@@ -101,7 +100,6 @@
     --hl-addition: #b5f0cf;
     --hl-deletion: #ffd0d0;
     --hl-comment: #9aa5bc;
-    --alert-important: #c9adff;
     --diff-insert: rgba(60, 199, 156, 0.1);
     --diff-delete: rgba(255, 99, 105, 0.1);
     --diff-insert-word: rgba(60, 199, 156, 0.34);
@@ -1947,7 +1945,7 @@ button.danger {
 }
 
 .markdown-alert-important {
-  --alert-color: var(--alert-important);
+  --alert-color: var(--hl-title);
 }
 
 .markdown-alert-warning {
@@ -2376,20 +2374,13 @@ button.danger {
   border-color: var(--danger);
 }
 
-.theme-messages {
-  padding: 4px 12px;
-  border-left: 3px solid var(--accent);
-  border-radius: var(--radius-control);
-  background: var(--info-bg);
-}
-
-.theme-messages[role='alert'] {
+.notice.warning {
   border-left-color: var(--warning);
   background: var(--warning-bg);
 }
 
-.theme-messages p {
-  margin: 4px 0;
+.notice p {
+  margin: 0;
 }
 
 .theme-preview {
