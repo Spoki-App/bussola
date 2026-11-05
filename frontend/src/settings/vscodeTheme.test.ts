@@ -92,6 +92,7 @@ describe('parseVscodeTheme', () => {
 
     const theme = parseVscodeTheme('{"include": "./dark_plus.json", "colors": {"editor.background": "#1e1e1e"}}')
     expect(theme.notes[0]).toBe('This theme also takes colors from "./dark_plus.json" with include, which bussola does not read: those colors use the built in Dark palette.')
+    expect(() => parseVscodeTheme('{"tokenColors": "./syntaxes/theme.tmTheme"}')).toThrow('This theme takes its colors from "./syntaxes/theme.tmTheme" with tokenColors, which bussola does not read.')
   })
 
   it('rejects files that are not JSON or have no usable colors', () => {

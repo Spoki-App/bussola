@@ -142,21 +142,21 @@ export function parseVscodeTheme(text: string, fileName = ''): ParsedTheme {
   if (!isRecord(parsed)) {
     throw new Error('This file is not a VS Code color theme: it has no colors or tokenColors.')
   }
-  const include = typeof parsed.include === 'string' ? parsed.include : typeof parsed.tokenColors === 'string' ? parsed.tokenColors : null
+  const linked = typeof parsed.include === 'string' ? { file: parsed.include, key: 'include' } : typeof parsed.tokenColors === 'string' ? { file: parsed.tokenColors, key: 'tokenColors' } : null
   const colors = mapThemeColors(parsed.colors, parsed.tokenColors)
   const count = Object.keys(colors).length
   if (count === 0) {
     throw new Error(
-      include
-        ? `This theme takes its colors from "${include}" with include, which bussola does not read. Import that file instead.`
+      linked
+        ? `This theme takes its colors from "${linked.file}" with ${linked.key}, which bussola does not read. Import that file instead.`
         : 'No colors found: the file has no hex or rgb colors that bussola uses.',
     )
   }
   const type = themeType(parsed.type, colors)
   const typeName = type === 'light' ? 'Light' : 'Dark'
   const notes = [`${String(count)} of ${String(COLOR_SLOTS.length)} colors come from the theme, the others from the built in ${typeName} palette.`]
-  if (include) {
-    notes.unshift(`This theme also takes colors from "${include}" with include, which bussola does not read: those colors use the built in ${typeName} palette.`)
+  if (linked) {
+    notes.unshift(`This theme also takes colors from "${linked.file}" with ${linked.key}, which bussola does not read: those colors use the built in ${typeName} palette.`)
   }
   return { name: themeName(parsed.name, fileName), type, colors, notes }
 }
