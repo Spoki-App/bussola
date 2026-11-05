@@ -127,6 +127,21 @@ describe('diffTokens', () => {
     ])
   })
 
+  it('marks the changed words of a line rewritten around the same names', () => {
+    const diff = [
+      '--- a/x.py',
+      '+++ b/x.py',
+      '@@ -1,1 +1,1 @@',
+      '-        self.key = f"account_email_credit:{self.account.id}:%s"  # key pattern',
+      '+        self.key = CREDIT_BALANCE_KEY_PATTERN.format(account_id=self.account.id)',
+      '',
+    ].join('\n')
+    const tokens = diffTokens(parseDiff(diff)[0].hunks, null)
+
+    expect(tokens?.old.map(markedRuns)).toEqual([['f"account_email_credit:{', '}:%s"  # key pattern']])
+    expect(tokens?.new.map(markedRuns)).toEqual([['CREDIT_BALANCE_KEY_PATTERN.format(account_id=', ')']])
+  })
+
   it('marks only the added indentation of a line that moved into a block, at the start of the line', () => {
     const diff = ['--- a/x.py', '+++ b/x.py', '@@ -1,1 +1,1 @@', '-    load(page)', '+        load(page)', ''].join('\n')
     const tokens = diffTokens(parseDiff(diff)[0].hunks, null)

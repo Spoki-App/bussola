@@ -1,7 +1,7 @@
 import DiffMatchPatch, { type Diff } from 'diff-match-patch'
 import { isDelete, isInsert, isNormal, pickRanges, type ChangeData, type HunkData, type RangeTokenNode, type TokenizeEnhancer } from 'react-diff-view'
 
-const MIN_SIMILARITY = 0.4
+const MIN_SIMILARITY = 0.3
 const MAX_COMPARISONS = 2500
 const MIN_PART_SIMILARITY = 0.5
 const WORD = /\w+|\s+|[^\w\s]/g
