@@ -106,6 +106,27 @@ describe('diffTokens', () => {
     expect(tokens?.new.map(markedRuns)).toEqual([['start_row(', ')', 'start_row(', ')'], ['return build(totally, different, things)']])
   })
 
+  it('pairs a removed line with the most similar added line of its block and marks only the changed parts of a renamed name', () => {
+    const diff = [
+      '--- a/x.py',
+      '+++ b/x.py',
+      '@@ -1,1 +1,3 @@',
+      '-    _refresh_balance_on_commit(account, recharge_credit.id)',
+      '+    # The wallet was decremented straight on the row.',
+      '+    # current_credit must follow once this commits.',
+      '+    refresh_credit_balance_on_commit(account.id, recharge_credit.id, delta=-total)',
+      '',
+    ].join('\n')
+    const tokens = diffTokens(parseDiff(diff)[0].hunks, 'python')
+
+    expect(tokens?.old.map(markedRuns)).toEqual([['_']])
+    expect(tokens?.new.map(markedRuns)).toEqual([
+      ['# The wallet was decremented straight on the row.'],
+      ['# current_credit must follow once this commits.'],
+      ['_credit', '.id', ', delta=-total'],
+    ])
+  })
+
   it('marks only the added indentation of a line that moved into a block, at the start of the line', () => {
     const diff = ['--- a/x.py', '+++ b/x.py', '@@ -1,1 +1,1 @@', '-    load(page)', '+        load(page)', ''].join('\n')
     const tokens = diffTokens(parseDiff(diff)[0].hunks, null)

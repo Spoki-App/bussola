@@ -2,13 +2,28 @@ import DiffMatchPatch, { type Diff } from 'diff-match-patch'
 import { isDelete, isInsert, isNormal, pickRanges, type ChangeData, type HunkData, type RangeTokenNode, type TokenizeEnhancer } from 'react-diff-view'
 
 const MIN_SIMILARITY = 0.4
+const MAX_COMPARISONS = 2500
+const MIN_PART_SIMILARITY = 0.5
 const WORD = /\w+|\s+|[^\w\s]/g
+const PART = /\p{Lu}+(?!\p{Ll})|\p{Lu}?\p{Ll}+|\p{N}+|[^\p{L}\p{N}]/gu
+const IDENTIFIER = /^\w+$/
 
 const matcher = new DiffMatchPatch()
 
 type ChangedLine = ChangeData & { lineNumber: number }
 
 type Edits = [RangeTokenNode[], RangeTokenNode[]]
+
+interface Pairing {
+  removed: ChangedLine
+  added: ChangedLine
+  edits: Edits
+}
+
+interface LineMatch {
+  edits: Edits
+  similarity: number
+}
 
 function changeRuns(changes: ChangeData[]): ChangeData[][] {
   const runs: ChangeData[][] = [[]]
@@ -53,10 +68,10 @@ function visibleLength(text: string): number {
   return text.replace(/\s/g, '').length
 }
 
-function wordDiff(before: string, after: string): Diff[] {
+function tokenDiff(before: string, after: string, pattern: RegExp): Diff[] {
   const vocabulary = new Map<string, string>()
   const encode = (text: string) =>
-    (text.match(WORD) ?? [])
+    (text.match(pattern) ?? [])
       .map((word) => {
         const code = vocabulary.get(word) ?? String.fromCharCode(vocabulary.size + 1)
         vocabulary.set(word, code)
@@ -66,7 +81,39 @@ function wordDiff(before: string, after: string): Diff[] {
   const encodedBefore = encode(before)
   const encodedAfter = encode(after)
   const words = [...vocabulary.keys()]
-  return matcher.diff_main(encodedBefore, encodedAfter, false).map(([operation, codes]) => [operation, Array.from({ length: codes.length }, (_, position) => words[codes.charCodeAt(position) - 1]).join('')])
+  const diffs = matcher.diff_main(encodedBefore, encodedAfter, false)
+  if (pattern === PART) {
+    matcher.diff_cleanupSemantic(diffs)
+  }
+  return diffs.map(([operation, codes]) => [operation, Array.from({ length: codes.length }, (_, position) => words[codes.charCodeAt(position) - 1]).join('')])
+}
+
+function similarity(diffs: Diff[], before: string, after: string): number {
+  const shared = diffs.filter(([operation]) => operation === DiffMatchPatch.DIFF_EQUAL).reduce((total, [, text]) => total + visibleLength(text), 0)
+  return (2 * shared) / (visibleLength(before) + visibleLength(after))
+}
+
+function renamedParts(removed: Diff, added: Diff | undefined): Diff[] | null {
+  if (removed[0] !== DiffMatchPatch.DIFF_DELETE || added?.[0] !== DiffMatchPatch.DIFF_INSERT || !IDENTIFIER.test(removed[1]) || !IDENTIFIER.test(added[1])) {
+    return null
+  }
+  const parts = tokenDiff(removed[1], added[1], PART)
+  return similarity(parts, removed[1], added[1]) >= MIN_PART_SIMILARITY ? parts : null
+}
+
+function wordDiff(before: string, after: string): Diff[] {
+  const words = tokenDiff(before, after, WORD)
+  const diffs: Diff[] = []
+  for (let position = 0; position < words.length; position += 1) {
+    const parts = renamedParts(words[position], words.at(position + 1))
+    if (parts) {
+      diffs.push(...parts)
+      position += 1
+    } else {
+      diffs.push(words[position])
+    }
+  }
+  return diffs
 }
 
 function wholeLine(line: ChangedLine): RangeTokenNode[] {
@@ -75,33 +122,68 @@ function wholeLine(line: ChangedLine): RangeTokenNode[] {
   return length > 0 ? [{ type: 'edit', lineNumber: line.lineNumber, start, length }] : []
 }
 
-function lineEdits(removed: ChangedLine, added: ChangedLine): Edits | null {
+function lineMatch(removed: ChangedLine, added: ChangedLine): LineMatch | null {
   if (removed.content.trimStart() === added.content.trimStart()) {
-    return indentEdits(removed, added)
+    return { edits: indentEdits(removed, added), similarity: 1 }
   }
   const diffs = wordDiff(removed.content, added.content)
-  const shared = diffs.filter(([operation]) => operation === DiffMatchPatch.DIFF_EQUAL).reduce((total, [, text]) => total + visibleLength(text), 0)
-  const similarity = (2 * shared) / (visibleLength(removed.content) + visibleLength(added.content))
-  if (diffs.length <= 1 || similarity < MIN_SIMILARITY) {
+  const shared = similarity(diffs, removed.content, added.content)
+  if (diffs.length <= 1 || shared < MIN_SIMILARITY) {
     return null
   }
-  return [sideRanges(diffs, DiffMatchPatch.DIFF_DELETE, removed.lineNumber), sideRanges(diffs, DiffMatchPatch.DIFF_INSERT, added.lineNumber)]
+  return { edits: [sideRanges(diffs, DiffMatchPatch.DIFF_DELETE, removed.lineNumber), sideRanges(diffs, DiffMatchPatch.DIFF_INSERT, added.lineNumber)], similarity: shared }
+}
+
+function inOrder(removed: ChangedLine[], added: ChangedLine[]): Pairing[] {
+  return removed.slice(0, added.length).flatMap((line, position) => {
+    const match = lineMatch(line, added[position])
+    return match ? [{ removed: line, added: added[position], edits: match.edits }] : []
+  })
+}
+
+function bestPairings(removed: ChangedLine[], added: ChangedLine[]): Pairing[] {
+  if (removed.length * added.length > MAX_COMPARISONS) {
+    return inOrder(removed, added)
+  }
+  const matches = removed.map((line) => added.map((other) => lineMatch(line, other)))
+  const best = Array.from({ length: removed.length + 1 }, () => new Array<number>(added.length + 1).fill(0))
+  for (let i = removed.length - 1; i >= 0; i -= 1) {
+    for (let j = added.length - 1; j >= 0; j -= 1) {
+      const match = matches[i][j]
+      best[i][j] = Math.max(best[i + 1][j], best[i][j + 1], match ? match.similarity + best[i + 1][j + 1] : 0)
+    }
+  }
+  const pairings: Pairing[] = []
+  let i = 0
+  let j = 0
+  while (i < removed.length && j < added.length) {
+    const match = matches[i][j]
+    if (match && best[i][j] === match.similarity + best[i + 1][j + 1]) {
+      pairings.push({ removed: removed[i], added: added[j], edits: match.edits })
+      i += 1
+      j += 1
+    } else if (best[i][j] === best[i + 1][j]) {
+      i += 1
+    } else {
+      j += 1
+    }
+  }
+  return pairings
 }
 
 function runEdits(run: ChangeData[]): Edits {
   const edits: Edits = [[], []]
-  const modified = new Set<ChangeData>()
-  run.forEach((change, position) => {
-    const next = run.at(position + 1)
-    const lines = isDelete(change) && next && isInsert(next) ? lineEdits(change, next) : null
-    if (lines) {
-      edits[0].push(...lines[0])
-      edits[1].push(...lines[1])
-      modified.add(change).add(next as ChangeData)
-    }
-  })
-  if (modified.size === 0) {
+  const removed = run.filter((change): change is ChangedLine => isDelete(change))
+  const added = run.filter((change): change is ChangedLine => isInsert(change))
+  const pairings = bestPairings(removed, added)
+  if (pairings.length === 0) {
     return edits
+  }
+  const modified = new Set<ChangeData>()
+  for (const pairing of pairings) {
+    edits[0].push(...pairing.edits[0])
+    edits[1].push(...pairing.edits[1])
+    modified.add(pairing.removed).add(pairing.added)
   }
   for (const change of run) {
     if (!modified.has(change) && (isDelete(change) || isInsert(change))) {
