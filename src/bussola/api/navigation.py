@@ -10,7 +10,7 @@ from bussola.api.state import app_state
 from bussola.config import load_repo_config
 from bussola.errors import InvalidRequestError, NotFoundError
 from bussola.forge.links import review_repository
-from bussola.navigation.navigator import Click, Navigation, Navigator, Target
+from bussola.navigation.navigator import Click, Navigation, Navigator
 from bussola.review.context import ReviewContext
 from bussola.review.repos import open_repo
 from bussola.review.rows import Side, side_commit, side_path
@@ -58,23 +58,23 @@ def source_file(context: ContextDep, request: Request, query: Annotated[SourceFi
     return SourceFileOut(path=query.path, side=query.side, commit=commit, text=data.decode(errors="replace"), url=url)
 
 
-def _units_by_path(context: ReviewContext, revision: Revision, side: Side) -> dict[str, list[UnitSnapshot]]:
+def units_by_path(context: ReviewContext, revision: Revision, side: Side) -> dict[str, list[UnitSnapshot]]:
     units: dict[str, list[UnitSnapshot]] = {}
     for snapshot in context.store.reviews.snapshot_lines(revision.id):
         units.setdefault(side_path(snapshot, side), []).append(snapshot)
     return units
 
 
-def _unit_at(units: dict[str, list[UnitSnapshot]], side: Side, target: Target) -> int | None:
-    for snapshot in units.get(target.path, []):
+def unit_at(units: dict[str, list[UnitSnapshot]], side: Side, path: str, line: int) -> int | None:
+    for snapshot in units.get(path, []):
         lines = snapshot.head_lines if side == Side.HEAD else snapshot.base_lines
-        if target.line in lines:
+        if line in lines:
             return snapshot.id
     return None
 
 
 def _navigation_out(found: Navigation, context: ReviewContext, revision: Revision, side: Side) -> NavigationOut:
-    units = _units_by_path(context, revision, side) if found.targets else {}
+    units = units_by_path(context, revision, side) if found.targets else {}
     hint = ServerHintOut.model_validate(found.missing_server, from_attributes=True) if found.missing_server else None
-    targets = [NavigationTargetOut(**asdict(target), side=side, unit_id=_unit_at(units, side, target)) for target in found.targets]
+    targets = [NavigationTargetOut(**asdict(target), side=side, unit_id=unit_at(units, side, target.path, target.line)) for target in found.targets]
     return NavigationOut(ready=found.ready, symbol=found.symbol, origin=found.origin, resolver=found.resolver, targets=targets, server_hint=hint)

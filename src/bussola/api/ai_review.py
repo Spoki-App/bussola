@@ -1,16 +1,23 @@
+import re
+from typing import Any
+
 from fastapi import APIRouter, Request
 
 from bussola.ai.base import AiCancelledError
 from bussola.api.deps import ContextDep, repo_of, resolve_revision
-from bussola.api.descriptions import ai_provider, ai_runner
-from bussola.api.schemas import AiReviewIn, AiReviewOut, AiReviewRunDetailOut, AiReviewRunOut, AiReviewStatusOut, CancelOut
+from bussola.api.descriptions import ai_provider, ai_runner, code_limit
+from bussola.api.navigation import unit_at, units_by_path
+from bussola.api.schemas import AiReviewIn, AiReviewLinkOut, AiReviewOut, AiReviewPartOut, AiReviewRunDetailOut, AiReviewRunOut, AiReviewStatusOut, CancelOut
 from bussola.api.state import app_state
 from bussola.config import load_repo_config
 from bussola.errors import NotFoundError
 from bussola.review.ai_review import AiReviewJob, AiReviewOutcome, RunStatus, ai_review_coverage, run_ai_review
+from bussola.review.context import ReviewContext
 from bussola.review.repos import open_repo
-from bussola.review.review_tools import ReviewTools
+from bussola.review.review_tools import SIDES, ReviewTools
 from bussola.storage.models import AiReviewRun
+
+SUMMARY_LINK = re.compile(r"\]\(<?#(?P<side>after|before):(?P<path>[^)>\s]+):(?P<line>\d+)>?\)")
 
 router = APIRouter(tags=["ai-review"])
 
@@ -26,7 +33,7 @@ def start_ai_review(context: ContextDep, body: AiReviewIn, request: Request) -> 
         with state.ai_calls.start(body.call_id) as cancellation, state.ai_reviews.start(context.review.id, cancellation) as report:
             snapshots = context.store.reviews.snapshots(revision.id)
             tools = ReviewTools(git_repo, revision, snapshots, state.navigator, ignore, cancellation)
-            outcome = run_ai_review(AiReviewJob(context, revision, ai_runner(state, provider), tools, report, again=body.again))
+            outcome = run_ai_review(AiReviewJob(context, revision, ai_runner(state, provider), tools, report, body.again, code_limit(state, provider)))
     except AiCancelledError:
         outcome = AiReviewOutcome(reviewed=0, findings=0, failed=0, cancelled=True, error=None)
     return AiReviewOut(reviewed=outcome.reviewed, findings=outcome.findings, failed=outcome.failed, cancelled=outcome.cancelled, error=outcome.error)
@@ -60,7 +67,18 @@ def get_ai_review_run(context: ContextDep, run_id: int, request: Request) -> AiR
     if run is None or run.review_id != context.review.id:
         raise NotFoundError("AI review run not found")
     brief = _run_out(run, app_state(request).ai_reviews.progress(context.review.id) is not None)
-    return AiReviewRunDetailOut(**brief.model_dump(), rating=run.details.get("rating"), parts=run.details.get("parts", []))
+    parts: list[dict[str, Any]] = run.details.get("parts", [])
+    shown = [AiReviewPartOut.model_validate(part) for part in parts]
+    return AiReviewRunDetailOut(**brief.model_dump(), rating=run.details.get("rating"), parts=shown, links=_summary_links(context, parts))
+
+
+def _summary_links(context: ReviewContext, parts: list[dict[str, Any]]) -> list[AiReviewLinkOut]:
+    found = sorted({(match["side"], match["path"], int(match["line"])) for part in parts for match in SUMMARY_LINK.finditer(part.get("summary") or "")})
+    if not found:
+        return []
+    revision = resolve_revision(context, None)
+    units = {name: units_by_path(context, revision, side) for name, side in SIDES.items()}
+    return [AiReviewLinkOut(path=path, side=SIDES[name], line=line, unit_id=unit_at(units[name], SIDES[name], path, line)) for name, path, line in found]
 
 
 def _run_out(run: AiReviewRun, running: bool) -> AiReviewRunOut:

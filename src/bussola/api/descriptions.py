@@ -45,7 +45,7 @@ def rate_all(context: ContextDep, body: AiCallIn, request: Request) -> RateImpac
     snapshots = context.store.reviews.snapshots(resolve_revision(context, None).id)
     try:
         with state.ai_calls.start(body.call_id) as cancellation:
-            outcome = rate_units(context, snapshots, ai_runner(state, provider), cancellation)
+            outcome = rate_units(context, snapshots, ai_runner(state, provider), cancellation, code_limit(state, provider))
     except AiCancelledError:
         outcome = BatchResult[int, None](cancelled=True)
     return RateImpactOut(
@@ -58,6 +58,10 @@ def rate_all(context: ContextDep, body: AiCallIn, request: Request) -> RateImpac
 
 def ai_runner(state: AppState, provider: AiProvider) -> AiRunner:
     return AiRunner(provider, state.ai_cache, prompts=load_user_config(state.settings.config_file).ai.prompts.custom())
+
+
+def code_limit(state: AppState, provider: AiProvider) -> int | None:
+    return load_user_config(state.settings.config_file).ai.code_limit(provider.name)
 
 
 def ai_provider(state: AppState, context: ReviewContext, target: str) -> AiProvider:

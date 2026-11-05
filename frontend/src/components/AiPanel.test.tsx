@@ -39,6 +39,7 @@ const EMPTY_CONFIG: AiConfig = {
   api_key_env: null,
   timeout: 600,
   max_tokens: null,
+  max_code_characters: null,
   config_file: CONFIG_FILE,
   problem: null,
 }
@@ -107,7 +108,7 @@ describe('AiPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByText('Saved')).toBeInTheDocument()
-    expect(savedBody(fetchMock)).toEqual({ provider: 'claude-code', model: 'claude-opus-5-5', endpoint: null, api_key_env: null, timeout: 600, max_tokens: null })
+    expect(savedBody(fetchMock)).toEqual({ provider: 'claude-code', model: 'claude-opus-5-5', endpoint: null, api_key_env: null, timeout: 600, max_tokens: null, max_code_characters: null })
   })
 
   it('asks for the endpoint, the key variable and the answer budget of an API provider', async () => {
@@ -120,10 +121,12 @@ describe('AiPanel', () => {
     fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'qwen2.5-coder' } })
     fireEvent.change(screen.getByLabelText('API key environment variable'), { target: { value: 'LM_KEY' } })
     fireEvent.change(screen.getByLabelText('Answer budget in tokens'), { target: { value: '4000' } })
+    expect(screen.getByLabelText('Code per call in characters')).toHaveAttribute('placeholder', '100000')
+    fireEvent.change(screen.getByLabelText('Code per call in characters'), { target: { value: '50000' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
-      expect(savedBody(fetchMock)).toEqual({ provider: 'openai-compatible', model: 'qwen2.5-coder', endpoint: 'http://localhost:1234/v1', api_key_env: 'LM_KEY', timeout: null, max_tokens: 4000 })
+      expect(savedBody(fetchMock)).toEqual({ provider: 'openai-compatible', model: 'qwen2.5-coder', endpoint: 'http://localhost:1234/v1', api_key_env: 'LM_KEY', timeout: null, max_tokens: 4000, max_code_characters: 50000 })
     })
   })
 
@@ -133,12 +136,13 @@ describe('AiPanel', () => {
 
     expect(await screen.findByLabelText('API key environment variable')).toHaveValue('WORK_KEY')
     expect(screen.getByLabelText('Timeout in seconds')).toHaveValue(120)
+    expect(screen.getByLabelText('Code per call in characters')).toHaveAttribute('placeholder', 'No limit')
 
     fireEvent.change(screen.getByLabelText('Provider'), { target: { value: 'none' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
-      expect(savedBody(fetchMock)).toEqual({ provider: 'none', model: null, endpoint: null, api_key_env: null, timeout: null, max_tokens: null })
+      expect(savedBody(fetchMock)).toEqual({ provider: 'none', model: null, endpoint: null, api_key_env: null, timeout: null, max_tokens: null, max_code_characters: null })
     })
   })
 

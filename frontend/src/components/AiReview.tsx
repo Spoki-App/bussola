@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { describeError } from '../api/client'
 import type { AiReviewState } from '../hooks/useAiReview'
+import type { CodeTarget } from '../hooks/useCodeNavigation'
 import { aiReviewCoverage, aiReviewProgress, aiReviewSummary } from '../review/aiReview'
 import { AiActionButton } from './AiActionButton'
 import { AiReviewDetails } from './AiReviewDetails'
@@ -12,16 +13,17 @@ interface Props {
   reviewId: number
   repoId: number
   review: AiReviewState
+  onShowLine?: (target: CodeTarget) => void
 }
 
-export function AiReview({ reviewId, repoId, review }: Props) {
+export function AiReview({ reviewId, repoId, review, onShowLine }: Props) {
   const [showing, setShowing] = useState(false)
   const details = (review.status?.runs ?? 0) > 0 && (
     <>
       <button type="button" onClick={() => { setShowing(true) }}>
         Details
       </button>
-      {showing && <AiReviewDetails reviewId={reviewId} onClose={() => { setShowing(false) }} />}
+      {showing && <AiReviewDetails reviewId={reviewId} onClose={() => { setShowing(false) }} onShowLine={onShowLine} />}
     </>
   )
   if (review.running) {
@@ -52,7 +54,7 @@ export function AiReview({ reviewId, repoId, review }: Props) {
         <AiActionButton
           repoId={repoId}
           label="AI review"
-          title="Ask the AI provider to review each unit changed since the last AI review, the highest impact first, and add what it finds as threads"
+          title="Ask the AI provider to review each unit changed since the last AI review, with the whole pull request in view, rate their impact and add what it finds as threads"
           onRun={(target) => { review.run(target) }}
         />
       )}

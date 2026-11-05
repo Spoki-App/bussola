@@ -38,6 +38,8 @@ PROVIDER_LABELS = {
 DEFAULT_MODELS = {ProviderName.ANTHROPIC: "claude-opus-5-5"}
 DEFAULT_ENDPOINTS = {ProviderName.ANTHROPIC: "https://api.anthropic.com"}
 DEFAULT_KEY_ENV = {ProviderName.ANTHROPIC: "ANTHROPIC_API_KEY"}
+DEFAULT_CODE_LIMITS = {ProviderName.OPENAI_COMPATIBLE.value: 100_000}
+MIN_CODE_CHARACTERS = 10
 
 
 class AiPrompts(BaseModel):
@@ -65,7 +67,11 @@ class UserAiConfig(BaseModel):
     timeout: float = Field(default=DEFAULT_TIMEOUT_SECONDS, gt=0, le=MAX_TIMEOUT_SECONDS)
     api_key_env: str | None = None
     max_tokens: int | None = Field(default=None, gt=0)
+    max_code_characters: int | None = Field(default=None, ge=MIN_CODE_CHARACTERS)
     prompts: AiPrompts = AiPrompts()
+
+    def code_limit(self, provider: str) -> int | None:
+        return self.max_code_characters or DEFAULT_CODE_LIMITS.get(provider)
 
     @field_validator("endpoint")
     @classmethod

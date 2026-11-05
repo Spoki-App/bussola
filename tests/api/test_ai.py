@@ -196,7 +196,7 @@ def test_saving_a_provider_writes_the_ai_section_and_takes_effect_at_once(data_d
 
 
 def test_the_saved_settings_are_read_back_as_written(data_dir: Path, config_file: Path) -> None:
-    write(config_file, '[ai]\nprovider = "anthropic"\napi_key_env = "WORK_KEY"\ntimeout = 120\n')
+    write(config_file, '[ai]\nprovider = "anthropic"\napi_key_env = "WORK_KEY"\ntimeout = 120\nmax_code_characters = 300000\n')
 
     config = client(data_dir, config_file).get("/api/ai/config").json()
 
@@ -207,6 +207,7 @@ def test_the_saved_settings_are_read_back_as_written(data_dir: Path, config_file
         "api_key_env": "WORK_KEY",
         "timeout": 120,
         "max_tokens": None,
+        "max_code_characters": 300000,
         "config_file": str(config_file),
         "problem": None,
     }

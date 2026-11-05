@@ -32,6 +32,13 @@ UNSUPPORTED_KEYWORDS = frozenset(
 )
 CODE_FENCE = re.compile(r"```[\w-]*\s*(?P<body>.*?)\s*```", re.DOTALL)
 REPORTED_ERRORS = 3
+PROMPT_SEPARATOR = "\n\n"
+
+
+@dataclass(frozen=True)
+class EditablePrompt:
+    setting: str
+    default: str
 
 
 @dataclass(frozen=True)
@@ -41,8 +48,7 @@ class AiTask[T: BaseModel]:
     system: str
     output: type[T]
     max_tokens: int = DEFAULT_MAX_TOKENS
-    instructions: str = ""
-    setting: str | None = None
+    prompts: tuple[EditablePrompt, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -72,8 +78,7 @@ class AiRunner:
         return AiRunner(self.provider, self._cache, tools, self._prompts)
 
     def system(self, task: AiTask[Any]) -> str:
-        custom = self._prompts.get(task.setting) if task.setting else None
-        return task.system + (task.instructions if custom is None else custom)
+        return task.system + PROMPT_SEPARATOR.join(self._prompts.get(prompt.setting, prompt.default) for prompt in task.prompts)
 
     def run[T: BaseModel](self, task: AiTask[T], prompt: str, cancellation: Cancellation, content_hash: str | None = None, *, refresh: bool = False) -> T:
         key = self._key(task, content_hash)

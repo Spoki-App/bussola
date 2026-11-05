@@ -447,6 +447,7 @@ class AiConfigIn(BaseModel):
     api_key_env: str | None = None
     timeout: float | None = None
     max_tokens: int | None = None
+    max_code_characters: int | None = None
 
     @field_validator("provider", "model", "endpoint", "api_key_env")
     @classmethod
@@ -461,6 +462,7 @@ class AiConfigOut(BaseModel):
     api_key_env: str | None = None
     timeout: float | None = None
     max_tokens: int | None = None
+    max_code_characters: int | None = None
     config_file: str | None = None
     problem: str | None = None
 
@@ -594,6 +596,14 @@ class AiReviewRatingOut(BaseModel):
     error: str | None
 
 
+class AiReviewLinkOut(BaseModel):
+    path: str
+    side: Side
+    line: int
+    unit_id: int | None
+
+
 class AiReviewRunDetailOut(AiReviewRunOut):
     rating: AiReviewRatingOut | None
     parts: list[AiReviewPartOut]
+    links: list[AiReviewLinkOut]

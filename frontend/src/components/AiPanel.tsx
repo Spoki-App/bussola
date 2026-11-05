@@ -28,6 +28,13 @@ const ENDPOINT_PLACEHOLDERS: Record<ProviderChoice, string> = {
   'openai-compatible': 'Required, for example http://localhost:11434/v1',
 }
 
+const CODE_LIMIT_PLACEHOLDERS: Record<ProviderChoice, string> = {
+  none: '',
+  'claude-code': 'No limit',
+  anthropic: 'No limit',
+  'openai-compatible': '100000',
+}
+
 const KEY_PLACEHOLDERS: Record<ProviderChoice, string> = {
   none: '',
   'claude-code': '',
@@ -42,6 +49,7 @@ interface Form {
   apiKeyEnv: string
   timeout: string
   maxTokens: string
+  codeLimit: string
 }
 
 function isProvider(value: string | null): value is ProviderChoice {
@@ -56,6 +64,7 @@ function formOf(config: AiConfig): Form {
     apiKeyEnv: config.api_key_env ?? '',
     timeout: config.timeout === null ? '' : String(config.timeout),
     maxTokens: config.max_tokens === null ? '' : String(config.max_tokens),
+    codeLimit: config.max_code_characters === null ? '' : String(config.max_code_characters),
   }
 }
 
@@ -73,6 +82,7 @@ function fieldsOf(form: Form): AiConfigFields {
     api_key_env: remote ? form.apiKeyEnv : null,
     timeout: off ? null : numberOrNull(form.timeout),
     max_tokens: remote ? numberOrNull(form.maxTokens) : null,
+    max_code_characters: off ? null : numberOrNull(form.codeLimit),
   }
 }
 
@@ -143,6 +153,9 @@ function ProviderForm({ config }: { config: AiConfig }) {
         <>
           <label htmlFor={`${id}-timeout`}>Timeout in seconds</label>
           <input id={`${id}-timeout`} type="number" min={1} max={3600} value={form.timeout} placeholder="600" onChange={(event) => { update({ timeout: event.target.value }) }} />
+          <label htmlFor={`${id}-code-limit`}>Code per call in characters</label>
+          <input id={`${id}-code-limit`} type="number" min={10} step={1} value={form.codeLimit} placeholder={CODE_LIMIT_PLACEHOLDERS[form.provider]} onChange={(event) => { update({ codeLimit: event.target.value }) }} />
+          <p className="muted">AI review and Rate impact send the whole pull request in one call, so the model sees every change together. Set a limit for a model with a small context: larger pull requests are then split into several calls.</p>
         </>
       )}
       {config.problem && (

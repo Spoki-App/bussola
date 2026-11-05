@@ -4,6 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 import type { AiReviewResult, AiReviewRunDetail, AiReviewStatus, AiStatus } from '../api/types'
 import { useAiReview } from '../hooks/useAiReview'
+import type { CodeTarget } from '../hooks/useCodeNavigation'
 import { rememberAiConsent } from '../settings/aiConsent'
 import { AiReview } from './AiReview'
 
@@ -22,8 +23,8 @@ const AI: AiStatus = {
 
 const IDLE: AiReviewStatus = { running: false, phase: null, done: 0, total: 0, lookups: 0, units: 5, reviewed_units: 0, runs: 0 }
 
-function Harness() {
-  return <AiReview reviewId={1} repoId={3} review={useAiReview(1)} />
+function Harness({ onShowLine }: { onShowLine?: (target: CodeTarget) => void }) {
+  return <AiReview reviewId={1} repoId={3} review={useAiReview(1)} onShowLine={onShowLine} />
 }
 
 function renderReview(answer: () => Promise<Response>, status: () => AiReviewStatus = () => IDLE) {
@@ -122,11 +123,11 @@ describe('AI review', () => {
       () => new Promise<Response>(() => undefined),
       () => {
         calls += 1
-        return calls < 3 ? { ...IDLE, running: true, phase: 'rating', done: calls, total: 5 } : IDLE
+        return calls < 3 ? { ...IDLE, running: true, phase: 'reviewing', done: 0, total: 5, lookups: calls } : IDLE
       },
     )
 
-    expect(await screen.findByText('Rating the impact first: 1 of 5 units...')).toBeInTheDocument()
+    expect(await screen.findByText('AI review: 0 of 5 units reviewed, 1 code lookup so far...')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'AI review' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => { expect(fetchMock.mock.calls.some(([url]) => url === '/api/reviews/1/ai-review/cancel')).toBe(true) })
@@ -190,12 +191,37 @@ const RUN: AiReviewRunDetail = {
   parts: [
     {
       units: [{ label: 'app.py::total', impact: 'high' }],
-      summary: 'Checked the **callers** of `total`.',
+      summary: 'Checked the **callers** of `total`, such as [the cart](#after:shop.py:5), and [the old sum](#before:app.py:1).',
       findings: [{ thread_id: 't9', place: 'app.py::total, line 2 after', body: 'The rate is hard-coded.' }],
       lookups: [{ tool: 'find_usages', arguments: { path: 'app.py', line: 1, name: 'total' }, result: 'shop.py:5: total(cart)', error: false }],
       error: null,
     },
   ],
+  links: [
+    { path: 'app.py', side: 'base', line: 1, unit_id: 4 },
+    { path: 'shop.py', side: 'head', line: 5, unit_id: null },
+  ],
+}
+
+function renderDetails(onShowLine?: (target: CodeTarget) => void) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) => {
+      const answers: Record<string, unknown> = {
+        '/api/repos/3/ai': AI,
+        '/api/reviews/1/ai-review': { ...IDLE, reviewed_units: 2, runs: 1 },
+        '/api/reviews/1/ai-review/runs': [RUN],
+        '/api/reviews/1/ai-review/runs/7': RUN,
+      }
+      return Promise.resolve(Response.json(answers[url] ?? []))
+    }),
+  )
+  window.history.replaceState(null, '', '/reviews/1')
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <Harness onShowLine={onShowLine} />
+    </QueryClientProvider>,
+  )
 }
 
 describe('AI review details', () => {
@@ -215,24 +241,7 @@ describe('AI review details', () => {
   })
 
   it('shows what the last run checked, found and looked up, and opens a finding in the review', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        const answers: Record<string, unknown> = {
-          '/api/repos/3/ai': AI,
-          '/api/reviews/1/ai-review': { ...IDLE, reviewed_units: 2, runs: 1 },
-          '/api/reviews/1/ai-review/runs': [RUN],
-          '/api/reviews/1/ai-review/runs/7': RUN,
-        }
-        return Promise.resolve(Response.json(answers[url] ?? []))
-      }),
-    )
-    window.history.replaceState(null, '', '/reviews/1')
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <Harness />
-      </QueryClientProvider>,
-    )
+    renderDetails()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Details' }))
 
@@ -243,5 +252,23 @@ describe('AI review details', () => {
     expect(within(dialog).getByText('find_usages(path: app.py, line: 1, name: total)')).toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: 'app.py::total, line 2 after' }))
     expect(window.location.search).toBe('?thread=t9')
+  })
+
+  it('shows a line linked from the summary in the review and closes the details', async () => {
+    const onShowLine = vi.fn<(target: CodeTarget) => void>()
+    renderDetails(onShowLine)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Details' }))
+    const dialog = await screen.findByRole('dialog', { name: 'AI review details' })
+    const old = await within(dialog).findByRole('link', { name: 'the old sum' })
+    expect(old).toHaveAttribute('title', 'Show old line 1 of app.py')
+    fireEvent.click(old)
+
+    expect(onShowLine).toHaveBeenCalledWith({ path: 'app.py', side: 'base', line: 1, unit_id: 4 })
+    expect(screen.queryByRole('dialog', { name: 'AI review details' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }))
+    fireEvent.click(await screen.findByRole('link', { name: 'the cart' }))
+    expect(onShowLine).toHaveBeenLastCalledWith({ path: 'shop.py', side: 'head', line: 5, unit_id: null })
   })
 })

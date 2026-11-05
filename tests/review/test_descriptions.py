@@ -47,6 +47,13 @@ def test_a_very_large_unit_is_clipped() -> None:
     assert "x" * (MAX_SIDE_CHARACTERS + 1) not in prompt
 
 
+def test_without_a_limit_a_very_large_unit_is_sent_whole() -> None:
+    prompt = unit_prompt(snapshot("x" * (MAX_SIDE_CHARACTERS + 10), "y"), clip=False)
+
+    assert "x" * (MAX_SIDE_CHARACTERS + 10) in prompt
+    assert "more characters not shown" not in prompt
+
+
 def test_the_impact_reason_is_kept_on_one_line() -> None:
     insight = UnitInsight.model_validate({"description": "  Text\n", "impact": "low", "impact_reason": "Only\n  a  rename.\n"})
 

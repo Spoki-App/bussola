@@ -268,9 +268,8 @@ def test_sync_reports_why_comments_were_not_sent(api: ApiClient, git_repo: GitFi
 def test_ai_findings_are_published_with_a_marker_naming_the_model(git_repo: GitFixture, data_dir: Path, tmp_path: Path, fake_gh: FakeGh) -> None:
     config_file = tmp_path / "config.toml"
     config_file.write_text(ANTHROPIC_CONFIG)
-    rating = {"impact": "high", "impact_reason": "New totals."}
     findings = {"findings": [{"path": "app.py", "side": "after", "start_line": 3, "end_line": 3, "body": "`count` is never used."}]}
-    api = ApiClient.create(git_repo, data_dir, config_file, fake_factory(FakeProvider({"ratings": [{"unit": "unit-1", **rating}]}, findings)))
+    api = ApiClient.create(git_repo, data_dir, config_file, fake_factory(FakeProvider(findings)))
     review = setup_review(api, git_repo, fake_gh)
     link(api, review)
     api.call("POST", f"/reviews/{review}/ai-review", body={"target": api.call("GET", "/ai")["target"], "call_id": uuid.uuid4().hex})

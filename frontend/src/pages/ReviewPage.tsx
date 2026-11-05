@@ -331,7 +331,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
             <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines. Cmd or Ctrl+click a name to go to its definition or list its usages.</p>
             <div className="summary-actions">
               <RateImpact repoId={data.repo_id} rating={rating} />
-              <AiReview reviewId={reviewId} repoId={data.repo_id} review={aiReview} />
+              <AiReview reviewId={reviewId} repoId={data.repo_id} review={aiReview} onShowLine={navigation.show} />
               {extensions.sidePanel && (
                 <button type="button" aria-pressed={panelOpen} onClick={() => { setPanelOpen(!panelOpen) }}>
                   {panelOpen ? `Hide ${extensions.sidePanel.label}` : `Show ${extensions.sidePanel.label}`}
