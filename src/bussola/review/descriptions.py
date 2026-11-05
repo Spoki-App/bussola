@@ -79,14 +79,19 @@ IMPACT_SCALE = (
 DESCRIPTION_RULES = (
     "description: GitHub-flavored Markdown for the reviewer, short and concrete. Start with what the unit does, "
     "then explain what this change does to it and why it matters. Mention behaviour changes, edge cases and risks. "
-    "Do not repeat the code line by line and do not add a title.\n\n"
+    "Do not repeat the code line by line and do not add a title. When you mention a specific change, link to its line.\n\n"
 )
 UNIT_KINDS = "a function, method, class, type, module-level code or a whole file. "
+LINE_LINKS = (
+    "Each line of code starts with its line number in the file. To point the reviewer at a line in the description, "
+    "write a Markdown link to #after-N for line N of the after side or #before-N for line N of the before side, "
+    "such as [the new check](#after-80) or [the old loop](#before-12): the reviewer clicks it to see that line in the diff.\n\n"
+)
 
 DESCRIBE_UNIT = AiTask(
     name="describe_unit",
     version=1,
-    system="You help a code reviewer understand one unit of a change: " + UNIT_KINDS + CODE_UNDER_REVIEW.format(verb="describe"),
+    system="You help a code reviewer understand one unit of a change: " + UNIT_KINDS + CODE_UNDER_REVIEW.format(verb="describe") + LINE_LINKS,
     output=UnitInsight,
     instructions=DESCRIPTION_RULES + IMPACT_SCALE,
     setting="describe",
@@ -144,7 +149,8 @@ def is_outdated(description: UnitDescription, snapshot: UnitSnapshot) -> bool:
 def describe_unit(snapshot: UnitSnapshot, runner: AiRunner, cancellation: Cancellation, *, regenerate: bool = False) -> UnitInsight:
     if is_binary(snapshot):
         raise InvalidRequestError("Binary files cannot be described")
-    return _ask(runner, DESCRIBE_UNIT, snapshot, cancellation, refresh=regenerate)
+    prompt = unit_prompt(snapshot, numbered=True)
+    return runner.run(DESCRIBE_UNIT, prompt, cancellation, content_hash=hashlib.sha256(prompt.encode()).hexdigest(), refresh=regenerate)
 
 
 def rate_units(
@@ -223,11 +229,6 @@ def description_row(
         provider_label=provider.label,
         model=provider.model,
     )
-
-
-def _ask[T: BaseModel](runner: AiRunner, task: AiTask[T], snapshot: UnitSnapshot, cancellation: Cancellation, *, refresh: bool = False) -> T:
-    prompt = unit_prompt(snapshot)
-    return runner.run(task, prompt, cancellation, content_hash=hashlib.sha256(prompt.encode()).hexdigest(), refresh=refresh)
 
 
 def unit_prompt(snapshot: UnitSnapshot, *, numbered: bool = False) -> str:

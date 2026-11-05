@@ -227,7 +227,7 @@ Only your own configuration chooses the provider, model and endpoint. A reposito
 
 ### AI descriptions
 
-With a provider configured, each unit card has a **Describe** button. One request to the provider explains what the unit does and what this change does to it, and rates the impact of the change as Low, Medium or High with a one-line reason. The answer appears above the diff in a collapsible block, rendered as Markdown and labelled as AI generated with the provider and model. While it runs the card shows that it is working and a **Cancel** button; a failure is shown on the card and **Describe** stays available.
+With a provider configured, each unit card has a **Describe** button. One request to the provider explains what the unit does and what this change does to it, and rates the impact of the change as Low, Medium or High with a one-line reason. The answer appears above the diff in a collapsible block, rendered as Markdown and labelled as AI generated with the provider and model. When it mentions a specific change it links to the line: clicking the link scrolls the diff to that line and highlights it. While it runs the card shows that it is working and a **Cancel** button; a failure is shown on the card and **Describe** stays available.
 
 Descriptions are kept per review for each version of a unit, so they are there when you open the review again. When a new revision changes a unit, its description is marked **outdated** until you press **Regenerate**; units that did not change keep theirs, also when their file is renamed. **Regenerate** asks the provider again and replaces the description. Binary files cannot be described.
 

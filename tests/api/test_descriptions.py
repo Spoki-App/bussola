@@ -66,8 +66,9 @@ def test_one_call_describes_and_rates_a_unit_and_names_the_provider(billing: Git
     request = provider.requests[0]
     assert request.name == "describe_unit"
     assert "Name: total" in request.prompt
-    assert re.search(r"<(before-[0-9a-f]{16})>\ndef total\(items\):\n    return sum\(items\)\n</\1>", request.prompt)
-    assert "return sum(items) * 1.2" in request.prompt
+    assert re.search(r"<(before-[0-9a-f]{16})>\n1: def total\(items\):\n2:     return sum\(items\)\n</\1>", request.prompt)
+    assert "2:     return sum(items) * 1.2" in request.prompt
+    assert "[the new check](#after-80)" in request.system
     assert request.schema["required"] == ["description", "impact", "impact_reason"]
 
 

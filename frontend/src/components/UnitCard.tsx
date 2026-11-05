@@ -1,4 +1,4 @@
-import { memo, useContext, useEffect, useState, type ReactNode } from 'react'
+import { memo, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/hooks'
@@ -9,6 +9,7 @@ import { TARGET_ROW_SELECTOR, unitElementId, useLinkedScroll } from '../review/l
 import { unitTitle } from '../review/logic'
 import { ReviewLinkContext } from '../review/reviewLink'
 import { useAiDescription } from '../hooks/useAiDescription'
+import type { LineLink } from '../markdown/lineLinks'
 import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
 import { AiActionButton } from './AiActionButton'
 import { AiDescription } from './AiDescription'
@@ -54,7 +55,7 @@ const APPROVE_LABELS = { approve: 'Approve', approve_under_name: 'Approve under 
 
 const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', base: 'Base → head' }
 
-function targetLine(target: UnitTarget | undefined, linkedLine: number | undefined): TargetLine | undefined {
+function targetLine(target: LineLink | undefined, linkedLine: number | undefined): TargetLine | undefined {
   if (target) {
     return { side: target.side === 'base' ? 'old' : 'new', line: target.line }
   }
@@ -70,9 +71,11 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
     setExpanded(todo)
   }
   const [mode, setMode] = useState<DiffMode | undefined>(undefined)
+  const [lineLink, setLineLink] = useState<LineLink | undefined>(undefined)
   const [seenTarget, setSeenTarget] = useState<UnitTarget | undefined>(undefined)
   if (navigationTarget !== seenTarget) {
     setSeenTarget(navigationTarget)
+    setLineLink(undefined)
     if (navigationTarget) {
       setExpanded(true)
     }
@@ -152,6 +155,18 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
     const element = linkedRef.current?.querySelector(TARGET_ROW_SELECTOR) ?? linkedRef.current
     element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [navigationTarget, diffLoaded, onFocus, unit.id, linkedRef])
+
+  const showLine = useCallback((link: LineLink) => {
+    setLineLink({ ...link })
+    if (link.side === 'base') {
+      setMode('base')
+    }
+  }, [])
+  useEffect(() => {
+    if (lineLink) {
+      linkedRef.current?.querySelector(TARGET_ROW_SELECTOR)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [lineLink, diff.data, linkedRef])
 
   const requestFrom = (row: DiffRow, side: GutterSide, column: number): NavigationRequest | null => {
     const base = side === 'old'
@@ -257,7 +272,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
       {!expanded && (ai.pending || ai.error) && <AiDescription repoId={repoId} ai={ai} />}
       {expanded && (
         <div className="unit-body">
-          <AiDescription repoId={repoId} ai={ai} />
+          <AiDescription repoId={repoId} ai={ai} onLineLink={showLine} />
           {diff.data?.approved_text_unavailable && <p className="diff-note">The approved version is too large to keep, so only the base diff is available.</p>}
           {unit.row_approvable && unit.todo && <p className="hint">Click changed lines to select them, shift-click to extend, then approve the selection.</p>}
           {diff.isPending && <p className="diff-note">Loading diff...</p>}
@@ -275,7 +290,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
               highlighted={highlightRows?.(unit, diff.data)}
               onNavigate={navigateFrom}
               canNavigate={canNavigateFrom}
-              target={targetLine(navigationTarget, linkedLine)}
+              target={targetLine(lineLink ?? navigationTarget, linkedLine)}
               widgets={renderWidgets ? (changeKeyOf) => renderWidgets(unit, diff.data, changeKeyOf) : undefined}
             />
           )}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { describeError } from '../api/client'
 import type { AiDescriptionState } from '../hooks/useAiDescription'
+import type { LineLink } from '../markdown/lineLinks'
 import { IMPACT_LABELS } from '../review/impact'
 import { AiActionButton } from './AiActionButton'
 import { ErrorNote } from './Badges'
@@ -10,9 +11,10 @@ import { Markdown } from './Markdown'
 interface Props {
   repoId: number
   ai: AiDescriptionState
+  onLineLink?: (link: LineLink) => void
 }
 
-export function AiDescription({ repoId, ai }: Props) {
+export function AiDescription({ repoId, ai, onLineLink }: Props) {
   const [open, setOpen] = useState(true)
   const { description, pending, error } = ai
   if (!description && !pending && !error) {
@@ -55,7 +57,7 @@ export function AiDescription({ repoId, ai }: Props) {
       {error && <ErrorNote message={describeError(error)} />}
       {description && open && (
         <div className={`pr-description-body${pending ? ' stale' : ''}`}>
-          <Markdown text={description.description} media={false} />
+          <Markdown text={description.description} media={false} onLineLink={onLineLink} />
           <p className="ai-impact">
             <strong>{`${IMPACT_LABELS[description.impact]} impact`}</strong>
             {`: ${description.impact_reason}`}

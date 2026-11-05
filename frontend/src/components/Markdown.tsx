@@ -1,4 +1,5 @@
 import type { Element, ElementContent } from 'hast'
+import { useMemo, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import rehypeRaw from 'rehype-raw'
@@ -8,6 +9,7 @@ import remarkGfm from 'remark-gfm'
 
 import { remarkAlerts } from '../markdown/alerts'
 import { imageSource } from '../markdown/assets'
+import { lineLinkOf, type LineLink } from '../markdown/lineLinks'
 import { remarkGitHubReferences } from '../markdown/references'
 import { ExternalLink } from './ExternalLink'
 import { MermaidDiagram } from './MermaidDiagram'
@@ -40,8 +42,12 @@ function mermaidSource(pre: Element | undefined): string | null {
   return Array.isArray(classes) && classes.includes('language-mermaid') ? textOf(code) : null
 }
 
+function Anchor({ href, children }: { href?: string; children?: ReactNode }) {
+  return href ? <ExternalLink href={href}>{children}</ExternalLink> : <span>{children}</span>
+}
+
 const components: Components = {
-  a: ({ href, children }) => (href ? <ExternalLink href={href}>{children}</ExternalLink> : <span>{children}</span>),
+  a: Anchor,
   img: ({ src, alt, title, width, height }) => (typeof src === 'string' ? <img src={imageSource(src)} alt={alt} title={title} width={width} height={height} loading="lazy" /> : null),
   pre: ({ node, children }) => {
     const mermaid = mermaidSource(node)
@@ -53,13 +59,41 @@ const withoutMediaSchema: SanitizeSchema = { ...schema, tagNames: (schema.tagNam
 
 const withoutMediaComponents: Components = { ...components, pre: ({ children }) => <pre>{children}</pre> }
 
-export function Markdown({ text, media = true }: { text: string; media?: boolean }) {
+function withLineLinks(base: Components, onLineLink: (link: LineLink) => void): Components {
+  return {
+    ...base,
+    a: ({ href, children }) => {
+      const link = href ? lineLinkOf(href) : null
+      if (!link) {
+        return <Anchor href={href}>{children}</Anchor>
+      }
+      const label = `Show ${link.side === 'base' ? 'old' : 'new'} line ${String(link.line)} in the diff`
+      return (
+        <a
+          href={href}
+          className="line-ref"
+          title={label}
+          onClick={(event) => {
+            event.preventDefault()
+            onLineLink(link)
+          }}
+        >
+          {children}
+        </a>
+      )
+    },
+  }
+}
+
+export function Markdown({ text, media = true, onLineLink }: { text: string; media?: boolean; onLineLink?: (link: LineLink) => void }) {
+  const base = media ? components : withoutMediaComponents
+  const chosen = useMemo(() => (onLineLink ? withLineLinks(base, onLineLink) : base), [base, onLineLink])
   return (
     <div className="markdown">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks, remarkAlerts, remarkGitHubReferences]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, media ? schema : withoutMediaSchema], [rehypeHighlight, { plainText: ['mermaid'] }]]}
-        components={media ? components : withoutMediaComponents}
+        components={chosen}
       >
         {text}
       </ReactMarkdown>

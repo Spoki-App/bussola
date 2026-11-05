@@ -132,6 +132,21 @@ describe('AI description on a unit card', () => {
     expect(posted(fetchMock, '/api/reviews/1/units/7/description')).toEqual([{ target: AI.target, regenerate: false, call_id: expect.stringMatching(/^[0-9a-f]{32}$/) as unknown }])
   })
 
+  it('turns links to lines into buttons that show the line in the diff', async () => {
+    Element.prototype.scrollIntoView = vi.fn()
+    const fetchMock = renderCard({ stored: [{ ...DESCRIBED, description: 'Adds [the tax](#after-2) instead of [the sum](#before-2), see [docs](https://example.com).' }] })
+
+    const tax = await screen.findByRole('link', { name: 'the tax' })
+    expect(tax).toHaveAttribute('title', 'Show new line 2 in the diff')
+    expect(screen.getByRole('link', { name: 'the sum' })).toHaveAttribute('title', 'Show old line 2 in the diff')
+    expect(screen.getByRole('link', { name: 'docs' })).toHaveAttribute('href', 'https://example.com')
+    fireEvent.click(tax)
+    expect(fetchMock.mock.calls.map(([url]) => url).filter((url) => url.includes('/diff'))).toEqual(['/api/reviews/1/units/7/diff'])
+
+    fireEvent.click(screen.getByRole('link', { name: 'the sum' }))
+    await waitFor(() => { expect(fetchMock.mock.calls.map(([url]) => url)).toContain('/api/reviews/1/units/7/diff?mode=base') })
+  })
+
   it('shows the loading state and can cancel the call', async () => {
     const fetchMock = renderCard({ answer: () => null })
 
