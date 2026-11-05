@@ -23,6 +23,10 @@ NOTHING: Json = {"findings": []}
 WAIT_SECONDS = 5.0
 
 
+def rated(*ratings: Json) -> Json:
+    return {"ratings": [{"unit": f"unit-{number}", **rating} for number, rating in enumerate(ratings, start=1)]}
+
+
 def finding(line: int, body: str, side: str = "after", end: int | None = None, path: str = "app.py") -> Json:
     return {"path": path, "side": side, "start_line": line, "end_line": end or line, "body": body}
 
@@ -71,13 +75,13 @@ def reviews(provider: FakeProvider) -> list[AiRequest]:
 
 
 def test_the_ai_review_rates_every_unit_then_reviews_the_pull_request_as_a_whole(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    provider = FakeProvider(LOW, HIGH, {"findings": [finding(6, "The shop name is now **store** everywhere.")]})
+    provider = FakeProvider(rated(LOW, HIGH), {"findings": [finding(6, "The shop name is now **store** everywhere.")]})
     api = client(billing, data_dir, config_file, provider)
     review_id = api.start_review()
 
     assert run(api, review_id) == {"reviewed": 2, "findings": 1, "failed": 0, "cancelled": False, "error": None}
 
-    assert [request.name for request in provider.requests] == ["rate_impact", "rate_impact", "review_pull_request"]
+    assert [request.name for request in provider.requests] == ["rate_impacts", "review_pull_request"]
     [request] = reviews(provider)
     assert request.prompt.index("Name: name") < request.prompt.index("Name: total")
     assert "6:     return 'store'" in request.prompt
@@ -97,7 +101,7 @@ def test_large_pull_requests_are_reviewed_in_groups_with_the_highest_impact_firs
     billing: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr("bussola.review.ai_review.MAX_GROUP_CHARACTERS", 10)
-    provider = FakeProvider(LOW, HIGH, NOTHING)
+    provider = FakeProvider(rated(LOW, HIGH), NOTHING)
     api = client(billing, data_dir, config_file, provider)
     review_id = api.start_review()
 
@@ -118,7 +122,7 @@ def test_findings_are_placed_on_the_unit_and_lines_they_name(billing: GitFixture
             finding(12, "A caller elsewhere breaks.", path="shop.py"),
         ]
     }
-    api = client(billing, data_dir, config_file, FakeProvider(HIGH, LOW, findings))
+    api = client(billing, data_dir, config_file, FakeProvider(rated(HIGH, LOW), findings))
     review_id = api.start_review()
 
     run(api, review_id)
@@ -131,7 +135,7 @@ def test_findings_are_placed_on_the_unit_and_lines_they_name(billing: GitFixture
 
 
 def test_the_prompt_carries_the_pull_request_description_and_the_comments_already_made(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    provider = FakeProvider(HIGH, LOW, NOTHING)
+    provider = FakeProvider(rated(HIGH, LOW), NOTHING)
     api = client(billing, data_dir, config_file, provider)
     review_id = api.start_review()
     with Database.open(data_dir).session() as session:
@@ -148,7 +152,7 @@ def test_the_prompt_carries_the_pull_request_description_and_the_comments_alread
 
 
 def test_a_finding_that_repeats_an_existing_thread_is_not_added(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    api = client(billing, data_dir, config_file, FakeProvider(HIGH, LOW, {"findings": [finding(2, "Is 1.2 the right rate?")]}))
+    api = client(billing, data_dir, config_file, FakeProvider(rated(HIGH, LOW), {"findings": [finding(2, "Is 1.2 the right rate?")]}))
     review_id = api.start_review()
     comment_on(api, review_id, "app.py::total", 1, "Is 1.2 the right rate?")
 
@@ -158,13 +162,13 @@ def test_a_finding_that_repeats_an_existing_thread_is_not_added(billing: GitFixt
 
 
 def test_running_again_reviews_only_the_units_changed_since_the_last_ai_review(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    provider = FakeProvider(HIGH, LOW, {"findings": [finding(2, "Hard-coded rate."), finding(6, "Renamed shop.")]}, NOTHING)
+    provider = FakeProvider(rated(HIGH, LOW), {"findings": [finding(2, "Hard-coded rate."), finding(6, "Renamed shop.")]}, rated(HIGH), NOTHING)
     api = client(billing, data_dir, config_file, provider)
     review_id = api.start_review()
     run(api, review_id)
 
     assert run(api, review_id)["reviewed"] == 0
-    assert len(provider.requests) == 3
+    assert len(provider.requests) == 2
     assert api.call("GET", f"/reviews/{review_id}/ai-review") == {
         "running": False,
         "phase": None,
@@ -181,7 +185,7 @@ def test_running_again_reviews_only_the_units_changed_since_the_last_ai_review(b
 
     assert run(api, review_id)["reviewed"] == 1
 
-    assert [request.name for request in provider.requests[3:]] == ["rate_impact", "review_pull_request"]
+    assert [request.name for request in provider.requests[2:]] == ["rate_impacts", "review_pull_request"]
     prompt = provider.requests[-1].prompt
     assert "round(sum(items) * 1.2, 2)" in prompt
     assert "Name: name" not in prompt
@@ -192,7 +196,7 @@ def test_running_again_reviews_only_the_units_changed_since_the_last_ai_review(b
 
 def test_review_again_reviews_every_unit_and_keeps_the_threads_already_added(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
     provider = FakeProvider(
-        HIGH, LOW, {"findings": [finding(2, "Hard-coded rate.")]}, {"findings": [finding(2, "Hard-coded rate."), finding(6, "Renamed shop.")]}
+        rated(HIGH, LOW), {"findings": [finding(2, "Hard-coded rate.")]}, {"findings": [finding(2, "Hard-coded rate."), finding(6, "Renamed shop.")]}
     )
     api = client(billing, data_dir, config_file, provider)
     review_id = api.start_review()
@@ -200,7 +204,7 @@ def test_review_again_reviews_every_unit_and_keeps_the_threads_already_added(bil
 
     assert run(api, review_id, again=True) == {"reviewed": 2, "findings": 1, "failed": 0, "cancelled": False, "error": None}
 
-    assert [request.name for request in provider.requests] == ["rate_impact", "rate_impact", "review_pull_request", "review_pull_request"]
+    assert [request.name for request in provider.requests] == ["rate_impacts", "review_pull_request", "review_pull_request"]
     second = provider.requests[-1].prompt
     assert "Name: name" in second
     assert "Name: total" in second
@@ -231,13 +235,13 @@ def test_progress_is_reported_and_cancelling_keeps_the_findings_already_made(
     billing: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr("bussola.review.ai_review.MAX_GROUP_CHARACTERS", 10)
-    provider = BlockingProvider(HIGH, LOW, {"findings": [finding(2, "Hard-coded rate.")]}, NOTHING, block_at=4)
+    provider = BlockingProvider(rated(HIGH, LOW), {"findings": [finding(2, "Hard-coded rate.")]}, NOTHING, block_at=3)
     api = client(billing, data_dir, config_file, provider)
     review_id = api.start_review()
     answers: list[Json] = []
     running = threading.Thread(target=lambda: answers.append(run(api, review_id, call_id="review-1")))
     running.start()
-    wait_for_requests(provider, 4)
+    wait_for_requests(provider, 3)
 
     status = api.call("GET", f"/reviews/{review_id}/ai-review")
     assert (status["running"], status["phase"], status["done"], status["total"]) == (True, "reviewing", 1, 2)
@@ -256,12 +260,12 @@ def test_an_unreachable_provider_while_rating_stops_before_any_review(billing: G
     api = client(billing, data_dir, config_file, provider)
     review_id = api.start_review()
 
-    assert run(api, review_id) == {"reviewed": 0, "findings": 0, "failed": 1, "cancelled": False, "error": "Cannot reach https://api.anthropic.com"}
-    assert [request.name for request in provider.requests] == ["rate_impact"]
+    assert run(api, review_id) == {"reviewed": 0, "findings": 0, "failed": 2, "cancelled": False, "error": "Cannot reach https://api.anthropic.com"}
+    assert [request.name for request in provider.requests] == ["rate_impacts"]
 
 
 def test_ai_threads_can_be_resolved_and_deleted_by_the_reviewer(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    api = client(billing, data_dir, config_file, FakeProvider(HIGH, LOW, {"findings": [finding(2, "Hard-coded rate.")]}))
+    api = client(billing, data_dir, config_file, FakeProvider(rated(HIGH, LOW), {"findings": [finding(2, "Hard-coded rate.")]}))
     review_id = api.start_review()
     run(api, review_id)
     [thread] = ai_threads(api, review_id)
@@ -277,7 +281,7 @@ def test_a_finding_in_a_function_stays_on_it_when_the_code_around_it_changed_too
     git_repo.commit({"app.py": "import os\n\nTAX = 1\n\n\ndef total(items):\n    return sum(items)\n\n\nRATE = 1\n"}, "base")
     git_repo.branch("feature")
     git_repo.commit({"app.py": "import os\nimport sys\n\nTAX = 2\n\n\ndef total(items):\n    return sum(items) * TAX\n\n\nRATE = 2\n"}, "tax")
-    api = client(git_repo, data_dir, config_file, FakeProvider(HIGH, HIGH, {"findings": [finding(8, "TAX is read before it is set.")]}))
+    api = client(git_repo, data_dir, config_file, FakeProvider(rated(HIGH, HIGH), {"findings": [finding(8, "TAX is read before it is set.")]}))
     review_id = api.start_review()
 
     run(api, review_id)
@@ -292,7 +296,7 @@ def test_a_finding_on_the_old_version_of_a_renamed_file_stays_on_the_old_lines(g
     git_repo.git("mv", "billing.py", "pricing.py")
     git_repo.commit({"pricing.py": "def total(items):\n    count = len(items)\n    return sum(items) * 2\n"}, "rename")
     findings = {"findings": [finding(3, "The old total ignored the rate.", side="before", path="pricing.py")]}
-    api = client(git_repo, data_dir, config_file, FakeProvider(HIGH, findings))
+    api = client(git_repo, data_dir, config_file, FakeProvider(rated(HIGH), findings))
     review_id = api.start_review()
 
     run(api, review_id)
@@ -302,7 +306,7 @@ def test_a_finding_on_the_old_version_of_a_renamed_file_stays_on_the_old_lines(g
 
 
 def test_a_finding_too_long_for_a_comment_is_shortened(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    api = client(billing, data_dir, config_file, FakeProvider(HIGH, LOW, {"findings": [finding(2, "x" * 70_000), finding(6, "Renamed shop.")]}))
+    api = client(billing, data_dir, config_file, FakeProvider(rated(HIGH, LOW), {"findings": [finding(2, "x" * 70_000), finding(6, "Renamed shop.")]}))
     review_id = api.start_review()
 
     assert run(api, review_id)["findings"] == 2
@@ -325,7 +329,7 @@ def test_a_group_that_fails_while_adding_threads_keeps_none_of_them(
         return create_thread(context, revision, request)
 
     monkeypatch.setattr("bussola.review.ai_review.create_thread", create_then_fail)
-    api = client(billing, data_dir, config_file, FakeProvider(HIGH, LOW, {"findings": [finding(2, "Hard-coded rate."), finding(6, "Renamed shop.")]}))
+    api = client(billing, data_dir, config_file, FakeProvider(rated(HIGH, LOW), {"findings": [finding(2, "Hard-coded rate."), finding(6, "Renamed shop.")]}))
     review_id = api.start_review()
 
     outcome = run(api, review_id)
@@ -379,7 +383,7 @@ def test_the_model_can_follow_the_code_outside_the_pull_request_with_tools(
         seen["status"] = json.dumps(api.call("GET", f"/reviews/{review_id}/ai-review"))
         return {"findings": [finding(1, "`shop.py:5` still calls `total` with one argument.", path="billing.py")]}
 
-    provider = FakeProvider(HIGH, review)
+    provider = FakeProvider(rated(HIGH), review)
     api = client(signature_change, data_dir, config_file, provider)
     review_id = api.start_review()
     monkeypatch.setattr("bussola.review.review_tools.MAX_SEARCH_RESULTS", 1)

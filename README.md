@@ -233,7 +233,7 @@ Descriptions are kept per review for each version of a unit, so they are there w
 
 ### AI impact rating
 
-The impact rating shows on the unit card as a **Low**, **Medium** or **High impact** badge, with its one-line reason in the tooltip. **Rate impact** on the review page rates every unit that has no current rating in one batch, one request per unit, skipping units already rated or described; the badges appear as the ratings arrive, and **Cancel** stops the batch and keeps what was rated. Once units are rated, the unit controls can show only units of one impact (or the ones not rated yet) and order the units with the highest impact first. Ratings are kept per unit version like descriptions: when a new revision changes a unit its badge is marked outdated, and the next **Rate impact** or **Describe** rates it again.
+The impact rating shows on the unit card as a **Low**, **Medium** or **High impact** badge, with its one-line reason in the tooltip. **Rate impact** on the review page rates every unit that has no current rating in a single request, or a few for a very large pull request (about 100,000 characters of code each), skipping units already rated or described; the badges appear as each request answers, a unit the model leaves out is reported as not rated, and **Cancel** stops the batch and keeps what was rated. Once units are rated, the unit controls can show only units of one impact (or the ones not rated yet) and order the units with the highest impact first. Ratings are kept per unit version like descriptions: when a new revision changes a unit its badge is marked outdated, and the next **Rate impact** or **Describe** rates it again.
 
 ### AI review
 

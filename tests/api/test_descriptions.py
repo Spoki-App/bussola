@@ -297,28 +297,49 @@ def test_a_unit_of_another_review_is_not_found(billing: GitFixture, data_dir: Pa
 RATING = {"impact": "medium", "impact_reason": "Changes the shop name shown to customers."}
 
 
+def ratings(*items: Json) -> Json:
+    return {"ratings": [{"unit": f"unit-{number}", **item} for number, item in enumerate(items, start=1)]}
+
+
 def rate(api: ApiClient, review_id: int, expected: int = 200, **body: Json) -> Json:
     payload = {"target": target(api), "call_id": uuid.uuid4().hex} | body
     return api.call("POST", f"/reviews/{review_id}/impact", expected, payload)
 
 
-def test_the_batch_rates_every_unit_and_stores_the_rating_without_a_description(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    provider = FakeProvider(RATING)
+def test_one_call_rates_every_unit_and_stores_the_rating_without_a_description(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    provider = FakeProvider(ratings(RATING, {"impact": "high", "impact_reason": "Prices change."}))
     api = ai_client(billing, data_dir, config_file, provider)
     review_id = api.start_review()
 
     assert rate(api, review_id) == {"rated": 2, "failed": 0, "cancelled": False, "error": None}
 
-    assert {request.name for request in provider.requests} == {"rate_impact"}
-    assert provider.requests[0].schema["required"] == ["impact", "impact_reason"]
+    [request] = provider.requests
+    assert request.name == "rate_impacts"
+    assert request.schema["required"] == ["ratings"]
+    assert request.prompt.index("Unit: unit-1\nPath: app.py") < request.prompt.index("Name: total") < request.prompt.index("Unit: unit-2")
     stored = descriptions(api, review_id)
     total = stored[api.unit(review_id, "app.py::total")["id"]]
     assert (total["description"], total["impact"], total["impact_reason"], total["outdated"]) == (None, "medium", RATING["impact_reason"], False)
     assert (total["provider"], total["model"]) == ("fake", "claude-opus-5-5")
+    assert stored[api.unit(review_id, "app.py::name")["id"]]["impact"] == "high"
+
+
+def test_a_large_pull_request_is_rated_in_a_few_calls(billing: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("bussola.review.descriptions.MAX_RATING_GROUP_CHARACTERS", 10)
+    provider = FakeProvider(ratings(RATING))
+    api = ai_client(billing, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    assert rate(api, review_id)["rated"] == 2
+
+    first, second = provider.requests
+    assert "Name: total" in first.prompt
+    assert "Name: name" not in first.prompt
+    assert "Unit: unit-1\nPath: app.py" in second.prompt
 
 
 def test_the_batch_skips_units_already_rated_and_keeps_their_description(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    provider = FakeProvider(INSIGHT, RATING)
+    provider = FakeProvider(INSIGHT, ratings(RATING))
     api = ai_client(billing, data_dir, config_file, provider)
     review_id = api.start_review()
     describe(api, review_id, "app.py::total")
@@ -326,15 +347,16 @@ def test_the_batch_skips_units_already_rated_and_keeps_their_description(billing
     assert rate(api, review_id)["rated"] == 1
     assert rate(api, review_id)["rated"] == 0
 
-    assert [request.name for request in provider.requests] == ["describe_unit", "rate_impact"]
+    assert [request.name for request in provider.requests] == ["describe_unit", "rate_impacts"]
     assert "Name: name" in provider.requests[1].prompt
+    assert "Name: total" not in provider.requests[1].prompt
     stored = descriptions(api, review_id)
     assert stored[api.unit(review_id, "app.py::total")["id"]]["description"] == INSIGHT["description"]
     assert stored[api.unit(review_id, "app.py::name")["id"]]["impact"] == "medium"
 
 
 def test_after_a_new_revision_only_the_changed_unit_is_rated_again(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    provider = FakeProvider(RATING, RATING, {"impact": "high", "impact_reason": "Rounding changes every total."})
+    provider = FakeProvider(ratings(RATING, RATING), ratings({"impact": "high", "impact_reason": "Rounding changes every total."}))
     api = ai_client(billing, data_dir, config_file, provider)
     review_id = api.start_review()
     rate(api, review_id)
@@ -352,7 +374,7 @@ def test_after_a_new_revision_only_the_changed_unit_is_rated_again(billing: GitF
 
 
 def test_describing_a_rated_unit_adds_the_description(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    api = ai_client(billing, data_dir, config_file, FakeProvider(RATING, INSIGHT))
+    api = ai_client(billing, data_dir, config_file, FakeProvider(ratings(RATING, RATING), INSIGHT))
     review_id = api.start_review()
     rate(api, review_id)
 
@@ -362,19 +384,30 @@ def test_describing_a_rated_unit_adds_the_description(billing: GitFixture, data_
     assert (stored["description"], stored["impact"]) == (INSIGHT["description"], "high")
 
 
-def test_a_unit_the_model_cannot_rate_does_not_stop_the_others(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    api = ai_client(billing, data_dir, config_file, FakeProvider({"impact": "huge", "impact_reason": "x"}, RATING))
+def test_a_unit_the_model_leaves_out_is_reported_and_the_others_are_kept(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    api = ai_client(billing, data_dir, config_file, FakeProvider(ratings(RATING)))
+    review_id = api.start_review()
+
+    assert rate(api, review_id) == {"rated": 1, "failed": 1, "cancelled": False, "error": "The model did not rate this unit"}
+    assert len(descriptions(api, review_id)) == 1
+
+
+def test_an_answer_that_does_not_match_the_format_fails_the_units_it_covers(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    api = ai_client(billing, data_dir, config_file, FakeProvider(ratings({"impact": "huge", "impact_reason": "x"}, RATING)))
     review_id = api.start_review()
 
     rated = rate(api, review_id)
 
-    assert (rated["rated"], rated["failed"], rated["cancelled"]) == (1, 1, False)
+    assert (rated["rated"], rated["failed"], rated["cancelled"]) == (0, 2, False)
     assert rated["error"].startswith("The model's answer does not match the expected format")
-    assert len(descriptions(api, review_id)) == 1
+    assert descriptions(api, review_id) == {}
 
 
-def test_a_batch_stopped_by_an_unreachable_provider_keeps_the_ratings_it_got(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    api = ai_client(billing, data_dir, config_file, FakeProvider(RATING, AiUnreachableError("Cannot reach https://api.anthropic.com")))
+def test_a_batch_stopped_by_an_unreachable_provider_keeps_the_ratings_it_got(
+    billing: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("bussola.review.descriptions.MAX_RATING_GROUP_CHARACTERS", 10)
+    api = ai_client(billing, data_dir, config_file, FakeProvider(ratings(RATING), AiUnreachableError("Cannot reach https://api.anthropic.com")))
     review_id = api.start_review()
 
     assert rate(api, review_id) == {"rated": 1, "failed": 1, "cancelled": False, "error": "Cannot reach https://api.anthropic.com"}
@@ -382,7 +415,7 @@ def test_a_batch_stopped_by_an_unreachable_provider_keeps_the_ratings_it_got(bil
 
 
 def test_a_batch_sends_nothing_when_the_provider_changed_since_it_was_confirmed(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    provider = FakeProvider(RATING)
+    provider = FakeProvider(ratings(RATING))
     api = ai_client(billing, data_dir, config_file, provider)
     review_id = api.start_review()
 
@@ -392,7 +425,7 @@ def test_a_batch_sends_nothing_when_the_provider_changed_since_it_was_confirmed(
 
 
 def test_a_running_batch_can_be_cancelled(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    provider = FakeProvider(RATING, delay=30.0, timeout=60.0)
+    provider = FakeProvider(ratings(RATING), delay=30.0, timeout=60.0)
     api = ai_client(billing, data_dir, config_file, provider)
     review_id = api.start_review()
     ai_target = target(api)
@@ -415,7 +448,7 @@ def test_binary_files_are_not_rated_in_a_batch(git_repo: GitFixture, data_dir: P
     git_repo.commit({"README.md": "hello\n"}, "base")
     git_repo.branch("feature")
     git_repo.commit({"logo.bin": b"\x00\x01\x02\xff"}, "logo")
-    provider = FakeProvider(RATING)
+    provider = FakeProvider(ratings(RATING))
     api = ai_client(git_repo, data_dir, config_file, provider)
     review_id = api.start_review()
 
@@ -424,7 +457,7 @@ def test_binary_files_are_not_rated_in_a_batch(git_repo: GitFixture, data_dir: P
 
 
 def test_a_batch_cancelled_before_it_starts_reports_a_cancelled_result(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    provider = FakeProvider(RATING)
+    provider = FakeProvider(ratings(RATING))
     api = ai_client(billing, data_dir, config_file, provider)
     review_id = api.start_review()
 
