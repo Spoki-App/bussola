@@ -61,7 +61,7 @@ export const SETTINGS: Setting[] = [
   {
     category: 'AI',
     name: 'AI provider',
-    description: 'The provider, model, endpoint and key variable used by the AI features, and a connection test.',
+    description: 'The provider, model, endpoint and key variable used by the AI features, the code sent per call, and a connection test.',
     render: () => <AiPanel />,
   },
   {
