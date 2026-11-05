@@ -4,12 +4,14 @@ from bussola.ai.base import AiCancelledError
 from bussola.ai.runner import AiRunner
 from bussola.api.deps import ContextDep, repo_of, resolve_revision
 from bussola.api.descriptions import ai_provider
-from bussola.api.schemas import AiReviewIn, AiReviewOut, AiReviewStatusOut, CancelOut
+from bussola.api.schemas import AiReviewIn, AiReviewOut, AiReviewRunDetailOut, AiReviewRunOut, AiReviewStatusOut, CancelOut
 from bussola.api.state import app_state
 from bussola.config import load_repo_config
-from bussola.review.ai_review import AiReviewJob, AiReviewOutcome, ai_review_coverage, run_ai_review
+from bussola.errors import NotFoundError
+from bussola.review.ai_review import AiReviewJob, AiReviewOutcome, RunStatus, ai_review_coverage, run_ai_review
 from bussola.review.repos import open_repo
 from bussola.review.review_tools import ReviewTools
+from bussola.storage.models import AiReviewRun
 
 router = APIRouter(tags=["ai-review"])
 
@@ -35,7 +37,8 @@ def start_ai_review(context: ContextDep, body: AiReviewIn, request: Request) -> 
 def ai_review_status(context: ContextDep, request: Request) -> AiReviewStatusOut:
     progress = app_state(request).ai_reviews.progress(context.review.id)
     units, reviewed = ai_review_coverage(context, resolve_revision(context, None))
-    status = AiReviewStatusOut(running=progress is not None, units=units, reviewed_units=reviewed)
+    runs = context.store.ai_reviews.count_runs(context.review.id)
+    status = AiReviewStatusOut(running=progress is not None, units=units, reviewed_units=reviewed, runs=runs)
     if progress is None:
         return status
     return status.model_copy(update={"phase": progress.phase, "done": progress.done, "total": progress.total, "lookups": progress.lookups})
@@ -44,3 +47,38 @@ def ai_review_status(context: ContextDep, request: Request) -> AiReviewStatusOut
 @router.post("/reviews/{review_id}/ai-review/cancel")
 def cancel_ai_review(context: ContextDep, request: Request) -> CancelOut:
     return CancelOut(cancelled=app_state(request).ai_reviews.cancel(context.review.id))
+
+
+@router.get("/reviews/{review_id}/ai-review/runs")
+def list_ai_review_runs(context: ContextDep, request: Request) -> list[AiReviewRunOut]:
+    running = app_state(request).ai_reviews.progress(context.review.id) is not None
+    return [_run_out(run, running) for run in context.store.ai_reviews.runs(context.review.id)]
+
+
+@router.get("/reviews/{review_id}/ai-review/runs/{run_id}")
+def get_ai_review_run(context: ContextDep, run_id: int, request: Request) -> AiReviewRunDetailOut:
+    run = context.store.ai_reviews.get_run(run_id)
+    if run is None or run.review_id != context.review.id:
+        raise NotFoundError("AI review run not found")
+    brief = _run_out(run, app_state(request).ai_reviews.progress(context.review.id) is not None)
+    return AiReviewRunDetailOut(**brief.model_dump(), rating=run.details.get("rating"), parts=run.details.get("parts", []))
+
+
+def _run_out(run: AiReviewRun, running: bool) -> AiReviewRunOut:
+    status = RunStatus(run.status)
+    if status == RunStatus.RUNNING and not running:
+        status = RunStatus.INTERRUPTED
+    return AiReviewRunOut(
+        id=run.id,
+        status=status,
+        again=run.again,
+        provider=run.provider,
+        provider_label=run.provider_label,
+        model=run.model,
+        reviewed=run.reviewed,
+        findings=run.findings,
+        failed=run.failed,
+        error=run.error,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+    )

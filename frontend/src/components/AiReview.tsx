@@ -1,16 +1,29 @@
+import { useState } from 'react'
+
 import { describeError } from '../api/client'
 import type { AiReviewState } from '../hooks/useAiReview'
 import { aiReviewCoverage, aiReviewProgress, aiReviewSummary } from '../review/aiReview'
 import { AiActionButton } from './AiActionButton'
+import { AiReviewDetails } from './AiReviewDetails'
 import { ErrorNote } from './Badges'
 import { Spinner } from './Spinner'
 
 interface Props {
+  reviewId: number
   repoId: number
   review: AiReviewState
 }
 
-export function AiReview({ repoId, review }: Props) {
+export function AiReview({ reviewId, repoId, review }: Props) {
+  const [showing, setShowing] = useState(false)
+  const details = (review.status?.runs ?? 0) > 0 && (
+    <>
+      <button type="button" onClick={() => { setShowing(true) }}>
+        Details
+      </button>
+      {showing && <AiReviewDetails reviewId={reviewId} onClose={() => { setShowing(false) }} />}
+    </>
+  )
   if (review.running) {
     return (
       <span className="summary-action">
@@ -21,6 +34,7 @@ export function AiReview({ repoId, review }: Props) {
         <button type="button" onClick={review.cancel}>
           Cancel
         </button>
+        {details}
       </span>
     )
   }
@@ -50,6 +64,7 @@ export function AiReview({ repoId, review }: Props) {
           onRun={(target) => { review.run(target, true) }}
         />
       )}
+      {details}
     </span>
   )
 }

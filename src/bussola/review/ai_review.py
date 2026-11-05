@@ -1,4 +1,5 @@
 import hashlib
+import json
 import threading
 from collections import Counter
 from collections.abc import Callable, Generator, Iterable
@@ -6,13 +7,14 @@ from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from itertools import accumulate
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from bussola.ai.base import AiProvider, Cancellation
+from bussola.ai.base import AiCancelledError, AiProvider, Cancellation
 from bussola.ai.batch import BatchProgress, BatchResult, run_batch
 from bussola.ai.runner import AiRunner, AiTask
+from bussola.ai.tools import Toolbox
 from bussola.errors import ConflictError
 from bussola.review.anchoring import selected_lines
 from bussola.review.context import ReviewContext
@@ -22,7 +24,7 @@ from bussola.review.review_tools import SIDES, ReviewTools, label_of, unit_label
 from bussola.review.rows import Side, is_binary, side_lines
 from bussola.review.thread_types import ThreadScope
 from bussola.review.threads import MAX_BODY_LENGTH, NewThread, ThreadView, create_thread, thread_views
-from bussola.storage.models import AiReviewedUnit, Reviewer, Revision, UnitSnapshot
+from bussola.storage.models import AiReviewedUnit, AiReviewRun, Reviewer, Revision, Thread, UnitSnapshot, utcnow
 
 AI_EMAIL_DOMAIN = "ai.bussola.invalid"
 IMPACT_ORDER = {Impact.HIGH: 0, Impact.MEDIUM: 1, Impact.LOW: 2}
@@ -52,6 +54,7 @@ class Finding(BaseModel):
 
 class ReviewFindings(BaseModel):
     findings: list[Finding]
+    summary: str = ""
 
 
 REVIEW_INPUT = (
@@ -76,12 +79,14 @@ REVIEW_RULES = (
     "findings: one entry per problem. Anchor it on lines of the units to review, at the change that causes the problem, and name any other "
     "place in the body as path:line. path: the file of those lines. side: after for lines of the new version, before for lines the change "
     "removes. start_line and end_line: the line numbers shown before the code on that side, the same number for a single line. "
-    "body: GitHub-flavored Markdown for the author, short and concrete: what is wrong, why it matters and how to fix it."
+    "body: GitHub-flavored Markdown for the author, short and concrete: what is wrong, why it matters and how to fix it.\n\n"
+    "summary: GitHub-flavored Markdown for the reviewer, a few sentences without a title: what you checked, what you looked up with "
+    "the tools and what you found there, and why the change looks correct or what the findings have in common. Do not repeat the findings."
 )
 
 REVIEW_PULL_REQUEST = AiTask(
     name="review_pull_request",
-    version=1,
+    version=2,
     system="You are a careful code reviewer. You review a pull request through the units it changes: "
     + UNIT_KINDS
     + REVIEW_INPUT
@@ -166,19 +171,32 @@ class RunningReviews:
 
 
 def run_ai_review(job: AiReviewJob) -> AiReviewOutcome:
+    record = _RunRecord.start(job)
+    try:
+        outcome = _run(job, record)
+    except BaseException as error:
+        record.finish(AiReviewOutcome(0, 0, 0, cancelled=False, error=str(error) or type(error).__name__), RunStatus.FAILED)
+        raise
+    record.finish(outcome, _status(outcome))
+    return outcome
+
+
+def _run(job: AiReviewJob, record: "_RunRecord") -> AiReviewOutcome:
     context, cancellation = job.context, job.cancellation
     snapshots, pending = reviewable_units(context, job.tools.snapshots)
     pending = snapshots if job.again else pending
     rating = rate_units(context, snapshots, job.runner, cancellation, lambda progress: job.report(_progress(AiReviewPhase.RATING, progress)))
+    record.rated(rating, snapshots)
     if rating.cancelled or rating.stopped_by is not None:
         return AiReviewOutcome(0, 0, len(rating.errors), rating.cancelled, rating.stopped_by)
-    groups = review_groups(snapshots, pending, _impacts(context, snapshots))
+    impacts = _impacts(context, snapshots)
+    groups = review_groups(snapshots, pending, impacts)
     done = [0, *accumulate(len(group) for group in groups)]
     progress = _ReviewProgress(job.report, len(pending))
     progress.reviewed(0)
     if groups:
         job.tools.prepare()
-    reviewer = _GroupReviewer(job, snapshots, ai_reviewer(context, job.runner.provider), progress)
+    reviewer = _GroupReviewer(job, snapshots, ai_reviewer(context, job.runner.provider), progress, record, impacts)
     context.store.commit()
     outcome: BatchResult[int, int] = run_batch(
         range(len(groups)), lambda index: reviewer.review(groups[index]), cancellation, lambda batch: progress.reviewed(done[batch.done])
@@ -269,39 +287,96 @@ class _ReviewProgress:
             self._report(AiReviewProgress(AiReviewPhase.REVIEWING, self._done, self._total, self._lookups))
 
 
+class RunStatus(StrEnum):
+    RUNNING = "running"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    FAILED = "failed"
+    INTERRUPTED = "interrupted"
+
+
+class _RunRecord:
+    def __init__(self, context: ReviewContext, run: AiReviewRun) -> None:
+        self._context = context
+        self._run = run
+        self._details: dict[str, Any] = {"rating": None, "parts": []}
+
+    @classmethod
+    def start(cls, job: AiReviewJob) -> "_RunRecord":
+        provider = job.runner.provider
+        run = AiReviewRun(job.context.review.id, job.revision.id, provider.name, provider.label, provider.model, job.again, RunStatus.RUNNING)
+        record = cls(job.context, job.context.store.ai_reviews.add_run(run))
+        record._save()
+        job.context.store.commit()
+        return record
+
+    def rated(self, rating: BatchResult[int, None], snapshots: list[UnitSnapshot]) -> None:
+        labels = {snapshot.id: unit_label(snapshot) for snapshot in snapshots}
+        failed = sorted(labels[unit_id] for unit_id in rating.errors if unit_id in labels)
+        error = rating.stopped_by or next(iter(rating.errors.values()), None)
+        self._details["rating"] = {"rated": len(rating.results), "failed": failed, "error": error}
+        self._save()
+        self._context.store.commit()
+
+    def part(self, part: dict[str, Any]) -> None:
+        self._details["parts"].append(part)
+        self._save()
+
+    def finish(self, outcome: AiReviewOutcome, status: "RunStatus") -> None:
+        run = self._run
+        run.status, run.reviewed, run.findings, run.failed, run.error = status, outcome.reviewed, outcome.findings, outcome.failed, outcome.error
+        run.finished_at = utcnow()
+        self._save()
+        self._context.store.commit()
+
+    def _save(self) -> None:
+        self._run.details = json.loads(json.dumps(self._details))
+
+
 @dataclass(frozen=True)
 class _GroupReviewer:
     job: AiReviewJob
     snapshots: list[UnitSnapshot]
     author: Reviewer
     progress: _ReviewProgress
+    record: _RunRecord
+    impacts: dict[int, Impact]
 
     def review(self, group: list[UnitSnapshot]) -> int:
         context, revision = self.job.context, self.job.revision
-        views = [view for view in thread_views(context, revision) if any(comment.deleted_at is None for comment in view.comments)]
         toolbox = self.job.tools.toolbox(self.progress.looked_up)
-        prompt = review_prompt(group, self.snapshots, revision, _pull_request_text(context), views)
-        content_hash = hashlib.sha256(f"{prompt}\0{toolbox.fingerprint()}".encode()).hexdigest()
-        findings = self.job.runner.with_tools(toolbox).run(REVIEW_PULL_REQUEST, prompt, self.job.cancellation, content_hash).findings
-        with context.store.session.begin_nested():
-            created = self._save(group, findings, views)
+        part: dict[str, Any] = {"units": [{"label": unit_label(unit), "impact": self.impacts.get(unit.id)} for unit in group]}
+        try:
+            views = [view for view in thread_views(context, revision) if any(comment.deleted_at is None for comment in view.comments)]
+            prompt = review_prompt(group, self.snapshots, revision, _pull_request_text(context), views)
+            content_hash = hashlib.sha256(f"{prompt}\0{toolbox.fingerprint()}".encode()).hexdigest()
+            answer = self.job.runner.with_tools(toolbox).run(REVIEW_PULL_REQUEST, prompt, self.job.cancellation, content_hash)
+            with context.store.session.begin_nested():
+                created = self._save(group, answer.findings, views)
+        except AiCancelledError:
+            raise
+        except Exception as error:
+            self.record.part(part | {"lookups": _lookups(toolbox), "error": str(error) or type(error).__name__})
+            context.store.commit()
+            raise
+        findings = [{"thread_id": thread.id, "place": place, "body": body} for thread, place, body in created]
+        self.record.part(part | {"summary": answer.summary.strip(), "findings": findings, "lookups": _lookups(toolbox), "error": None})
         context.store.commit()
-        return created
+        return len(created)
 
-    def _save(self, group: list[UnitSnapshot], findings: list[Finding], views: list[ThreadView]) -> int:
+    def _save(self, group: list[UnitSnapshot], findings: list[Finding], views: list[ThreadView]) -> list[tuple[Thread, str, str]]:
         context, provider = self.job.context, self.job.runner.provider
         raised = {_raised_key(view) for view in views}
         ai_context = replace(context, reviewer=self.author)
         per_unit: Counter[int] = Counter()
-        created = 0
+        created: list[tuple[Thread, str, str]] = []
         for finding in findings:
             request = place_finding(finding, group, self.snapshots)
             key = _request_key(request)
             if key in raised:
                 continue
-            create_thread(ai_context, self.job.revision, request)
+            created.append((create_thread(ai_context, self.job.revision, request), _request_place(request), request.body))
             raised.add(key)
-            created += 1
             if request.snapshot is not None:
                 per_unit[request.snapshot.id] += 1
         for snapshot in group:
@@ -341,6 +416,22 @@ def _distance(snapshot: UnitSnapshot, side: Side, line: int) -> int:
 
 def _nearest(numbers: list[int | None], wanted: int) -> int:
     return min(range(len(numbers)), key=lambda index: (numbers[index] is None, abs((numbers[index] or 0) - wanted)))
+
+
+def _request_place(request: NewThread) -> str:
+    snapshot, offset = request.snapshot, request.line_offset
+    if request.scope == ThreadScope.REVIEW:
+        return "The whole pull request"
+    if snapshot is None or offset is None:
+        return request.path or ""
+    lines = side_lines(snapshot, request.side)
+    first, last = lines[offset].file_line, lines[offset + request.line_count - 1].file_line
+    span = f"line {first}" if first == last else f"lines {first}-{last}"
+    return f"{unit_label(snapshot)}, {span} {'before' if request.side == Side.BASE else 'after'}"
+
+
+def _lookups(toolbox: Toolbox) -> list[dict[str, Any]]:
+    return [{"tool": call.name, "arguments": call.arguments, "result": call.result, "error": call.error} for call in toolbox.log]
 
 
 def _request_key(request: NewThread) -> RaisedKey:
@@ -389,6 +480,12 @@ def _pull_request_text(context: ReviewContext) -> str | None:
 def _impacts(context: ReviewContext, snapshots: list[UnitSnapshot]) -> dict[int, Impact]:
     found = stored_descriptions(snapshots, context.store.descriptions.descriptions(context.review.id))
     return {unit_id: Impact(description.impact) for unit_id, description in found.items()}
+
+
+def _status(outcome: AiReviewOutcome) -> "RunStatus":
+    if outcome.cancelled:
+        return RunStatus.CANCELLED
+    return RunStatus.FAILED if outcome.error and outcome.reviewed == 0 else RunStatus.COMPLETED
 
 
 def _progress(phase: AiReviewPhase, progress: BatchProgress) -> AiReviewProgress:

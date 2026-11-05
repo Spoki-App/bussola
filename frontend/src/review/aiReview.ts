@@ -1,4 +1,4 @@
-import type { AiReviewResult, AiReviewStatus } from '../api/types'
+import type { AiReviewLookup, AiReviewResult, AiReviewRun, AiReviewRunStatus, AiReviewStatus } from '../api/types'
 import { plural } from './text'
 
 export function aiReviewProgress(status: AiReviewStatus | null): string {
@@ -28,4 +28,28 @@ export function aiReviewCoverage(status: AiReviewStatus | null): string | null {
     return null
   }
   return status.reviewed_units === status.units ? 'Every unit has an AI review.' : `${String(status.reviewed_units)} of ${plural(status.units, 'unit')} have an AI review.`
+}
+
+const RUN_STATUS_LABELS: Record<AiReviewRunStatus, string> = {
+  running: 'Running',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  failed: 'Failed',
+  interrupted: 'Interrupted, bussola stopped while it ran',
+}
+
+export function runLabel(run: AiReviewRun): string {
+  return `${new Date(run.started_at).toLocaleString()}, ${RUN_STATUS_LABELS[run.status].toLowerCase()}`
+}
+
+export function runHeadline(run: AiReviewRun): string {
+  const provider = run.model ? `${run.provider_label} (${run.model})` : run.provider_label
+  const kind = run.again ? 'Review again' : 'AI review'
+  const counts = `${plural(run.reviewed, 'unit')} reviewed, ${plural(run.findings, 'finding')}${run.failed > 0 ? `, ${plural(run.failed, 'unit')} not reviewed` : ''}.`
+  return `${RUN_STATUS_LABELS[run.status]}: ${kind} with ${provider}, started ${new Date(run.started_at).toLocaleString()}. ${counts}`
+}
+
+export function lookupCall(lookup: AiReviewLookup): string {
+  const values = Object.entries(lookup.arguments).map(([name, value]) => `${name}: ${typeof value === 'string' ? value : JSON.stringify(value)}`)
+  return `${lookup.tool}(${values.join(', ')})`
 }

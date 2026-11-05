@@ -1,10 +1,10 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from bussola.navigation.navigator import Origin, Resolver, TargetRole
-from bussola.review.ai_review import AiReviewPhase
+from bussola.review.ai_review import AiReviewPhase, RunStatus
 from bussola.review.descriptions import Impact
 from bussola.review.diffs import DiffMode
 from bussola.review.rows import LineChange, Side
@@ -523,3 +523,56 @@ class AiReviewStatusOut(BaseModel):
     lookups: int = 0
     units: int
     reviewed_units: int
+    runs: int = 0
+
+
+class AiReviewRunOut(BaseModel):
+    id: int
+    status: RunStatus
+    again: bool
+    provider: str
+    provider_label: str
+    model: str | None
+    reviewed: int
+    findings: int
+    failed: int
+    error: str | None
+    started_at: datetime
+    finished_at: datetime | None
+
+
+class AiReviewLookupOut(BaseModel):
+    tool: str
+    arguments: dict[str, Any]
+    result: str
+    error: bool
+
+
+class AiReviewFindingOut(BaseModel):
+    thread_id: str
+    place: str
+    body: str
+
+
+class AiReviewUnitOut(BaseModel):
+    label: str
+    impact: Impact | None
+
+
+class AiReviewPartOut(BaseModel):
+    units: list[AiReviewUnitOut]
+    summary: str | None = None
+    findings: list[AiReviewFindingOut] = []
+    lookups: list[AiReviewLookupOut] = []
+    error: str | None = None
+
+
+class AiReviewRatingOut(BaseModel):
+    rated: int
+    failed: list[str]
+    error: str | None
+
+
+class AiReviewRunDetailOut(AiReviewRunOut):
+    rating: AiReviewRatingOut | None
+    parts: list[AiReviewPartOut]

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, defer
 
 from bussola.storage.models import (
     AiReviewedUnit,
+    AiReviewRun,
     Approval,
     Comment,
     ForgeLink,
@@ -271,6 +272,19 @@ class SqlAiReviewRepository(_SqlRepository):
         replaced = {name: value for name, value in values.items() if name not in CHANGE_KEY}
         with self._session.begin_nested():
             self._session.execute(insert(AiReviewedUnit).values(**values).on_conflict_do_update(index_elements=list(CHANGE_KEY), set_=replaced))
+
+    def add_run(self, run: AiReviewRun) -> AiReviewRun:
+        return self._add(run)
+
+    def runs(self, review_id: int) -> list[AiReviewRun]:
+        query = select(AiReviewRun).where(AiReviewRun.review_id == review_id).order_by(AiReviewRun.started_at.desc(), AiReviewRun.id.desc())
+        return list(self._session.scalars(query.options(defer(AiReviewRun.details))))
+
+    def get_run(self, run_id: int) -> AiReviewRun | None:
+        return self._session.get(AiReviewRun, run_id)
+
+    def count_runs(self, review_id: int) -> int:
+        return self._session.scalar(select(func.count()).select_from(AiReviewRun).where(AiReviewRun.review_id == review_id)) or 0
 
 
 class Store:

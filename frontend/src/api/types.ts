@@ -353,4 +353,48 @@ export interface AiReviewStatus {
   lookups: number
   units: number
   reviewed_units: number
+  runs: number
+}
+
+export type AiReviewRunStatus = 'running' | 'completed' | 'cancelled' | 'failed' | 'interrupted'
+
+export interface AiReviewRun {
+  id: number
+  status: AiReviewRunStatus
+  again: boolean
+  provider: string
+  provider_label: string
+  model: string | null
+  reviewed: number
+  findings: number
+  failed: number
+  error: string | null
+  started_at: string
+  finished_at: string | null
+}
+
+export interface AiReviewLookup {
+  tool: string
+  arguments: Record<string, unknown>
+  result: string
+  error: boolean
+}
+
+export interface AiReviewFinding {
+  thread_id: string
+  place: string
+  body: string
+}
+
+export interface AiReviewPart {
+  units: { label: string; impact: Impact | null }[]
+  summary: string | null
+  findings: AiReviewFinding[]
+  lookups: AiReviewLookup[]
+  error: string | null
+}
+
+export interface AiReviewRunDetail extends AiReviewRun {
+  rating: { rated: number; failed: string[]; error: string | null } | null
+  parts: AiReviewPart[]
 }

@@ -86,7 +86,7 @@ def test_the_ai_review_rates_every_unit_then_reviews_the_pull_request_as_a_whole
     assert request.prompt.index("Name: name") < request.prompt.index("Name: total")
     assert "6:     return 'store'" in request.prompt
     assert "Reviewed commits: before" in request.prompt
-    assert request.schema["required"] == ["findings"]
+    assert request.schema["required"] == ["findings", "summary"]
     assert request.tools is not None
     assert [tool.name for tool in request.tools.definitions] == ["find_definition", "find_usages", "read_file", "search", "unit_diff"]
     [thread] = ai_threads(api, review_id)
@@ -177,6 +177,7 @@ def test_running_again_reviews_only_the_units_changed_since_the_last_ai_review(b
         "lookups": 0,
         "units": 2,
         "reviewed_units": 2,
+        "runs": 2,
     }
 
     billing.commit({"app.py": "def total(items):\n    return round(sum(items) * 1.2, 2)\n\n\ndef name():\n    return 'store'\n"}, "round")
@@ -250,6 +251,9 @@ def test_progress_is_reported_and_cancelling_keeps_the_findings_already_made(
     running.join(WAIT_SECONDS)
 
     assert answers == [{"reviewed": 1, "findings": 1, "failed": 0, "cancelled": True, "error": None}]
+    [last] = api.call("GET", f"/reviews/{review_id}/ai-review/runs")
+    assert (last["status"], last["reviewed"]) == ("cancelled", 1)
+    assert len(api.call("GET", f"/reviews/{review_id}/ai-review/runs/{last['id']}")["parts"]) == 1
     assert [thread["comments"][0]["body"] for thread in ai_threads(api, review_id)] == ["Hard-coded rate."]
     assert api.call("GET", f"/reviews/{review_id}/ai-review")["running"] is False
     assert api.call("POST", f"/reviews/{review_id}/ai-review/cancel")["cancelled"] is False
@@ -335,6 +339,10 @@ def test_a_group_that_fails_while_adding_threads_keeps_none_of_them(
     outcome = run(api, review_id)
 
     assert (outcome["reviewed"], outcome["failed"], outcome["error"]) == (0, 2, "disk full")
+    [last] = api.call("GET", f"/reviews/{review_id}/ai-review/runs")
+    assert (last["status"], last["error"]) == ("failed", "disk full")
+    [part] = api.call("GET", f"/reviews/{review_id}/ai-review/runs/{last['id']}")["parts"]
+    assert (part["error"], part["findings"]) == ("disk full", [])
     assert ai_threads(api, review_id) == []
     assert api.call("GET", f"/reviews/{review_id}/ai-review")["reviewed_units"] == 0
 
@@ -381,7 +389,10 @@ def test_the_model_can_follow_the_code_outside_the_pull_request_with_tools(
         for label, (name, arguments) in calls.items():
             seen[label] = request.tools.call(name, arguments).text
         seen["status"] = json.dumps(api.call("GET", f"/reviews/{review_id}/ai-review"))
-        return {"findings": [finding(1, "`shop.py:5` still calls `total` with one argument.", path="billing.py")]}
+        return {
+            "findings": [finding(1, "`shop.py:5` still calls `total` with one argument.", path="billing.py")],
+            "summary": "Followed the callers of `total`.",
+        }
 
     provider = FakeProvider(rated(HIGH), review)
     api = client(signature_change, data_dir, config_file, provider)
@@ -404,3 +415,28 @@ def test_the_model_can_follow_the_code_outside_the_pull_request_with_tools(
     assert seen["hidden"] == "generated/client.py is excluded from reviews in this repository"
     [thread] = ai_threads(api, review_id)
     assert (thread["path"], thread["qualified_name"]) == ("billing.py", "total")
+    [last] = api.call("GET", f"/reviews/{review_id}/ai-review/runs")
+    assert (last["status"], last["reviewed"], last["findings"], last["provider_label"]) == ("completed", 1, 1, "Fake provider")
+    detail = api.call("GET", f"/reviews/{review_id}/ai-review/runs/{last['id']}")
+    assert detail["rating"] == {"rated": 1, "failed": [], "error": None}
+    [part] = detail["parts"]
+    assert part["units"] == [{"label": "billing.py::total", "impact": "high"}]
+    assert part["summary"] == "Followed the callers of `total`."
+    assert part["findings"] == [{"thread_id": thread["id"], "place": "billing.py::total, line 1 after", "body": thread["comments"][0]["body"]}]
+    assert [lookup["tool"] for lookup in part["lookups"]][:2] == ["find_usages", "find_definition"]
+    assert part["lookups"][-1] == {
+        "tool": "read_file",
+        "arguments": {"path": "shop.py", "side": "after", "start_line": 5, "end_line": 4},
+        "result": "end_line must not be before start_line",
+        "error": True,
+    }
+    assert api.call("GET", f"/reviews/{review_id}/ai-review")["runs"] == 1
+
+
+def test_a_run_of_another_review_is_not_found(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    api = client(billing, data_dir, config_file, FakeProvider(rated(HIGH, LOW), NOTHING))
+    review_id = api.start_review()
+    run(api, review_id)
+    [run_out] = api.call("GET", f"/reviews/{review_id}/ai-review/runs")
+
+    assert api.call("GET", f"/reviews/{review_id}/ai-review/runs/{run_out['id'] + 1}", 404)["detail"] == "AI review run not found"

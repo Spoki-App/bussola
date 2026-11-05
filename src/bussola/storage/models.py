@@ -276,3 +276,23 @@ class AiReviewedUnit(Base):
     model: Mapped[str | None] = mapped_column()
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+
+
+class AiReviewRun(Base):
+    __tablename__ = "ai_review_runs"
+
+    review_id: Mapped[int] = mapped_column(ForeignKey("reviews.id"), index=True)
+    revision_id: Mapped[int] = mapped_column(ForeignKey("revisions.id"))
+    provider: Mapped[str] = mapped_column()
+    provider_label: Mapped[str] = mapped_column()
+    model: Mapped[str | None] = mapped_column()
+    again: Mapped[bool] = mapped_column()
+    status: Mapped[str] = mapped_column()
+    reviewed: Mapped[int] = mapped_column(default=0)
+    findings: Mapped[int] = mapped_column(default=0)
+    failed: Mapped[int] = mapped_column(default=0)
+    error: Mapped[str | None] = mapped_column(default=None)
+    details: Mapped[dict[str, Any]] = mapped_column(JSON, default_factory=dict)
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    started_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(default=None)

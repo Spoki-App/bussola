@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { AiReviewResult, AiReviewStatus, AiStatus } from '../api/types'
+import type { AiReviewResult, AiReviewRunDetail, AiReviewStatus, AiStatus } from '../api/types'
 import { useAiReview } from '../hooks/useAiReview'
 import { rememberAiConsent } from '../settings/aiConsent'
 import { AiReview } from './AiReview'
@@ -20,10 +20,10 @@ const AI: AiStatus = {
   target: '["anthropic", "claude-opus-5-5", "https://api.anthropic.com"]',
 }
 
-const IDLE: AiReviewStatus = { running: false, phase: null, done: 0, total: 0, lookups: 0, units: 5, reviewed_units: 0 }
+const IDLE: AiReviewStatus = { running: false, phase: null, done: 0, total: 0, lookups: 0, units: 5, reviewed_units: 0, runs: 0 }
 
 function Harness() {
-  return <AiReview repoId={3} review={useAiReview(1)} />
+  return <AiReview reviewId={1} repoId={3} review={useAiReview(1)} />
 }
 
 function renderReview(answer: () => Promise<Response>, status: () => AiReviewStatus = () => IDLE) {
@@ -76,7 +76,7 @@ describe('AI review', () => {
 
   it('shows the progress and can be cancelled, keeping what was found', async () => {
     const request: { finish?: (response: Response) => void; done?: boolean } = {}
-    const running: AiReviewStatus = { running: true, phase: 'reviewing', done: 2, total: 5, lookups: 3, units: 5, reviewed_units: 2 }
+    const running: AiReviewStatus = { running: true, phase: 'reviewing', done: 2, total: 5, lookups: 3, units: 5, reviewed_units: 2, runs: 1 }
     const fetchMock = renderReview(
       () => new Promise<Response>((resolve) => { request.finish = resolve }),
       () => (request.finish && !request.done ? running : IDLE),
@@ -170,5 +170,78 @@ describe('AI review start', () => {
     await waitFor(() => { expect(screen.getByRole('button', { name: 'AI review' })).toHaveAttribute('aria-busy', 'true') })
     answer(Response.json({ ...AI, configured: false, problem: 'AI is off' }))
     await waitFor(() => { expect(screen.getByRole('button', { name: 'AI review' })).toHaveAttribute('aria-busy', 'false') })
+  })
+})
+
+const RUN: AiReviewRunDetail = {
+  id: 7,
+  status: 'completed',
+  again: false,
+  provider: 'anthropic',
+  provider_label: 'Anthropic API',
+  model: 'claude-opus-5-5',
+  reviewed: 2,
+  findings: 1,
+  failed: 0,
+  error: null,
+  started_at: '2026-11-05T10:00:00Z',
+  finished_at: '2026-11-05T10:02:00Z',
+  rating: { rated: 2, failed: [], error: null },
+  parts: [
+    {
+      units: [{ label: 'app.py::total', impact: 'high' }],
+      summary: 'Checked the **callers** of `total`.',
+      findings: [{ thread_id: 't9', place: 'app.py::total, line 2 after', body: 'The rate is hard-coded.' }],
+      lookups: [{ tool: 'find_usages', arguments: { path: 'app.py', line: 1, name: 'total' }, result: 'shop.py:5: total(cart)', error: false }],
+      error: null,
+    },
+  ],
+}
+
+describe('AI review details', () => {
+  beforeAll(() => {
+    HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+      this.open = true
+    }
+    HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+      this.open = false
+      this.dispatchEvent(new Event('close'))
+    }
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('shows what the last run checked, found and looked up, and opens a finding in the review', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        const answers: Record<string, unknown> = {
+          '/api/repos/3/ai': AI,
+          '/api/reviews/1/ai-review': { ...IDLE, reviewed_units: 2, runs: 1 },
+          '/api/reviews/1/ai-review/runs': [RUN],
+          '/api/reviews/1/ai-review/runs/7': RUN,
+        }
+        return Promise.resolve(Response.json(answers[url] ?? []))
+      }),
+    )
+    window.history.replaceState(null, '', '/reviews/1')
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <Harness />
+      </QueryClientProvider>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Details' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'AI review details' })
+    expect(await within(dialog).findByText(/^Completed: AI review with Anthropic API \(claude-opus-5-5\)/)).toBeInTheDocument()
+    expect(within(dialog).getByText('callers')).toBeInTheDocument()
+    expect(within(dialog).getByText('1 code lookup')).toBeInTheDocument()
+    expect(within(dialog).getByText('find_usages(path: app.py, line: 1, name: total)')).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'app.py::total, line 2 after' }))
+    expect(window.location.search).toBe('?thread=t9')
   })
 })

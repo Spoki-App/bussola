@@ -11,12 +11,21 @@ from bussola.ai.base import AiCancelledError, ToolDefinition, ToolOutcome, descr
 from bussola.ai.runner import output_schema
 
 MAX_TOOL_OUTPUT_CHARACTERS = 20_000
+MAX_LOGGED_CHARACTERS = 2_000
 REPORTED_ERRORS = 3
 logger = logging.getLogger(__name__)
 
 
 class ToolError(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    name: str
+    arguments: dict[str, Any]
+    result: str
+    error: bool
 
 
 @dataclass(frozen=True)
@@ -37,6 +46,7 @@ class Toolbox:
         self._on_call = on_call
         self._lock = threading.Lock()
         self.calls = 0
+        self.log: list[ToolCall] = []
 
     @property
     def definitions(self) -> tuple[ToolDefinition, ...]:
@@ -46,6 +56,12 @@ class Toolbox:
         return json.dumps([[item.name, item.description, item.schema] for item in self.definitions], sort_keys=True)
 
     def call(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
+        outcome = self._call(name, arguments)
+        with self._lock:
+            self.log.append(ToolCall(name, arguments, outcome.text[:MAX_LOGGED_CHARACTERS], outcome.error))
+        return outcome
+
+    def _call(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
         with self._lock:
             self.calls += 1
             spent = self.calls > self._max_calls
