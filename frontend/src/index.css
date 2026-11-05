@@ -2341,22 +2341,90 @@ button.danger {
 }
 
 .settings-dialog {
-  width: min(640px, calc(100vw - 32px));
-  height: auto;
-  max-height: calc(100vh - 64px);
+  width: min(920px, calc(100vw - 32px));
+  height: min(720px, calc(100vh - 64px));
+}
+
+.settings-search {
+  width: 100%;
+}
+
+.settings-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 20px;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   overflow-y: auto;
 }
 
-.settings-dialog section + section {
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
+.settings-nav button {
+  flex-shrink: 0;
+  border-color: transparent;
+  background: none;
+  text-align: left;
+}
+
+.settings-nav button[aria-current='true'] {
+  background: var(--bg-sunken);
+  font-weight: 650;
+}
+
+.settings-content {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.settings-category:not([hidden]) ~ .settings-category:not([hidden]) {
+  margin-top: 24px;
 }
 
 .settings-dialog h3 {
-  margin: 0 0 4px;
+  margin: 0 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
   font-size: 15px;
   font-stretch: var(--narrow);
   font-weight: 650;
+}
+
+.setting:not([hidden]) ~ .setting:not([hidden]) {
+  margin-top: 20px;
+}
+
+.setting h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.setting-description {
+  margin: 0 0 8px;
+}
+
+.settings-dialog mark {
+  border-radius: 2px;
+  background: var(--warning-bg);
+  color: inherit;
+}
+
+@media (max-width: 640px) {
+  .settings-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    overflow-x: auto;
+  }
 }
 
 .settings-dialog .inline-form {
