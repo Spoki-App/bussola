@@ -12,6 +12,7 @@ const PROGRESS_POLL_MS = 1000
 interface AiCall {
   target: string
   call_id: string
+  again: boolean
 }
 
 export const aiReviewKey = (reviewId: number) => ['ai-review', reviewId] as const

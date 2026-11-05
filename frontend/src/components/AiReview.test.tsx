@@ -71,7 +71,7 @@ describe('AI review', () => {
     const posts = fetchMock.mock.calls.filter(([url, init]) => url === '/api/reviews/1/ai-review' && init?.method === 'POST')
     expect(posts).toHaveLength(1)
     const body = posts[0][1]?.body
-    expect(JSON.parse(typeof body === 'string' ? body : '{}')).toEqual({ target: AI.target, call_id: expect.stringMatching(/^[0-9a-f]{32}$/) as unknown })
+    expect(JSON.parse(typeof body === 'string' ? body : '{}')).toEqual({ target: AI.target, call_id: expect.stringMatching(/^[0-9a-f]{32}$/) as unknown, again: false })
   })
 
   it('shows the progress and can be cancelled, keeping what was found', async () => {
@@ -92,10 +92,28 @@ describe('AI review', () => {
     expect(await screen.findByText('Cancelled, 2 units reviewed, 1 finding added as threads.')).toBeInTheDocument()
   })
 
-  it('says how much of the pull request already has an AI review', async () => {
+  it('says how much of the pull request already has an AI review and offers both reviews', async () => {
     renderReview(() => new Promise<Response>(() => undefined), () => ({ ...IDLE, reviewed_units: 3 }))
 
     expect(await screen.findByText('3 of 5 units have an AI review.')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'AI review' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review again' })).toBeInTheDocument()
+  })
+
+  it('reviews the whole pull request again once every unit has an AI review', async () => {
+    const fetchMock = renderReview(
+      () => Promise.resolve(Response.json({ reviewed: 5, findings: 2, failed: 0, cancelled: false, error: null })),
+      () => ({ ...IDLE, reviewed_units: 5 }),
+    )
+
+    expect(await screen.findByText('Every unit has an AI review.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'AI review' })).toBeNull()
+    fireEvent.click(await screen.findByRole('button', { name: 'Review again' }))
+
+    expect(await screen.findByText('5 units reviewed, 2 findings added as threads.')).toBeInTheDocument()
+    const post = fetchMock.mock.calls.find(([url, init]) => url === '/api/reviews/1/ai-review' && init?.method === 'POST')
+    const body = post?.[1]?.body
+    expect(JSON.parse(typeof body === 'string' ? body : '{}')).toMatchObject({ again: true })
   })
 
   it('follows and cancels a review started in another tab', async () => {

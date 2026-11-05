@@ -57,8 +57,8 @@ def client(git: GitFixture, data_dir: Path, config_file: Path, provider: FakePro
     return ApiClient.create(git, data_dir, config_file, fake_factory(provider))
 
 
-def run(api: ApiClient, review_id: int, expected: int = 200, call_id: str | None = None) -> Json:
-    body = {"target": api.call("GET", "/ai")["target"], "call_id": call_id or uuid.uuid4().hex}
+def run(api: ApiClient, review_id: int, expected: int = 200, call_id: str | None = None, *, again: bool = False) -> Json:
+    body = {"target": api.call("GET", "/ai")["target"], "call_id": call_id or uuid.uuid4().hex, "again": again}
     return api.call("POST", f"/reviews/{review_id}/ai-review", expected, body)
 
 
@@ -188,6 +188,25 @@ def test_running_again_reviews_only_the_units_changed_since_the_last_ai_review(b
     assert "app.py::name" in prompt
     assert "an earlier version, after: return sum(items) * 1.2 (open):\n- Hard-coded rate." in prompt
     assert sorted(thread["comments"][0]["body"] for thread in ai_threads(api, review_id)) == ["Hard-coded rate.", "Renamed shop."]
+
+
+def test_review_again_reviews_every_unit_and_keeps_the_threads_already_added(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    provider = FakeProvider(
+        HIGH, LOW, {"findings": [finding(2, "Hard-coded rate.")]}, {"findings": [finding(2, "Hard-coded rate."), finding(6, "Renamed shop.")]}
+    )
+    api = client(billing, data_dir, config_file, provider)
+    review_id = api.start_review()
+    run(api, review_id)
+
+    assert run(api, review_id, again=True) == {"reviewed": 2, "findings": 1, "failed": 0, "cancelled": False, "error": None}
+
+    assert [request.name for request in provider.requests] == ["rate_impact", "rate_impact", "review_pull_request", "review_pull_request"]
+    second = provider.requests[-1].prompt
+    assert "Name: name" in second
+    assert "Name: total" in second
+    assert "Hard-coded rate." in second
+    assert sorted(thread["comments"][0]["body"] for thread in ai_threads(api, review_id)) == ["Hard-coded rate.", "Renamed shop."]
+    assert api.call("GET", f"/reviews/{review_id}/ai-review")["reviewed_units"] == 2
 
 
 class BlockingProvider(FakeProvider):

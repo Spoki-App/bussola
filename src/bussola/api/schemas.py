@@ -480,6 +480,10 @@ class DescribeUnitIn(AiCallIn):
     regenerate: bool = False
 
 
+class AiReviewIn(AiCallIn):
+    again: bool = False
+
+
 class UnitDescriptionOut(BaseModel):
     unit_id: int
     description: str | None

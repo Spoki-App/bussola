@@ -4,7 +4,7 @@ from bussola.ai.base import AiCancelledError
 from bussola.ai.runner import AiRunner
 from bussola.api.deps import ContextDep, repo_of, resolve_revision
 from bussola.api.descriptions import ai_provider
-from bussola.api.schemas import AiCallIn, AiReviewOut, AiReviewStatusOut, CancelOut
+from bussola.api.schemas import AiReviewIn, AiReviewOut, AiReviewStatusOut, CancelOut
 from bussola.api.state import app_state
 from bussola.config import load_repo_config
 from bussola.review.ai_review import AiReviewJob, AiReviewOutcome, ai_review_coverage, run_ai_review
@@ -15,7 +15,7 @@ router = APIRouter(tags=["ai-review"])
 
 
 @router.post("/reviews/{review_id}/ai-review")
-def start_ai_review(context: ContextDep, body: AiCallIn, request: Request) -> AiReviewOut:
+def start_ai_review(context: ContextDep, body: AiReviewIn, request: Request) -> AiReviewOut:
     state = app_state(request)
     provider = ai_provider(state, context, body.target)
     revision = resolve_revision(context, None)
@@ -25,7 +25,7 @@ def start_ai_review(context: ContextDep, body: AiCallIn, request: Request) -> Ai
         with state.ai_calls.start(body.call_id) as cancellation, state.ai_reviews.start(context.review.id, cancellation) as report:
             snapshots = context.store.reviews.snapshots(revision.id)
             tools = ReviewTools(git_repo, revision, snapshots, state.navigator, ignore, cancellation)
-            outcome = run_ai_review(AiReviewJob(context, revision, AiRunner(provider, state.ai_cache), tools, report))
+            outcome = run_ai_review(AiReviewJob(context, revision, AiRunner(provider, state.ai_cache), tools, report, again=body.again))
     except AiCancelledError:
         outcome = AiReviewOutcome(reviewed=0, findings=0, failed=0, cancelled=True, error=None)
     return AiReviewOut(reviewed=outcome.reviewed, findings=outcome.findings, failed=outcome.failed, cancelled=outcome.cancelled, error=outcome.error)

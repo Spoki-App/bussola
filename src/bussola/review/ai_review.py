@@ -120,6 +120,7 @@ class AiReviewJob:
     runner: AiRunner
     tools: ReviewTools
     report: Callable[[AiReviewProgress], None]
+    again: bool = False
 
     @property
     def cancellation(self) -> Cancellation:
@@ -167,6 +168,7 @@ class RunningReviews:
 def run_ai_review(job: AiReviewJob) -> AiReviewOutcome:
     context, cancellation = job.context, job.cancellation
     snapshots, pending = reviewable_units(context, job.tools.snapshots)
+    pending = snapshots if job.again else pending
     rating = rate_units(context, snapshots, job.runner, cancellation, lambda progress: job.report(_progress(AiReviewPhase.RATING, progress)))
     if rating.cancelled or rating.stopped_by is not None:
         return AiReviewOutcome(0, 0, len(rating.errors), rating.cancelled, rating.stopped_by)

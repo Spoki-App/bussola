@@ -9,7 +9,7 @@ export interface AiReviewState {
   status: AiReviewStatus | null
   result: AiReviewResult | null
   error: Error | null
-  run: (target: string) => void
+  run: (target: string, again?: boolean) => void
   cancel: () => void
 }
 
@@ -32,10 +32,10 @@ export function useAiReview(reviewId: number): AiReviewState {
     status: status.data ?? null,
     result: review.data ?? null,
     error: review.error ?? cancelCall.error ?? cancelReview.error,
-    run: (target) => {
+    run: (target, again = false) => {
       cancelCall.reset()
       cancelReview.reset()
-      review.mutate({ target, call_id: newCallId() })
+      review.mutate({ target, call_id: newCallId(), again })
     },
     cancel: () => {
       for (const callId of calls) {

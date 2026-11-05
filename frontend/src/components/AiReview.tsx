@@ -23,6 +23,7 @@ export function AiReview({ repoId, review }: Props) {
     )
   }
   const note = review.result ? aiReviewSummary(review.result) : aiReviewCoverage(review.status)
+  const status = review.status
   return (
     <span className="summary-action">
       {note && (
@@ -31,12 +32,22 @@ export function AiReview({ repoId, review }: Props) {
         </span>
       )}
       {review.error && <ErrorNote message={describeError(review.error)} />}
-      <AiActionButton
-        repoId={repoId}
-        label="AI review"
-        title="Ask the AI provider to review each unit changed since the last AI review, the highest impact first, and add what it finds as threads"
-        onRun={review.run}
-      />
+      {(!status || status.reviewed_units < status.units) && (
+        <AiActionButton
+          repoId={repoId}
+          label="AI review"
+          title="Ask the AI provider to review each unit changed since the last AI review, the highest impact first, and add what it finds as threads"
+          onRun={(target) => { review.run(target) }}
+        />
+      )}
+      {status && status.reviewed_units > 0 && (
+        <AiActionButton
+          repoId={repoId}
+          label="Review again"
+          title="Ask the AI provider to review the whole pull request again, also the units it already reviewed, keeping the threads it added before"
+          onRun={(target) => { review.run(target, true) }}
+        />
+      )}
     </span>
   )
 }
