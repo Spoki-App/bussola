@@ -45,7 +45,7 @@ class Target:
     line: int
     column: int
     preview: str
-    enclosing: Enclosing | None = None
+    enclosing: Enclosing | None
 
 
 @dataclass(frozen=True)
