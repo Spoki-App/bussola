@@ -325,8 +325,8 @@ def test_one_call_rates_every_unit_and_stores_the_rating_without_a_description(b
     assert stored[api.unit(review_id, "app.py::name")["id"]]["impact"] == "high"
 
 
-def test_a_large_pull_request_is_rated_in_a_few_calls(billing: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("bussola.review.descriptions.MAX_RATING_GROUP_CHARACTERS", 10)
+def test_with_a_limit_a_large_pull_request_is_rated_in_a_few_calls(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    config_file.write_text(ANTHROPIC_CONFIG + "max_code_characters = 10\n")
     provider = FakeProvider(ratings(RATING))
     api = ai_client(billing, data_dir, config_file, provider)
     review_id = api.start_review()
@@ -404,10 +404,8 @@ def test_an_answer_that_does_not_match_the_format_fails_the_units_it_covers(bill
     assert descriptions(api, review_id) == {}
 
 
-def test_a_batch_stopped_by_an_unreachable_provider_keeps_the_ratings_it_got(
-    billing: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr("bussola.review.descriptions.MAX_RATING_GROUP_CHARACTERS", 10)
+def test_a_batch_stopped_by_an_unreachable_provider_keeps_the_ratings_it_got(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    config_file.write_text(ANTHROPIC_CONFIG + "max_code_characters = 10\n")
     api = ai_client(billing, data_dir, config_file, FakeProvider(ratings(RATING), AiUnreachableError("Cannot reach https://api.anthropic.com")))
     review_id = api.start_review()
 

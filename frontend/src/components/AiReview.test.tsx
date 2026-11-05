@@ -123,11 +123,11 @@ describe('AI review', () => {
       () => new Promise<Response>(() => undefined),
       () => {
         calls += 1
-        return calls < 3 ? { ...IDLE, running: true, phase: 'rating', done: calls, total: 5 } : IDLE
+        return calls < 3 ? { ...IDLE, running: true, phase: 'reviewing', done: 0, total: 5, lookups: calls } : IDLE
       },
     )
 
-    expect(await screen.findByText('Rating the impact first: 1 of 5 units...')).toBeInTheDocument()
+    expect(await screen.findByText('AI review: 0 of 5 units reviewed, 1 code lookup so far...')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'AI review' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => { expect(fetchMock.mock.calls.some(([url]) => url === '/api/reviews/1/ai-review/cancel')).toBe(true) })

@@ -203,3 +203,11 @@ def test_a_repository_can_only_turn_ai_off(tmp_path: Path, repository: str) -> N
 def test_a_repository_cannot_turn_ai_on_for_a_user_who_has_not(tmp_path: Path, user: str) -> None:
     for repository in ('[ai]\nprovider = "anthropic"\n', '[ai]\nprovider = "ollama"\n'):
         assert ai_settings_for(tmp_path, user, repository) == AiSettings(ProviderName.NONE)
+
+
+def test_claude_sees_the_whole_pull_request_unless_a_limit_is_set() -> None:
+    assert UserAiConfig().code_limit(ProviderName.CLAUDE_CODE) is None
+    assert UserAiConfig().code_limit(ProviderName.ANTHROPIC) is None
+    assert UserAiConfig().code_limit(ProviderName.OPENAI_COMPATIBLE) == 100_000
+    assert UserAiConfig(max_code_characters=50_000).code_limit(ProviderName.ANTHROPIC) == 50_000
+    assert UserAiConfig(max_code_characters=50_000).code_limit(ProviderName.OPENAI_COMPATIBLE) == 50_000

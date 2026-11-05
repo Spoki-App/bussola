@@ -299,6 +299,7 @@ export interface AiConfigFields {
   api_key_env: string | null
   timeout: number | null
   max_tokens: number | null
+  max_code_characters: number | null
 }
 
 export interface AiConfig extends AiConfigFields {
@@ -343,7 +344,7 @@ export interface AiReviewResult {
   error: string | null
 }
 
-export type AiReviewPhase = 'rating' | 'reviewing'
+export type AiReviewPhase = 'reviewing'
 
 export interface AiReviewStatus {
   running: boolean

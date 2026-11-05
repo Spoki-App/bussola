@@ -6,6 +6,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Added
 
+- **AI review** sends the whole pull request in one call with Claude Code and the Anthropic API, nothing clipped, and the same answer rates the impact of each unit, so the review starts at once instead of after a separate rating step. **Code per call** in **Settings** (`max_code_characters`) caps the code of one call for a model with a smaller context; OpenAI-compatible endpoints keep 100,000 characters unless it is set.
 - AI descriptions link to the lines they talk about: the model gets each line with its number and writes links such as `[the new check](#after-80)`, and clicking one opens the line in the unit's diff and highlights it, switching to the base diff for a line of the old version.
 - The summary of an AI review in **Details** links to the lines it mentions, as `[text](#after:path:80)`: a click closes **Details** and scrolls the review to the line, highlighted, or opens the file when it is not part of the review.
 - **AI prompts** in **Settings**: the instructions of **Describe**, **Rate impact** and **AI review** can be changed and reset to the default. bussola keeps its own part of each prompt (the input, the safety rule about instructions in the code, the tools and the answer format) and puts yours after it. They are saved in the `[ai.prompts]` section of `config.toml`, and a repository cannot change them.

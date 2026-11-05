@@ -13,14 +13,14 @@ from bussola.api.deps import RepoDep
 from bussola.api.schemas import MAX_CALL_ID_LENGTH, AiConfigIn, AiConfigOut, AiPromptOut, AiPromptsIn, AiPromptsOut, AiStatusOut, AiTestOut, CancelOut
 from bussola.api.state import AppState, app_state
 from bussola.errors import ConflictError, InvalidRequestError
-from bussola.review.ai_review import REVIEW_PULL_REQUEST
-from bussola.review.descriptions import DESCRIBE_UNIT, RATE_IMPACTS
+from bussola.review.ai_review import REVIEW_PROMPT
+from bussola.review.descriptions import DESCRIBE_PROMPT, IMPACT_PROMPT
 
 router = APIRouter(tags=["ai"])
 PROMPTS = {
-    "describe": ("Describe", DESCRIBE_UNIT.instructions),
-    "impact": ("Rate impact", RATE_IMPACTS.instructions),
-    "review": ("AI review", REVIEW_PULL_REQUEST.instructions),
+    "describe": ("Describe", DESCRIBE_PROMPT.default),
+    "impact": ("Rate impact", IMPACT_PROMPT.default),
+    "review": ("AI review", REVIEW_PROMPT.default),
 }
 
 

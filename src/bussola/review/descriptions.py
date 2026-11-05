@@ -1,15 +1,14 @@
 import hashlib
 import json
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from enum import StrEnum
-from itertools import accumulate
 from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, Field, field_validator
 
 from bussola.ai.base import AiProvider, Cancellation
-from bussola.ai.batch import BatchProgress, BatchResult, run_batch
-from bussola.ai.runner import AiRunner, AiTask
+from bussola.ai.batch import BatchResult, run_batch
+from bussola.ai.runner import AiRunner, AiTask, EditablePrompt
 from bussola.errors import InvalidRequestError
 from bussola.review.context import ReviewContext
 from bussola.review.keys import KeyTuple, key_of
@@ -76,11 +75,14 @@ IMPACT_SCALE = (
     "impact_reason: one short sentence that justifies the impact."
 )
 
+IMPACT_PROMPT = EditablePrompt("impact", IMPACT_SCALE)
+
 DESCRIPTION_RULES = (
     "description: GitHub-flavored Markdown for the reviewer, short and concrete. Start with what the unit does, "
     "then explain what this change does to it and why it matters. Mention behaviour changes, edge cases and risks. "
     "Do not repeat the code line by line and do not add a title. When you mention a specific change, link to its line.\n\n"
 )
+DESCRIBE_PROMPT = EditablePrompt("describe", DESCRIPTION_RULES + IMPACT_SCALE)
 UNIT_KINDS = "a function, method, class, type, module-level code or a whole file. "
 LINE_LINKS = (
     "Each line of code starts with its line number in the file. To point the reviewer at a line in the description, "
@@ -93,8 +95,7 @@ DESCRIBE_UNIT = AiTask(
     version=1,
     system="You help a code reviewer understand one unit of a change: " + UNIT_KINDS + CODE_UNDER_REVIEW.format(verb="describe") + LINE_LINKS,
     output=UnitInsight,
-    instructions=DESCRIPTION_RULES + IMPACT_SCALE,
-    setting="describe",
+    prompts=(DESCRIBE_PROMPT,),
 )
 
 RATING_INPUT = (
@@ -112,10 +113,8 @@ RATE_IMPACTS = AiTask(
     + UNIT_KINDS
     + RATING_INPUT,
     output=ImpactRatings,
-    instructions=IMPACT_SCALE,
-    setting="impact",
+    prompts=(IMPACT_PROMPT,),
 )
-MAX_RATING_GROUP_CHARACTERS = 100_000
 RATING_ID = "unit-{}"
 
 
@@ -158,17 +157,16 @@ def rate_units(
     snapshots: list[UnitSnapshot],
     runner: AiRunner,
     cancellation: Cancellation,
-    on_progress: Callable[[BatchProgress], None] | None = None,
+    limit: int | None,
 ) -> BatchResult[int, None]:
     pending = unrated(snapshots, context.store.descriptions.descriptions(context.review.id))
     context.store.commit()
-    groups = rating_groups(pending)
+    groups = rating_groups(pending, limit)
     outcome: BatchResult[int, None] = BatchResult()
-    done = [0, *accumulate(len(group) for group in groups)]
 
     def rate(index: int) -> None:
         group = groups[index]
-        ratings = _ask_ratings(runner, group, cancellation)
+        ratings = _ask_ratings(runner, group, cancellation, clip=limit is not None)
         for number, snapshot in enumerate(group, start=1):
             rating = ratings.get(RATING_ID.format(number))
             if rating is None:
@@ -178,23 +176,19 @@ def rate_units(
             outcome.results[snapshot.id] = None
         context.store.commit()
 
-    def report(progress: BatchProgress) -> None:
-        if on_progress is not None:
-            on_progress(BatchProgress(done[progress.done], len(outcome.errors), len(pending)))
-
-    groups_outcome = run_batch(range(len(groups)), rate, cancellation, report)
+    groups_outcome = run_batch(range(len(groups)), rate, cancellation)
     for index, error in groups_outcome.errors.items():
         outcome.errors.update(dict.fromkeys((snapshot.id for snapshot in groups[index]), error))
     outcome.cancelled, outcome.stopped_by = groups_outcome.cancelled, groups_outcome.stopped_by
     return outcome
 
 
-def rating_groups(snapshots: list[UnitSnapshot]) -> list[list[UnitSnapshot]]:
+def rating_groups(snapshots: list[UnitSnapshot], limit: int | None) -> list[list[UnitSnapshot]]:
     groups: list[list[UnitSnapshot]] = []
     size = 0
     for snapshot in snapshots:
-        cost = len(unit_prompt(snapshot))
-        if not groups or (groups[-1] and size + cost > MAX_RATING_GROUP_CHARACTERS):
+        cost = len(unit_prompt(snapshot, clip=limit is not None))
+        if not groups or (limit is not None and groups[-1] and size + cost > limit):
             groups.append([])
             size = 0
         groups[-1].append(snapshot)
@@ -202,8 +196,8 @@ def rating_groups(snapshots: list[UnitSnapshot]) -> list[list[UnitSnapshot]]:
     return groups
 
 
-def _ask_ratings(runner: AiRunner, group: list[UnitSnapshot], cancellation: Cancellation) -> dict[str, UnitRating]:
-    prompt = "\n".join(f"Unit: {RATING_ID.format(number)}\n{unit_prompt(snapshot)}" for number, snapshot in enumerate(group, start=1))
+def _ask_ratings(runner: AiRunner, group: list[UnitSnapshot], cancellation: Cancellation, *, clip: bool) -> dict[str, UnitRating]:
+    prompt = "\n".join(f"Unit: {RATING_ID.format(number)}\n{unit_prompt(snapshot, clip=clip)}" for number, snapshot in enumerate(group, start=1))
     answer = runner.run(RATE_IMPACTS, prompt, cancellation, content_hash=hashlib.sha256(prompt.encode()).hexdigest())
     return {rating.unit.strip(): rating for rating in answer.ratings}
 
@@ -231,15 +225,15 @@ def description_row(
     )
 
 
-def unit_prompt(snapshot: UnitSnapshot, *, numbered: bool = False) -> str:
+def unit_prompt(snapshot: UnitSnapshot, *, numbered: bool = False, clip: bool = True) -> str:
     name = snapshot.qualified_name or f"(the whole {UNIT_NAMES.get(snapshot.kind, snapshot.kind)})"
     lines = [f"Path: {snapshot.path}"]
     if snapshot.old_path and snapshot.old_path != snapshot.path:
         lines.append(f"Renamed from: {snapshot.old_path}")
     lines += [f"Kind: {snapshot.kind}", f"Name: {name}", ""]
     base, head = (_numbered(snapshot, Side.BASE), _numbered(snapshot, Side.HEAD)) if numbered else (snapshot.base_text, snapshot.head_text)
-    lines += _side("before", snapshot.base_hash, base, "The unit did not exist before this change.")
-    lines += _side("after", snapshot.head_hash, head, "This change removes the unit.")
+    lines += _side("before", snapshot.base_hash, base, "The unit did not exist before this change.", clip)
+    lines += _side("after", snapshot.head_hash, head, "This change removes the unit.", clip)
     return "\n".join(lines)
 
 
@@ -250,14 +244,14 @@ def _numbered(snapshot: UnitSnapshot, side: Side) -> str | None:
     return "\n".join(f"{'' if line.file_line is None else line.file_line}: {line.text}" for line in lines)
 
 
-def _side(tag: str, content_hash: str | None, text: str | None, missing: str) -> list[str]:
+def _side(tag: str, content_hash: str | None, text: str | None, missing: str, clip: bool) -> list[str]:
     if text is None:
         return [f"<{tag}>{missing if content_hash is None else BINARY_SIDE}</{tag}>", ""]
-    return [*marked(tag, text), ""]
+    return [*marked(tag, text, clip=clip), ""]
 
 
-def marked(tag: str, text: str) -> list[str]:
-    clipped = _clipped(text)
+def marked(tag: str, text: str, *, clip: bool = True) -> list[str]:
+    clipped = _clipped(text) if clip else text
     marker = f"{tag}-{hashlib.sha256(clipped.encode()).hexdigest()[:MARKER_HASH_LENGTH]}"
     return [f"<{marker}>", clipped, f"</{marker}>"]
 
