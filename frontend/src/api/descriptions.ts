@@ -5,7 +5,7 @@ import type { RateImpactResult, Unit, UnitDescription } from './types'
 
 const RATING_POLL_MS = 2000
 
-const descriptionsKey = (reviewId: number, revisionId?: number) => ['descriptions', reviewId, ...(revisionId === undefined ? [] : [revisionId])] as const
+export const descriptionsKey = (reviewId: number, revisionId?: number) => ['descriptions', reviewId, ...(revisionId === undefined ? [] : [revisionId])] as const
 
 interface AiCall {
   target: string

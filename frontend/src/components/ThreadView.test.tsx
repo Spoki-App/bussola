@@ -17,7 +17,7 @@ function thread(canDelete: boolean, resolvable: boolean): Thread {
     side: null,
     status: 'open',
     resolvable,
-    created_by: { id: 1, email: 'a@b.c', name: 'Alice' },
+    created_by: { id: 1, email: 'a@b.c', name: 'Alice', ai: false },
     created_at: '2026-10-28T10:00:00Z',
     line_text: null,
     line_count: 1,
@@ -96,5 +96,20 @@ describe('ThreadView links', () => {
 
     expect(screen.getByRole('button', { name: '▾' })).toHaveAttribute('aria-expanded', 'true')
     Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+  })
+})
+
+describe('ThreadView authors', () => {
+  it('marks threads and comments the AI review added', () => {
+    const ai = { id: 2, email: 'anthropic.claude-opus-5-5@ai.bussola.invalid', name: 'Anthropic API (claude-opus-5-5)', ai: true }
+    const comment = { id: 'c1', thread_id: 't1', author: ai, body: 'Missing check.', created_at: '2026-10-28T10:00:00Z', edited_at: null, deleted: false, mine: false, remote_url: null }
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ThreadView reviewId={1} thread={{ ...thread(true, true), created_by: ai, comments: [comment] }} />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getAllByText('Anthropic API (claude-opus-5-5)')).toHaveLength(2)
+    expect(screen.getAllByTitle('Added by the AI review')).toHaveLength(2)
   })
 })

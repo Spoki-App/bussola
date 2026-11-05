@@ -11,6 +11,7 @@ from bussola.config import AppSettings
 from bussola.forge.base import ForgeAdapter
 from bussola.identity import GitConfigIdentity
 from bussola.navigation.navigator import Navigator
+from bussola.review.ai_review import RunningReviews
 from bussola.storage.ai_cache import DatabaseAiCache
 from bussola.storage.database import Database
 
@@ -25,6 +26,7 @@ class AppState:
     navigator: Navigator
     ai_factory: Callable[[AiSettings], AiProvider]
     ai_calls: RunningCalls = field(default_factory=RunningCalls)
+    ai_reviews: RunningReviews = field(default_factory=RunningReviews)
 
     @property
     def ai_cache(self) -> DatabaseAiCache:

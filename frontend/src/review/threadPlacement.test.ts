@@ -43,7 +43,7 @@ function thread(side: Thread['side'], offset: number | null, lineCount = 1, outd
     side,
     status: 'open',
     resolvable: true,
-    created_by: { id: 1, email: 'a@b.c', name: 'A' },
+    created_by: { id: 1, email: 'a@b.c', name: 'A', ai: false },
     created_at: '',
     line_text: 'b',
     line_count: lineCount,

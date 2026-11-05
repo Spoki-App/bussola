@@ -70,12 +70,12 @@ def delete_comment(context: ReviewContext, comment: Comment) -> Comment:
 
 
 def can_delete(context: ReviewContext, thread: Thread, comments: list[Comment]) -> bool:
-    return thread.created_by == context.reviewer.id and all(comment.author_id == context.reviewer.id for comment in comments if comment.deleted_at is None)
+    return _removable_by(context, thread.created_by) and all(_removable_by(context, comment.author_id) for comment in comments if comment.deleted_at is None)
 
 
 def delete_thread(context: ReviewContext, thread: Thread) -> Thread:
-    if thread.created_by != context.reviewer.id:
-        raise ForbiddenError("You can only delete threads you started")
+    if not _removable_by(context, thread.created_by):
+        raise ForbiddenError("You can only delete threads you started or the AI review added")
     if not can_delete(context, thread, context.store.threads.comments([thread.id])):
         raise ForbiddenError("Others replied to this thread, so it cannot be deleted. Resolve it instead.")
     thread.deleted_at = utcnow()
@@ -145,6 +145,13 @@ def anchor_to_unit(thread: Thread, snapshot: UnitSnapshot, side: Side, line_offs
     thread.line_text = LINE_SEPARATOR.join(line.rstrip() for line in lines[line_offset : last + 1])
     thread.context_before = [line.rstrip() for line in before]
     thread.context_after = [line.rstrip() for line in after]
+
+
+def _removable_by(context: ReviewContext, author_id: int) -> bool:
+    if author_id == context.reviewer.id:
+        return True
+    author = context.store.reviews.get_reviewer(author_id)
+    return author is not None and author.ai
 
 
 def _check_author(context: ReviewContext, comment: Comment) -> None:

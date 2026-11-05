@@ -2,7 +2,7 @@ import { useContext, useState } from 'react'
 
 import { describeError } from '../api/client'
 import { useDeleteComment, useDeleteThread, useEditComment, useReply, useSetThreadStatus } from '../api/threads'
-import type { Comment, Thread } from '../api/types'
+import type { Comment, Reviewer, Thread } from '../api/types'
 import { ErrorNote } from './Badges'
 import { CopyLinkButton } from './CopyLinkButton'
 import { ExternalLink } from './ExternalLink'
@@ -38,7 +38,7 @@ export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
         <button type="button" className="disclosure" aria-expanded={!collapsed} onClick={() => { setCollapsed(!collapsed) }}>
           {collapsed ? '▸' : '▾'}
         </button>
-        <strong>{thread.comments.at(0)?.author.name ?? thread.created_by.name}</strong>
+        <AuthorName author={thread.comments.at(0)?.author ?? thread.created_by} />
         {resolved && <span className="badge state-approved">Resolved</span>}
         {thread.anchor?.outdated && <span className="badge state-changed">Outdated</span>}
         {thread.line_count > 1 && thread.anchor?.file_line != null && thread.anchor.end_file_line != null && (
@@ -111,6 +111,19 @@ function Snippet({ thread }: { thread: Thread }) {
   )
 }
 
+function AuthorName({ author }: { author: Reviewer }) {
+  return (
+    <>
+      <strong>{author.name}</strong>
+      {author.ai && (
+        <span className="badge ai-badge" title="Added by the AI review">
+          AI
+        </span>
+      )}
+    </>
+  )
+}
+
 function CommentItem({ reviewId, comment }: { reviewId: number; comment: Comment }) {
   const [editing, setEditing] = useState(false)
   const edit = useEditComment(reviewId)
@@ -121,7 +134,7 @@ function CommentItem({ reviewId, comment }: { reviewId: number; comment: Comment
   return (
     <div className="comment">
       <div className="comment-meta">
-        <strong>{comment.author.name}</strong>
+        <AuthorName author={comment.author} />
         <span className="muted">{new Date(comment.created_at).toLocaleString()}</span>
         {comment.edited_at && <span className="muted">(edited)</span>}
         {comment.remote_url && (

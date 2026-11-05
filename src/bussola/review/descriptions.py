@@ -1,18 +1,18 @@
 import hashlib
 import json
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from enum import StrEnum
 from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, Field, field_validator
 
 from bussola.ai.base import AiProvider, Cancellation
-from bussola.ai.batch import BatchResult, run_batch
+from bussola.ai.batch import BatchProgress, BatchResult, run_batch
 from bussola.ai.runner import AiCache, AiRunner, AiTask
 from bussola.errors import InvalidRequestError
 from bussola.review.context import ReviewContext
 from bussola.review.keys import KeyTuple, key_of
-from bussola.review.rows import is_binary
+from bussola.review.rows import Side, is_binary, side_lines
 from bussola.storage.models import UnitDescription, UnitSnapshot
 
 
@@ -111,14 +111,14 @@ def stored_descriptions(snapshots: Iterable[UnitSnapshot], descriptions: Iterabl
         exact[(key_of(description), description.change_hash)] = description
     found: dict[int, UnitDescription] = {}
     for snapshot in snapshots:
-        key, old_key, change = key_of(snapshot), _old_key(snapshot), change_hash(snapshot)
+        key, old_key, change = key_of(snapshot), old_key_of(snapshot), change_hash(snapshot)
         description = exact.get((key, change)) or exact.get((old_key, change)) or latest.get(key) or latest.get(old_key)
         if description is not None:
             found[snapshot.id] = description
     return found
 
 
-def _old_key(snapshot: UnitSnapshot) -> KeyTuple:
+def old_key_of(snapshot: UnitSnapshot) -> KeyTuple:
     return (snapshot.old_path or snapshot.path, snapshot.kind, snapshot.qualified_name)
 
 
@@ -132,22 +132,26 @@ def describe_unit(snapshot: UnitSnapshot, provider: AiProvider, cache: AiCache |
     return _ask(AiRunner(provider, cache), DESCRIBE_UNIT, snapshot, cancellation, refresh=regenerate)
 
 
-def rate_impact(snapshot: UnitSnapshot, provider: AiProvider, cache: AiCache | None, cancellation: Cancellation) -> ImpactRating:
-    return _ask(AiRunner(provider, cache), RATE_IMPACT, snapshot, cancellation)
+def rate_impact(snapshot: UnitSnapshot, runner: AiRunner, cancellation: Cancellation) -> ImpactRating:
+    return _ask(runner, RATE_IMPACT, snapshot, cancellation)
 
 
 def rate_units(
-    context: ReviewContext, snapshots: list[UnitSnapshot], provider: AiProvider, cache: AiCache | None, cancellation: Cancellation
+    context: ReviewContext,
+    snapshots: list[UnitSnapshot],
+    runner: AiRunner,
+    cancellation: Cancellation,
+    on_progress: Callable[[BatchProgress], None] | None = None,
 ) -> BatchResult[int, None]:
     pending = {snapshot.id: snapshot for snapshot in unrated(snapshots, context.store.descriptions.descriptions(context.review.id))}
     context.store.commit()
 
     def rate(unit_id: int) -> None:
         snapshot = pending[unit_id]
-        context.store.descriptions.save(description_row(context, snapshot, provider, rate_impact(snapshot, provider, cache, cancellation), None))
+        context.store.descriptions.save(description_row(context, snapshot, runner.provider, rate_impact(snapshot, runner, cancellation), None))
         context.store.commit()
 
-    return run_batch(list(pending), rate, cancellation)
+    return run_batch(list(pending), rate, cancellation, on_progress)
 
 
 def unrated(snapshots: list[UnitSnapshot], descriptions: Iterable[UnitDescription]) -> list[UnitSnapshot]:
@@ -178,23 +182,35 @@ def _ask[T: BaseModel](runner: AiRunner, task: AiTask[T], snapshot: UnitSnapshot
     return runner.run(task, prompt, cancellation, content_hash=hashlib.sha256(prompt.encode()).hexdigest(), refresh=refresh)
 
 
-def unit_prompt(snapshot: UnitSnapshot) -> str:
+def unit_prompt(snapshot: UnitSnapshot, *, numbered: bool = False) -> str:
     name = snapshot.qualified_name or f"(the whole {UNIT_NAMES.get(snapshot.kind, snapshot.kind)})"
     lines = [f"Path: {snapshot.path}"]
     if snapshot.old_path and snapshot.old_path != snapshot.path:
         lines.append(f"Renamed from: {snapshot.old_path}")
     lines += [f"Kind: {snapshot.kind}", f"Name: {name}", ""]
-    lines += _side("before", snapshot.base_hash, snapshot.base_text, "The unit did not exist before this change.")
-    lines += _side("after", snapshot.head_hash, snapshot.head_text, "This change removes the unit.")
+    base, head = (_numbered(snapshot, Side.BASE), _numbered(snapshot, Side.HEAD)) if numbered else (snapshot.base_text, snapshot.head_text)
+    lines += _side("before", snapshot.base_hash, base, "The unit did not exist before this change.")
+    lines += _side("after", snapshot.head_hash, head, "This change removes the unit.")
     return "\n".join(lines)
+
+
+def _numbered(snapshot: UnitSnapshot, side: Side) -> str | None:
+    lines = side_lines(snapshot, side)
+    if not lines:
+        return None
+    return "\n".join(f"{'' if line.file_line is None else line.file_line}: {line.text}" for line in lines)
 
 
 def _side(tag: str, content_hash: str | None, text: str | None, missing: str) -> list[str]:
     if text is None:
         return [f"<{tag}>{missing if content_hash is None else BINARY_SIDE}</{tag}>", ""]
+    return [*marked(tag, text), ""]
+
+
+def marked(tag: str, text: str) -> list[str]:
     clipped = _clipped(text)
     marker = f"{tag}-{hashlib.sha256(clipped.encode()).hexdigest()[:MARKER_HASH_LENGTH]}"
-    return [f"<{marker}>", clipped, f"</{marker}>", ""]
+    return [f"<{marker}>", clipped, f"</{marker}>"]
 
 
 def _clipped(text: str) -> str:

@@ -3,6 +3,7 @@ from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session, defer
 
 from bussola.storage.models import (
+    AiReviewedUnit,
     Approval,
     Comment,
     ForgeLink,
@@ -20,7 +21,7 @@ from bussola.storage.models import (
 )
 
 SNAPSHOT_TEXT_COLUMNS = (UnitSnapshot.base_text, UnitSnapshot.head_text, UnitSnapshot.base_lines, UnitSnapshot.head_lines)
-DESCRIPTION_KEY = ("review_id", "path", "kind", "qualified_name", "change_hash")
+CHANGE_KEY = ("review_id", "path", "kind", "qualified_name", "change_hash")
 
 
 class _SqlRepository:
@@ -113,6 +114,11 @@ class SqlReviewRepository(_SqlRepository):
         if existing.name != name:
             existing.name = name
         return existing
+
+    def ai_reviewer(self, email: str, name: str) -> Reviewer:
+        reviewer = self.reviewer(email, name)
+        reviewer.ai = True
+        return reviewer
 
     def get_reviewer(self, reviewer_id: int) -> Reviewer | None:
         return self._session.get(Reviewer, reviewer_id)
@@ -240,13 +246,24 @@ class SqlDescriptionRepository(_SqlRepository):
     def save(self, description: UnitDescription) -> UnitDescription:
         values = {column.name: getattr(description, column.name) for column in UnitDescription.__table__.columns if column.name != "id"}
         inserted = insert(UnitDescription).values(**values)
-        replaced = {name: value for name, value in values.items() if name not in DESCRIPTION_KEY}
+        replaced = {name: value for name, value in values.items() if name not in CHANGE_KEY}
         replaced["description"] = func.coalesce(inserted.excluded.description, UnitDescription.description)
-        statement = inserted.on_conflict_do_update(index_elements=list(DESCRIPTION_KEY), set_=replaced)
+        statement = inserted.on_conflict_do_update(index_elements=list(CHANGE_KEY), set_=replaced)
         with self._session.begin_nested():
             self._session.execute(statement)
-        query = select(UnitDescription).where(*(getattr(UnitDescription, name) == values[name] for name in DESCRIPTION_KEY))
+        query = select(UnitDescription).where(*(getattr(UnitDescription, name) == values[name] for name in CHANGE_KEY))
         return self._session.scalars(query, execution_options={"populate_existing": True}).one()
+
+
+class SqlAiReviewRepository(_SqlRepository):
+    def reviewed_units(self, review_id: int) -> list[AiReviewedUnit]:
+        return list(self._session.scalars(select(AiReviewedUnit).where(AiReviewedUnit.review_id == review_id)))
+
+    def save_reviewed_unit(self, reviewed: AiReviewedUnit) -> None:
+        values = {column.name: getattr(reviewed, column.name) for column in AiReviewedUnit.__table__.columns if column.name != "id"}
+        replaced = {name: value for name, value in values.items() if name not in CHANGE_KEY}
+        with self._session.begin_nested():
+            self._session.execute(insert(AiReviewedUnit).values(**values).on_conflict_do_update(index_elements=list(CHANGE_KEY), set_=replaced))
 
 
 class Store:
@@ -257,6 +274,7 @@ class Store:
         self.threads = SqlThreadRepository(session)
         self.forge = SqlForgeRepository(session)
         self.descriptions = SqlDescriptionRepository(session)
+        self.ai_reviews = SqlAiReviewRepository(session)
 
     def commit(self) -> None:
         self.session.commit()

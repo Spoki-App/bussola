@@ -5,6 +5,7 @@ import { useDescriptions } from '../api/descriptions'
 import { useSync } from '../api/forge'
 import { useApprove, useFinishReview, useReview, useUnits } from '../api/hooks'
 import type { DiffRow, ReviewDetail, SyncResult, Unit, UnitDescription, UnitDiff, UnitFilter } from '../api/types'
+import { AiReview } from '../components/AiReview'
 import { CourseStrip, ErrorNote } from '../components/Badges'
 import { CopyLinkButton } from '../components/CopyLinkButton'
 import { DiffLayoutSwitch } from '../components/DiffLayoutPanel'
@@ -18,6 +19,7 @@ import { ReviewTitle } from '../components/ReviewTitle'
 import { SyncSummary } from '../components/SyncSummary'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
 import { UnitTree } from '../components/UnitTree'
+import { useAiReview } from '../hooks/useAiReview'
 import { useCodeNavigation } from '../hooks/useCodeNavigation'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useRateImpact } from '../hooks/useRateImpact'
@@ -159,6 +161,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const [impactFilter, setImpactFilter] = useState<ImpactFilter>('all')
   const [order, setOrder] = useState<UnitOrder>('files')
   const rating = useRateImpact(reviewId)
+  const aiReview = useAiReview(reviewId)
   const descriptions = useDescriptions(reviewId, revisionId, rating.pending)
   const ratings = useMemo(() => new Map((descriptions.data ?? []).map((description) => [description.unit_id, description])), [descriptions.data])
   const ratingsInUse = impactFilter !== 'all' || order === 'impact' ? ratings : NO_RATINGS
@@ -328,6 +331,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
             <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines. Cmd or Ctrl+click a name to go to its definition or list its usages.</p>
             <div className="summary-actions">
               <RateImpact repoId={data.repo_id} rating={rating} />
+              <AiReview repoId={data.repo_id} review={aiReview} />
               {extensions.sidePanel && (
                 <button type="button" aria-pressed={panelOpen} onClick={() => { setPanelOpen(!panelOpen) }}>
                   {panelOpen ? `Hide ${extensions.sidePanel.label}` : `Show ${extensions.sidePanel.label}`}

@@ -15,7 +15,7 @@ const outdated: Thread = {
   side: 'head',
   status: 'open',
   resolvable: true,
-  created_by: { id: 1, email: 'a@b.c', name: 'Alice' },
+  created_by: { id: 1, email: 'a@b.c', name: 'Alice', ai: false },
   created_at: '2026-10-28T10:00:00Z',
   line_text: 'return 0',
   line_count: 1,

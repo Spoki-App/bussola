@@ -171,4 +171,4 @@ def _comment(store: Store, comment_id: str) -> Comment:
 
 def _reviewer_out(store: Store, reviewer_id: int) -> ReviewerOut:
     reviewer = store.reviews.get_reviewer(reviewer_id) or Reviewer(email="unknown", name="Unknown")
-    return ReviewerOut(id=reviewer_id, email=reviewer.email, name=reviewer.name)
+    return ReviewerOut(id=reviewer_id, email=reviewer.email, name=reviewer.name, ai=reviewer.ai)

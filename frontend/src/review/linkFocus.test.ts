@@ -40,7 +40,7 @@ function comment(remoteUrl: string | null): Comment {
   return {
     id: 'c',
     thread_id: 't',
-    author: { id: 1, email: 'a@b.c', name: 'A' },
+    author: { id: 1, email: 'a@b.c', name: 'A', ai: false },
     body: 'hi',
     created_at: '',
     edited_at: null,
@@ -61,7 +61,7 @@ function thread(id: string, unitId: number | null, remoteUrl: string | null = nu
     side: 'head',
     status: 'open',
     resolvable: true,
-    created_by: { id: 1, email: 'a@b.c', name: 'A' },
+    created_by: { id: 1, email: 'a@b.c', name: 'A', ai: false },
     created_at: '',
     line_text: null,
     line_count: 1,

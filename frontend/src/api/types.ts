@@ -9,6 +9,7 @@ export interface Reviewer {
   id: number
   email: string
   name: string
+  ai: boolean
 }
 
 export interface Repo {
@@ -332,4 +333,23 @@ export interface RateImpactResult {
   failed: number
   cancelled: boolean
   error: string | null
+}
+
+export interface AiReviewResult {
+  reviewed: number
+  findings: number
+  failed: number
+  cancelled: boolean
+  error: string | null
+}
+
+export type AiReviewPhase = 'rating' | 'reviewing'
+
+export interface AiReviewStatus {
+  running: boolean
+  phase: AiReviewPhase | null
+  done: number
+  total: number
+  units: number
+  reviewed_units: number
 }

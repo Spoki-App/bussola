@@ -45,6 +45,7 @@ class Reviewer(Base):
 
     email: Mapped[str] = mapped_column(unique=True)
     name: Mapped[str] = mapped_column()
+    ai: Mapped[bool] = mapped_column(default=False)
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
 
 
@@ -256,6 +257,22 @@ class UnitDescription(Base):
     impact_reason: Mapped[str] = mapped_column()
     provider: Mapped[str] = mapped_column()
     provider_label: Mapped[str] = mapped_column()
+    model: Mapped[str | None] = mapped_column()
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
+
+
+class AiReviewedUnit(Base):
+    __tablename__ = "ai_reviewed_units"
+    __table_args__ = (UniqueConstraint("review_id", "path", "kind", "qualified_name", "change_hash"),)
+
+    review_id: Mapped[int] = mapped_column(ForeignKey("reviews.id"), index=True)
+    path: Mapped[str] = mapped_column()
+    kind: Mapped[str] = mapped_column()
+    qualified_name: Mapped[str] = mapped_column()
+    change_hash: Mapped[str] = mapped_column()
+    findings: Mapped[int] = mapped_column()
+    provider: Mapped[str] = mapped_column()
     model: Mapped[str | None] = mapped_column()
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)

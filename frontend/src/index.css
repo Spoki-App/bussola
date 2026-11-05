@@ -2373,6 +2373,11 @@ button.danger {
   }
 }
 
+.ai-badge {
+  --state: var(--accent);
+  --state-bg: var(--info-bg);
+}
+
 .impact-high {
   --state: var(--danger);
   --state-bg: var(--danger-bg);

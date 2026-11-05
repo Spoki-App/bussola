@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request
 
 from bussola.ai.base import AiCancelledError, AiProvider
 from bussola.ai.batch import BatchResult
+from bussola.ai.runner import AiRunner
 from bussola.ai.settings import load_ai_settings, require_target
 from bussola.api.deps import ContextDep, repo_of, resolve_revision, snapshot_of
 from bussola.api.schemas import AiCallIn, DescribeUnitIn, RateImpactOut, UnitDescriptionOut
@@ -27,7 +28,7 @@ def list_descriptions(context: ContextDep, revision_id: int | None = None) -> li
 def describe(context: ContextDep, unit_id: int, body: DescribeUnitIn, request: Request) -> UnitDescriptionOut:
     state = app_state(request)
     snapshot = snapshot_of(context, unit_id)
-    provider = _provider(state, context, body.target)
+    provider = ai_provider(state, context, body.target)
     context.store.commit()
     with state.ai_calls.start(body.call_id) as cancellation:
         insight = describe_unit(snapshot, provider, state.ai_cache, cancellation, regenerate=body.regenerate)
@@ -39,11 +40,11 @@ def describe(context: ContextDep, unit_id: int, body: DescribeUnitIn, request: R
 @router.post("/reviews/{review_id}/impact")
 def rate_all(context: ContextDep, body: AiCallIn, request: Request) -> RateImpactOut:
     state = app_state(request)
-    provider = _provider(state, context, body.target)
+    provider = ai_provider(state, context, body.target)
     snapshots = context.store.reviews.snapshots(resolve_revision(context, None).id)
     try:
         with state.ai_calls.start(body.call_id) as cancellation:
-            outcome = rate_units(context, snapshots, provider, state.ai_cache, cancellation)
+            outcome = rate_units(context, snapshots, AiRunner(provider, state.ai_cache), cancellation)
     except AiCancelledError:
         outcome = BatchResult[int, None](cancelled=True)
     return RateImpactOut(
@@ -54,7 +55,7 @@ def rate_all(context: ContextDep, body: AiCallIn, request: Request) -> RateImpac
     )
 
 
-def _provider(state: AppState, context: ReviewContext, target: str) -> AiProvider:
+def ai_provider(state: AppState, context: ReviewContext, target: str) -> AiProvider:
     return state.ai_factory(require_target(load_ai_settings(state.settings.config_file, Path(repo_of(context).path)), target))
 
 

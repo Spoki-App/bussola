@@ -4,6 +4,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from bussola.navigation.navigator import Origin, Resolver, TargetRole
+from bussola.review.ai_review import AiReviewPhase
 from bussola.review.descriptions import Impact
 from bussola.review.diffs import DiffMode
 from bussola.review.rows import LineChange, Side
@@ -26,6 +27,7 @@ class ReviewerOut(BaseModel):
     id: int
     email: str
     name: str
+    ai: bool = False
 
 
 class RepoIn(BaseModel):
@@ -499,3 +501,20 @@ class RateImpactOut(BaseModel):
 
 class CancelOut(BaseModel):
     cancelled: bool
+
+
+class AiReviewOut(BaseModel):
+    reviewed: int
+    findings: int
+    failed: int
+    cancelled: bool
+    error: str | None
+
+
+class AiReviewStatusOut(BaseModel):
+    running: bool
+    phase: AiReviewPhase | None = None
+    done: int = 0
+    total: int = 0
+    units: int
+    reviewed_units: int
