@@ -27,6 +27,15 @@ function reviewWithTitle(title: string): ReviewDetail {
   }
 }
 
+function renderPage(extensions?: ReviewExtensions) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={client}>
+      <ReviewPage reviewId={3} extensions={extensions} />
+    </QueryClientProvider>,
+  )
+}
+
 const synced: SyncResult = {
   refresh: { revision, created: false, warning: null },
   published: null,
@@ -65,12 +74,7 @@ describe('ReviewPage window title', () => {
   })
 
   it('names the pull request, follows its title after a sync and goes back to the default when left', async () => {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const { unmount } = render(
-      <QueryClientProvider client={client}>
-        <ReviewPage reviewId={3} />
-      </QueryClientProvider>,
-    )
+    const { unmount } = renderPage()
 
     await waitFor(() => {
       expect(document.title).toBe('bussola#34 feat: first title')
@@ -91,15 +95,6 @@ describe('ReviewPage window title', () => {
 describe('ReviewPage conversation panel', () => {
   const extensions: ReviewExtensions = { sidePanel: { label: 'conversation', count: 2, content: <p>Thread list</p> } }
 
-  function renderPage() {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    return render(
-      <QueryClientProvider client={client}>
-        <ReviewPage reviewId={3} extensions={extensions} />
-      </QueryClientProvider>,
-    )
-  }
-
   beforeEach(() => {
     window.localStorage.clear()
     stubServer()
@@ -111,7 +106,7 @@ describe('ReviewPage conversation panel', () => {
 
   it('hides the panel behind a thin bar with the open count and remembers it after a reload', async () => {
     window.localStorage.setItem('bussola.sidePanelHidden', 'false')
-    const { unmount } = renderPage()
+    const { unmount } = renderPage(extensions)
 
     expect(await screen.findByText('Thread list')).toBeInTheDocument()
 
@@ -124,7 +119,7 @@ describe('ReviewPage conversation panel', () => {
     expect(window.localStorage.getItem('bussola.sidePanelHidden')).toBe('true')
 
     unmount()
-    renderPage()
+    renderPage(extensions)
 
     expect(await screen.findByRole('button', { name: 'Show conversation (2 open)' })).toBeInTheDocument()
     expect(screen.queryByText('Thread list')).not.toBeInTheDocument()
@@ -137,7 +132,7 @@ describe('ReviewPage conversation panel', () => {
 
   it('toggles the panel with t, but not while typing', async () => {
     window.localStorage.setItem('bussola.sidePanelHidden', 'true')
-    renderPage()
+    renderPage(extensions)
     await screen.findByRole('button', { name: 'Show conversation (2 open)' })
 
     fireEvent.keyDown(screen.getByRole('searchbox'), { key: 't' })

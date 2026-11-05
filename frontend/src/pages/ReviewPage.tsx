@@ -66,9 +66,9 @@ const NO_RATINGS: ReadonlyMap<number, UnitDescription> = new Map()
 const FILES_HIDDEN_KEY = 'bussola.filesHidden'
 const PANEL_HIDDEN_KEY = 'bussola.sidePanelHidden'
 
-function loadPanelOpen(): boolean {
+function loadPanelHidden(): boolean {
   const stored = readStored(PANEL_HIDDEN_KEY)
-  return stored === null ? window.innerWidth >= WIDE_LAYOUT_PX : stored !== 'true'
+  return stored === null ? window.innerWidth < WIDE_LAYOUT_PX : stored === 'true'
 }
 
 const SYNC_TITLE =
@@ -185,7 +185,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const navigation = useCodeNavigation(reviewId, revisionId, (unitId) => shownUnits.has(unitId))
   const [focusedId, setFocusedId] = useState<number | null>(null)
   const actions = useRef(new Map<number, UnitActions>())
-  const [panelOpen, setPanelOpen] = useState(loadPanelOpen)
+  const [panelHidden, setPanelHidden] = useState(loadPanelHidden)
   const [filesHidden, setFilesHidden] = useState(() => readStored(FILES_HIDDEN_KEY) === 'true')
   const [appliedLink, setAppliedLink] = useState<{ target: FocusTarget | null } | null>(null)
   const { link, sidePanel } = extensions
@@ -194,8 +194,8 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     writeStored(FILES_HIDDEN_KEY, String(!filesHidden))
   }
   const togglePanel = () => {
-    setPanelOpen(!panelOpen)
-    writeStored(PANEL_HIDDEN_KEY, String(panelOpen))
+    setPanelHidden(!panelHidden)
+    writeStored(PANEL_HIDDEN_KEY, String(!panelHidden))
   }
 
   const [seenLinkKey, setSeenLinkKey] = useState<string | null>(null)
@@ -220,7 +220,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     if (linkedTarget?.unitId != null) {
       setFocusedId(linkedTarget.unitId)
     }
-    setPanelOpen(panelOpen || linkedTarget?.unitId === null)
+    setPanelHidden(panelHidden && linkedTarget?.unitId !== null)
   }
   const [linkScroll] = useState(createLinkScroll)
   const pullRequestUrl = review.data?.pull_request?.url
@@ -349,7 +349,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
       </div>
       <LinkScrollContext value={linkScroll}>
         <ReviewLinkContext value={makeLink}>
-          <div className={`review-layout${sidePanel ? (panelOpen ? ' with-panel' : ' panel-hidden') : ''}${filesHidden ? ' files-hidden' : ''}`}>
+          <div className={`review-layout${sidePanel ? (panelHidden ? ' panel-hidden' : ' with-panel') : ''}${filesHidden ? ' files-hidden' : ''}`}>
             <aside className="sidebar" aria-label="Files">
               <button type="button" className="sidebar-toggle" aria-expanded={!filesHidden} aria-controls={filesHidden ? undefined : 'file-tree'} title={filesHidden ? 'Show files' : 'Hide files'} onClick={toggleFiles}>
                 <SidebarIcon />
@@ -401,16 +401,16 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                 <button
                   type="button"
                   className="sidebar-toggle"
-                  aria-expanded={panelOpen}
-                  aria-controls={panelOpen ? 'side-panel-content' : undefined}
-                  aria-label={panelOpen ? `Hide ${sidePanel.label}` : `Show ${sidePanel.label} (${String(sidePanel.count)} open)`}
-                  title={`${panelOpen ? 'Hide' : 'Show'} ${sidePanel.label}. Shortcut: t`}
+                  aria-expanded={!panelHidden}
+                  aria-controls={panelHidden ? undefined : 'side-panel-content'}
+                  aria-label={panelHidden ? `Show ${sidePanel.label} (${String(sidePanel.count)} open)` : `Hide ${sidePanel.label}`}
+                  title={`${panelHidden ? 'Show' : 'Hide'} ${sidePanel.label}. Shortcut: t`}
                   onClick={togglePanel}
                 >
                   <SidebarIcon />
-                  {!panelOpen && sidePanel.count > 0 && <span className="side-panel-count">{sidePanel.count}</span>}
+                  {panelHidden && sidePanel.count > 0 && <span className="side-panel-count">{sidePanel.count}</span>}
                 </button>
-                {panelOpen && <div id="side-panel-content">{sidePanel.content}</div>}
+                {!panelHidden && <div id="side-panel-content">{sidePanel.content}</div>}
               </aside>
             )}
           </div>

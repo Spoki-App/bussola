@@ -809,29 +809,23 @@ textarea {
 }
 
 .review-layout {
+  --files-column: 280px;
+  --panel-column: 0;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: var(--files-column) minmax(0, 1fr) var(--panel-column);
   align-items: start;
 }
 
-.review-layout.with-panel {
-  grid-template-columns: 280px minmax(0, 1fr) 340px;
-}
-
 .review-layout.files-hidden {
-  grid-template-columns: 44px minmax(0, 1fr);
+  --files-column: 44px;
 }
 
-.review-layout.files-hidden.with-panel {
-  grid-template-columns: 44px minmax(0, 1fr) 340px;
+.review-layout.with-panel {
+  --panel-column: 340px;
 }
 
 .review-layout.panel-hidden {
-  grid-template-columns: 280px minmax(0, 1fr) 44px;
-}
-
-.review-layout.files-hidden.panel-hidden {
-  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  --panel-column: 44px;
 }
 
 .summary-row {
@@ -979,22 +973,12 @@ button.busy {
 }
 
 @media (max-width: 1100px) {
-  .review-layout,
+  .review-layout {
+    --files-column: 200px;
+  }
+
   .review-layout.with-panel {
-    grid-template-columns: 200px minmax(0, 1fr);
-  }
-
-  .review-layout.files-hidden,
-  .review-layout.files-hidden.with-panel {
-    grid-template-columns: 44px minmax(0, 1fr);
-  }
-
-  .review-layout.panel-hidden {
-    grid-template-columns: 200px minmax(0, 1fr) 44px;
-  }
-
-  .review-layout.files-hidden.panel-hidden {
-    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    --panel-column: 0;
   }
 
   .review-layout.with-panel .side-panel {
@@ -1035,22 +1019,18 @@ button.busy {
   background: var(--bg-subtle);
 }
 
-.files-hidden .sidebar {
+.files-hidden .sidebar,
+.panel-hidden .side-panel {
   padding: 12px 6px;
 }
 
 .panel-hidden .side-panel {
   height: 100vh;
-  padding: 12px 6px;
 }
 
 .panel-hidden .side-panel .sidebar-toggle {
   flex-direction: column;
   padding: 6px;
-}
-
-.side-panel-count {
-  font-size: 12px;
 }
 
 .sidebar-toggle {
@@ -1132,6 +1112,10 @@ button.busy {
 
 .file-tree .count {
   margin-left: auto;
+}
+
+.file-tree .count,
+.side-panel-count {
   min-width: 20px;
   padding: 0 6px;
   border-radius: 999px;
@@ -2579,18 +2563,14 @@ button.danger {
 }
 
 @media (max-width: 700px) {
-  .review-layout,
-  .review-layout.with-panel,
-  .review-layout.files-hidden,
-  .review-layout.files-hidden.with-panel,
-  .review-layout.panel-hidden,
-  .review-layout.files-hidden.panel-hidden {
+  .review-layout {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .panel-hidden .side-panel {
+  .review-layout .side-panel {
     position: static;
     height: auto;
+    max-height: none;
     border-left: none;
     border-top: 1px solid var(--border);
   }
