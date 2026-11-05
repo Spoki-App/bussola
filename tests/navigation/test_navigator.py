@@ -123,6 +123,7 @@ func (c *Cart) Total() int {
             [(5, Enclosing(UnitKind.MODULE, "")), (9, Enclosing(UnitKind.METHOD, "Cart.total")), (14, Enclosing(UnitKind.FUNCTION, "review"))],
         ),
         ("shop.js", JAVASCRIPT_USAGES, [(7, Enclosing(UnitKind.METHOD, "Cart.total"))]),
+        ("inline.ts", "function helper() { return 1 }\nclass Cart { total() { return helper() } }\n", [(2, Enclosing(UnitKind.METHOD, "Cart.total"))]),
         ("shop.go", GO_USAGES, [(5, Enclosing(UnitKind.MODULE, "")), (10, Enclosing(UnitKind.METHOD, "Cart.Total"))]),
     ],
 )

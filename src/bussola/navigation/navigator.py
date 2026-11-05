@@ -106,7 +106,7 @@ class SourceFiles:
         if path not in self._units:
             extractor = extractor_for(path)
             self._units[path] = (extractor.extract(self.source(path)) if extractor else None) or []
-        return next((Enclosing(unit.kind, unit.qualified_name) for unit in self._units[path] if line in unit.line_numbers), None)
+        return next((Enclosing(unit.kind, unit.qualified_name) for unit in reversed(self._units[path]) if line in unit.line_numbers), None)
 
     def symbol_target(self, role: TargetRole, file: IndexedFile, symbol: Symbol) -> Target | None:
         self.source(file.path, file.object_id)
