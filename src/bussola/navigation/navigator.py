@@ -1,9 +1,10 @@
-import threading
-from collections import OrderedDict
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import lru_cache
 from pathlib import Path
 from typing import Self
+
+from tree_sitter import Node, Tree
 
 from bussola.git import BlobReader, GitRepo
 from bussola.navigation.external import Imported, LibrarySource, ProjectLayout, imported_symbol, is_library_file, package_info
@@ -12,7 +13,7 @@ from bussola.navigation.lsp import ServerLocation
 from bussola.navigation.positions import byte_to_utf16, preview, source_lines, utf16_to_byte
 from bussola.navigation.servers import LanguageServers, server_command
 from bussola.navigation.specs import SERVER_SPECS, ServerSpec
-from bussola.navigation.symbols import SourceLanguage, Symbol, language_for, references, symbol_at
+from bussola.navigation.symbols import SourceLanguage, Symbol, identifier_at, language_for, parse, references, symbol_of
 
 MAX_TARGETS = 200
 CHECKOUTS_DIR = "checkouts"
@@ -121,8 +122,6 @@ class Navigator:
     def __init__(self, data_dir: Path, start: Starter = start_daemon) -> None:
         self.indexes = IndexCache(start)
         self.servers = LanguageServers(data_dir / CHECKOUTS_DIR, start)
-        self._layouts: OrderedDict[tuple[Path, str], ProjectLayout] = OrderedDict()
-        self._layouts_lock = threading.Lock()
 
     def prepare(self, repo: GitRepo, commit: str, ignore: tuple[str, ...]) -> bool:
         return self.indexes.get(repo, commit, ignore) is not None
@@ -131,13 +130,14 @@ class Navigator:
         clicked = _clicked(repo, commit, click)
         if clicked is None:
             return Navigation(ready=True)
-        language, source, lines, symbol = clicked
+        language, source, lines, tree, node = clicked
+        symbol = symbol_of(language, node)
         origin = Origin.DEFINITION if symbol.definition else Origin.REFERENCE
         spec = SERVER_SPECS[language.family]
         missing = spec if server_command(spec) is None else None
         position = ServerLocation(click.path, symbol.row, byte_to_utf16(lines[symbol.row], symbol.start))
-        imported = imported_symbol(language, source, symbol.row, symbol.start) if origin == Origin.REFERENCE else None
-        if imported is not None and self._layout(repo, commit).is_external(imported):
+        imported = imported_symbol(language, tree, node) if origin == Origin.REFERENCE else None
+        if imported is not None and _layout(repo.root, commit).is_external(imported):
             documentation, resolver = self._document(repo, commit, spec, position, imported)
             return Navigation(True, symbol.name, origin, resolver, missing_server=missing, documentation=documentation)
         with SourceFiles(repo, commit) as files:
@@ -157,43 +157,37 @@ class Navigator:
 
     def _document(self, repo: GitRepo, commit: str, spec: ServerSpec, position: ServerLocation, imported: Imported) -> tuple[Documentation, Resolver]:
         text = self.servers.ask(repo, commit, spec, lambda session: session.hover(position.path, position.row, position.character), None)
-        package = package_info(imported, repo.root, position.path, self._layout(repo, commit))
+        package = package_info(imported, repo.root, str(Path(position.path).parent), _layout(repo.root, commit))
         source = package.source if package.source is not None and is_library_file(Path(package.source.path), repo.root) else None
         documentation = Documentation(imported.qualified_name, package.name, package.version, package.url, text, source)
         return documentation, Resolver.LANGUAGE_SERVER if text else Resolver.TREE_SITTER
 
-    def _layout(self, repo: GitRepo, commit: str) -> ProjectLayout:
-        key = (repo.root, commit)
-        with self._layouts_lock:
-            cached = self._layouts.get(key)
-        if cached is not None:
-            return cached
-        layout = ProjectLayout.of(repo.tree_paths(commit), lambda path: repo.file_at(commit, path))
-        with self._layouts_lock:
-            self._layouts[key] = layout
-            while len(self._layouts) > CACHED_LAYOUTS:
-                self._layouts.popitem(last=False)
-        return layout
-
     def _ask_server(self, repo: GitRepo, commit: str, spec: ServerSpec, position: ServerLocation, origin: Origin) -> tuple[TargetRole, list[ServerLocation]]:
         if origin == Origin.DEFINITION:
             role = TargetRole.USAGE
-            locations = self.servers.locate(repo, commit, spec, lambda session: session.references(position.path, position.row, position.character))
+            locations = self.servers.ask(repo, commit, spec, lambda session: session.references(position.path, position.row, position.character), [])
         else:
             role = TargetRole.DEFINITION
-            locations = self.servers.locate(repo, commit, spec, lambda session: session.definitions(position.path, position.row, position.character))
+            locations = self.servers.ask(repo, commit, spec, lambda session: session.definitions(position.path, position.row, position.character), [])
         ordered = sorted(set(locations), key=lambda location: (location.path, location.row, location.character))
         return role, ordered[:MAX_TARGETS]
 
 
-def _clicked(repo: GitRepo, commit: str, click: Click) -> tuple[SourceLanguage, bytes, list[bytes], Symbol] | None:
+def _clicked(repo: GitRepo, commit: str, click: Click) -> tuple[SourceLanguage, bytes, list[bytes], Tree, Node] | None:
     language = language_for(click.path)
     source = repo.file_at(commit, click.path)
     lines = source_lines(source) if source is not None else []
     if language is None or source is None or not 1 <= click.line <= len(lines):
         return None
-    symbol = symbol_at(language, source, click.line - 1, utf16_to_byte(lines[click.line - 1], click.column))
-    return (language, source, lines, symbol) if symbol is not None else None
+    tree = parse(language, source)
+    node = identifier_at(language, tree, click.line - 1, utf16_to_byte(lines[click.line - 1], click.column))
+    return (language, source, lines, tree, node) if node is not None else None
+
+
+@lru_cache(maxsize=CACHED_LAYOUTS)
+def _layout(root: Path, commit: str) -> ProjectLayout:
+    repo = GitRepo(root)
+    return ProjectLayout.of(repo.tree_paths(commit), lambda path: repo.file_at(commit, path))
 
 
 def _definitions(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, path: str, files: SourceFiles) -> tuple[Target, ...]:

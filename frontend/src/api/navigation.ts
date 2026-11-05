@@ -100,17 +100,13 @@ export function usePrepareNavigation(reviewId: number, revisionId: number | unde
   })
 }
 
-function fetchLibraryFile(reviewId: number, path: string): Promise<ShownFile> {
-  return getJson<Omit<ShownFile, 'url'>>(`/reviews/${String(reviewId)}/library-source?${new URLSearchParams({ path }).toString()}`).then((file) => ({ ...file, url: null }))
-}
-
 export function useSourceFile(reviewId: number, revisionId: number | undefined, location: CodeLocation | undefined) {
   const path = location?.path ?? ''
   const side = location?.side ?? 'head'
   const library = location?.library ?? false
   return useQuery<ShownFile>({
     queryKey: ['source', reviewId, revisionId, side, path, library],
-    queryFn: () => (library ? fetchLibraryFile(reviewId, path) : getJson<SourceFile>(`/reviews/${String(reviewId)}/source?${query(revisionId, side, { path })}`)),
+    queryFn: () => getJson<ShownFile>(library ? `/reviews/${String(reviewId)}/library-source?${new URLSearchParams({ path }).toString()}` : `/reviews/${String(reviewId)}/source?${query(revisionId, side, { path })}`),
     enabled: location !== undefined,
     staleTime: INDEX_STALE_MS,
   })

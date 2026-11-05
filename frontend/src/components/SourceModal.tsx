@@ -96,7 +96,7 @@ export function SourceModal({ reviewId, revisionId, stack, onBack, onClose, onNa
           <h2 id="source-dialog-title">
             <code>{`${location.path}:${String(location.line)}`}</code>
           </h2>
-          {location.side === 'base' && !location.library && <span className="label">base</span>}
+          {location.side === 'base' && <span className="label">base</span>}
           {location.library && <span className="label">installed library</span>}
         </div>
         <div className="source-actions">

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from bussola.git import GitError, GitRepo
 from bussola.navigation.index import Starter, start_daemon
-from bussola.navigation.lsp import LanguageServerError, LanguageServerSession, ServerLocation
+from bussola.navigation.lsp import LanguageServerError, LanguageServerSession
 from bussola.navigation.specs import ServerSpec
 
 CACHED_SESSIONS = 3
@@ -54,9 +54,6 @@ class LanguageServers:
         self._slots: OrderedDict[SessionKey, _Slot] = OrderedDict()
         self._cleaned = False
         self._closed = False
-
-    def locate(self, repo: GitRepo, commit: str, spec: ServerSpec, ask: Callable[[LanguageServerSession], list[ServerLocation]]) -> list[ServerLocation]:
-        return self.ask(repo, commit, spec, ask, [])
 
     def ask[T](self, repo: GitRepo, commit: str, spec: ServerSpec, question: Callable[[LanguageServerSession], T], fallback: T) -> T:
         session = self._session(repo, commit, spec)

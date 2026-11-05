@@ -10,10 +10,12 @@ from importlib.metadata import Distribution, distributions
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
-from tree_sitter import Node
+from tree_sitter import Node, Tree
 
-from bussola.navigation.symbols import SourceLanguage, file_symbols, identifier_at, language_for, nodes, parse
+from bussola.navigation.index import MAX_FILE_BYTES
+from bussola.navigation.symbols import SourceLanguage, file_symbols, language_for, nodes
 from bussola.units.extractors.treesitter import node_text
+from bussola.units.modules import GO_MOD, go_module_name
 
 PYTHON_DOCS = "https://docs.python.org/3/library/{module}.html#{qualified}"
 PYPI = "https://pypi.org/project/{name}/"
@@ -33,12 +35,9 @@ NODE_BUILTINS = frozenset(
 )
 LOCAL_SPECIFIERS = (".", "/", "@/", "~/", "#")
 DOCUMENTATION_LABELS = (("documentation", "docs"), ("homepage", "home", "source", "repository"))
-GO_MOD = "go.mod"
 GO_TEST_SUFFIX = "_test.go"
 GO_VERSION_SEGMENT = re.compile(r"v\d+")
 GO_REQUIRE = re.compile(rb"^\s*(?:require\s+)?([^\s()]+)\s+(v[^\s]+)", re.MULTILINE)
-GO_MODULE = re.compile(rb"^module\s+(\S+)", re.MULTILINE)
-MAX_LIBRARY_FILE_BYTES = 2_000_000
 
 
 @dataclass(frozen=True)
@@ -84,7 +83,7 @@ LINKS: dict[str, dict[str, Link]] = {
 ROOT_TYPES = frozenset({"identifier", "package_identifier"})
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class ProjectLayout:
     names: dict[str, frozenset[str]]
     root_names: dict[str, frozenset[str]]
@@ -126,11 +125,7 @@ class ProjectLayout:
         return max(found, key=lambda item: len(item[0]), default=None)
 
 
-def imported_symbol(language: SourceLanguage, source: bytes, row: int, column: int) -> Imported | None:
-    tree = parse(language, source)
-    node = identifier_at(language, tree, row, column)
-    if node is None:
-        return None
+def imported_symbol(language: SourceLanguage, tree: Tree, node: Node) -> Imported | None:
     family = language.family
     in_statement = _import_statement_name(family, node)
     if in_statement is not None:
@@ -142,18 +137,19 @@ def imported_symbol(language: SourceLanguage, source: bytes, row: int, column: i
     return Imported(family, imported.module, ".".join(part for part in (imported.name, *chain[1:]) if part))
 
 
-def package_info(imported: Imported, root: Path, origin: str, layout: ProjectLayout) -> PackageInfo:
+@lru_cache(maxsize=256)
+def package_info(imported: Imported, root: Path, origin_dir: str, layout: ProjectLayout) -> PackageInfo:
     if imported.family == "python":
         return _python_package(imported, root)
     if imported.family == "ecmascript":
-        return _node_package(imported, root, origin)
+        return _node_package(imported, root, origin_dir)
     return _go_package(imported, layout)
 
 
 def is_library_file(path: Path, root: Path) -> bool:
     try:
         resolved = path.resolve()
-        if not resolved.is_file() or language_for(resolved.name) is None or resolved.stat().st_size > MAX_LIBRARY_FILE_BYTES:
+        if not resolved.is_file() or language_for(resolved.name) is None:
             return False
     except OSError:
         return False
@@ -319,11 +315,9 @@ IMPORTS: dict[str, Callable[[Node], dict[str, Imported]]] = {"python": _python_i
 
 
 def _go_mod(content: bytes) -> tuple[str, dict[str, str]] | None:
-    module = GO_MODULE.search(content)
-    if module is None:
-        return None
+    module = go_module_name(content)
     requires = {path.decode(): version.decode() for path, version in GO_REQUIRE.findall(content)}
-    return module.group(1).decode(), requires
+    return (module, requires) if module is not None else None
 
 
 def _python_package(imported: Imported, root: Path) -> PackageInfo:
@@ -386,7 +380,7 @@ def _python_source(site: Path, imported: Imported) -> LibrarySource | None:
     return None
 
 
-def _node_package(imported: Imported, root: Path, origin: str) -> PackageInfo:
+def _node_package(imported: Imported, root: Path, origin_dir: str) -> PackageInfo:
     specifier = imported.module.removeprefix(NODE_SCHEME)
     segments = specifier.split("/")
     if imported.module.startswith(NODE_SCHEME) or segments[0] in NODE_BUILTINS:
@@ -396,7 +390,7 @@ def _node_package(imported: Imported, root: Path, origin: str) -> PackageInfo:
         return PackageInfo(specifier)
     name, subpath = "/".join(segments[:count]), "/".join(segments[count:])
     project = root.resolve()
-    directory = (project / origin).parent
+    directory = project / origin_dir
     while directory.is_relative_to(project):
         modules = directory / NODE_MODULES
         manifest = _json(modules / name / "package.json")
@@ -481,7 +475,7 @@ def _go_escape(path: str) -> str:
 def _defined_at(path: Path, name: str) -> int | None:
     language = language_for(path.name)
     try:
-        if language is None or path.stat().st_size > MAX_LIBRARY_FILE_BYTES:
+        if language is None or path.stat().st_size > MAX_FILE_BYTES:
             return None
         source = path.read_bytes()
     except OSError:

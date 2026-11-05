@@ -41,7 +41,7 @@ function serve(reply: NavigationReply, prepared: () => boolean = () => true) {
         return json(reply(url.searchParams))
       }
       if (url.pathname.endsWith('/library-source')) {
-        return json({ path: url.searchParams.get('path'), text: SHORTCUTS_SOURCE })
+        return json({ path: url.searchParams.get('path'), text: SHORTCUTS_SOURCE, url: null })
       }
       const path = url.searchParams.get('path') ?? ''
       const source: SourceFile = { path, side: 'head', commit: 'abc123', text: path === 'lib.py' ? LIB : CART, url: `${GITHUB}/${path}` }

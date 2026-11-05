@@ -121,12 +121,12 @@ def file_symbols(language: SourceLanguage, source: bytes) -> FileSymbols:
 
 def references(language: SourceLanguage, source: bytes, name: str) -> list[Symbol]:
     wanted = name.encode()
-    return [_symbol(language, node) for node in _identifiers(language, parse(language, source)) if node.text == wanted and not language.is_definition(node)]
+    return [symbol_of(language, node) for node in _identifiers(language, parse(language, source)) if node.text == wanted and not language.is_definition(node)]
 
 
 def symbol_at(language: SourceLanguage, source: bytes, row: int, column: int) -> Symbol | None:
     node = identifier_at(language, parse(language, source), row, column)
-    return _symbol(language, node) if node is not None else None
+    return symbol_of(language, node) if node is not None else None
 
 
 def identifier_at(language: SourceLanguage, tree: Tree, row: int, column: int) -> Node | None:
@@ -144,14 +144,14 @@ def parse(language: SourceLanguage, source: bytes) -> Tree:
 
 
 def _symbols(language: SourceLanguage, tree: Tree) -> Iterator[Symbol]:
-    return (_symbol(language, node) for node in _identifiers(language, tree))
+    return (symbol_of(language, node) for node in _identifiers(language, tree))
 
 
 def _identifiers(language: SourceLanguage, tree: Tree) -> Iterator[Node]:
     return (node for node in nodes(tree.root_node) if node.type in language.identifiers and node.start_point[0] == node.end_point[0])
 
 
-def _symbol(language: SourceLanguage, node: Node) -> Symbol:
+def symbol_of(language: SourceLanguage, node: Node) -> Symbol:
     row, start = node.start_point
     return Symbol(node_text(node), row, start, language.is_definition(node))
 

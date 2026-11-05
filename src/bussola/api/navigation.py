@@ -77,7 +77,10 @@ def library_file(context: ContextDep, query: Annotated[LibraryFileIn, Query()]) 
     path = Path(query.path)
     if not path.is_absolute() or not is_library_file(path, open_repo(repo_of(context)).root):
         raise NotFoundError(f"{query.path} is not an installed library file of this repository")
-    return LibraryFileOut(path=query.path, text=path.read_bytes().decode(errors="replace"))
+    data = path.read_bytes()
+    if len(data) > MAX_SOURCE_BYTES:
+        raise InvalidRequestError(f"{query.path} is too large to show here")
+    return LibraryFileOut(path=query.path, text=data.decode(errors="replace"), url=None)
 
 
 def units_by_path(context: ReviewContext, revision: Revision, side: Side) -> dict[str, list[UnitSnapshot]]:

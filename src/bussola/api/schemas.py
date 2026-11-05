@@ -439,6 +439,7 @@ class LibraryFileIn(BaseModel):
 class LibraryFileOut(BaseModel):
     path: str
     text: str
+    url: None
 
 
 class SourceFileOut(BaseModel):

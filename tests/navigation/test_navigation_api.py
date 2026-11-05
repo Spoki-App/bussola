@@ -206,7 +206,11 @@ def test_an_external_name_without_a_language_server_shows_its_package_and_link(n
         "text": None,
         "source": {"path": shortcuts, "line": 1},
     }
-    assert nav_api.call("GET", f"/reviews/{review}/library-source?path={shortcuts}") == {"path": shortcuts, "text": "def render(request):\n    pass\n"}
+    assert nav_api.call("GET", f"/reviews/{review}/library-source?path={shortcuts}") == {
+        "path": shortcuts,
+        "text": "def render(request):\n    pass\n",
+        "url": None,
+    }
 
 
 def test_an_external_name_shows_the_language_server_hover(nav_api: ApiClient, git_repo: GitFixture, servers: LanguageServerPath) -> None:
