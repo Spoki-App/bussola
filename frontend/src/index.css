@@ -1572,6 +1572,13 @@ button.copy-link.failed {
   overflow-wrap: anywhere;
 }
 
+.navigation-enclosing {
+  display: inline-flex;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+}
+
 .label.in-review {
   color: var(--success);
   font-weight: 600;

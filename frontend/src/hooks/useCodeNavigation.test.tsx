@@ -13,7 +13,7 @@ const CART = 'from lib import price\n\n\ndef total(items):\n    return price(ite
 const GITHUB = 'https://github.com/acme/widgets/blob/abc123'
 
 function target(path: string, line: number, unitId: number | null, role: NavigationTarget['role'] = 'definition'): NavigationTarget {
-  return { role, path, line, column: 4, preview: `preview of ${path}:${String(line)}`, side: 'head', unit_id: unitId }
+  return { role, path, line, column: 4, preview: `preview of ${path}:${String(line)}`, enclosing: null, side: 'head', unit_id: unitId }
 }
 
 function found(targets: NavigationTarget[], overrides: Partial<NavigationResult> = {}): NavigationResult {
@@ -139,6 +139,25 @@ describe('useCodeNavigation', () => {
     fireEvent.click(entries[0])
     expect(screen.getByLabelText('target')).toHaveTextContent('4:1')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('names the function, method or class each usage lives in and labels module level usages', async () => {
+    serve(() =>
+      found(
+        [
+          { ...target('cart.py', 1, null, 'usage'), enclosing: { kind: 'module', qualified_name: '' } },
+          { ...target('cart.py', 5, null, 'usage'), enclosing: { kind: 'method', qualified_name: 'Cart.total' } },
+          target('notes.txt', 2, null, 'usage'),
+        ],
+        { origin: 'definition' },
+      ),
+    )
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'Usages of price' })
+    const entries = within(popup).getAllByRole('button')
+    expect(entries.map((entry) => entry.querySelector('.navigation-location')?.textContent)).toEqual(['cart.py:1module level', 'cart.py:5in Cart.total', 'notes.txt:2'])
+    expect(entries[1].querySelector('.qualified-name')).toHaveAttribute('title', 'Cart.total')
   })
 
   it('opens targets outside the review in a modal with nested navigation, a back control and a GitHub link', async () => {

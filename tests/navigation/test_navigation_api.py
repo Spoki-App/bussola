@@ -44,6 +44,7 @@ def test_a_definition_outside_the_review_has_no_unit(nav_api: ApiClient, git_rep
 
     assert targets(result) == [("definition", "shop/prices.py", 5, "def discount(item):")]
     assert result["targets"][0]["unit_id"] is None
+    assert result["targets"][0]["enclosing"] is None
 
 
 def test_a_definition_lists_its_usages(nav_api: ApiClient, git_repo: GitFixture) -> None:
@@ -59,6 +60,10 @@ def test_a_definition_lists_its_usages(nav_api: ApiClient, git_repo: GitFixture)
     assert [target["unit_id"] for target in result["targets"]] == [
         nav_api.unit(review, "shop/cart.py")["id"],
         nav_api.unit(review, "shop/cart.py::total")["id"],
+    ]
+    assert [target["enclosing"] for target in result["targets"]] == [
+        {"kind": "module", "qualified_name": ""},
+        {"kind": "function", "qualified_name": "total"},
     ]
 
 

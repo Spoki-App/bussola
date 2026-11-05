@@ -1,10 +1,11 @@
 import { useEffect, type KeyboardEvent, type MouseEvent } from 'react'
 
-import type { NavigationResult, NavigationTarget } from '../api/navigation'
+import type { EnclosingUnit, NavigationResult, NavigationTarget } from '../api/navigation'
 import { useModalDialog } from '../hooks/useModalDialog'
 import { emptyMessage, groupTargets, titleOf, type ScreenPoint } from '../review/codeNavigation'
 import { plural } from '../review/text'
 import { ErrorNote } from './Badges'
+import { QualifiedName } from './QualifiedName'
 
 export type PopupState = { status: 'loading'; building: boolean } | { status: 'ready'; result: NavigationResult } | { status: 'error'; message: string }
 
@@ -46,12 +47,24 @@ function moveFocus(dialog: HTMLDialogElement, step: number) {
   entries[next].focus()
 }
 
+function Enclosing({ unit }: { unit: EnclosingUnit }) {
+  if (unit.kind === 'module') {
+    return <span className="label">module level</span>
+  }
+  return (
+    <span className="navigation-enclosing">
+      in <QualifiedName module={null} name={unit.qualified_name} />
+    </span>
+  )
+}
+
 function Entry({ target, onChoose }: { target: NavigationTarget; onChoose: (target: NavigationTarget) => void }) {
   return (
     <li>
       <button type="button" className="navigation-entry" onClick={() => { onChoose(target) }}>
         <span className="navigation-location">
           <span>{`${target.path}:${String(target.line)}`}</span>
+          {target.enclosing && <Enclosing unit={target.enclosing} />}
           {target.side === 'base' && <span className="label">base</span>}
           {target.unit_id !== null && <span className="label in-review">in review</span>}
         </span>

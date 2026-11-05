@@ -5,12 +5,18 @@ import type { Side } from './types'
 
 export type TargetRole = 'definition' | 'usage'
 
+export interface EnclosingUnit {
+  kind: string
+  qualified_name: string
+}
+
 export interface NavigationTarget {
   role: TargetRole
   path: string
   line: number
   column: number
   preview: string
+  enclosing: EnclosingUnit | null
   side: Side
   unit_id: number | null
 }

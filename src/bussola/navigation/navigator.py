@@ -10,6 +10,8 @@ from bussola.navigation.positions import byte_to_utf16, preview, source_lines, u
 from bussola.navigation.servers import LanguageServers, server_command
 from bussola.navigation.specs import SERVER_SPECS, ServerSpec
 from bussola.navigation.symbols import SourceLanguage, Symbol, language_for, references, symbol_at
+from bussola.units.model import Unit, UnitKind
+from bussola.units.registry import extractor_for
 
 MAX_TARGETS = 200
 CHECKOUTS_DIR = "checkouts"
@@ -31,12 +33,19 @@ class Resolver(StrEnum):
 
 
 @dataclass(frozen=True)
+class Enclosing:
+    kind: UnitKind
+    qualified_name: str
+
+
+@dataclass(frozen=True)
 class Target:
     role: TargetRole
     path: str
     line: int
     column: int
     preview: str
+    enclosing: Enclosing | None = None
 
 
 @dataclass(frozen=True)
@@ -63,6 +72,7 @@ class SourceFiles:
         self._reader: BlobReader | None = None
         self._sources: dict[str, bytes] = {}
         self._lines: dict[str, list[bytes]] = {}
+        self._units: dict[str, list[Unit]] = {}
 
     def __enter__(self) -> Self:
         return self
@@ -88,7 +98,15 @@ class SourceFiles:
         lines = self.lines(location.path)
         if location.row >= len(lines):
             return None
-        return Target(role, location.path, location.row + 1, location.character, preview(lines[location.row]))
+        line = location.row + 1
+        enclosing = self.enclosing(location.path, line) if role == TargetRole.USAGE else None
+        return Target(role, location.path, line, location.character, preview(lines[location.row]), enclosing)
+
+    def enclosing(self, path: str, line: int) -> Enclosing | None:
+        if path not in self._units:
+            extractor = extractor_for(path)
+            self._units[path] = (extractor.extract(self.source(path)) if extractor else None) or []
+        return next((Enclosing(unit.kind, unit.qualified_name) for unit in self._units[path] if line in unit.line_numbers), None)
 
     def symbol_target(self, role: TargetRole, file: IndexedFile, symbol: Symbol) -> Target | None:
         self.source(file.path, file.object_id)
