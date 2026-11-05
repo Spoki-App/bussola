@@ -7,6 +7,7 @@ export function useModalDialog() {
     const element = ref.current
     if (element && !element.open) {
       element.showModal()
+      element.querySelector<HTMLElement>('[data-autofocus]')?.focus()
     }
     return () => {
       element?.close()

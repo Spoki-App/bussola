@@ -185,3 +185,22 @@ test('the window title names the open review and goes back to bussola elsewhere'
   await page.getByRole('link', { name: 'demo', exact: true }).click()
   await expect(page).toHaveTitle('bussola')
 })
+
+test('settings open with the search focused, move between categories with the arrow keys and close with Esc', async ({ page }) => {
+  await page.goto(`/?token=${E2E_TOKEN}`)
+  await page.getByRole('button', { name: 'Settings' }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Settings' })
+  await expect(dialog.getByRole('searchbox', { name: 'Search settings' })).toBeFocused()
+
+  await dialog.getByRole('button', { name: 'Pull requests' }).focus()
+  await page.keyboard.press('ArrowDown')
+  await expect(dialog.getByRole('button', { name: 'Repositories' })).toBeFocused()
+  await expect(dialog.getByRole('heading', { name: 'Add repository' })).toBeVisible()
+
+  await dialog.getByRole('searchbox', { name: 'Search settings' }).fill('wrap')
+  await expect(dialog.getByRole('heading', { name: 'Line wrap' })).toBeVisible()
+
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+})
