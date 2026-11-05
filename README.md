@@ -29,17 +29,17 @@ In Go, each function, method and type is its own unit. A method is named after i
 Requirements: Python 3.12+, git, and the [GitHub CLI](https://cli.github.com) (`gh`) for the GitHub features only.
 
 ```bash
-uv tool install --compile-bytecode bussola
+uv tool install bussola
 ```
 
-`--compile-bytecode` compiles bussola and its libraries once at install time. Without it, uv leaves that to the first run after every install or upgrade, which then takes several seconds more, so the first `bussola://` link after an update seems to do nothing for a while. Upgrade with `uv tool upgrade --compile-bytecode bussola`. `pipx install bussola` works too and compiles by default. bussola is developed on macOS and tested on macOS and Linux. Windows is not tested yet.
+`pipx install bussola` works too. bussola is developed on macOS and tested on macOS and Linux. Windows is not tested yet.
 
 To install from a clone instead, you also need Node.js 22.12+ to build the UI (`frontend/.nvmrc` pins 24):
 
 ```bash
 npm --prefix frontend ci
 npm --prefix frontend run build
-uv tool install --compile-bytecode .
+uv tool install .
 ```
 
 The UI build goes to `src/bussola/static/` and is packaged with the Python wheel, so rebuild it before reinstalling.
