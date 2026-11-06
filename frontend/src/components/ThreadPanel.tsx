@@ -40,6 +40,7 @@ export function ThreadPanel({ reviewId, threads }: Props) {
           <ThreadView key={thread.id} reviewId={reviewId} thread={thread} />
         ))}
         <Composer
+          reviewId={reviewId}
           submitLabel="Comment"
           placeholder="Comment on the whole review (Markdown)"
           busy={create.isPending}

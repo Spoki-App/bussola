@@ -65,6 +65,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
           <div key="draft" className="thread draft">
             {request.line_count > 1 && <p className="muted draft-range">{`Commenting on ${String(request.line_count)} lines`}</p>}
             <Composer
+              reviewId={reviewId}
               submitLabel="Start thread"
               autoFocus
               busy={creating}

@@ -72,6 +72,26 @@ query($owner: String!, $name: String!, $number: Int!) {
   }
 }
 """
+COLLABORATORS_FIELD = "assignableUsers(first: 100) { nodes { login } }"
+COLLABORATORS_QUERY = f"""
+query($owner: String!, $name: String!) {{
+  repository(owner: $owner, name: $name) {{ {COLLABORATORS_FIELD} }}
+}}
+"""
+PARTICIPANTS_QUERY = f"""
+query($owner: String!, $name: String!, $number: Int!) {{
+  repository(owner: $owner, name: $name) {{
+    {COLLABORATORS_FIELD}
+    pullRequest(number: $number) {{
+      author {{ login }}
+      reviewRequests(first: 100) {{ nodes {{ requestedReviewer {{ ... on User {{ login }} }} }} }}
+      reviews(first: 100) {{ nodes {{ author {{ login }} }} }}
+      comments(first: 100) {{ nodes {{ author {{ login }} }} }}
+      reviewThreads(first: 100) {{ nodes {{ comments(first: 100) {{ nodes {{ author {{ login }} }} }} }} }}
+    }}
+  }}
+}}
+"""
 RESOLVE_THREAD_MUTATION = """
 mutation($threadId: ID!) {
   resolveReviewThread(input: {threadId: $threadId}) { thread { isResolved } }
@@ -212,6 +232,20 @@ class GitHubAdapter:
             raise ForgeError(result.stderr.decode(errors="replace").strip() or "gh api graphql failed")
         return failed
 
+    def mention_candidates(self, repository: str, number: int | None) -> list[str]:
+        owner, name = _repo(repository).split("/")
+        if number is None:
+            response = self._graphql(COLLABORATORS_QUERY, owner=owner, name=name)
+        else:
+            response = self._graphql(PARTICIPANTS_QUERY, owner=owner, name=name, number=number)
+        try:
+            data: JsonObject = response["data"]["repository"]
+        except (KeyError, TypeError) as error:
+            raise ForgeError(f"GitHub did not return the people of {repository}") from error
+        return list(
+            dict.fromkeys(login for login in [*_participants(data.get("pullRequest") or {}), *map(_login, _nodes(data.get("assignableUsers")))] if login)
+        )
+
     def can_reply(self, remote_id: str | None) -> bool:
         return remote_id is not None and remote_id.isdigit()
 
@@ -327,6 +361,13 @@ def _remote_thread(item: JsonObject) -> RemoteThread:
         comments=[_note(comment, "", "createdAt") for comment in _nodes(item.get("comments"))],
         remote_id=str(item.get("id") or ""),
     )
+
+
+def _participants(pull: JsonObject) -> list[str]:
+    reviewers = [_login(request.get("requestedReviewer")) for request in _nodes(pull.get("reviewRequests"))]
+    authored = [*_nodes(pull.get("reviews")), *_nodes(pull.get("comments"))]
+    authored += [comment for thread in _nodes(pull.get("reviewThreads")) for comment in _nodes(thread.get("comments"))]
+    return [_login(pull.get("author")), *reviewers, *(_login(item.get("author")) for item in authored)]
 
 
 def _inline_payload(item: InlineComment) -> JsonObject:

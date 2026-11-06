@@ -11,12 +11,16 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  return send<T>(method, path, body === undefined ? undefined : 'application/json', body === undefined ? undefined : JSON.stringify(body))
+}
+
+async function send<T>(method: string, path: string, contentType?: string, body?: BodyInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     method,
     credentials: 'same-origin',
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: contentType === undefined ? undefined : { 'Content-Type': contentType },
+    body,
   })
   if (!response.ok) {
     throw await apiError(response)
@@ -48,6 +52,7 @@ export const getJson = <T>(path: string) => request<T>('GET', path)
 export const postJson = <T>(path: string, body?: unknown) => request<T>('POST', path, body ?? {})
 export const patchJson = <T>(path: string, body: unknown) => request<T>('PATCH', path, body)
 export const putJson = <T>(path: string, body: unknown) => request<T>('PUT', path, body)
+export const postFile = <T>(path: string, file: Blob) => send<T>('POST', path, file.type || 'application/octet-stream', file)
 export const deleteJson = <T>(path: string) => request<T>('DELETE', path)
 
 export function describeError(error: unknown): string {

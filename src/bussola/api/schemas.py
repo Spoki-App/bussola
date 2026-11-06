@@ -19,6 +19,10 @@ MAX_CALL_ID_LENGTH = 100
 LineRangeIn = Annotated[tuple[int, int], Field(description="Inclusive file line range")]
 
 
+class AttachmentOut(BaseModel):
+    url: str
+
+
 class HealthOut(BaseModel):
     status: str
     app: str

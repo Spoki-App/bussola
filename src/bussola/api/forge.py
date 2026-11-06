@@ -13,7 +13,7 @@ from bussola.api.schemas import (
 from bussola.api.state import app_state
 from bussola.api.views import forge_status_out, pull_request_out
 from bussola.forge.base import Asset
-from bussola.forge.links import ForgeOverview, forge_overview, link_pull_request
+from bussola.forge.links import ForgeOverview, forge_overview, link_pull_request, review_repository
 from bussola.forge.publish import require_link
 from bussola.forge.pulls import sync_conversation
 from bussola.review.context import ReviewContext
@@ -45,6 +45,17 @@ def put_forge(body: ForgeLinkIn, context: ContextDep, request: Request) -> Forge
     link_pull_request(context, app_state(request).forge, open_repo(repo_of(context)), body.pr_number)
     context.store.commit()
     return _overview(context, request)
+
+
+@router.get("/reviews/{review_id}/mentions")
+def mentions(context: ContextDep, request: Request) -> list[str]:
+    state = app_state(request)
+    review_id = context.review.id
+    if review_id not in state.mentions:
+        link = context.store.forge.link(review_id)
+        repository = link.repository if link else review_repository(state.forge, open_repo(repo_of(context)), context.review.head_ref)
+        state.mentions[review_id] = state.forge.mention_candidates(repository, link.pr_number if link else None) if repository else []
+    return state.mentions[review_id]
 
 
 @router.post("/reviews/{review_id}/forge/sync")

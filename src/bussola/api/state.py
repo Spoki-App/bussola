@@ -27,6 +27,7 @@ class AppState:
     ai_factory: Callable[[AiSettings], AiProvider]
     ai_calls: RunningCalls = field(default_factory=RunningCalls)
     ai_reviews: RunningReviews = field(default_factory=RunningReviews)
+    mentions: dict[int, list[str]] = field(default_factory=dict)
 
     @property
     def ai_cache(self) -> DatabaseAiCache:

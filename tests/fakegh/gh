@@ -71,6 +71,20 @@ def file_views(args, state):
     return [{"data": {"repository": {"pullRequest": {"id": f"PR_{pull['number']}", "headRefOid": pull["headRefOid"], "files": files}}}}]
 
 
+def people(args, state):
+    repository = {"assignableUsers": {"nodes": [{"login": login} for login in state.get("collaborators", [])]}}
+    if any(arg.startswith("number=") for arg in args):
+        pull = next(pr for pr in state["prs"] if pr["number"] == int(variable(args, "number")))
+        conversation = state.get("conversation", {})
+        requests = [{"requestedReviewer": {"login": login}} for login in state.get("requested_reviewers", [])]
+        repository["pullRequest"] = {
+            "author": pull.get("author"),
+            "reviewRequests": {"nodes": requests},
+            **{key: {"nodes": conversation.get(key, [])} for key in ("comments", "reviews", "reviewThreads")},
+        }
+    return {"data": {"repository": repository}}
+
+
 def set_files_viewed(args, state):
     if state.get("fail_viewed_request"):
         fail(state["fail_viewed_request"])
@@ -114,6 +128,9 @@ def main():
         return
     if args[:2] == ["api", "graphql"] and any("markFileAsViewed(input" in arg for arg in args):
         print(json.dumps(set_files_viewed(args, state)))
+        return
+    if args[:2] == ["api", "graphql"] and any("assignableUsers" in arg for arg in args):
+        print(json.dumps(people(args, state)))
         return
     if args[:2] == ["api", "graphql"] and any("viewerViewedState" in arg for arg in args):
         print(json.dumps(file_views(args, state)))

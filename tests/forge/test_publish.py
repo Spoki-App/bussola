@@ -291,3 +291,14 @@ def test_the_ai_line_is_left_out_of_an_ai_comment_edited_on_github(data_dir: Pat
 
         assert local_body(context, Comment(thread_id="t", author_id=ai.id, body="x"), edited) == "Edited on GitHub."
         assert local_body(context, Comment(thread_id="t", author_id=me.id, body="x"), edited) == edited
+
+
+def test_local_images_are_not_sent_to_github(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
+    review = setup_review(api, git_repo, fake_gh)
+    link(api, review)
+    image = f"/api/attachments/{'a' * 64}.png"
+    api.call("POST", f"/reviews/{review}/threads", 201, {"scope": "review", "body": f"See ![screenshot.png]({image}) and ![](https://example.com/x.png)"})
+
+    publish(api, review)
+
+    assert fake_gh.api_posts("/reviews")[0]["input"]["body"] == "See *(image kept in bussola: screenshot.png)* and ![](https://example.com/x.png)"

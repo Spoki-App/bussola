@@ -18,6 +18,7 @@ export function FileCommentButton({ reviewId, path }: { reviewId: number; path: 
   return (
     <div className="file-composer">
       <Composer
+        reviewId={reviewId}
         submitLabel="Comment"
         placeholder={`Comment on ${path} (Markdown)`}
         busy={create.isPending}
