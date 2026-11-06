@@ -73,6 +73,7 @@ ignore = ["S105", "S603", "S607"]
 "tests/**" = ["S101", "PLR2004"]
 "src/bussola/forge/github.py" = ["S310"]
 "src/bussola/ai/http.py" = ["S310"]
+"src/bussola/cli.py" = ["PLC0415"]
 
 [tool.ruff.lint.pylint]
 max-args = 5
