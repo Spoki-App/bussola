@@ -233,6 +233,34 @@ export interface ReviewSubmitResult {
   unsent_comments: number
 }
 
+export type MergeMethod = 'merge' | 'squash' | 'rebase'
+
+export interface CommitText {
+  title: string
+  message: string
+}
+
+export interface MergeOptions {
+  head_sha: string
+  methods: MergeMethod[]
+  default_method: MergeMethod | null
+  commit_texts: Partial<Record<MergeMethod, CommitText>>
+  blockers: string[]
+  branch_deletion: 'optional' | 'automatic' | 'unavailable'
+}
+
+export interface MergeRequest extends CommitText {
+  method: MergeMethod
+  head_sha: string
+  delete_branch: boolean
+}
+
+export interface MergeResult {
+  state: string
+  branch_deleted: boolean
+  branch_error: string | null
+}
+
 export interface PublishOutcome {
   comment_ids: string[]
   status: 'published' | 'updated' | 'skipped' | 'failed'

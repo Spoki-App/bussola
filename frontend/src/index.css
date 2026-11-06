@@ -705,6 +705,26 @@ textarea {
   color: var(--muted);
 }
 
+.merge-pull-request {
+  width: 100%;
+  max-width: 720px;
+}
+
+.merge-pull-request > label:not(.checkbox) {
+  display: grid;
+  gap: 4px;
+}
+
+.merge-pull-request .notice p,
+.merge-result p {
+  margin: 0;
+}
+
+.merge-pull-request .notice ul {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+
 .review-summary {
   display: grid;
   gap: 12px;

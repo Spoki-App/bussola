@@ -13,6 +13,17 @@ FILES = re.compile(r"^repos/[^/]+/[^/]+/pulls/\d+/files$")
 COMMENTS = re.compile(r"^repos/[^/]+/[^/]+/pulls/\d+/comments$")
 REPLIES = re.compile(r"^repos/[^/]+/[^/]+/pulls/\d+/comments/(\d+)/replies$")
 EDIT = re.compile(r"^repos/[^/]+/[^/]+/pulls/comments/(\d+)$")
+MERGE = re.compile(r"^repos/[^/]+/[^/]+/pulls/(\d+)/merge$")
+BRANCH = re.compile(r"^repos/([^/]+/[^/]+)/git/refs/heads/(.+)$")
+MERGE_SETTINGS = {
+    "nameWithOwner": "acme/widgets",
+    "mergeCommitAllowed": True,
+    "squashMergeAllowed": True,
+    "rebaseMergeAllowed": True,
+    "viewerDefaultMergeMethod": "MERGE",
+    "deleteBranchOnMerge": False,
+}
+MERGE_STATUS = {"mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "reviewDecision": None, "statusCheckRollup": {"state": "SUCCESS"}}
 
 
 def option(args, name):
@@ -47,7 +58,36 @@ def api(args, state, payload):
         return new_comment(state, payload)
     if EDIT.match(endpoint):
         return {"id": int(EDIT.match(endpoint)[1]), **payload}
+    if match := MERGE.match(endpoint):
+        return merge(state, int(match[1]), payload)
+    if match := BRANCH.match(endpoint):
+        state.setdefault("deleted_branches", []).append(f"{match[1]}:{match[2]}")
+        return None
     fail(f"unexpected endpoint {endpoint}")
+
+
+def merge(state, number, payload):
+    pull = next(pr for pr in state["prs"] if pr["number"] == number)
+    if state.get("merge_error"):
+        fail(state["merge_error"])
+    if payload["sha"] != pull["headRefOid"]:
+        fail("Head branch was modified. Review and try the merge again. (HTTP 409)")
+    pull["state"] = "MERGED"
+    state["merged"] = payload
+    return {"sha": "f" * 40, "merged": True, "message": "Pull Request successfully merged"}
+
+
+def merge_options(args, state):
+    pull = next(pr for pr in state["prs"] if pr["number"] == int(variable(args, "number")))
+    head = {"nameWithOwner": "acme/widgets"}
+    texts = {
+        "mergeTitle": f"Merge pull request #{pull['number']} from bob/{pull['headRefName']}",
+        "mergeMessage": pull["title"],
+        "squashTitle": f"{pull['title']} (#{pull['number']})",
+        "squashMessage": "* contribution",
+    }
+    details = {"state": "OPEN", "isDraft": False, "headRepository": head, **texts, **pull, **MERGE_STATUS, **state.get("merge_status", {})}
+    return {"data": {"repository": {**MERGE_SETTINGS, **state.get("merge_settings", {}), "pullRequest": details}}}
 
 
 def pull_requests(args, state):
@@ -120,6 +160,9 @@ def main():
         return
     if args[:2] == ["api", "graphql"] and any("viewerViewedState" in arg for arg in args):
         print(json.dumps(file_views(args, state)))
+        return
+    if args[:2] == ["api", "graphql"] and any("viewerMergeHeadlineText" in arg for arg in args):
+        print(json.dumps(merge_options(args, state)))
         return
     if args[:2] == ["api", "graphql"] and any("pullRequest(number" in arg for arg in args):
         conversation = state.get("conversation", {})
