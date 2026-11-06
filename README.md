@@ -21,6 +21,8 @@ and comments that go straight back to GitHub.
   <img alt="bussola splits a pull request into a function, a method, module code and another function. Three are approved one by one, the AI review adds a high severity comment with a fix, and after a force-push the two units whose code did not change stay approved while only the module code needs another look." src="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/hero-light.svg" width="820">
 </picture>
 
+**[▶ Watch the 2-minute video tour](https://youtu.be/-FeO_eDhOrU)**
+
 </div>
 
 *Bussola* is Italian for compass: it helps you find your way through a large change.
