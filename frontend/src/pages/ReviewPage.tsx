@@ -4,7 +4,7 @@ import { describeError } from '../api/client'
 import { useDescriptions } from '../api/descriptions'
 import { useSync } from '../api/forge'
 import { useApprove, useFinishReview, useReview, useUnits } from '../api/hooks'
-import type { DiffRow, ReviewDetail, SyncResult, Unit, UnitDescription, UnitDiff, UnitFilter } from '../api/types'
+import type { DiffRow, ReviewDetail, ReviewSubmitResult, SyncResult, Unit, UnitDescription, UnitDiff, UnitFilter } from '../api/types'
 import { AiReview } from '../components/AiReview'
 import { CourseStrip, ErrorNote } from '../components/Badges'
 import { CopyLinkButton } from '../components/CopyLinkButton'
@@ -16,6 +16,7 @@ import { LinkPullRequest } from '../components/LinkPullRequest'
 import { PullRequestDescription } from '../components/PullRequestDescription'
 import { RateImpact } from '../components/RateImpact'
 import { ReviewTitle } from '../components/ReviewTitle'
+import { SubmitReviewDialog } from '../components/SubmitReviewDialog'
 import { SyncSummary } from '../components/SyncSummary'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
 import { UnitTree } from '../components/UnitTree'
@@ -39,6 +40,7 @@ import {
 } from '../review/linkFocus'
 import { ReviewLinkContext, reviewLinkMaker } from '../review/reviewLink'
 import { reviewDocumentTitle } from '../review/reviewName'
+import { submittedMessage } from '../review/submitReview'
 import { buildUnitTree, unitsInOrder } from '../review/unitTree'
 import { filterGroups, matchesUnitQuery } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
@@ -74,6 +76,7 @@ function loadPanelHidden(): boolean {
 const SYNC_TITLE =
   'Fetch the branch from its remote and record any new commits as a new revision. If the review is linked to a GitHub pull request, also bring in its comments and send your unsent comments as one review.'
 const PULL_SYNC_TITLE = 'Download the latest commits and comments of the pull request from GitHub, record any new commits as a new revision, then send your unsent comments as one review.'
+const SUBMIT_TITLE = 'Send your unsent comments to GitHub as one review with a summary, and comment, approve or request changes.'
 const MARK_TITLE = 'Remember this point. The "Since my last review" filter will then show only what changes after now. Nothing is approved or closed.'
 
 function syncLabel(review: ReviewDetail, pending: boolean): string {
@@ -86,15 +89,33 @@ function syncLabel(review: ReviewDetail, pending: boolean): string {
 function ReviewHeader({ review }: { review: ReviewDetail }) {
   const isPullRequest = review.pull_request !== null
   const makeLink = reviewLinkMaker(review.pull_request?.url)
-  const [message, setMessage] = useState<string | null>(null)
+  const [message, setMessage] = useState<ReactNode>(null)
   const [synced, setSynced] = useState<SyncResult | null>(null)
   const sync = useSync(review.id)
   const finish = useFinishReview(review.id)
   const revision = review.latest_revision
+  const [submitting, setSubmitting] = useState(false)
+  const [summary, setSummary] = useState('')
 
   const runSync = () => {
     setMessage(null)
     sync.mutate(undefined, { onSuccess: setSynced })
+  }
+  const onSubmitted = (result: ReviewSubmitResult) => {
+    setSummary('')
+    setSynced(null)
+    const url = result.published.review_url
+    setMessage(
+      <>
+        {submittedMessage(result)}
+        {url && (
+          <>
+            {' '}
+            <ExternalLink href={url}>Open on GitHub</ExternalLink>
+          </>
+        )}
+      </>,
+    )
   }
   useKeyboardShortcuts({ r: runSync })
   const needsLink = synced !== null && !isPullRequest && synced.unsent_comments > 0
@@ -132,6 +153,11 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
         <button type="button" onClick={runSync} disabled={sync.isPending} title={`${review.pull_request_review ? PULL_SYNC_TITLE : SYNC_TITLE} Shortcut: r`}>
           {syncLabel(review, sync.isPending)}
         </button>
+        {isPullRequest && (
+          <button type="button" title={SUBMIT_TITLE} onClick={() => { setSubmitting(true) }}>
+            Submit review
+          </button>
+        )}
         <button
           type="button"
           className="primary"
@@ -150,6 +176,16 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
         </button>
       </div>
       {message && <p className="notice">{message}</p>}
+      {submitting && (
+        <SubmitReviewDialog
+          reviewId={review.id}
+          pendingComments={review.unsent_comments}
+          summary={summary}
+          onSummaryChange={setSummary}
+          onSubmitted={onSubmitted}
+          onClose={() => { setSubmitting(false) }}
+        />
+      )}
       {synced && <SyncSummary result={synced} />}
       {needsLink && <LinkPullRequest reviewId={review.id} unsent={synced.unsent_comments} onLinked={runSync} />}
       {(sync.error ?? finish.error) && <ErrorNote message={describeError(sync.error ?? finish.error)} />}

@@ -117,6 +117,9 @@ class GitHubAdapter:
             return ForgeStatus(available=True, authenticated=False, message="gh is not logged in. Run `gh auth login` in a terminal.")
         return ForgeStatus(available=True, authenticated=True, message="gh is ready")
 
+    def viewer(self) -> str:
+        return _login(self._json(["api", "user"]))
+
     def repository_for(self, remote_url: str) -> str | None:
         for pattern in REMOTE_PATTERNS:
             match = pattern.match(remote_url.strip())
@@ -149,7 +152,7 @@ class GitHubAdapter:
             "commit_id": submission.commit_id,
             "body": submission.body,
             "comments": [_inline_payload(item) for item in submission.comments],
-            "event": "COMMENT",
+            "event": submission.event.value,
         }
         review = self._json(["api", "--method", "POST", f"repos/{_repo(repository)}/pulls/{number}/reviews", "--input", "-"], payload)
         review_id = f"{REVIEW_PREFIX}{review['id']}" if "id" in review else None

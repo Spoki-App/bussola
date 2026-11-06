@@ -9,12 +9,14 @@ from bussola.api.schemas import (
     ForgeLinkIn,
     ForgeLinkOut,
     ForgeOut,
+    ReviewSubmitIn,
+    ReviewSubmitOut,
 )
 from bussola.api.state import app_state
-from bussola.api.views import forge_status_out, pull_request_out
+from bussola.api.views import forge_status_out, publish_out, pull_request_out
 from bussola.forge.base import Asset
 from bussola.forge.links import ForgeOverview, forge_overview, link_pull_request
-from bussola.forge.publish import require_link
+from bussola.forge.publish import ReviewVerdict, pending_comment_count, publish_comments, require_link
 from bussola.forge.pulls import sync_conversation
 from bussola.review.context import ReviewContext
 from bussola.review.repos import open_repo
@@ -54,6 +56,14 @@ def sync(context: ContextDep, request: Request) -> ConversationSyncOut:
     return ConversationSyncOut(changes=result.changes, new_commits=result.new_commits, state=result.state)
 
 
+@router.post("/reviews/{review_id}/forge/review")
+def submit_review(body: ReviewSubmitIn, context: ContextDep, request: Request) -> ReviewSubmitOut:
+    revision = resolve_revision(context, None)
+    result = publish_comments(context, app_state(request).forge, revision, ReviewVerdict(body.event, body.body))
+    context.store.commit()
+    return ReviewSubmitOut(event=body.event, published=publish_out(result), unsent_comments=pending_comment_count(context, revision))
+
+
 def _overview(context: ReviewContext, request: Request) -> ForgeOut:
     revision = resolve_revision(context, None)
     overview: ForgeOverview = forge_overview(context, app_state(request).forge, open_repo(repo_of(context)))
@@ -67,4 +77,5 @@ def _overview(context: ReviewContext, request: Request) -> ForgeOut:
         candidates=[pull_request_out(item) for item in overview.candidates],
         head_matches=pull.head_sha == revision.head_sha if pull else None,
         error=overview.error,
+        viewer=overview.viewer,
     )

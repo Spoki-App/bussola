@@ -122,7 +122,13 @@ POST   /reviews/{review_id}/sync               refresh with fetch, then publish 
 | Review thread | Part of the review body |
 | Reply in a thread already on GitHub | Reply to that review comment |
 
-Sending is blocked while the pull request head differs from the reviewed head, because line numbers would not match. A failed publish does not undo the refresh. Approvals are never sent as GitHub reviews.
+Sending is blocked while the pull request head differs from the reviewed head, because line numbers would not match. A failed publish does not undo the refresh. Unit approvals are never sent as GitHub reviews.
+
+```
+POST   /reviews/{review_id}/forge/review       publish unsent comments in one review with the chosen event and summary
+```
+
+**Submit review** builds the same plan as **Sync**, without refreshing, and always submits the review: its body is the summary followed by the review threads, its event is `COMMENT`, `APPROVE` or `REQUEST_CHANGES`, and the inline comments are the unsent unit threads. File comments, replies and edits follow as in **Sync**. `REQUEST_CHANGES` needs a non-empty body, `COMMENT` a body or an inline comment; otherwise the request is refused before GitHub is contacted. If GitHub refuses the review, nothing is recorded as published, so the comments stay unsent. `GET /reviews/{review_id}/forge` includes the GitHub login of the current user (`gh api user`), so the dialog can offer only **Comment** on your own pull request.
 
 ### Viewed files
 

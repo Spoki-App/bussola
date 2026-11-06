@@ -173,6 +173,8 @@ The handler runs the Python that ran `install-handler`, and keeps the `BUSSOLA_D
 - Later replies and edits are sent as replies and edits of the published comments. Deleting a thread locally does not change GitHub; resolving or reopening one that is on GitHub does.
 - Sending is blocked while the pull request head differs from the reviewed commit, because line numbers would not match.
 
+**Submit review** on a pull request review finishes it like GitHub's "Finish your review": write a summary (with **Write** and **Preview** tabs, Markdown) and choose **Comment**, **Approve** or **Request changes**. Your unsent comments go into the same review, so it holds everything you wrote in bussola. **Request changes** needs a summary, and **Comment** needs one when there are no unsent comments; **Approve** can be empty. On your own pull request only **Comment** is possible, as on GitHub. If GitHub refuses the review (for example, missing permissions, or new commits on the pull request), the error is shown, the dialog stays open with your summary, and your comments stay unsent. After submitting, the review header says what was submitted, with a link to it, and the pull request's comments are synced again.
+
 Approvals stay local, but **Sync** ticks "Viewed" on GitHub for every file whose changes you have all approved. Files approved only in part, or changed since you approved them, are left alone, and files you marked by hand are never unmarked. If the pull request gets new commits while files are being marked, the marks are undone and Sync asks you to run it again. A file that cannot be marked is listed as an error after the sync; the rest of the sync still goes through.
 
 ### Themes

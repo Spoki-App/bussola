@@ -8,6 +8,12 @@ class ForgeError(Exception):
     pass
 
 
+class ReviewEvent(StrEnum):
+    COMMENT = "COMMENT"
+    APPROVE = "APPROVE"
+    REQUEST_CHANGES = "REQUEST_CHANGES"
+
+
 class DiffSide(StrEnum):
     RIGHT = "RIGHT"
     LEFT = "LEFT"
@@ -61,6 +67,7 @@ class ReviewSubmission:
     commit_id: str
     body: str
     comments: list[InlineComment] = field(default_factory=list)
+    event: ReviewEvent = ReviewEvent.COMMENT
 
 
 @dataclass(frozen=True)
@@ -121,6 +128,7 @@ class ForgeAdapter(Protocol):
     provider: str
 
     def status(self) -> ForgeStatus: ...
+    def viewer(self) -> str: ...
     def repository_for(self, remote_url: str) -> str | None: ...
     def find_pull_requests(self, repository: str, head_branch: str, base_branch: str) -> list[PullRequest]: ...
     def open_pull_requests(self, repository: str) -> list[PullRequest]: ...

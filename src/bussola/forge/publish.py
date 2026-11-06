@@ -3,8 +3,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from bussola.errors import ConflictError
-from bussola.forge.base import DiffSide, ForgeAdapter, ForgeError, InlineComment, LineRanges, RemoteComment, ReviewSubmission
+from bussola.errors import ConflictError, InvalidRequestError
+from bussola.forge.base import DiffSide, ForgeAdapter, ForgeError, InlineComment, LineRanges, RemoteComment, ReviewEvent, ReviewSubmission
 from bussola.forge.heads import HeadMismatchError, head_mismatch
 from bussola.review.context import ReviewContext
 from bussola.review.rows import Side
@@ -37,6 +37,12 @@ class PublishResult:
     outcomes: list[Outcome]
 
 
+@dataclass(frozen=True)
+class ReviewVerdict:
+    event: ReviewEvent
+    summary: str = ""
+
+
 @dataclass
 class PublishPlan:
     inline: list[tuple[list[Comment], InlineComment]] = field(default_factory=list)
@@ -47,14 +53,14 @@ class PublishPlan:
     skipped: list[Outcome] = field(default_factory=list)
 
 
-def publish_comments(context: ReviewContext, adapter: ForgeAdapter, revision: Revision) -> PublishResult:
+def publish_comments(context: ReviewContext, adapter: ForgeAdapter, revision: Revision, verdict: ReviewVerdict | None = None) -> PublishResult:
     link = require_link(context)
     pull = adapter.pull_request(link.repository, link.pr_number)
     if (mismatch := head_mismatch(pull.head_sha, revision.head_sha)) is not None:
         raise HeadMismatchError(f"{mismatch} Push the branch or refresh the review first.")
     plan = build_plan(context, adapter, revision, adapter.diff_ranges(link.repository, link.pr_number))
     publisher = _Publisher(context, adapter, link, revision.head_sha, list(plan.skipped))
-    review_url = publisher.submit_review(plan)
+    review_url = publisher.submit_review(plan, verdict)
     for comments, path, body in plan.files:
         publisher.attempt(comments, lambda path=path, body=body: adapter.create_file_comment(link.repository, link.pr_number, revision.head_sha, path, body))
     for comment, remote_id, body in plan.replies:
@@ -169,14 +175,19 @@ class _Publisher:
     commit_id: str
     outcomes: list[Outcome]
 
-    def submit_review(self, plan: PublishPlan) -> str | None:
-        if not plan.inline and not plan.body_parts:
+    def submit_review(self, plan: PublishPlan, verdict: ReviewVerdict | None) -> str | None:
+        if verdict is None and not plan.inline and not plan.body_parts:
             return None
-        body = GROUP_SEPARATOR.join(text for _, text in plan.body_parts)
-        submission = ReviewSubmission(self.commit_id, body, [item for _, item in plan.inline])
+        summary = [verdict.summary.strip()] if verdict is not None and verdict.summary.strip() else []
+        body = GROUP_SEPARATOR.join([*summary, *(text for _, text in plan.body_parts)])
+        event = verdict.event if verdict is not None else ReviewEvent.COMMENT
+        _require_summary(event, body, plan)
+        submission = ReviewSubmission(self.commit_id, body, [item for _, item in plan.inline], event)
         try:
             submitted = self.adapter.submit_review(self.link.repository, self.link.pr_number, submission)
         except ForgeError as error:
+            if verdict is not None:
+                raise
             self.outcomes.extend(Outcome(_ids(comments), PublishStatus.FAILED, str(error)) for comments, _ in [*plan.inline, *plan.body_parts])
             return None
         for (comments, _), remote in zip(plan.inline, submitted.comments, strict=False):
@@ -211,6 +222,13 @@ class _Publisher:
         for comment in comments:
             record = PublishedComment(comment.id, self.adapter.provider, remote.remote_id, remote.url, body_hash(self.context, comment))
             self.context.store.forge.save_published(record)
+
+
+def _require_summary(event: ReviewEvent, body: str, plan: PublishPlan) -> None:
+    if event == ReviewEvent.REQUEST_CHANGES and not body:
+        raise InvalidRequestError("Write a summary to request changes")
+    if event == ReviewEvent.COMMENT and not body and not plan.inline:
+        raise InvalidRequestError("Write a summary or a comment to submit a review")
 
 
 def _is_edited(context: ReviewContext, comment: Comment, record: PublishedComment) -> bool:

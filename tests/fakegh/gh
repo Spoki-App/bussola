@@ -98,6 +98,9 @@ def main():
         log.write(json.dumps({"args": args, "input": payload}) + "\n")
     if args[:2] == ["auth", "status"]:
         sys.exit(0 if state.get("authenticated", True) else 1)
+    if args[:2] == ["api", "user"]:
+        print(json.dumps({"login": state.get("viewer", "alice-gh")}))
+        return
     if args[:2] == ["auth", "token"]:
         print("fake-token")
         return
