@@ -1,15 +1,29 @@
 from dataclasses import asdict
+from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 
 from fastapi import APIRouter, Query, Request
 
 from bussola.api.deps import ContextDep, repo_of, resolve_revision
-from bussola.api.schemas import NavigationIn, NavigationIndexOut, NavigationOut, NavigationTargetOut, RevisionSideIn, ServerHintOut, SourceFileIn, SourceFileOut
+from bussola.api.schemas import (
+    DocumentationOut,
+    LibraryFileIn,
+    LibraryFileOut,
+    NavigationIn,
+    NavigationIndexOut,
+    NavigationOut,
+    NavigationTargetOut,
+    RevisionSideIn,
+    ServerHintOut,
+    SourceFileIn,
+    SourceFileOut,
+)
 from bussola.api.state import app_state
 from bussola.config import load_repo_config
 from bussola.errors import InvalidRequestError, NotFoundError
 from bussola.forge.links import review_repository
+from bussola.navigation.external import is_library_file
 from bussola.navigation.navigator import Click, Navigation, Navigator
 from bussola.review.context import ReviewContext
 from bussola.review.repos import open_repo
@@ -58,6 +72,16 @@ def source_file(context: ContextDep, request: Request, query: Annotated[SourceFi
     return SourceFileOut(path=query.path, side=query.side, commit=commit, text=data.decode(errors="replace"), url=url)
 
 
+@router.get("/reviews/{review_id}/library-source")
+def library_file(context: ContextDep, query: Annotated[LibraryFileIn, Query()]) -> LibraryFileOut:
+    path = Path(query.path).resolve() if Path(query.path).is_absolute() else None
+    if path is None or not is_library_file(path, open_repo(repo_of(context)).root):
+        raise NotFoundError(f"{query.path} is not an installed library file of this repository")
+    if path.stat().st_size > MAX_SOURCE_BYTES:
+        raise InvalidRequestError(f"{query.path} is too large to show here")
+    return LibraryFileOut(path=query.path, text=path.read_bytes().decode(errors="replace"), url=None)
+
+
 def units_by_path(context: ReviewContext, revision: Revision, side: Side) -> dict[str, list[UnitSnapshot]]:
     units: dict[str, list[UnitSnapshot]] = {}
     for snapshot in context.store.reviews.snapshot_lines(revision.id):
@@ -77,4 +101,7 @@ def _navigation_out(found: Navigation, context: ReviewContext, revision: Revisio
     units = units_by_path(context, revision, side) if found.targets else {}
     hint = ServerHintOut.model_validate(found.missing_server, from_attributes=True) if found.missing_server else None
     targets = [NavigationTargetOut(**asdict(target), side=side, unit_id=unit_at(units, side, target.path, target.line)) for target in found.targets]
-    return NavigationOut(ready=found.ready, symbol=found.symbol, origin=found.origin, resolver=found.resolver, targets=targets, server_hint=hint)
+    documentation = DocumentationOut.model_validate(asdict(found.documentation)) if found.documentation else None
+    return NavigationOut(
+        ready=found.ready, symbol=found.symbol, origin=found.origin, resolver=found.resolver, targets=targets, server_hint=hint, documentation=documentation
+    )

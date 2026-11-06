@@ -1618,6 +1618,26 @@ button.copy-link.failed {
   white-space: pre;
 }
 
+.navigation-documentation {
+  display: grid;
+  gap: 8px;
+}
+
+.navigation-signature pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.navigation-package,
+.navigation-documentation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .picker.source-dialog {
   width: min(1100px, calc(100vw - 32px));
   height: min(800px, calc(100vh - 48px));

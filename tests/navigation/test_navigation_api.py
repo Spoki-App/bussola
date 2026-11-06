@@ -86,7 +86,7 @@ def test_clicking_outside_a_name_finds_nothing(nav_api: ApiClient, git_repo: Git
 
     result = nav_api.call("GET", f"/reviews/{review}/navigation?path=shop/cart.py&line=2&column=0")
 
-    assert result == {"ready": True, "symbol": None, "origin": None, "resolver": "tree-sitter", "targets": [], "server_hint": None}
+    assert result == {"ready": True, "symbol": None, "origin": None, "resolver": "tree-sitter", "targets": [], "server_hint": None, "documentation": None}
 
 
 def test_the_index_can_be_prepared_ahead_of_the_first_click(nav_api: ApiClient, git_repo: GitFixture) -> None:
@@ -183,3 +183,106 @@ def test_a_file_too_large_to_show_is_refused(nav_api: ApiClient, git_repo: GitFi
     review = start(git_repo, nav_api)
 
     nav_api.call("GET", f"/reviews/{review}/source?path=data.py", 400)
+
+
+VIEWS = "from django.shortcuts import render\n\n\ndef page(request):\n    return render(request)\n"
+
+
+def start_views(git_repo: GitFixture, api: ApiClient) -> int:
+    git_repo.commit({"shop/prices.py": PRICES})
+    git_repo.branch("feature")
+    git_repo.commit({"shop/views.py": VIEWS})
+    return api.start_review()
+
+
+def click_views(api: ApiClient, review: int) -> Json:
+    column = VIEWS.split("\n")[4].index("render") + 1
+    return wait_for(lambda: api.call("GET", f"/reviews/{review}/navigation?path=shop/views.py&line=5&column={column}"), lambda result: result["ready"])
+
+
+SHORTCUTS = 'def render(request, template_name):\n    """Return an HttpResponse for the template."""\n'
+
+
+def install_django(git_repo: GitFixture) -> str:
+    site = git_repo.root / ".venv" / "lib" / "python3.12" / "site-packages"
+    git_repo.write(
+        {
+            ".venv/lib/python3.12/site-packages/django/__init__.py": "",
+            ".venv/lib/python3.12/site-packages/django/shortcuts.py": SHORTCUTS,
+            ".venv/lib/python3.12/site-packages/Django-5.1.dist-info/METADATA": "Metadata-Version: 2.1\nName: Django\nVersion: 5.1\nHome-page: https://www.djangoproject.com/\n",
+            ".venv/lib/python3.12/site-packages/Django-5.1.dist-info/top_level.txt": "django\n",
+        }
+    )
+    return str(site / "django" / "shortcuts.py")
+
+
+def test_an_external_name_without_a_language_server_shows_its_package_and_link(nav_api: ApiClient, git_repo: GitFixture) -> None:
+    review = start_views(git_repo, nav_api)
+    shortcuts = install_django(git_repo)
+
+    result = click_views(nav_api, review)
+
+    assert (result["symbol"], result["origin"], result["resolver"], result["targets"]) == ("render", "reference", "tree-sitter", [])
+    assert result["documentation"] == {
+        "qualified_name": "django.shortcuts.render",
+        "package": "Django",
+        "version": "5.1",
+        "url": "https://docs.djangoproject.com/en/5.1/topics/http/shortcuts/#django.shortcuts.render",
+        "home_url": "https://www.djangoproject.com/",
+        "signature": "def render(request, template_name)",
+        "language": "python",
+        "docstring": "Return an HttpResponse for the template.",
+        "source": {"path": shortcuts, "line": 1},
+    }
+    assert nav_api.call("GET", f"/reviews/{review}/library-source?path={shortcuts}") == {"path": shortcuts, "text": SHORTCUTS, "url": None}
+
+
+def test_an_external_name_shows_the_language_server_hover(nav_api: ApiClient, git_repo: GitFixture, servers: LanguageServerPath) -> None:
+    hover = "```python\ndef render(request, template_name) -> HttpResponse\n```\n---\nReturn an HttpResponse."
+    servers.install("basedpyright-langserver", hover=hover)
+    review = start_views(git_repo, nav_api)
+
+    result = wait_for(lambda: click_views(nav_api, review), lambda result: result["resolver"] == "language-server")
+
+    documentation = result["documentation"]
+    assert (documentation["signature"], documentation["language"], documentation["docstring"]) == (
+        "def render(request, template_name) -> HttpResponse",
+        "python",
+        "Return an HttpResponse.",
+    )
+    assert (documentation["package"], documentation["url"], documentation["home_url"]) == (
+        "django",
+        "https://docs.djangoproject.com/en/stable/topics/http/shortcuts/#django.shortcuts.render",
+        "https://pypi.org/project/django/",
+    )
+    request = next(message for message in servers.messages() if message.get("method") == "textDocument/hover")
+    assert request["params"]["position"] == {"line": 4, "character": 11}
+
+
+def test_a_hover_that_could_not_resolve_the_import_gives_way_to_the_installed_source(
+    nav_api: ApiClient, git_repo: GitFixture, servers: LanguageServerPath
+) -> None:
+    servers.install("basedpyright-langserver", hover="```python\n(import) render: Unknown\n```")
+    review = start_views(git_repo, nav_api)
+    install_django(git_repo)
+    wait_for(lambda: click_views(nav_api, review), lambda _: "textDocument/hover" in servers.methods())
+
+    documentation = click_views(nav_api, review)["documentation"]
+
+    assert (documentation["signature"], documentation["docstring"]) == ("def render(request, template_name)", "Return an HttpResponse for the template.")
+
+
+def test_only_installed_library_files_are_served(nav_api: ApiClient, git_repo: GitFixture) -> None:
+    review = start_views(git_repo, nav_api)
+
+    nav_api.call("GET", f"/reviews/{review}/library-source?path={git_repo.root / 'shop' / 'views.py'}", 404)
+    nav_api.call("GET", f"/reviews/{review}/library-source?path=shop/views.py", 404)
+
+
+def test_a_library_file_too_large_to_show_is_refused(nav_api: ApiClient, git_repo: GitFixture) -> None:
+    review = start_views(git_repo, nav_api)
+    bundle = git_repo.root / "node_modules" / "big" / "bundle.js"
+    bundle.parent.mkdir(parents=True)
+    bundle.write_text("//" + "x" * 2_100_000 + "\n")
+
+    nav_api.call("GET", f"/reviews/{review}/library-source?path={bundle}", 400)

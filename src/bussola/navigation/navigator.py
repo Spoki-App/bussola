@@ -1,22 +1,27 @@
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import lru_cache
 from pathlib import Path
 from typing import Self
 
-from tree_sitter import Tree
+from tree_sitter import Node, Tree
 
 from bussola.git import BlobReader, GitRepo
+from bussola.navigation.definitions import CODE_LANGUAGES, HoverDoc, from_hover
+from bussola.navigation.external import Imported, LibrarySource, ProjectLayout, imported_symbol, is_library_file, package_info
 from bussola.navigation.index import MAX_FILE_BYTES, IndexCache, IndexedFile, Starter, SymbolIndex, start_daemon
 from bussola.navigation.lsp import ServerLocation
 from bussola.navigation.positions import byte_to_utf16, preview, source_lines, utf16_to_byte
 from bussola.navigation.scopes import Enclosing, enclosing_at
 from bussola.navigation.servers import LanguageServers, server_command
 from bussola.navigation.specs import SERVER_SPECS, ServerSpec
-from bussola.navigation.symbols import SourceLanguage, Symbol, language_for, references, symbol_at
+from bussola.navigation.symbols import SourceLanguage, Symbol, identifier_at, language_for, references, symbol_of
+from bussola.navigation.symbols import parse as parse_source
 from bussola.units.extractors.treesitter import parse
 
 MAX_TARGETS = 200
 CHECKOUTS_DIR = "checkouts"
+CACHED_LAYOUTS = 4
 
 
 class Origin(StrEnum):
@@ -45,6 +50,19 @@ class Target:
 
 
 @dataclass(frozen=True)
+class Documentation:
+    qualified_name: str
+    package: str
+    version: str | None
+    url: str | None
+    home_url: str | None
+    signature: str | None
+    language: str
+    docstring: str | None
+    source: LibrarySource | None
+
+
+@dataclass(frozen=True)
 class Navigation:
     ready: bool
     symbol: str | None = None
@@ -52,6 +70,7 @@ class Navigation:
     resolver: Resolver = Resolver.TREE_SITTER
     targets: tuple[Target, ...] = ()
     missing_server: ServerSpec | None = None
+    documentation: Documentation | None = None
 
 
 @dataclass(frozen=True)
@@ -128,20 +147,19 @@ class Navigator:
         return self.indexes.get(repo, commit, ignore) is not None
 
     def navigate(self, repo: GitRepo, commit: str, ignore: tuple[str, ...], click: Click) -> Navigation:
-        language = language_for(click.path)
-        source = repo.file_at(commit, click.path)
-        if language is None or source is None:
+        clicked = _clicked(repo, commit, click)
+        if clicked is None:
             return Navigation(ready=True)
-        lines = source_lines(source)
-        if not 1 <= click.line <= len(lines):
-            return Navigation(ready=True)
-        symbol = symbol_at(language, source, click.line - 1, utf16_to_byte(lines[click.line - 1], click.column))
-        if symbol is None:
-            return Navigation(ready=True)
+        language, source, lines, tree, node = clicked
+        symbol = symbol_of(language, node)
         origin = Origin.DEFINITION if symbol.definition else Origin.REFERENCE
         spec = SERVER_SPECS[language.family]
         missing = spec if server_command(spec) is None else None
         position = ServerLocation(click.path, symbol.row, byte_to_utf16(lines[symbol.row], symbol.start))
+        imported = imported_symbol(language, tree, node) if origin == Origin.REFERENCE else None
+        if imported is not None and _layout(repo.root, commit).is_external(imported):
+            documentation, resolver = self._document(repo, commit, spec, position, imported)
+            return Navigation(True, symbol.name, origin, resolver, missing_server=missing, documentation=documentation)
         with SourceFiles(repo, commit) as files:
             files.seed(click.path, source)
             role, locations = self._ask_server(repo, commit, spec, position, origin)
@@ -157,15 +175,53 @@ class Navigator:
     def close(self) -> None:
         self.servers.close()
 
+    def _document(self, repo: GitRepo, commit: str, spec: ServerSpec, position: ServerLocation, imported: Imported) -> tuple[Documentation, Resolver]:
+        text = self.servers.ask(repo, commit, spec, lambda session: session.hover(position.path, position.row, position.character), None)
+        hover = from_hover(text) if text else HoverDoc(None, None, None)
+        package = package_info(imported, repo.root, str(Path(position.path).parent), _layout(repo.root, commit))
+        local = package.definition
+        source = LibrarySource(str(local.path), local.line) if local is not None and is_library_file(local.path, repo.root) else None
+        documentation = Documentation(
+            qualified_name=imported.qualified_name,
+            package=package.name,
+            version=package.version,
+            url=package.url,
+            home_url=package.home_url,
+            signature=hover.signature or (local.signature if local else None),
+            language=(hover.language if hover.signature else None) or CODE_LANGUAGES[imported.family],
+            docstring=hover.docstring or (local.docstring if local else None),
+            source=source,
+        )
+        return documentation, Resolver.LANGUAGE_SERVER if hover.signature or hover.docstring else Resolver.TREE_SITTER
+
     def _ask_server(self, repo: GitRepo, commit: str, spec: ServerSpec, position: ServerLocation, origin: Origin) -> tuple[TargetRole, list[ServerLocation]]:
         if origin == Origin.DEFINITION:
             role = TargetRole.USAGE
-            locations = self.servers.locate(repo, commit, spec, lambda session: session.references(position.path, position.row, position.character))
+            locations = self.servers.ask(repo, commit, spec, lambda session: session.references(position.path, position.row, position.character), [])
         else:
             role = TargetRole.DEFINITION
-            locations = self.servers.locate(repo, commit, spec, lambda session: session.definitions(position.path, position.row, position.character))
+            locations = self.servers.ask(repo, commit, spec, lambda session: session.definitions(position.path, position.row, position.character), [])
         ordered = sorted(set(locations), key=lambda location: (location.path, location.row, location.character))
         return role, ordered[:MAX_TARGETS]
+
+
+def _clicked(repo: GitRepo, commit: str, click: Click) -> tuple[SourceLanguage, bytes, list[bytes], Tree, Node] | None:
+    language = language_for(click.path)
+    source = repo.file_at(commit, click.path)
+    lines = source_lines(source) if source is not None else []
+    if language is None or source is None or not 1 <= click.line <= len(lines):
+        return None
+    tree = parse_source(language, source)
+    node = identifier_at(language, tree, click.line - 1, utf16_to_byte(lines[click.line - 1], click.column))
+    return (language, source, lines, tree, node) if node is not None else None
+
+
+@lru_cache(maxsize=CACHED_LAYOUTS)
+def _layout(root: Path, commit: str) -> ProjectLayout:
+    repo = GitRepo(root)
+    blobs = {blob.path: blob.object_id for blob in repo.tree_blobs(commit) if not blob.is_symlink}
+    with repo.blob_reader() as reader:
+        return ProjectLayout.of(list(blobs), lambda path: reader.read(blobs[path]))
 
 
 def _definitions(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, path: str, files: SourceFiles) -> tuple[Target, ...]:

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, type KeyboardEvent, type MouseEvent } from 'react'
 
-import type { EnclosingUnit, NavigationResult, NavigationTarget } from '../api/navigation'
+import type { Documentation, EnclosingUnit, LibrarySource, NavigationResult, NavigationTarget } from '../api/navigation'
 import { useModalDialog } from '../hooks/useModalDialog'
-import { emptyMessage, groupTargets, titleOf, type ScreenPoint } from '../review/codeNavigation'
+import { emptyMessage, groupTargets, missingDocumentation, signatureMarkdown, titleOf, type ScreenPoint } from '../review/codeNavigation'
 import { sourceLines } from '../review/sourceLines'
 import { plural } from '../review/text'
 import { ErrorNote } from './Badges'
+import { ExternalLink } from './ExternalLink'
 import { LineCode } from './LineCode'
+import { Markdown } from './Markdown'
 import { QualifiedName } from './QualifiedName'
 
 export type PopupState = { status: 'loading'; building: boolean } | { status: 'ready'; result: NavigationResult } | { status: 'error'; message: string }
@@ -15,6 +17,7 @@ interface Props {
   state: PopupState
   point: ScreenPoint
   onChoose: (target: NavigationTarget) => void
+  onOpenSource: (source: LibrarySource) => void
   onClose: () => void
 }
 
@@ -113,6 +116,46 @@ function Results({ result, onChoose }: { result: NavigationResult; onChoose: (ta
   )
 }
 
+function DocumentationView({ documentation, onOpenSource }: { documentation: Documentation; onOpenSource: (source: LibrarySource) => void }) {
+  const missing = missingDocumentation(documentation)
+  const signature = signatureMarkdown(documentation)
+  const { source, url, home_url: homeUrl } = documentation
+  return (
+    <div className="navigation-documentation">
+      {signature && (
+        <div className="navigation-signature" aria-label="Signature">
+          <Markdown text={signature} media={false} />
+        </div>
+      )}
+      {documentation.docstring && (
+        <div className="navigation-docstring" aria-label="Docstring">
+          <Markdown text={documentation.docstring} media={false} />
+        </div>
+      )}
+      {missing && <p className="muted">{missing}</p>}
+      <p className="navigation-package">
+        <code>{documentation.package}</code>
+        {documentation.version && <span className="label">{documentation.version}</span>}
+      </p>
+      {(url ?? homeUrl ?? source) && (
+        <p className="navigation-documentation-actions">
+          {url && <ExternalLink href={url}>Documentation</ExternalLink>}
+          {homeUrl && (
+            <ExternalLink href={homeUrl} className="muted">
+              Package home
+            </ExternalLink>
+          )}
+          {source && (
+            <button type="button" className="link" onClick={() => { onOpenSource(source) }}>
+              Open source
+            </button>
+          )}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function heading(state: PopupState): string {
   if (state.status === 'ready') {
     return titleOf(state.result)
@@ -120,7 +163,7 @@ function heading(state: PopupState): string {
   return state.status === 'error' ? 'Navigation failed' : 'Finding the symbol'
 }
 
-export function NavigationPopup({ state, point, onChoose, onClose }: Props) {
+export function NavigationPopup({ state, point, onChoose, onOpenSource, onClose }: Props) {
   const { ref, close } = useModalDialog()
 
   useEffect(() => {
@@ -158,7 +201,8 @@ export function NavigationPopup({ state, point, onChoose, onClose }: Props) {
       <h2>{title}</h2>
       {state.status === 'loading' && <p className="muted" role="status">{state.building ? 'Indexing the repository, this happens once per commit...' : 'Searching...'}</p>}
       {state.status === 'error' && <ErrorNote message={state.message} />}
-      {state.status === 'ready' && <Results result={state.result} onChoose={onChoose} />}
+      {state.status === 'ready' &&
+        (state.result.documentation ? <DocumentationView documentation={state.result.documentation} onOpenSource={onOpenSource} /> : <Results result={state.result} onChoose={onChoose} />)}
     </dialog>
   )
 }

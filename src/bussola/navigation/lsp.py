@@ -33,10 +33,11 @@ class ServerLocation:
 
 
 class LanguageServerClient:
-    def __init__(self, process: subprocess.Popen[bytes]) -> None:
+    def __init__(self, process: subprocess.Popen[bytes], settings: dict[str, Any] | None = None) -> None:
         if process.stdin is None or process.stdout is None:
             raise LanguageServerError("The language server has no pipes")
         self._process = process
+        self._settings = settings or {}
         self._stdin: IO[bytes] = process.stdin
         self._stdout: IO[bytes] = process.stdout
         self._write_lock = threading.Lock()
@@ -46,14 +47,14 @@ class LanguageServerClient:
         threading.Thread(target=self._read_loop, name="bussola-language-server", daemon=True).start()
 
     @classmethod
-    def start(cls, command: list[str], cwd: Path, environment: dict[str, str]) -> Self:
+    def start(cls, command: list[str], cwd: Path, environment: dict[str, str], settings: dict[str, Any] | None = None) -> Self:
         try:
             process = subprocess.Popen(
                 command, cwd=cwd, env={**os.environ, **environment}, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
             )
         except OSError as error:
             raise LanguageServerError(f"Could not start {command[0]}") from error
-        return cls(process)
+        return cls(process, settings)
 
     def request(self, method: str, params: Any, timeout: float) -> Any:
         future: Future[Any] = Future()
@@ -140,7 +141,8 @@ class LanguageServerClient:
 
     def _answer(self, request_id: Any, method: str, params: Any) -> None:
         items = _as_object(params).get("items")
-        result = [None] * len(cast(list[Any], items)) if method == CONFIGURATION_REQUEST and isinstance(items, list) else None
+        sections = [_as_object(item).get("section") for item in cast(list[Any], items)] if isinstance(items, list) else []
+        result = [self._settings.get(section) if isinstance(section, str) else None for section in sections] if method == CONFIGURATION_REQUEST else None
         try:
             self._send({"jsonrpc": "2.0", "id": request_id, "result": result})
         except LanguageServerError:
@@ -156,8 +158,8 @@ class LanguageServerSession:
         self._lock = threading.Lock()
 
     @classmethod
-    def open(cls, command: list[str], root: Path, spec: ServerSpec) -> Self:
-        client = LanguageServerClient.start(command, root, spec.environment)
+    def open(cls, command: list[str], root: Path, spec: ServerSpec, settings: dict[str, Any] | None = None) -> Self:
+        client = LanguageServerClient.start(command, root, spec.environment, settings)
         try:
             client.request("initialize", _initialize_params(root, spec.initialization_options), INITIALIZE_TIMEOUT_SECONDS)
             client.notify("initialized", {})
@@ -172,12 +174,17 @@ class LanguageServerSession:
     def references(self, path: str, row: int, character: int) -> list[ServerLocation]:
         return self._locate("textDocument/references", path, row, character, {"context": {"includeDeclaration": False}})
 
+    def hover(self, path: str, row: int, character: int) -> str | None:
+        self._open(path)
+        result = self._client.request("textDocument/hover", _position_params(self._uri(path), row, character), REQUEST_TIMEOUT_SECONDS)
+        return _hover_text(_as_object(result).get("contents")) or None
+
     def close(self) -> None:
         self._client.close()
 
     def _locate(self, method: str, path: str, row: int, character: int, extra: dict[str, Any]) -> list[ServerLocation]:
         self._open(path)
-        params = {"textDocument": {"uri": self._uri(path)}, "position": {"line": row, "character": character}, **extra}
+        params = {**_position_params(self._uri(path), row, character), **extra}
         result = self._client.request(method, params, REQUEST_TIMEOUT_SECONDS)
         items = cast(list[Any], result) if isinstance(result, list) else [result]
         return [location for item in items if (location := self._location(_as_object(item))) is not None]
@@ -218,6 +225,25 @@ def _as_object(value: Any) -> dict[str, Any]:
     return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
+def _position_params(uri: str, row: int, character: int) -> dict[str, Any]:
+    return {"textDocument": {"uri": uri}, "position": {"line": row, "character": character}}
+
+
+def _hover_text(contents: Any) -> str:
+    if isinstance(contents, str):
+        return contents.strip()
+    if isinstance(contents, list):
+        return "\n\n".join(text for item in cast(list[Any], contents) if (text := _hover_text(item)))
+    item = _as_object(contents)
+    value = item.get("value")
+    if not isinstance(value, str) or not value.strip():
+        return ""
+    language = item.get("language")
+    if isinstance(language, str):
+        return f"```{language}\n{value.strip()}\n```"
+    return value.strip() if item.get("kind") == "markdown" else f"```text\n{value.strip()}\n```"
+
+
 def _initialize_params(root: Path, options: dict[str, Any]) -> dict[str, Any]:
     return {
         "processId": os.getpid(),
@@ -226,7 +252,12 @@ def _initialize_params(root: Path, options: dict[str, Any]) -> dict[str, Any]:
         "rootPath": str(root),
         "workspaceFolders": [{"uri": root.as_uri(), "name": root.name}],
         "capabilities": {
-            "textDocument": {"definition": {"linkSupport": True}, "references": {}, "synchronization": {"didSave": False}},
+            "textDocument": {
+                "definition": {"linkSupport": True},
+                "references": {},
+                "hover": {"contentFormat": ["markdown", "plaintext"]},
+                "synchronization": {"didSave": False},
+            },
             "workspace": {"configuration": True, "workspaceFolders": True},
         },
     }

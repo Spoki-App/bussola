@@ -423,6 +423,23 @@ class ServerHintOut(BaseModel):
     install: str
 
 
+class LibrarySourceOut(BaseModel):
+    path: str
+    line: int
+
+
+class DocumentationOut(BaseModel):
+    qualified_name: str
+    package: str
+    version: str | None
+    url: str | None
+    home_url: str | None
+    signature: str | None
+    language: str
+    docstring: str | None
+    source: LibrarySourceOut | None
+
+
 class NavigationOut(BaseModel):
     ready: bool
     symbol: str | None
@@ -430,6 +447,17 @@ class NavigationOut(BaseModel):
     resolver: Resolver
     targets: list[NavigationTargetOut]
     server_hint: ServerHintOut | None
+    documentation: DocumentationOut | None
+
+
+class LibraryFileIn(BaseModel):
+    path: str = Field(min_length=1)
+
+
+class LibraryFileOut(BaseModel):
+    path: str
+    text: str
+    url: None
 
 
 class SourceFileOut(BaseModel):

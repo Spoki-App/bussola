@@ -8,8 +8,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from bussola.git import GitError, GitRepo
+from bussola.navigation.external import python_server_settings
 from bussola.navigation.index import Starter, start_daemon
-from bussola.navigation.lsp import LanguageServerError, LanguageServerSession, ServerLocation
+from bussola.navigation.lsp import LanguageServerError, LanguageServerSession
 from bussola.navigation.specs import ServerSpec
 
 CACHED_SESSIONS = 3
@@ -55,14 +56,14 @@ class LanguageServers:
         self._cleaned = False
         self._closed = False
 
-    def locate(self, repo: GitRepo, commit: str, spec: ServerSpec, ask: Callable[[LanguageServerSession], list[ServerLocation]]) -> list[ServerLocation]:
+    def ask[T](self, repo: GitRepo, commit: str, spec: ServerSpec, question: Callable[[LanguageServerSession], T], fallback: T) -> T:
         session = self._session(repo, commit, spec)
         if session is None:
-            return []
+            return fallback
         try:
-            return ask(session)
+            return question(session)
         except (LanguageServerError, OSError):
-            return []
+            return fallback
 
     def checkout(self, commit: str) -> Path:
         return (self._checkouts / commit).resolve()
@@ -96,7 +97,8 @@ class LanguageServers:
 
     def _open(self, slot: _Slot, repo: GitRepo, commit: str, spec: ServerSpec, command: list[str]) -> None:
         try:
-            session = None if self._is_closed() else LanguageServerSession.open(command, self._prepare_checkout(repo, commit), spec)
+            settings = python_server_settings(repo.root) if spec.family == "python" else {}
+            session = None if self._is_closed() else LanguageServerSession.open(command, self._prepare_checkout(repo, commit), spec, settings)
         except (LanguageServerError, GitError, OSError, tarfile.TarError):
             session = None
         if session is not None and self._is_closed():

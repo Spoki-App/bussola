@@ -56,8 +56,11 @@ def main():
             if mode == "crash":
                 return
             root = message["params"]["rootUri"]
-            send({"jsonrpc": "2.0", "id": 900, "method": "workspace/configuration", "params": {"items": [{"section": "python"}]}})
+            send({"jsonrpc": "2.0", "id": 900, "method": "workspace/configuration", "params": {"items": [{"section": "python"}, {"section": "python.analysis"}, {"section": "basedpyright.analysis"}]}})
             send({"jsonrpc": "2.0", "id": message["id"], "result": {"capabilities": {"definitionProvider": True, "referencesProvider": True}}})
+        elif method == "textDocument/hover":
+            hover = STATE.get("hover")
+            send({"jsonrpc": "2.0", "id": message["id"], "result": {"contents": {"kind": "markdown", "value": hover}} if hover else None})
         elif method in LOCATION_METHODS:
             if mode == "hang":
                 time.sleep(30)

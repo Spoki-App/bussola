@@ -1,4 +1,4 @@
-import type { NavigationRequest, NavigationResult, NavigationTarget } from '../api/navigation'
+import type { Documentation, NavigationRequest, NavigationResult, NavigationTarget } from '../api/navigation'
 import type { Side } from '../api/types'
 
 export interface ScreenPoint {
@@ -151,7 +151,7 @@ export function rangeOf(container: Element, span: SymbolSpan): Range | null {
 }
 
 export function isNavigable(result: NavigationResult): boolean {
-  return result.ready && result.symbol !== null && result.targets.length > 0
+  return result.ready && result.symbol !== null && (result.targets.length > 0 || result.documentation !== null)
 }
 
 export function groupTargets(targets: NavigationTarget[]): TargetGroups {
@@ -185,5 +185,26 @@ export function emptyMessage(result: NavigationResult): string {
 }
 
 export function titleOf(result: NavigationResult): string {
-  return wording(result).title
+  return result.documentation?.qualified_name ?? wording(result).title
+}
+
+export function missingDocumentation(documentation: Documentation): string | null {
+  const name = documentation.qualified_name
+  if (documentation.docstring) {
+    return null
+  }
+  if (documentation.signature) {
+    return `No docstring for ${name}.`
+  }
+  return documentation.url ? `No signature or docstring found for ${name}.` : `No documentation found for ${name}.`
+}
+
+export function signatureMarkdown(documentation: Documentation): string | null {
+  const { signature, language } = documentation
+  if (!signature) {
+    return null
+  }
+  const longestRun = Math.max(2, ...(signature.match(/`+/g) ?? []).map((run) => run.length))
+  const fence = '`'.repeat(longestRun + 1)
+  return `${fence}${language}\n${signature}\n${fence}`
 }

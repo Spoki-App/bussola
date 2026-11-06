@@ -102,6 +102,9 @@ class ReviewTools:
         found = self._navigate(location)
         if found.origin == Origin.DEFINITION:
             return f"{location.path}:{location.line} is where {found.symbol} is defined."
+        if (documentation := found.documentation) is not None:
+            summary = f"{location.name} is {documentation.qualified_name} from the external package {documentation.package}, not defined in this repository."
+            return "\n\n".join(part for part in (summary, documentation.signature, documentation.docstring) if part)
         return self._targets(found.targets, f"No definition of {location.name} was found.")
 
     def find_usages(self, location: Location) -> str:
