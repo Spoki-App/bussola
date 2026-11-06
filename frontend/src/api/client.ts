@@ -12,7 +12,7 @@ export class ApiError extends Error {
 }
 
 function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  return send<T>(method, path, body === undefined ? undefined : 'application/json', body === undefined ? undefined : JSON.stringify(body))
+  return body === undefined ? send<T>(method, path) : send<T>(method, path, 'application/json', JSON.stringify(body))
 }
 
 async function send<T>(method: string, path: string, contentType?: string, body?: BodyInit): Promise<T> {

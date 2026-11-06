@@ -72,25 +72,22 @@ query($owner: String!, $name: String!, $number: Int!) {
   }
 }
 """
-COLLABORATORS_FIELD = "assignableUsers(first: 100) { nodes { login } }"
-COLLABORATORS_QUERY = f"""
-query($owner: String!, $name: String!) {{
-  repository(owner: $owner, name: $name) {{ {COLLABORATORS_FIELD} }}
-}}
+COLLABORATORS_QUERY = """
+query Collaborators($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) { assignableUsers(first: 100) { nodes { login } } }
+}
 """
-PARTICIPANTS_QUERY = f"""
-query($owner: String!, $name: String!, $number: Int!) {{
-  repository(owner: $owner, name: $name) {{
-    {COLLABORATORS_FIELD}
-    pullRequest(number: $number) {{
-      author {{ login }}
-      reviewRequests(first: 100) {{ nodes {{ requestedReviewer {{ ... on User {{ login }} }} }} }}
-      reviews(first: 100) {{ nodes {{ author {{ login }} }} }}
-      comments(first: 100) {{ nodes {{ author {{ login }} }} }}
-      reviewThreads(first: 100) {{ nodes {{ comments(first: 100) {{ nodes {{ author {{ login }} }} }} }} }}
-    }}
-  }}
-}}
+PARTICIPANTS_QUERY = """
+query Participants($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    assignableUsers(first: 100) { nodes { login } }
+    pullRequest(number: $number) {
+      author { login }
+      reviewRequests(first: 100) { nodes { requestedReviewer { ... on User { login } } } }
+      participants(first: 100) { nodes { login } }
+    }
+  }
+}
 """
 RESOLVE_THREAD_MUTATION = """
 mutation($threadId: ID!) {
@@ -365,9 +362,7 @@ def _remote_thread(item: JsonObject) -> RemoteThread:
 
 def _participants(pull: JsonObject) -> list[str]:
     reviewers = [_login(request.get("requestedReviewer")) for request in _nodes(pull.get("reviewRequests"))]
-    authored = [*_nodes(pull.get("reviews")), *_nodes(pull.get("comments"))]
-    authored += [comment for thread in _nodes(pull.get("reviewThreads")) for comment in _nodes(thread.get("comments"))]
-    return [_login(pull.get("author")), *reviewers, *(_login(item.get("author")) for item in authored)]
+    return [_login(pull.get("author")), *reviewers, *map(_login, _nodes(pull.get("participants")))]
 
 
 def _inline_payload(item: InlineComment) -> JsonObject:

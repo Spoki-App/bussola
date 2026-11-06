@@ -1,39 +1,28 @@
 from tests.apiclient import ApiClient
-from tests.forge.conftest import FakeGh
-from tests.forge.test_publish import link, setup_review
+from tests.forge.conftest import FIRST, FakeGh, GitHubSandbox
+from tests.forge.test_conversation import start_review
 from tests.gitrepo import GitFixture
-
-
-def thread_with(*logins: str) -> dict[str, object]:
-    return {"comments": {"nodes": [{"author": {"login": login}} for login in logins]}}
 
 
 def mention_calls(fake_gh: FakeGh) -> int:
     return sum(1 for call in fake_gh.calls() if any("assignableUsers" in arg for arg in call["args"]))
 
 
-def test_pull_request_participants_come_before_collaborators(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
-    review = setup_review(api, git_repo, fake_gh)
-    link(api, review)
-    state = fake_gh.state()
-    state["prs"][0]["author"] = {"login": "bob"}
-    conversation = {"reviews": [{"author": {"login": "carol"}}], "comments": [{"author": None}], "reviewThreads": [thread_with("dave", "bob")]}
-    fake_gh.configure(prs=state["prs"], conversation=conversation, requested_reviewers=["erin"], collaborators=["alice", "carol"])
+def test_pull_request_participants_come_before_collaborators(api: ApiClient, github: GitHubSandbox) -> None:
+    github.open_pull_request({"app.py": FIRST})
+    github.fake_gh.configure(requested_reviewers=["erin"], participants=["bob", "carol", "dave"], collaborators=["alice", "carol"])
+    review = start_review(api)
 
-    candidates = api.call("GET", f"/reviews/{review}/mentions")
-
-    assert candidates == ["bob", "erin", "carol", "dave", "alice"]
+    assert api.call("GET", f"/reviews/{review}/mentions") == ["bob", "erin", "carol", "dave", "alice"]
 
 
-def test_mentions_are_fetched_once_per_review(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
-    review = setup_review(api, git_repo, fake_gh)
-    fake_gh.configure(collaborators=["alice"])
+def test_branch_reviews_of_a_github_repository_offer_its_collaborators(api: ApiClient, github: GitHubSandbox) -> None:
+    github.local.branch("feature")
+    github.local.commit({"app.py": FIRST})
+    github.fake_gh.configure(collaborators=["alice"])
+    review = api.start_review()
 
-    first = api.call("GET", f"/reviews/{review}/mentions")
-    second = api.call("GET", f"/reviews/{review}/mentions")
-
-    assert first == second == ["alice"]
-    assert mention_calls(fake_gh) == 1
+    assert api.call("GET", f"/reviews/{review}/mentions") == ["alice"]
 
 
 def test_branch_reviews_without_a_github_remote_have_no_mentions(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:

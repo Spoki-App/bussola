@@ -7,3 +7,7 @@ export function installContentEditable(): void {
     },
   })
 }
+
+export function installExecCommand(): void {
+  Object.assign(document, { execCommand: () => false })
+}

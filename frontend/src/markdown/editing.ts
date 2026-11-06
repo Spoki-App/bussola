@@ -1,4 +1,4 @@
-export interface TextEdit {
+interface TextEdit {
   text: string
   caret: number
 }

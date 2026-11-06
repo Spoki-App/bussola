@@ -7,7 +7,7 @@ export function mentionQuery(textBeforeCaret: string): string | null {
 
 export function filterMentions(candidates: readonly string[], query: string): string[] {
   const needle = query.toLowerCase()
-  const starting = candidates.filter((login) => login.toLowerCase().startsWith(needle))
-  const containing = candidates.filter((login) => !login.toLowerCase().startsWith(needle) && login.toLowerCase().includes(needle))
-  return [...starting, ...containing].slice(0, MAX_SUGGESTIONS)
+  const matching = candidates.filter((login) => login.toLowerCase().includes(needle))
+  const starts = (login: string) => (login.toLowerCase().startsWith(needle) ? 0 : 1)
+  return matching.sort((left, right) => starts(left) - starts(right)).slice(0, MAX_SUGGESTIONS)
 }

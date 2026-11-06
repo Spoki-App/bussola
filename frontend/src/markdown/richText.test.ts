@@ -1,12 +1,31 @@
 import { describe, expect, it } from 'vitest'
 
-import { keepsContentAsRichText, markdownToRichHtml, richRoundTrip, richToMarkdown, sameContent } from './richText'
+import { richHtmlFor, richToMarkdown } from './richText'
+
+function richElement(html: string): HTMLElement {
+  const root = document.createElement('div')
+  root.innerHTML = html
+  return root
+}
+
+function richRoundTrip(markdown: string): string {
+  const html = richHtmlFor(markdown)
+  if (html === null) {
+    throw new Error('not kept')
+  }
+  return richToMarkdown(richElement(html))
+}
+
+function markdownToRichHtml(markdown: string): string {
+  return richHtmlFor(markdown) ?? ''
+}
 
 const KEPT_EXACTLY = {
   'code blocks': '```python\ndef f():\n    return 1\n```',
   mermaid: 'Look:\n\n```mermaid\ngraph TD\n  A --> B\n```',
   'task lists': '- [ ] todo\n- [x] done',
   alerts: '> [!NOTE]\n> Useful information.',
+  brackets: 'Use a[0] or [x] here, not *this* \\*literal\\*',
   'code in lists': '- item\n\n  ```js\n  x()\n  ```',
   'reference links': 'See [x].\n\n[x]: https://example.com',
   footnotes: 'Hi[^1]\n\n[^1]: note',
@@ -22,12 +41,6 @@ const KEPT_AS_CONTENT = {
   'hard breaks': 'line  \nhard\\\nbreak',
 }
 
-function richElement(html: string): HTMLElement {
-  const root = document.createElement('div')
-  root.innerHTML = html
-  return root
-}
-
 describe('rich text round trip', () => {
   for (const [name, markdown] of Object.entries(KEPT_EXACTLY)) {
     it(`keeps ${name} unchanged`, () => {
@@ -37,8 +50,8 @@ describe('rich text round trip', () => {
 
   for (const [name, markdown] of Object.entries(KEPT_AS_CONTENT)) {
     it(`keeps the content of ${name}`, () => {
-      expect(sameContent(markdown, richRoundTrip(markdown))).toBe(true)
-      expect(keepsContentAsRichText(markdown)).toBe(true)
+      const once = richRoundTrip(markdown)
+      expect(richHtmlFor(once)).toBe(richHtmlFor(markdown))
     })
   }
 
@@ -50,7 +63,7 @@ describe('rich text round trip', () => {
   })
 
   it('reports Markdown that rich text cannot keep', () => {
-    expect(keepsContentAsRichText('a&nbsp;b')).toBe(false)
+    expect(richHtmlFor('a&nbsp;b')).toBeNull()
   })
 })
 

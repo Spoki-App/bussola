@@ -3,12 +3,12 @@ import re
 from pathlib import Path
 
 from bussola.errors import InvalidRequestError, NotFoundError
+from bussola.review.images import image_type
 
 ATTACHMENTS_DIR = "attachments"
 ATTACHMENT_PATH = "/api/attachments/"
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
-MEDIA_TYPES = {"png": "image/png", "jpg": "image/jpeg", "gif": "image/gif", "webp": "image/webp"}
-ATTACHMENT_NAME = re.compile(r"[0-9a-f]{64}\.(?P<extension>png|jpg|gif|webp)")
+ATTACHMENT_NAME = re.compile(r"[0-9a-f]{64}\.(?:png|jpg|gif|webp)")
 LOCAL_IMAGE = re.compile(r"!\[(?P<alt>[^\]]*)\]\(" + re.escape(ATTACHMENT_PATH) + ATTACHMENT_NAME.pattern + r"\)")
 
 
@@ -43,11 +43,11 @@ def save_attachment(directory: Path, data: bytes) -> str:
 
 
 def read_attachment(directory: Path, name: str) -> tuple[bytes, str]:
-    match = ATTACHMENT_NAME.fullmatch(name)
     path = directory / name
-    if match is None or not path.is_file():
+    media_type = image_type(name)
+    if not ATTACHMENT_NAME.fullmatch(name) or media_type is None or not path.is_file():
         raise NotFoundError(f"Attachment {name} not found")
-    return path.read_bytes(), MEDIA_TYPES[match["extension"]]
+    return path.read_bytes(), media_type
 
 
 def local_images_as_text(body: str) -> str:

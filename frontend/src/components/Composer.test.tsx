@@ -72,7 +72,6 @@ const png = (name = 'shot.png') => new File(['png'], name, { type: 'image/png' }
 
 beforeEach(() => {
   window.localStorage.clear()
-  Object.assign(document, { execCommand: vi.fn(() => true) })
 })
 
 afterEach(() => {

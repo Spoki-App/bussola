@@ -75,13 +75,9 @@ def people(args, state):
     repository = {"assignableUsers": {"nodes": [{"login": login} for login in state.get("collaborators", [])]}}
     if any(arg.startswith("number=") for arg in args):
         pull = next(pr for pr in state["prs"] if pr["number"] == int(variable(args, "number")))
-        conversation = state.get("conversation", {})
         requests = [{"requestedReviewer": {"login": login}} for login in state.get("requested_reviewers", [])]
-        repository["pullRequest"] = {
-            "author": pull.get("author"),
-            "reviewRequests": {"nodes": requests},
-            **{key: {"nodes": conversation.get(key, [])} for key in ("comments", "reviews", "reviewThreads")},
-        }
+        participants = [{"login": login} for login in state.get("participants", [])]
+        repository["pullRequest"] = {"author": pull.get("author"), "reviewRequests": {"nodes": requests}, "participants": {"nodes": participants}}
     return {"data": {"repository": repository}}
 
 
@@ -129,7 +125,7 @@ def main():
     if args[:2] == ["api", "graphql"] and any("markFileAsViewed(input" in arg for arg in args):
         print(json.dumps(set_files_viewed(args, state)))
         return
-    if args[:2] == ["api", "graphql"] and any("assignableUsers" in arg for arg in args):
+    if args[:2] == ["api", "graphql"] and any(re.search(r"query (Collaborators|Participants)\(", arg) for arg in args):
         print(json.dumps(people(args, state)))
         return
     if args[:2] == ["api", "graphql"] and any("viewerViewedState" in arg for arg in args):

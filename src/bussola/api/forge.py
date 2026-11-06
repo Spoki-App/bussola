@@ -49,13 +49,12 @@ def put_forge(body: ForgeLinkIn, context: ContextDep, request: Request) -> Forge
 
 @router.get("/reviews/{review_id}/mentions")
 def mentions(context: ContextDep, request: Request) -> list[str]:
-    state = app_state(request)
-    review_id = context.review.id
-    if review_id not in state.mentions:
-        link = context.store.forge.link(review_id)
-        repository = link.repository if link else review_repository(state.forge, open_repo(repo_of(context)), context.review.head_ref)
-        state.mentions[review_id] = state.forge.mention_candidates(repository, link.pr_number if link else None) if repository else []
-    return state.mentions[review_id]
+    forge = app_state(request).forge
+    link = context.store.forge.link(context.review.id)
+    if link:
+        return forge.mention_candidates(link.repository, link.pr_number)
+    repository = review_repository(forge, open_repo(repo_of(context)), context.review.head_ref)
+    return forge.mention_candidates(repository, None) if repository else []
 
 
 @router.post("/reviews/{review_id}/forge/sync")

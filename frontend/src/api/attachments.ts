@@ -1,7 +1,7 @@
 import { postFile } from './client'
 
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
-export const MAX_IMAGE_MB = 10
+const MAX_IMAGE_MB = 10
 
 export function imageProblem(file: File): string | null {
   if (!IMAGE_TYPES.includes(file.type)) {

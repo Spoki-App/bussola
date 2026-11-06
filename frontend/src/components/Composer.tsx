@@ -5,13 +5,14 @@ import { describeError } from '../api/client'
 import { useMentionCandidates } from '../api/mentions'
 import { imageAlt, insertRichImage, replaceRange, runCommand, replaceRichBeforeCaret, replaceRichImage, richTextBeforeCaret, uploadingImage } from '../markdown/editing'
 import { filterMentions, mentionQuery } from '../markdown/mentions'
-import { keepsContentAsRichText, markdownToRichHtml, richToMarkdown } from '../markdown/richText'
+import { richHtmlFor, richToMarkdown } from '../markdown/richText'
 import { readStored, writeStored } from '../settings/storage'
 import { ErrorNote } from './Badges'
 import { MentionList } from './MentionList'
 import { Segmented } from './Segmented'
 
 type Mode = 'write' | 'rich'
+type Placeholder = ReturnType<typeof uploadingImage>
 
 const MODE_KEY = 'bussola.commentEditor'
 const MODES: Record<Mode, string> = { write: 'Write', rich: 'Rich text' }
@@ -36,11 +37,12 @@ interface Props {
   onCancel?: () => void
 }
 
-function initialMode(initial: string): { mode: Mode; notice: string | null } {
-  if (readStored(MODE_KEY) !== 'rich') {
-    return { mode: 'write', notice: null }
+function initialState(initial: string): { mode: Mode; html: string; notice: string | null } {
+  const html = readStored(MODE_KEY) === 'rich' ? richHtmlFor(initial) : null
+  if (html === null) {
+    return { mode: 'write', html: '', notice: readStored(MODE_KEY) === 'rich' ? NOT_KEPT : null }
   }
-  return keepsContentAsRichText(initial) ? { mode: 'rich', notice: null } : { mode: 'write', notice: NOT_KEPT }
+  return { mode: 'rich', html, notice: null }
 }
 
 function imageFiles(files: FileList | null | undefined): File[] {
@@ -49,15 +51,14 @@ function imageFiles(files: FileList | null | undefined): File[] {
 
 export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)', submitLabel, initial = '', busy = false, autoFocus = false, onSubmit, onCancel }: Props) {
   const [body, setBody] = useState(initial)
-  const [start] = useState(() => initialMode(initial))
+  const [start] = useState(() => initialState(initial))
   const [mode, setMode] = useState(start.mode)
-  const [rich, setRich] = useState(() => ({ html: start.mode === 'rich' ? markdownToRichHtml(initial) : '', version: 0 }))
+  const [rich, setRich] = useState({ html: start.html, version: 0 })
   const [notice, setNotice] = useState(start.notice)
   const [mention, setMention] = useState<{ query: string; active: number } | null>(null)
-  const [mentionsWanted, setMentionsWanted] = useState(false)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const editor = useRef<HTMLDivElement>(null)
-  const candidates = useMentionCandidates(reviewId, mentionsWanted)
+  const candidates = useMentionCandidates(reviewId, mention !== null)
   useEffect(() => {
     if (autoFocus) {
       editor.current?.focus()
@@ -65,19 +66,18 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
   }, [autoFocus])
   const options = mention ? filterMentions(candidates.data ?? [], mention.query) : []
 
-  const showRich = (markdown: string) => {
-    setRich((current) => ({ html: markdownToRichHtml(markdown), version: current.version + 1 }))
+  const showRich = (html: string) => {
+    setRich((current) => ({ html, version: current.version + 1 }))
   }
   const changeMode = (next: Mode) => {
     setMention(null)
-    if (next === 'rich' && !keepsContentAsRichText(body)) {
+    const html = next === 'rich' ? richHtmlFor(body) : ''
+    if (html === null) {
       setNotice(NOT_KEPT)
       return
     }
     setNotice(null)
-    if (next === 'rich') {
-      showRich(body)
-    }
+    showRich(html)
     setMode(next)
     writeStored(MODE_KEY, next)
   }
@@ -97,14 +97,14 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
 
   const updateMention = (before: string | null) => {
     const query = before === null ? null : mentionQuery(before)
-    if (query !== null) {
-      setMentionsWanted(true)
-    }
     setMention((current) => (query === null ? null : current?.query === query ? current : { query, active: 0 }))
   }
   const updateWriteMention = () => {
     const element = textarea.current
     updateMention(element && element.selectionStart === element.selectionEnd ? element.value.slice(0, element.selectionStart) : null)
+  }
+  const updateRichMention = () => {
+    updateMention(editor.current ? richTextBeforeCaret(editor.current) : null)
   }
   const pickMention = (login: string) => {
     if (!mention) {
@@ -125,7 +125,7 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
     }
   }
 
-  const insertPlaceholder = (alt: string, markdown: string) => {
+  const insertPlaceholder = ({ alt, markdown }: Placeholder) => {
     if (editor.current) {
       insertRichImage(editor.current, alt)
       syncRich()
@@ -136,7 +136,7 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
     const end = element?.selectionEnd ?? body.length
     setBody((current) => replaceRange(current, start, end, markdown).text)
   }
-  const replacePlaceholder = (alt: string, markdown: string, image: { alt: string; src: string } | null) => {
+  const replacePlaceholder = ({ alt, markdown }: Placeholder, image: { alt: string; src: string } | null) => {
     if (editor.current) {
       replaceRichImage(editor.current, alt, image)
       syncRich()
@@ -153,25 +153,18 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
         continue
       }
       const placeholder = uploadingImage(file.name)
-      insertPlaceholder(placeholder.alt, placeholder.markdown)
+      insertPlaceholder(placeholder)
       uploadImage(file).then(
-        (src) => { replacePlaceholder(placeholder.alt, placeholder.markdown, { alt: imageAlt(file.name), src }) },
+        (src) => { replacePlaceholder(placeholder, { alt: imageAlt(file.name), src }) },
         (error: unknown) => {
-          replacePlaceholder(placeholder.alt, placeholder.markdown, null)
+          replacePlaceholder(placeholder, null)
           setNotice(`${file.name} could not be uploaded: ${describeError(error)}`)
         },
       )
     }
   }
-  const onPaste = (event: ClipboardEvent) => {
-    const files = imageFiles(event.clipboardData.files)
-    if (files.length) {
-      event.preventDefault()
-      attach(files)
-    }
-  }
-  const onDrop = (event: DragEvent) => {
-    const files = imageFiles(event.dataTransfer.files)
+  const attachFrom = (event: ClipboardEvent | DragEvent) => {
+    const files = imageFiles('clipboardData' in event ? event.clipboardData.files : event.dataTransfer.files)
     if (files.length) {
       event.preventDefault()
       attach(files)
@@ -207,7 +200,7 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
   }
 
   return (
-    <div className="composer" onPaste={onPaste} onDrop={onDrop} onDragOver={(event) => { event.preventDefault() }}>
+    <div className="composer" onPaste={attachFrom} onDrop={attachFrom} onDragOver={(event) => { event.preventDefault() }}>
       <div className="composer-toolbar">
         <Segmented label="Editor mode" labels={MODES} value={mode} onChange={changeMode} />
         {mode === 'rich' &&
@@ -256,10 +249,10 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
             onFocus={() => { runCommand('defaultParagraphSeparator', 'p') }}
             onInput={() => {
               syncRich()
-              updateMention(editor.current ? richTextBeforeCaret(editor.current) : null)
+              updateRichMention()
             }}
             onKeyDown={onKeyDown}
-            onKeyUp={() => { updateMention(editor.current ? richTextBeforeCaret(editor.current) : null) }}
+            onKeyUp={updateRichMention}
             onBlur={() => { setMention(null) }}
           />
         ) : (
