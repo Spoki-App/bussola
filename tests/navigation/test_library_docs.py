@@ -271,6 +271,8 @@ def test_docs_links_point_at_the_symbol(imported: Imported, version: str | None,
         ),
         ("```typescript\nfunction useState<S>(): S\n```", ("function useState<S>(): S", "typescript", None)),
         ("Just some text", (None, None, "Just some text")),
+        ("```python\n(import) on_commit: Unknown\n```", (None, None, None)),
+        ("```typescript\n(alias) const useQuery: any\nimport useQuery\n```", (None, None, None)),
     ],
 )
 def test_language_server_hover_is_split_into_signature_and_docstring(hover: str, expected: tuple[str | None, str | None, str | None]) -> None:

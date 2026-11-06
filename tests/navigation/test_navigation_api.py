@@ -237,6 +237,19 @@ def test_an_external_name_shows_the_language_server_hover(nav_api: ApiClient, gi
     assert request["params"]["position"] == {"line": 4, "character": 11}
 
 
+def test_a_hover_that_could_not_resolve_the_import_gives_way_to_the_installed_source(
+    nav_api: ApiClient, git_repo: GitFixture, servers: LanguageServerPath
+) -> None:
+    servers.install("basedpyright-langserver", hover="```python\n(import) render: Unknown\n```")
+    review = start_views(git_repo, nav_api)
+    install_django(git_repo)
+    wait_for(lambda: click_views(nav_api, review), lambda _: "textDocument/hover" in servers.methods())
+
+    documentation = click_views(nav_api, review)["documentation"]
+
+    assert (documentation["signature"], documentation["docstring"]) == ("def render(request, template_name)", "Return an HttpResponse for the template.")
+
+
 def test_only_installed_library_files_are_served(nav_api: ApiClient, git_repo: GitFixture) -> None:
     review = start_views(git_repo, nav_api)
 

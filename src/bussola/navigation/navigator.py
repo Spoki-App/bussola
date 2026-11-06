@@ -176,7 +176,7 @@ class Navigator:
             docstring=hover.docstring or (local.docstring if local else None),
             source=source,
         )
-        return documentation, Resolver.LANGUAGE_SERVER if text else Resolver.TREE_SITTER
+        return documentation, Resolver.LANGUAGE_SERVER if hover.signature or hover.docstring else Resolver.TREE_SITTER
 
     def _ask_server(self, repo: GitRepo, commit: str, spec: ServerSpec, position: ServerLocation, origin: Origin) -> tuple[TargetRole, list[ServerLocation]]:
         if origin == Origin.DEFINITION:

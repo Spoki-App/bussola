@@ -385,6 +385,12 @@ def _python_package(imported: Imported, root: Path) -> PackageInfo:
     return PackageInfo(top, url=imported.docs_url, home_url=PYPI.format(name=top))
 
 
+def python_server_settings(root: Path) -> dict[str, Any]:
+    paths = [str(site) for site in _site_packages(root)]
+    analysis = {"extraPaths": paths}
+    return {"python": {"analysis": analysis}, "python.analysis": analysis, "basedpyright.analysis": analysis} if paths else {}
+
+
 def _site_packages(root: Path) -> list[Path]:
     return [site for environment in PYTHON_ENVIRONMENTS for pattern in SITE_PACKAGES for site in sorted((root / environment).glob(pattern)) if site.is_dir()]
 

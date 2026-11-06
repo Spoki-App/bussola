@@ -56,7 +56,19 @@ def test_definitions_come_from_a_checkout_of_the_commit(servers: LanguageServerP
     assert (checkout / "app" / "lib.py").read_text() == SOURCE["app/lib.py"]
     opened = [message["params"]["textDocument"] for message in servers.messages() if message.get("method") == "textDocument/didOpen"]
     assert opened == [{"uri": (checkout / "app/main.py").as_uri(), "languageId": "python", "version": 1, "text": SOURCE["app/main.py"]}]
-    assert {"id": 900, "jsonrpc": "2.0", "result": [None]} in servers.messages()
+    assert {"id": 900, "jsonrpc": "2.0", "result": [None, None, None]} in servers.messages()
+
+
+def test_a_python_server_resolves_imports_from_the_project_environment(servers: LanguageServerPath, pool: LanguageServers, git_repo: GitFixture) -> None:
+    servers.install("pyright-langserver", definition=[])
+    commit = git_repo.commit(SOURCE)
+    site = git_repo.root / ".venv" / "lib" / "python3.12" / "site-packages"
+    site.mkdir(parents=True)
+
+    pool.ask(git_repo.repo, commit, PYTHON, definitions(ServerLocation("app/main.py", 2, 0)), [])
+
+    analysis = {"extraPaths": [str(site)]}
+    assert {"id": 900, "jsonrpc": "2.0", "result": [{"analysis": analysis}, analysis, analysis]} in servers.messages()
 
 
 def test_references_exclude_the_declaration_and_drop_files_outside_the_checkout(

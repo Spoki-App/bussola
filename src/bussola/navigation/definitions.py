@@ -14,6 +14,7 @@ MAX_REEXPORT_DEPTH = 4
 MAX_SIGNATURE_LINES = 12
 HOVER_FENCE = re.compile(r"\A\s*```(\w*)\n(.*?)\n?```\s*(.*)\Z", re.DOTALL)
 HOVER_RULE = "---"
+UNRESOLVED_HOVER = re.compile(r":\s*(?:Unknown|any)\s*$", re.MULTILINE)
 STRING_PREFIX = re.compile(r"\A[rRbBuUfF]*")
 STRING_QUOTES = ('"""', "'''", '"', "'")
 JSDOC_START = "/**"
@@ -51,6 +52,8 @@ def from_hover(text: str) -> HoverDoc:
     if match is None:
         return HoverDoc(None, None, text.strip() or None)
     rest = match.group(3).strip().removeprefix(HOVER_RULE).strip()
+    if UNRESOLVED_HOVER.search(match.group(2)):
+        return HoverDoc(None, None, None)
     return HoverDoc(match.group(2).strip() or None, match.group(1) or None, rest or None)
 
 

@@ -33,10 +33,11 @@ class ServerLocation:
 
 
 class LanguageServerClient:
-    def __init__(self, process: subprocess.Popen[bytes]) -> None:
+    def __init__(self, process: subprocess.Popen[bytes], settings: dict[str, Any] | None = None) -> None:
         if process.stdin is None or process.stdout is None:
             raise LanguageServerError("The language server has no pipes")
         self._process = process
+        self._settings = settings or {}
         self._stdin: IO[bytes] = process.stdin
         self._stdout: IO[bytes] = process.stdout
         self._write_lock = threading.Lock()
@@ -46,14 +47,14 @@ class LanguageServerClient:
         threading.Thread(target=self._read_loop, name="bussola-language-server", daemon=True).start()
 
     @classmethod
-    def start(cls, command: list[str], cwd: Path, environment: dict[str, str]) -> Self:
+    def start(cls, command: list[str], cwd: Path, environment: dict[str, str], settings: dict[str, Any] | None = None) -> Self:
         try:
             process = subprocess.Popen(
                 command, cwd=cwd, env={**os.environ, **environment}, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
             )
         except OSError as error:
             raise LanguageServerError(f"Could not start {command[0]}") from error
-        return cls(process)
+        return cls(process, settings)
 
     def request(self, method: str, params: Any, timeout: float) -> Any:
         future: Future[Any] = Future()
@@ -140,7 +141,8 @@ class LanguageServerClient:
 
     def _answer(self, request_id: Any, method: str, params: Any) -> None:
         items = _as_object(params).get("items")
-        result = [None] * len(cast(list[Any], items)) if method == CONFIGURATION_REQUEST and isinstance(items, list) else None
+        sections = [_as_object(item).get("section") for item in cast(list[Any], items)] if isinstance(items, list) else []
+        result = [self._settings.get(section) if isinstance(section, str) else None for section in sections] if method == CONFIGURATION_REQUEST else None
         try:
             self._send({"jsonrpc": "2.0", "id": request_id, "result": result})
         except LanguageServerError:
@@ -156,8 +158,8 @@ class LanguageServerSession:
         self._lock = threading.Lock()
 
     @classmethod
-    def open(cls, command: list[str], root: Path, spec: ServerSpec) -> Self:
-        client = LanguageServerClient.start(command, root, spec.environment)
+    def open(cls, command: list[str], root: Path, spec: ServerSpec, settings: dict[str, Any] | None = None) -> Self:
+        client = LanguageServerClient.start(command, root, spec.environment, settings)
         try:
             client.request("initialize", _initialize_params(root, spec.initialization_options), INITIALIZE_TIMEOUT_SECONDS)
             client.notify("initialized", {})
