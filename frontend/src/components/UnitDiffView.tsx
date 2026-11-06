@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
-import { Decoration, Diff, Hunk, getChangeKey, isDelete, isInsert, parseDiff, type ChangeData, type HunkData } from 'react-diff-view'
+import { Decoration, Diff, Hunk, getChangeKey, isDelete, isInsert, parseDiff, type ChangeData, type HunkData, type ViewType } from 'react-diff-view'
 import 'react-diff-view/style/index.css'
 
 import type { DiffRow, UnitDiff } from '../api/types'
@@ -27,7 +27,7 @@ export interface TargetLine {
 }
 
 interface Props {
-  diff: UnitDiff
+  diff: Pick<UnitDiff, 'rows' | 'unified' | 'binary'>
   path: string
   selectable: boolean
   selected: ReadonlySet<string>
@@ -39,6 +39,7 @@ interface Props {
   onNavigate?: (row: DiffRow, side: GutterSide, column: number, point: ScreenPoint) => void
   canNavigate?: (row: DiffRow, side: GutterSide, column: number) => Promise<boolean>
   target?: TargetLine
+  viewType?: ViewType
 }
 
 interface RowIndex {
@@ -154,9 +155,10 @@ function renderSegments(segments: Segment[], hunks: HunkData[], expand: (id: str
   })
 }
 
-export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted, onNavigate, canNavigate, target }: Props) {
+export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted, onNavigate, canNavigate, target, viewType: fixedViewType }: Props) {
   const modified = useMemo(() => hasModification(diff.rows), [diff.rows])
-  const viewType = useViewType(modified)
+  const preferredViewType = useViewType(modified)
+  const viewType = fixedViewType ?? preferredViewType
   const dragging = useRef(false)
   const endSelection = useRef(onLineSelectEnd)
   const makeLink = useContext(ReviewLinkContext)

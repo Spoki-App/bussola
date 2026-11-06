@@ -14,6 +14,7 @@ from bussola.review.thread_types import ThreadScope, ThreadStatus
 from bussola.units.model import UnitKind
 
 MAX_THREAD_LINES = 500
+MAX_COMPARE_LINES = 5000
 MAX_CALL_ID_LENGTH = 100
 
 LineRangeIn = Annotated[tuple[int, int], Field(description="Inclusive file line range")]
@@ -146,6 +147,45 @@ class DiffOut(BaseModel):
     available_modes: list[DiffMode]
     approved_text_unavailable: bool
     binary: bool
+    unified: str
+    rows: list[DiffRowOut]
+
+
+class CodeRangeIn(BaseModel):
+    unit_id: int
+    side: Side
+    line_offset: int = Field(ge=0)
+    line_count: int = Field(ge=1, le=MAX_COMPARE_LINES)
+
+
+class CompareIn(BaseModel):
+    left: CodeRangeIn
+    right: CodeRangeIn
+
+
+class CodeRangeOut(BaseModel):
+    unit_id: int
+    path: str
+    qualified_name: str
+    kind: str
+    side: Side
+    line_offset: int
+    line_count: int
+    first_line: int | None
+    last_line: int | None
+
+
+class MoveOut(BaseModel):
+    removed: CodeRangeOut
+    added: CodeRangeOut
+    similarity: float
+    identical: bool
+
+
+class CompareOut(BaseModel):
+    left: CodeRangeOut
+    right: CodeRangeOut
+    identical: bool
     unified: str
     rows: list[DiffRowOut]
 

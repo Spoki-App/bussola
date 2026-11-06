@@ -61,6 +61,11 @@ def build_diff(snapshot: UnitSnapshot, mode: DiffMode, approval: Approval | None
     return UnitDiff(mode, rows, _unified(snapshot.old_path or snapshot.path, snapshot.path, rows), is_binary(snapshot))
 
 
+def compare_lines(old: list[UnitLine], new: list[UnitLine], old_path: str, new_path: str) -> tuple[list[DiffRow], str]:
+    rows = [_labelled(row) for row in _rows(old, new, with_hashes=False)]
+    return rows, _unified(old_path, new_path, rows)
+
+
 def _labelled(row: DiffRow) -> DiffRow:
     if row.text != UNIT_PLACEHOLDER:
         return row

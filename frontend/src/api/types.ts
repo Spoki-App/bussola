@@ -430,3 +430,38 @@ export interface AiPrompts {
   config_file: string | null
   problem: string | null
 }
+
+export interface CodeRangeRequest {
+  unit_id: number
+  side: Side
+  line_offset: number
+  line_count: number
+}
+
+export interface CodeRange extends CodeRangeRequest {
+  path: string
+  qualified_name: string
+  kind: string
+  first_line: number | null
+  last_line: number | null
+}
+
+export interface Move {
+  removed: CodeRange
+  added: CodeRange
+  similarity: number
+  identical: boolean
+}
+
+export interface ComparisonRequest {
+  left: CodeRangeRequest
+  right: CodeRangeRequest
+}
+
+export interface Comparison {
+  left: CodeRange
+  right: CodeRange
+  identical: boolean
+  unified: string
+  rows: DiffRow[]
+}

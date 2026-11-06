@@ -103,6 +103,12 @@ To approve part of a module or file, click changed lines in its diff (shift-clic
 
 Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve or revoke (or approve the selected lines), `c` comment, `r` check for new commits, `t` show or hide the conversation panel. Cmd/Ctrl+click a name to go to its definition or usages.
 
+### Comparing code
+
+Code moved or extracted elsewhere is found automatically: a block of removed lines and a block of added lines with nearly the same code, in the same file or in another one, are linked both ways. The unit the code left gets **moved to `validate`**, the unit it arrived in gets **moved from `checkout`**, and a click on either opens the two blocks side by side, with the changed words highlighted. Moves that kept the code as it was, apart from indentation and blank lines, are marked **identical**. Small blocks (fewer than three lines with some code on them) and trivial lines such as `}` or `else:` are left out, so short or common snippets do not show up as moves.
+
+To compare any two pieces of code, select lines by their numbers in a unit, as for a comment, and choose **Compare with...**. Then select a second range, in any unit or file of the review, and choose **Compare with first range**. **Cancel** in the bar at the bottom drops the first range.
+
 ### Comments
 
 Click a line number to start a thread on that line. To comment on several lines, drag over their line numbers or shift-click another line number; the thread is sent to GitHub as a multi-line comment. Use "Comment on file" in a file header, or the conversation panel for comments on the whole review. Comments and pull request descriptions are rendered like on GitHub: GitHub Flavored Markdown (tables, task lists, line breaks), `> [!NOTE]` style alerts, safe HTML, highlighted code, mermaid diagrams, `owner/repo#123` links, and images attached on GitHub (downloaded through bussola with your `gh` login, since GitHub only serves them to signed-in users). You can edit or delete your own comments, and delete a thread you started as long as nobody else replied to it (otherwise resolve it). As on GitHub, only line and file threads can be resolved and count as open; comments on the whole review are part of the conversation. Deleted threads disappear from bussola but stay on GitHub if they were already sent. When the code changes, a thread moves with its line. It follows a renamed unit, and becomes outdated, showing the original snippet, when its line is gone.
