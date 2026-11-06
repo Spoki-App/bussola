@@ -5,9 +5,10 @@ import 'react-diff-view/style/index.css'
 import type { DiffRow, UnitDiff } from '../api/types'
 import { useViewType } from '../hooks/useDiffLayout'
 import { useSymbolLink } from '../hooks/useSymbolLink'
-import { isNavigationClick, navigationColumn, type ScreenPoint } from '../review/codeNavigation'
+import { hasNavigationModifier, isNavigationClick, navigationColumn, symbolAt, type ScreenPoint } from '../review/codeNavigation'
 import { collapsedUnified, segmentRows, unifiedOrder, type Segment } from '../review/collapse'
 import { diffTokens, languageFor } from '../review/highlight'
+import { markOccurrences } from '../review/occurrences'
 import { isSelectable, rowKey } from '../review/selection'
 import { ReviewLinkContext } from '../review/reviewLink'
 import { plural } from '../review/text'
@@ -162,6 +163,8 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
   const makeLink = useContext(ReviewLinkContext)
   const wrap = useDiffWrap()
   const link = useSymbolLink()
+  const [occurrence, setOccurrence] = useState<string | null>(null)
+  const claimedClick = useRef<Event | null>(null)
 
   useEffect(() => {
     endSelection.current = onLineSelectEnd
@@ -179,6 +182,28 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       window.removeEventListener('mouseup', onMouseUp)
     }
   }, [])
+
+  useEffect(() => {
+    if (occurrence === null) {
+      return
+    }
+    const onClick = (event: Event) => {
+      if (event !== claimedClick.current) {
+        setOccurrence(null)
+      }
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOccurrence(null)
+      }
+    }
+    window.addEventListener('click', onClick)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('click', onClick)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [occurrence])
 
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const rows = useMemo(() => (viewType === 'split' ? diff.rows : unifiedOrder(diff.rows)), [diff.rows, viewType])
@@ -198,6 +223,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
     const whole: Segment[] = diff.rows.length > 0 ? [{ kind: 'rows', start: 0, end: diff.rows.length - 1 }] : []
     return diffTokens(parseDiff(collapsedUnified(header, diff.rows, whole))[0]?.hunks ?? [], languageFor(path))
   }, [header, diff.rows, path])
+  const shownTokens = useMemo(() => (tokens && occurrence ? markOccurrences(tokens, occurrence) : tokens), [tokens, occurrence])
 
   if (diff.binary) {
     return <p className="diff-note">Binary file, no diff available.</p>
@@ -219,7 +245,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       viewType={viewType}
       diffType={file.type}
       hunks={file.hunks}
-      tokens={tokens}
+      tokens={shownTokens}
       selectedChanges={selectedChanges}
       widgets={widgetMap}
       className={selectable ? 'diff selectable' : 'diff'}
@@ -273,12 +299,17 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
         },
         onClick: ({ change, side }, event: MouseEvent<HTMLElement>) => {
           const row = index.rowOf(change)
+          claimedClick.current = event.nativeEvent
           if (onNavigate && isNavigationClick(event)) {
             const column = navigationColumn(event.currentTarget, event.clientX, event.clientY)
             if (row && column !== null) {
               onNavigate(row, side ?? gutterSide(row), column, { x: event.clientX, y: event.clientY })
             }
             return
+          }
+          if (!hasNavigationModifier(event)) {
+            const span = symbolAt(event.currentTarget, event.clientX, event.clientY)
+            setOccurrence(span && event.currentTarget.textContent.slice(span.start, span.end))
           }
           if (selectable && row && isSelectable(row)) {
             onRowClick(row, event.shiftKey)

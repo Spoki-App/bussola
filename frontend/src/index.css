@@ -48,6 +48,7 @@
   --diff-selected: rgba(41, 82, 204, 0.14);
   --diff-selected-gutter: rgba(41, 82, 204, 0.22);
   --diff-selection: #b3d7ff;
+  --diff-occurrence: rgba(214, 160, 30, 0.3);
   --sans: 'Instrument Sans Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --code-size: 12px;
@@ -109,6 +110,7 @@
     --diff-selected: rgba(138, 171, 255, 0.25);
     --diff-selected-gutter: rgba(138, 171, 255, 0.35);
     --diff-selection: rgba(138, 171, 255, 0.4);
+    --diff-occurrence: rgba(240, 190, 80, 0.3);
   }
 }
 
@@ -1450,6 +1452,11 @@ button.copy-link.failed {
 
 .diff .diff-code .diff-code-edit {
   color: inherit;
+  border-radius: 2px;
+}
+
+.diff .diff-code .diff-occurrence {
+  background-color: var(--diff-occurrence);
   border-radius: 2px;
 }
 
