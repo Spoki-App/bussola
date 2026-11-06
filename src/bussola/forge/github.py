@@ -108,6 +108,7 @@ type JsonObject = dict[str, Any]
 
 class GitHubAdapter:
     provider: str = PROVIDER
+    _viewer: str | None = None
 
     def status(self) -> ForgeStatus:
         if shutil.which(GH) is None:
@@ -118,7 +119,9 @@ class GitHubAdapter:
         return ForgeStatus(available=True, authenticated=True, message="gh is ready")
 
     def viewer(self) -> str:
-        return _login(self._json(["api", "user"]))
+        if self._viewer is None:
+            self._viewer = _login(self._json(["api", "user"]))
+        return self._viewer
 
     def repository_for(self, remote_url: str) -> str | None:
         for pattern in REMOTE_PATTERNS:

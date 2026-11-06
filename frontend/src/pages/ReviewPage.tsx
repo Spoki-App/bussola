@@ -17,7 +17,7 @@ import { PullRequestDescription } from '../components/PullRequestDescription'
 import { RateImpact } from '../components/RateImpact'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { SubmitReviewDialog } from '../components/SubmitReviewDialog'
-import { SyncSummary } from '../components/SyncSummary'
+import { PublishSummary, SyncSummary } from '../components/SyncSummary'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
 import { UnitTree } from '../components/UnitTree'
 import { useAiReview } from '../hooks/useAiReview'
@@ -89,33 +89,25 @@ function syncLabel(review: ReviewDetail, pending: boolean): string {
 function ReviewHeader({ review }: { review: ReviewDetail }) {
   const isPullRequest = review.pull_request !== null
   const makeLink = reviewLinkMaker(review.pull_request?.url)
-  const [message, setMessage] = useState<ReactNode>(null)
+  const [message, setMessage] = useState<string | null>(null)
   const [synced, setSynced] = useState<SyncResult | null>(null)
   const sync = useSync(review.id)
   const finish = useFinishReview(review.id)
   const revision = review.latest_revision
   const [submitting, setSubmitting] = useState(false)
   const [summary, setSummary] = useState('')
+  const [submitted, setSubmitted] = useState<ReviewSubmitResult | null>(null)
 
   const runSync = () => {
     setMessage(null)
+    setSubmitted(null)
     sync.mutate(undefined, { onSuccess: setSynced })
   }
   const onSubmitted = (result: ReviewSubmitResult) => {
     setSummary('')
     setSynced(null)
-    const url = result.published.review_url
-    setMessage(
-      <>
-        {submittedMessage(result)}
-        {url && (
-          <>
-            {' '}
-            <ExternalLink href={url}>Open on GitHub</ExternalLink>
-          </>
-        )}
-      </>,
-    )
+    setMessage(null)
+    setSubmitted(result)
   }
   useKeyboardShortcuts({ r: runSync })
   const needsLink = synced !== null && !isPullRequest && synced.unsent_comments > 0
@@ -167,6 +159,7 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
             finish.mutate(undefined, {
               onSuccess: () => {
                 setSynced(null)
+                setSubmitted(null)
                 setMessage('Marked as reviewed. "Since my last review" now shows only what changes after this point.')
               },
             })
@@ -187,6 +180,7 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
         />
       )}
       {synced && <SyncSummary result={synced} />}
+      {submitted && <PublishSummary message={submittedMessage(submitted)} published={submitted.published} />}
       {needsLink && <LinkPullRequest reviewId={review.id} unsent={synced.unsent_comments} onLinked={runSync} />}
       {(sync.error ?? finish.error) && <ErrorNote message={describeError(sync.error ?? finish.error)} />}
     </header>

@@ -74,14 +74,14 @@ export function SubmitReviewDialog({ reviewId, pendingComments, summary, onSumma
         <div className="submit-review-preview">{summary.trim() ? <Markdown text={summary} /> : <p className="muted">Nothing to preview</p>}</div>
       )}
       <fieldset className="submit-review-events" aria-label="Review type">
-        {(Object.keys(REVIEW_EVENTS) as ReviewEvent[]).map((option) => {
+        {(Object.entries(REVIEW_EVENTS) as [ReviewEvent, (typeof REVIEW_EVENTS)[ReviewEvent]][]).map(([option, { label, description }]) => {
           const disabled = own && option !== 'COMMENT'
           return (
             <label key={option} className={disabled ? 'disabled' : ''} title={disabled ? OWN_PULL_REQUEST : undefined}>
               <input type="radio" name="review-event" value={option} checked={event === option} disabled={disabled} onChange={() => { setEvent(option) }} />
               <span>
-                <strong>{REVIEW_EVENTS[option].label}</strong>
-                <span className="muted">{REVIEW_EVENTS[option].description}</span>
+                <strong>{label}</strong>
+                <span className="muted">{description}</span>
               </span>
             </label>
           )

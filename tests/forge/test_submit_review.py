@@ -94,7 +94,7 @@ def test_a_review_needs_a_linked_pull_request(api: ApiClient, git_repo: GitFixtu
 
 def test_overview_names_the_github_user(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
     review = setup_review(api, git_repo, fake_gh)
-    link(api, review)
     fake_gh.configure(viewer="carol")
+    link(api, review)
 
     assert api.call("GET", f"/reviews/{review}/forge")["viewer"] == "carol"

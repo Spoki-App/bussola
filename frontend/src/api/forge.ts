@@ -33,7 +33,7 @@ export function useSync(reviewId: number) {
 
 export function useSubmitReview(reviewId: number) {
   return useInvalidatingMutation(
-    [keys.units(reviewId), keys.review(reviewId), threadsKey(reviewId), forgeKey(reviewId), githubSyncKey(reviewId)],
+    [keys.review(reviewId), threadsKey(reviewId), githubSyncKey(reviewId)],
     (request: { event: ReviewEvent; body: string }) => postJson<ReviewSubmitResult>(`/reviews/${String(reviewId)}/forge/review`, request),
   )
 }

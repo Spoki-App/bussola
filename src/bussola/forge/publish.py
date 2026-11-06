@@ -176,20 +176,22 @@ class _Publisher:
     outcomes: list[Outcome]
 
     def submit_review(self, plan: PublishPlan, verdict: ReviewVerdict | None) -> str | None:
-        if verdict is None and not plan.inline and not plan.body_parts:
+        if verdict is not None:
+            return self.submit(plan, verdict)
+        if not plan.inline and not plan.body_parts:
             return None
-        summary = [verdict.summary.strip()] if verdict is not None and verdict.summary.strip() else []
-        body = GROUP_SEPARATOR.join([*summary, *(text for _, text in plan.body_parts)])
-        event = verdict.event if verdict is not None else ReviewEvent.COMMENT
-        _require_summary(event, body, plan)
-        submission = ReviewSubmission(self.commit_id, body, [item for _, item in plan.inline], event)
         try:
-            submitted = self.adapter.submit_review(self.link.repository, self.link.pr_number, submission)
+            return self.submit(plan, ReviewVerdict(ReviewEvent.COMMENT))
         except ForgeError as error:
-            if verdict is not None:
-                raise
             self.outcomes.extend(Outcome(_ids(comments), PublishStatus.FAILED, str(error)) for comments, _ in [*plan.inline, *plan.body_parts])
             return None
+
+    def submit(self, plan: PublishPlan, verdict: ReviewVerdict) -> str | None:
+        summary = verdict.summary.strip()
+        body = GROUP_SEPARATOR.join([*([summary] if summary else []), *(text for _, text in plan.body_parts)])
+        _require_summary(verdict.event, body, plan)
+        submission = ReviewSubmission(self.commit_id, body, [item for _, item in plan.inline], verdict.event)
+        submitted = self.adapter.submit_review(self.link.repository, self.link.pr_number, submission)
         for (comments, _), remote in zip(plan.inline, submitted.comments, strict=False):
             self.record(comments, remote)
             self.outcomes.append(Outcome(_ids(comments), PublishStatus.PUBLISHED, "Review comment", remote.url))

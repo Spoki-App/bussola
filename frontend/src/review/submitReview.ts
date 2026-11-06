@@ -1,16 +1,11 @@
 import type { ForgeOverview, ReviewEvent, ReviewSubmitResult } from '../api/types'
+import { sentCount } from './sync'
 import { plural } from './text'
 
-export const REVIEW_EVENTS: Record<ReviewEvent, { label: string; description: string }> = {
-  COMMENT: { label: 'Comment', description: 'Submit general feedback without explicit approval.' },
-  APPROVE: { label: 'Approve', description: 'Submit feedback and approve merging these changes.' },
-  REQUEST_CHANGES: { label: 'Request changes', description: 'Submit feedback that must be addressed before merging.' },
-}
-
-const SUBMITTED: Record<ReviewEvent, string> = {
-  COMMENT: 'Review submitted on GitHub.',
-  APPROVE: 'Approved on GitHub.',
-  REQUEST_CHANGES: 'Changes requested on GitHub.',
+export const REVIEW_EVENTS: Record<ReviewEvent, { label: string; description: string; submitted: string }> = {
+  COMMENT: { label: 'Comment', description: 'Submit general feedback without explicit approval.', submitted: 'Review submitted on GitHub.' },
+  APPROVE: { label: 'Approve', description: 'Submit feedback and approve merging these changes.', submitted: 'Approved on GitHub.' },
+  REQUEST_CHANGES: { label: 'Request changes', description: 'Submit feedback that must be addressed before merging.', submitted: 'Changes requested on GitHub.' },
 }
 
 export function isOwnPullRequest(forge: ForgeOverview | undefined): boolean {
@@ -23,8 +18,8 @@ export function needsSummary(event: ReviewEvent, pendingComments: number): boole
 }
 
 export function submittedMessage(result: ReviewSubmitResult): string {
-  const sent = result.published.outcomes.filter((outcome) => outcome.status === 'published' || outcome.status === 'updated').length
-  const parts = [SUBMITTED[result.event]]
+  const sent = sentCount(result.published)
+  const parts = [REVIEW_EVENTS[result.event].submitted]
   if (sent > 0) {
     parts.push(`Sent ${plural(sent, 'comment')}.`)
   }
