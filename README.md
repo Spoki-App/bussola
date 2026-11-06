@@ -101,7 +101,7 @@ A unit's own name does not count towards its content, so renaming a function wit
 
 To approve part of a module or file, click changed lines in its diff (shift-click extends the selection) and press "Approve selection". An approved line needs review again if it or the line next to it changes.
 
-Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve or revoke (or approve the selected lines), `c` comment, `r` check for new commits. Cmd/Ctrl+click a name to go to its definition or usages.
+Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve or revoke (or approve the selected lines), `c` comment, `r` check for new commits, `t` show or hide the conversation panel. Cmd/Ctrl+click a name to go to its definition or usages.
 
 ### Comments
 

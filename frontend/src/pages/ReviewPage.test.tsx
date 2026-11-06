@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { ReviewDetail, SyncResult } from '../api/types'
-import { ReviewPage } from './ReviewPage'
+import { ReviewPage, type ReviewExtensions } from './ReviewPage'
 
 const revision = { id: 2, number: 1, head_sha: 'b', base_sha: 'a', merge_base_sha: 'a', created_at: '2026-11-04T10:00:00Z' }
 
@@ -25,6 +25,15 @@ function reviewWithTitle(title: string): ReviewDetail {
     pull_request_review: true,
     unsent_comments: 0,
   }
+}
+
+function renderPage(extensions?: ReviewExtensions) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={client}>
+      <ReviewPage reviewId={3} extensions={extensions} />
+    </QueryClientProvider>,
+  )
 }
 
 const synced: SyncResult = {
@@ -65,12 +74,7 @@ describe('ReviewPage window title', () => {
   })
 
   it('names the pull request, follows its title after a sync and goes back to the default when left', async () => {
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const { unmount } = render(
-      <QueryClientProvider client={client}>
-        <ReviewPage reviewId={3} />
-      </QueryClientProvider>,
-    )
+    const { unmount } = renderPage()
 
     await waitFor(() => {
       expect(document.title).toBe('bussola#34 feat: first title')
@@ -85,5 +89,81 @@ describe('ReviewPage window title', () => {
     unmount()
 
     expect(document.title).toBe('bussola')
+  })
+})
+
+describe('ReviewPage conversation panel', () => {
+  const extensions: ReviewExtensions = { sidePanel: { label: 'conversation', count: 2, content: <><p>Thread list</p><textarea aria-label="Review comment" /></> } }
+
+  beforeEach(() => {
+    window.localStorage.clear()
+    stubServer()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('hides the panel behind a thin bar with the open count and remembers it after a reload', async () => {
+    window.localStorage.setItem('bussola.sidePanelHidden', 'false')
+    const { unmount } = renderPage(extensions)
+
+    expect(await screen.findByText('Thread list')).toBeVisible()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide conversation' }))
+
+    expect(screen.getByText('Thread list')).not.toBeVisible()
+    const reopen = screen.getByRole('button', { name: 'Show conversation (2 open)' })
+    expect(reopen).toHaveAttribute('aria-expanded', 'false')
+    expect(reopen).toHaveTextContent('2')
+    expect(window.localStorage.getItem('bussola.sidePanelHidden')).toBe('true')
+
+    unmount()
+    renderPage(extensions)
+
+    expect(await screen.findByRole('button', { name: 'Show conversation (2 open)' })).toBeInTheDocument()
+    expect(screen.getByText('Thread list')).not.toBeVisible()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show conversation (2 open)' }))
+
+    expect(screen.getByText('Thread list')).toBeVisible()
+    expect(window.localStorage.getItem('bussola.sidePanelHidden')).toBe('false')
+  })
+
+  it('draws the conversation toggle as a right column and the files toggle as a left one', async () => {
+    window.localStorage.setItem('bussola.sidePanelHidden', 'true')
+    renderPage(extensions)
+    const divider = (button: HTMLElement) => button.querySelector('path')?.getAttribute('d')
+
+    expect(divider(await screen.findByRole('button', { name: 'Show conversation (2 open)' }))).toBe('M10 2.5v11')
+    expect(divider(screen.getByRole('button', { name: 'Files' }))).toBe('M6 2.5v11')
+  })
+
+  it('keeps an unsent comment while the panel is hidden', async () => {
+    window.localStorage.setItem('bussola.sidePanelHidden', 'false')
+    renderPage(extensions)
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Review comment' }), { target: { value: 'Not sent yet' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide conversation' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show conversation (2 open)' }))
+
+    expect(screen.getByRole('textbox', { name: 'Review comment' })).toHaveValue('Not sent yet')
+  })
+
+  it('toggles the panel with t, but not while typing', async () => {
+    window.localStorage.setItem('bussola.sidePanelHidden', 'true')
+    renderPage(extensions)
+    await screen.findByRole('button', { name: 'Show conversation (2 open)' })
+
+    fireEvent.keyDown(screen.getByRole('searchbox'), { key: 't' })
+    expect(screen.getByText('Thread list')).not.toBeVisible()
+
+    fireEvent.keyDown(window, { key: 't' })
+    expect(screen.getByText('Thread list')).toBeVisible()
+    expect(window.localStorage.getItem('bussola.sidePanelHidden')).toBe('false')
+
+    fireEvent.keyDown(window, { key: 't' })
+    expect(screen.getByText('Thread list')).not.toBeVisible()
+    expect(window.localStorage.getItem('bussola.sidePanelHidden')).toBe('true')
   })
 })
