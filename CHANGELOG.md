@@ -4,6 +4,8 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-06
+
 ### Added
 
 - **Submit review** on a pull request review finishes the review on GitHub like its "Finish your review" dialog: a summary with **Write** and **Preview**, and **Comment**, **Approve** or **Request changes**. Unsent comments are sent in the same review first, so it includes everything written in bussola. **Request changes** needs a summary, **Comment** needs one when nothing else is sent, **Approve** can be empty, and only **Comment** is offered on your own pull request. Errors are shown in the dialog, keeping the summary and the unsent comments; after submitting, the header shows the result with a link and the pull request is synced again ([#48](https://github.com/Spoki-App/bussola/issues/48)).

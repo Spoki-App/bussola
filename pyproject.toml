@@ -1,6 +1,6 @@
 [project]
 name = "bussola"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local, per-function code review on git branches"
 readme = "README.md"
 license = "MIT"
