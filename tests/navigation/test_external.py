@@ -6,9 +6,37 @@ import pytest
 from bussola.navigation.external import Imported, LibrarySource, ProjectLayout, imported_symbol, is_library_file, package_info
 from bussola.navigation.symbols import identifier_at, language_for, parse
 
-REPO_PATHS = ["shop/prices.py", "shop/cart.py", "tools/json/loader.py", "src/utils/format.ts", "frontend/src/App.tsx", "go.mod", "cmd/app/main.go"]
-GO_MOD = b"module github.com/acme/app\n\ngo 1.22\n\nrequire (\n\tgithub.com/google/uuid v1.6.0\n\tgithub.com/BurntSushi/toml v1.3.2 // indirect\n)\n"
-LAYOUT = ProjectLayout.of(REPO_PATHS, lambda path: GO_MOD if path == "go.mod" else None)
+REPO_PATHS = [
+    *("shop/prices.py", "shop/cart.py", "tools/json/loader.py", "proj/__init__.py", "proj/celery.py"),
+    *("tsconfig.json", "src/utils/format.ts", "src/api/axios.ts", "frontend/src/App.tsx", "packages/ui/package.json", "packages/ui/index.ts"),
+    *("go.mod", "cmd/app/main.go"),
+]
+GO_MOD = b"""module github.com/acme/app
+
+go 1.22
+
+require (
+\tgithub.com/google/uuid v1.6.0
+\tgithub.com/BurntSushi/toml v1.3.2 // indirect
+)
+
+require github.com/mattn/go-sqlite3 v1.14.22
+
+replace (
+\tgithub.com/google/uuid v1.5.0 => ../uuid
+)
+"""
+TSCONFIG = b"""{
+  // comments and trailing commas, as tsc allows
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "baseUrl": "src",
+    "paths": {"@app/*": ["*"], "*": ["types/*"],},
+  },
+}
+"""
+FILES = {"go.mod": GO_MOD, "tsconfig.json": TSCONFIG, "packages/ui/package.json": b'{"name": "@acme/ui"}'}
+LAYOUT = ProjectLayout.of(REPO_PATHS, FILES.get)
 
 
 def imported_at(path: str, source: str, line: int, text: str, occurrence: int = 0) -> Imported | None:
@@ -153,12 +181,19 @@ def test_go_names_resolve_to_their_import(line: int, text: str, expected: tuple[
         (Imported("python", "os", "path.join"), True),
         (Imported("python", "json", "loads"), True),
         (Imported("python", "shop.prices", "price"), False),
+        (Imported("python", "proj.celery", "app"), False),
+        (Imported("python", "celery", "shared_task"), True),
         (Imported("ecmascript", "react", "useState"), True),
         (Imported("ecmascript", "node:path", "join"), True),
         (Imported("ecmascript", "@tanstack/react-query", "useQuery"), True),
         (Imported("ecmascript", "@/utils/format", "format"), False),
         (Imported("ecmascript", "./helper", "helper"), False),
         (Imported("ecmascript", "utils/format", "format"), False),
+        (Imported("ecmascript", "@app/utils/format", "format"), False),
+        (Imported("ecmascript", "@acme/ui", "Button"), False),
+        (Imported("ecmascript", "@acme/ui/theme", "colors"), False),
+        (Imported("ecmascript", "axios", ""), True),
+        (Imported("ecmascript", "lodash", "debounce"), True),
         (Imported("go", "fmt", "Println"), True),
         (Imported("go", "github.com/google/uuid", "New"), True),
         (Imported("go", "github.com/acme/app/internal/store", "Open"), False),
@@ -274,3 +309,32 @@ def test_a_python_environment_linked_from_outside_the_repository_is_not_served(t
     (project / ".venv").symlink_to(outside)
 
     assert not is_library_file(project / ".venv" / "notes" / "secret.py", project)
+
+
+def test_go_requirements_ignore_replace_directives() -> None:
+    assert LAYOUT.go_requirement("github.com/google/uuid") == ("github.com/google/uuid", "v1.6.0")
+    assert LAYOUT.go_requirement("github.com/mattn/go-sqlite3") == ("github.com/mattn/go-sqlite3", "v1.14.22")
+
+
+def test_go_package_names_drop_the_go_affixes_of_their_path() -> None:
+    source = (
+        'package main\n\nimport (\n\t"github.com/mattn/go-sqlite3"\n\t"github.com/redis/go-redis/v9"\n)\n\nfunc main() { sqlite3.Open(); redis.NewClient() }\n'
+    )
+
+    assert imported_at("main.go", source, 8, "Open") == Imported("go", "github.com/mattn/go-sqlite3", "Open")
+    assert imported_at("main.go", source, 8, "NewClient") == Imported("go", "github.com/redis/go-redis/v9", "NewClient")
+
+
+def test_installed_packages_are_read_again_after_an_upgrade(tmp_path: Path) -> None:
+    package = tmp_path / "node_modules" / "left-pad"
+    package.mkdir(parents=True)
+    package.joinpath("package.json").write_text(json.dumps({"version": "1.0.0", "main": "index.js"}))
+    package.joinpath("index.js").write_text("function leftPad() {}\n")
+    before = package_info(Imported("ecmascript", "left-pad", "leftPad"), tmp_path, ".", LAYOUT)
+
+    package.joinpath("package.json").write_text(json.dumps({"version": "1.1.0", "main": "index.js"}))
+    package.joinpath("index.js").write_text("const version = 2\n\nfunction leftPad() {}\n")
+    after = package_info(Imported("ecmascript", "left-pad", "leftPad"), tmp_path, ".", LAYOUT)
+
+    assert (before.version, before.source) == ("1.0.0", LibrarySource(str(package / "index.js"), 1))
+    assert (after.version, after.source) == ("1.1.0", LibrarySource(str(package / "index.js"), 3))

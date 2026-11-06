@@ -74,13 +74,12 @@ def source_file(context: ContextDep, request: Request, query: Annotated[SourceFi
 
 @router.get("/reviews/{review_id}/library-source")
 def library_file(context: ContextDep, query: Annotated[LibraryFileIn, Query()]) -> LibraryFileOut:
-    path = Path(query.path)
-    if not path.is_absolute() or not is_library_file(path, open_repo(repo_of(context)).root):
+    path = Path(query.path).resolve() if Path(query.path).is_absolute() else None
+    if path is None or not is_library_file(path, open_repo(repo_of(context)).root):
         raise NotFoundError(f"{query.path} is not an installed library file of this repository")
-    data = path.read_bytes()
-    if len(data) > MAX_SOURCE_BYTES:
+    if path.stat().st_size > MAX_SOURCE_BYTES:
         raise InvalidRequestError(f"{query.path} is too large to show here")
-    return LibraryFileOut(path=query.path, text=data.decode(errors="replace"), url=None)
+    return LibraryFileOut(path=query.path, text=path.read_bytes().decode(errors="replace"), url=None)
 
 
 def units_by_path(context: ReviewContext, revision: Revision, side: Side) -> dict[str, list[UnitSnapshot]]:

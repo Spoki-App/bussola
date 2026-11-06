@@ -107,7 +107,8 @@ function DocumentationView({ documentation, onOpenSource }: { documentation: Doc
         <code>{documentation.package}</code>
         {documentation.version && <span className="label">{documentation.version}</span>}
       </p>
-      {missing ? <p className="muted">{missing}</p> : <Markdown text={documentation.text ?? ''} media={false} />}
+      {missing && <p className="muted">{missing}</p>}
+      {documentation.text && <Markdown text={documentation.text} media={false} />}
       {(url ?? source) && (
         <p className="navigation-documentation-actions">
           {url && <ExternalLink href={url}>Documentation</ExternalLink>}

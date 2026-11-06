@@ -1,5 +1,6 @@
 import json
 import os
+import posixpath
 import re
 import shutil
 import sys
@@ -37,7 +38,11 @@ LOCAL_SPECIFIERS = (".", "/", "@/", "~/", "#")
 DOCUMENTATION_LABELS = (("documentation", "docs"), ("homepage", "home", "source", "repository"))
 GO_TEST_SUFFIX = "_test.go"
 GO_VERSION_SEGMENT = re.compile(r"v\d+")
-GO_REQUIRE = re.compile(rb"^\s*(?:require\s+)?([^\s()]+)\s+(v[^\s]+)", re.MULTILINE)
+PACKAGE_JSON = "package.json"
+SCRIPT_CONFIG = re.compile(r"(?:tsconfig.*|jsconfig)\.json")
+WILDCARD = "*"
+JSON_STRING_OR_COMMENT = re.compile(r'("(?:\\.|[^"\\])*")|//[^\n]*|/\*.*?\*/', re.DOTALL)
+JSON_TRAILING_COMMA = re.compile(r",(\s*[}\]])")
 
 
 @dataclass(frozen=True)
@@ -83,37 +88,44 @@ LINKS: dict[str, dict[str, Link]] = {
 ROOT_TYPES = frozenset({"identifier", "package_identifier"})
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True)
 class ProjectLayout:
-    names: dict[str, frozenset[str]]
-    root_names: dict[str, frozenset[str]]
+    python_modules: frozenset[str] = frozenset()
+    python_roots: frozenset[str] = frozenset()
+    script_modules: frozenset[str] = frozenset()
+    script_bases: tuple[str, ...] = ()
+    script_aliases: tuple[str, ...] = ()
     go_modules: tuple[tuple[str, dict[str, str]], ...] = ()
 
     @classmethod
     def of(cls, paths: list[str], read: Callable[[str], bytes | None]) -> "ProjectLayout":
-        names: dict[str, set[str]] = {}
-        root_names: dict[str, set[str]] = {}
-        for path in paths:
-            language = language_for(path)
-            if language is None:
-                continue
-            parts = PurePosixPath(path).with_suffix("").parts
-            names.setdefault(language.family, set()).update(parts)
-            root_names.setdefault(language.family, set()).add(parts[0])
+        families = {path: language.family for path in paths if (language := language_for(path)) is not None}
+        python = [PurePosixPath(path) for path, family in families.items() if family == "python"]
+        scripts = [PurePosixPath(path) for path, family in families.items() if family == "ecmascript"]
+        configs = [_script_config(PurePosixPath(path), _jsonc(read(path) or b"")) for path in paths if SCRIPT_CONFIG.fullmatch(PurePosixPath(path).name)]
+        workspaces = [name for path in paths if PurePosixPath(path).name == PACKAGE_JSON and isinstance(name := _jsonc(read(path) or b"").get("name"), str)]
         go_modules = tuple(module for path in paths if PurePosixPath(path).name == GO_MOD and (module := _go_mod(read(path) or b"")) is not None)
         return cls(
-            {family: frozenset(found) for family, found in names.items()}, {family: frozenset(found) for family, found in root_names.items()}, go_modules
+            python_modules=_python_modules(python),
+            python_roots=frozenset(path.with_suffix("").parts[0] for path in python),
+            script_modules=frozenset(str(module) for path in scripts for module in (path.with_suffix(""), *path.parents)),
+            script_bases=tuple(base for base, _ in configs if base is not None),
+            script_aliases=tuple(alias for _, aliases in configs for alias in aliases) + tuple(alias for name in workspaces for alias in (name, f"{name}/*")),
+            go_modules=go_modules,
         )
 
     def is_external(self, imported: Imported) -> bool:
         if imported.family == "go":
             return not any(imported.module == path or imported.module.startswith(f"{path}/") for path, _ in self.go_modules)
-        if imported.family == "ecmascript" and imported.module.startswith(LOCAL_SPECIFIERS):
+        if imported.family == "python":
+            top = imported.module.split(".")[0]
+            return top not in (self.python_roots if top in sys.stdlib_module_names else self.python_modules)
+        specifier = imported.module
+        if specifier.startswith(LOCAL_SPECIFIERS) or any(_alias_matches(alias, specifier) for alias in self.script_aliases):
             return False
-        top = re.split(r"[./]", imported.module.removeprefix(NODE_SCHEME))[0]
-        standard = top in sys.stdlib_module_names if imported.family == "python" else top in NODE_BUILTINS
-        known = self.root_names if standard else self.names
-        return top not in known.get(imported.family, frozenset())
+        return specifier.startswith(NODE_SCHEME) or not any(
+            posixpath.normpath(posixpath.join(base, specifier)) in self.script_modules for base in self.script_bases
+        )
 
     def go_requirement(self, import_path: str) -> tuple[str, str] | None:
         found = [
@@ -137,7 +149,6 @@ def imported_symbol(language: SourceLanguage, tree: Tree, node: Node) -> Importe
     return Imported(family, imported.module, ".".join(part for part in (imported.name, *chain[1:]) if part))
 
 
-@lru_cache(maxsize=256)
 def package_info(imported: Imported, root: Path, origin_dir: str, layout: ProjectLayout) -> PackageInfo:
     if imported.family == "python":
         return _python_package(imported, root)
@@ -309,7 +320,7 @@ def _go_imports(root: Node) -> dict[str, Imported]:
 def _go_package_name(path: str) -> str:
     segments = path.split("/")
     last = segments[-2] if len(segments) > 1 and GO_VERSION_SEGMENT.fullmatch(segments[-1]) else segments[-1]
-    return last.split(".")[0]
+    return last.split(".")[0].removeprefix("go-").removesuffix("-go").replace("-", "")
 
 
 IMPORTS: dict[str, Callable[[Node], dict[str, Imported]]] = {"python": _python_imports, "ecmascript": _ecmascript_imports, "go": _go_imports}
@@ -317,8 +328,52 @@ IMPORTS: dict[str, Callable[[Node], dict[str, Imported]]] = {"python": _python_i
 
 def _go_mod(content: bytes) -> tuple[str, dict[str, str]] | None:
     module = go_module_name(content)
-    requires = {path.decode(): version.decode() for path, version in GO_REQUIRE.findall(content)}
-    return (module, requires) if module is not None else None
+    return (module, _go_requires(content)) if module is not None else None
+
+
+def _go_requires(content: bytes) -> dict[str, str]:
+    requires: dict[str, str] = {}
+    in_block = False
+    for line in content.decode(errors="replace").splitlines():
+        words = line.split("//", 1)[0].split()
+        if words[:1] == ["require"]:
+            in_block, entry = words[1:] == ["("], words[1:]
+        elif words[:1] == [")"]:
+            in_block, entry = False, []
+        else:
+            entry = words if in_block else []
+        match entry:
+            case [path, version, *_] if path != "(":
+                requires[path] = version
+            case _:
+                pass
+    return requires
+
+
+def _python_modules(paths: list[PurePosixPath]) -> frozenset[str]:
+    packages = {path.parent for path in paths if path.stem == "__init__" and path.parent != PurePosixPath(".")}
+    return frozenset(part for path in paths for index, part in enumerate(path.with_suffix("").parts) if PurePosixPath(*path.parts[:index]) not in packages)
+
+
+def _script_config(path: PurePosixPath, config: dict[str, Any]) -> tuple[str | None, list[str]]:
+    options = config.get("compilerOptions")
+    options = cast(dict[str, Any], options) if isinstance(options, dict) else {}
+    base, paths = options.get("baseUrl"), options.get("paths")
+    aliases = [key for key in cast(dict[str, Any], paths) if key != WILDCARD] if isinstance(paths, dict) else []
+    return (posixpath.normpath(posixpath.join(str(path.parent), base)) if isinstance(base, str) else None), aliases
+
+
+def _alias_matches(alias: str, specifier: str) -> bool:
+    return specifier.startswith(alias.removesuffix(WILDCARD)) if alias.endswith(WILDCARD) else specifier == alias
+
+
+def _jsonc(content: bytes) -> dict[str, Any]:
+    text = JSON_STRING_OR_COMMENT.sub(lambda match: match.group(1) or "", content.decode(errors="replace"))
+    try:
+        value = json.loads(JSON_TRAILING_COMMA.sub(r"\1", text))
+    except ValueError:
+        return {}
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
 def _python_package(imported: Imported, root: Path) -> PackageInfo:
@@ -474,14 +529,26 @@ def _go_escape(path: str) -> str:
 
 
 def _defined_at(path: Path, name: str) -> int | None:
-    language = language_for(path.name)
     try:
-        if language is None or path.stat().st_size > MAX_FILE_BYTES:
-            return None
-        source = path.read_bytes()
+        status = path.stat()
     except OSError:
         return None
-    return next((symbol.row + 1 for symbol in file_symbols(language, source).definitions if symbol.name == name), None)
+    return _definition_lines(path, status.st_mtime_ns, status.st_size).get(name)
+
+
+@lru_cache(maxsize=64)
+def _definition_lines(path: Path, _modified: int, size: int) -> dict[str, int]:
+    language = language_for(path.name)
+    try:
+        source = path.read_bytes() if language is not None and size <= MAX_FILE_BYTES else None
+    except OSError:
+        source = None
+    if language is None or source is None:
+        return {}
+    lines: dict[str, int] = {}
+    for symbol in file_symbols(language, source).definitions:
+        lines.setdefault(symbol.name, symbol.row + 1)
+    return lines
 
 
 def _json(path: Path) -> dict[str, Any] | None:

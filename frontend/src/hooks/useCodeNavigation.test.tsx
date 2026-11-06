@@ -346,6 +346,15 @@ describe('useCodeNavigation', () => {
     expect(within(popup).queryByRole('link')).not.toBeInTheDocument()
   })
 
+  it('shows only the package and the documentation link when the language server gives no text', async () => {
+    serve(() => found([], { documentation: RENDER }))
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'django.shortcuts.render' })
+    expect(within(popup).getByRole('link', { name: 'Documentation' })).toHaveAttribute('href', 'https://docs.djangoproject.com/')
+    expect(within(popup).queryByText(/No documentation found/)).not.toBeInTheDocument()
+  })
+
   it('opens the installed library source read only from the documentation shown inside the modal, with Back', async () => {
     serve((params) => (params.get('path') === 'lib.py' ? found([], { documentation: { ...RENDER, source: { path: SHORTCUTS, line: 1 } } }) : found([target('lib.py', 1, null)])))
     renderHarness()

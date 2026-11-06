@@ -187,7 +187,9 @@ def _clicked(repo: GitRepo, commit: str, click: Click) -> tuple[SourceLanguage, 
 @lru_cache(maxsize=CACHED_LAYOUTS)
 def _layout(root: Path, commit: str) -> ProjectLayout:
     repo = GitRepo(root)
-    return ProjectLayout.of(repo.tree_paths(commit), lambda path: repo.file_at(commit, path))
+    blobs = {blob.path: blob.object_id for blob in repo.tree_blobs(commit) if not blob.is_symlink}
+    with repo.blob_reader() as reader:
+        return ProjectLayout.of(list(blobs), lambda path: reader.read(blobs[path]))
 
 
 def _definitions(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, path: str, files: SourceFiles) -> tuple[Target, ...]:

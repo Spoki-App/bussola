@@ -231,3 +231,12 @@ def test_only_installed_library_files_are_served(nav_api: ApiClient, git_repo: G
 
     nav_api.call("GET", f"/reviews/{review}/library-source?path={git_repo.root / 'shop' / 'views.py'}", 404)
     nav_api.call("GET", f"/reviews/{review}/library-source?path=shop/views.py", 404)
+
+
+def test_a_library_file_too_large_to_show_is_refused(nav_api: ApiClient, git_repo: GitFixture) -> None:
+    review = start_views(git_repo, nav_api)
+    bundle = git_repo.root / "node_modules" / "big" / "bundle.js"
+    bundle.parent.mkdir(parents=True)
+    bundle.write_text("//" + "x" * 2_100_000 + "\n")
+
+    nav_api.call("GET", f"/reviews/{review}/library-source?path={bundle}", 400)

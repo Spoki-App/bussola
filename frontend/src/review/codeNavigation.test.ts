@@ -110,6 +110,7 @@ describe('code navigation helpers', () => {
     expect(titleOf(external)).toBe('django.shortcuts.render')
     expect(missingDocumentation(RENDER)).toBe('No documentation found for django.shortcuts.render.')
     expect(missingDocumentation({ ...RENDER, text: 'Renders a template.' })).toBeNull()
+    expect(missingDocumentation({ ...RENDER, url: 'https://docs.djangoproject.com/' })).toBeNull()
   })
 
   it('lists definitions first, then usages grouped by file in their order', () => {

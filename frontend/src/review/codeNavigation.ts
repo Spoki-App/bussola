@@ -189,5 +189,5 @@ export function titleOf(result: NavigationResult): string {
 }
 
 export function missingDocumentation(documentation: Documentation): string | null {
-  return documentation.text ? null : `No documentation found for ${documentation.qualified_name}.`
+  return documentation.text || documentation.url ? null : `No documentation found for ${documentation.qualified_name}.`
 }
