@@ -63,9 +63,9 @@ bussola refresh feature/x --fetch
 
 ### Shell completion
 
-Tab completes commands, options, paths for `--repo` and, for the branch argument and `--base`, the branches of the repository in the current folder (or of `--repo`): local branches first, then remote ones. Completion only reads refs with `git for-each-ref`: it never fetches, touches the network or starts the server, and outside a repository it offers no branches.
+Tab completes commands, options, paths for `--repo` and, for the branch argument and `--base`, the local and remote branches of the repository in the current folder (or of `--repo`). Completion only reads refs with `git for-each-ref`: it never fetches, touches the network or starts the server, and outside a repository it offers no branches.
 
-Run `bussola --install-completion` once in your shell to set it up, or add the line for your shell yourself (`bussola --show-completion` prints the script for the current shell):
+Run `bussola --install-completion` once in your shell to set it up (in PowerShell it also sets the execution policy of your user to `Unrestricted`, so you may prefer the line below), or add the line for your shell yourself (`bussola --show-completion` prints the script for the current shell):
 
 | Shell | Add to | Line |
 |---|---|---|

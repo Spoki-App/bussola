@@ -34,7 +34,7 @@ app = typer.Typer(no_args_is_help=True)
 
 def complete_branch(ctx: typer.Context, incomplete: str) -> list[str]:
     try:
-        local, remote = GitRepo(ctx.params.get("repo") or Path.cwd()).branches()
+        local, remote = GitRepo(Path(ctx.params.get("repo") or Path.cwd()).expanduser()).branches()
     except (GitError, OSError):
         return []
     return [name for name in (*local, *remote) if name.startswith(incomplete)]
@@ -61,6 +61,8 @@ def serve(
     register: Annotated[bool, typer.Option("--register/--no-register", hidden=True)] = True,
 ) -> None:
     """Start the review UI."""
+    from bussola.app import create_app
+
     host = host.removeprefix("[").removesuffix("]")
     if not is_local_host(host):
         typer.secho(f"warning: listening on {host} exposes your repositories to other machines on the network", fg=typer.colors.YELLOW, err=True)
@@ -81,8 +83,6 @@ def serve(
     if not no_open:
         threading.Timer(BROWSER_OPEN_DELAY_SECONDS, webbrowser.open, args=[url]).start()
     typer.echo(f"bussola listening on {url}")
-    from bussola.app import create_app
-
     run_published(create_app(settings), settings.data_dir, address)
 
 

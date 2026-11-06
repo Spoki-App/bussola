@@ -299,6 +299,14 @@ def test_completes_branches_of_the_repo_option(git_repo: GitFixture, tmp_path: P
     assert _complete(f"bussola refresh --repo {root} x --base ma") == ["main"]
 
 
+def test_completes_branches_of_a_repo_option_under_the_home_folder(git_repo: GitFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    _repo_with_branches(git_repo)
+
+    assert _complete("bussola status --repo ~/repo feature/") == ["feature/x"]
+
+
 def test_completes_no_branches_outside_a_repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
 
