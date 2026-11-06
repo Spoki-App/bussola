@@ -16,6 +16,7 @@ class ForgeOverview:
     pull_request: PullRequest | None
     candidates: list[PullRequest] = field(default_factory=list)
     error: str | None = None
+    viewer: str | None = None
 
 
 def review_repository(adapter: ForgeAdapter, git_repo: GitRepo, head_ref: str) -> str | None:
@@ -37,11 +38,18 @@ def forge_overview(context: ReviewContext, adapter: ForgeAdapter, git_repo: GitR
         return ForgeOverview(status, repository, link, None)
     try:
         if link is not None:
-            return ForgeOverview(status, repository, link, adapter.pull_request(link.repository, link.pr_number))
+            return ForgeOverview(status, repository, link, adapter.pull_request(link.repository, link.pr_number), viewer=_viewer(adapter))
         head, base = branch_name(git_repo, context.review.head_ref), branch_name(git_repo, context.review.base_ref)
         return ForgeOverview(status, repository, None, None, adapter.find_pull_requests(repository, head, base))
     except ForgeError as error:
         return ForgeOverview(status, repository, link, None, error=str(error))
+
+
+def _viewer(adapter: ForgeAdapter) -> str | None:
+    try:
+        return adapter.viewer()
+    except ForgeError:
+        return None
 
 
 def link_pull_request(context: ReviewContext, adapter: ForgeAdapter, git_repo: GitRepo, number: int) -> ForgeLink:

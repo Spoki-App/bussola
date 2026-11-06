@@ -222,6 +222,15 @@ export interface ForgeOverview {
   candidates: PullRequest[]
   head_matches: boolean | null
   error: string | null
+  viewer: string | null
+}
+
+export type ReviewEvent = 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES'
+
+export interface ReviewSubmitResult {
+  event: ReviewEvent
+  published: PublishResult
+  unsent_comments: number
 }
 
 export type MergeMethod = 'merge' | 'squash' | 'rebase'

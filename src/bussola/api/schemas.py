@@ -3,7 +3,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from bussola.forge.base import BranchDeletion, MergeMethod
+from bussola.forge.base import BranchDeletion, MergeMethod, ReviewEvent
 from bussola.navigation.navigator import Origin, Resolver, TargetRole
 from bussola.review.ai_review import AiReviewPhase, RunStatus
 from bussola.review.descriptions import Impact
@@ -345,6 +345,7 @@ class ForgeOut(BaseModel):
     candidates: list[PullRequestOut]
     head_matches: bool | None
     error: str | None
+    viewer: str | None
 
 
 class ForgeLinkIn(BaseModel):
@@ -361,6 +362,17 @@ class PublishOutcomeOut(BaseModel):
 class PublishOut(BaseModel):
     review_url: str | None
     outcomes: list[PublishOutcomeOut]
+
+
+class ReviewSubmitIn(BaseModel):
+    event: ReviewEvent
+    body: str = Field(default="", max_length=65536)
+
+
+class ReviewSubmitOut(BaseModel):
+    event: ReviewEvent
+    published: PublishOut
+    unsent_comments: int
 
 
 class SyncOut(BaseModel):

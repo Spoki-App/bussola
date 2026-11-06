@@ -1,5 +1,9 @@
-import type { SyncResult } from '../api/types'
+import type { PublishResult, SyncResult } from '../api/types'
 import { plural } from './text'
+
+export function sentCount(published: PublishResult | null): number {
+  return published?.outcomes.filter((outcome) => outcome.status === 'published' || outcome.status === 'updated').length ?? 0
+}
 
 export function syncMessage(result: SyncResult): string {
   const { refresh, published, publish_error: publishError, marked_viewed: markedViewed, viewed_error: viewedError } = result
@@ -7,9 +11,9 @@ export function syncMessage(result: SyncResult): string {
   if (refresh.warning) {
     parts.push(refresh.warning)
   }
-  const sent = published?.outcomes.filter((outcome) => outcome.status === 'published' || outcome.status === 'updated') ?? []
-  if (sent.length > 0) {
-    parts.push(`Sent ${plural(sent.length, 'comment')} to GitHub.`)
+  const sent = sentCount(published)
+  if (sent > 0) {
+    parts.push(`Sent ${plural(sent, 'comment')} to GitHub.`)
   }
   if (publishError) {
     parts.push(`Comments not sent: ${publishError}`)
