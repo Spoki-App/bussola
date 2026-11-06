@@ -3,15 +3,17 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Self
 
+from tree_sitter import Tree
+
 from bussola.git import BlobReader, GitRepo
-from bussola.navigation.index import IndexCache, IndexedFile, Starter, SymbolIndex, start_daemon
+from bussola.navigation.index import MAX_FILE_BYTES, IndexCache, IndexedFile, Starter, SymbolIndex, start_daemon
 from bussola.navigation.lsp import ServerLocation
 from bussola.navigation.positions import byte_to_utf16, preview, source_lines, utf16_to_byte
+from bussola.navigation.scopes import Enclosing, enclosing_at
 from bussola.navigation.servers import LanguageServers, server_command
 from bussola.navigation.specs import SERVER_SPECS, ServerSpec
 from bussola.navigation.symbols import SourceLanguage, Symbol, language_for, references, symbol_at
-from bussola.units.model import Unit, UnitKind
-from bussola.units.registry import extractor_for
+from bussola.units.extractors.treesitter import parse
 
 MAX_TARGETS = 200
 CHECKOUTS_DIR = "checkouts"
@@ -30,12 +32,6 @@ class TargetRole(StrEnum):
 class Resolver(StrEnum):
     TREE_SITTER = "tree-sitter"
     LANGUAGE_SERVER = "language-server"
-
-
-@dataclass(frozen=True)
-class Enclosing:
-    kind: UnitKind
-    qualified_name: str
 
 
 @dataclass(frozen=True)
@@ -72,7 +68,7 @@ class SourceFiles:
         self._reader: BlobReader | None = None
         self._sources: dict[str, bytes] = {}
         self._lines: dict[str, list[bytes]] = {}
-        self._units: dict[str, list[Unit]] = {}
+        self._trees: dict[str, Tree | None] = {}
 
     def __enter__(self) -> Self:
         return self
@@ -98,15 +94,18 @@ class SourceFiles:
         lines = self.lines(location.path)
         if location.row >= len(lines):
             return None
-        line = location.row + 1
-        enclosing = self.enclosing(location.path, line) if role == TargetRole.USAGE else None
-        return Target(role, location.path, line, location.character, preview(lines[location.row]), enclosing)
+        enclosing = self.enclosing(location.path, location.row, utf16_to_byte(lines[location.row], location.character)) if role == TargetRole.USAGE else None
+        return Target(role, location.path, location.row + 1, location.character, preview(lines[location.row]), enclosing)
 
-    def enclosing(self, path: str, line: int) -> Enclosing | None:
-        if path not in self._units:
-            extractor = extractor_for(path)
-            self._units[path] = (extractor.extract(self.source(path)) if extractor else None) or []
-        return next((Enclosing(unit.kind, unit.qualified_name) for unit in reversed(self._units[path]) if line in unit.line_numbers), None)
+    def enclosing(self, path: str, row: int, column: int) -> Enclosing | None:
+        language = language_for(path)
+        if language is None:
+            return None
+        if path not in self._trees:
+            source = self.source(path)
+            self._trees[path] = parse(language.grammar, source) if len(source) <= MAX_FILE_BYTES else None
+        tree = self._trees[path]
+        return enclosing_at(language.family, tree.root_node, row, column) if tree else None
 
     def symbol_target(self, role: TargetRole, file: IndexedFile, symbol: Symbol) -> Target | None:
         self.source(file.path, file.object_id)

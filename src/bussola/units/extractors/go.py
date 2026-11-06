@@ -33,7 +33,7 @@ def _collect(siblings: list[Node]) -> list[Span]:
         if node.type == FUNCTION_DECLARATION:
             spans.append(with_name(span_for(siblings, index, UnitKind.FUNCTION, node_text(name_node)), name_node))
         elif node.type == METHOD_DECLARATION:
-            name = f"{_receiver_type(node)}.{node_text(name_node)}".lstrip(".")
+            name = f"{receiver_type(node)}.{node_text(name_node)}".lstrip(".")
             spans.append(with_name(span_for(siblings, index, UnitKind.METHOD, name), name_node))
         elif node.type == TYPE_DECLARATION:
             spans.extend(_types(siblings, index))
@@ -54,7 +54,7 @@ def _types(siblings: list[Node], index: int) -> list[Span]:
     ]
 
 
-def _receiver_type(method: Node) -> str:
+def receiver_type(method: Node) -> str:
     receiver = method.child_by_field_name("receiver")
     parameter = next((child for child in receiver.named_children if child.type == PARAMETER_DECLARATION), None) if receiver else None
     node = parameter.child_by_field_name("type") if parameter else None

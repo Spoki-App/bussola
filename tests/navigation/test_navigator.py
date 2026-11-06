@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from bussola.navigation.navigator import Click, Enclosing, Navigator, Origin
+from bussola.navigation.navigator import Click, Navigator, Origin
+from bussola.navigation.scopes import Enclosing
 from bussola.units.model import UnitKind
 from tests.gitrepo import GitFixture
 from tests.navigation.test_index import ManualStarter
@@ -104,6 +105,52 @@ func (c *Cart) Total() int {
 """
 
 
+PYTHON_SCOPES = """import sys
+
+
+def helper():
+    return 1
+
+
+if sys.version_info > (3,):
+    def compat():
+        return helper()
+
+
+@register(helper)
+def decorated(limit=helper()):
+    pass
+
+
+class Cart:
+    @property
+    def size(self):
+        return 1
+
+    @size.setter
+    def size(self, value):
+        helper()
+"""
+
+
+TYPESCRIPT_SCOPES = """export function helper(): number {
+  return 1
+}
+
+export default {
+  run() {
+    return helper()
+  },
+}
+
+describe('cart', () => {
+  helper()
+})
+
+const total = () => helper()
+"""
+
+
 @pytest.mark.parametrize(
     ("path", "source", "expected"),
     [
@@ -114,7 +161,7 @@ func (c *Cart) Total() int {
                 (5, Enclosing(UnitKind.MODULE, "")),
                 (9, Enclosing(UnitKind.CLASS, "Cart")),
                 (12, Enclosing(UnitKind.METHOD, "Cart.total")),
-                (17, Enclosing(UnitKind.FUNCTION, "review")),
+                (17, Enclosing(UnitKind.FUNCTION, "review.inner")),
             ],
         ),
         (
@@ -125,6 +172,21 @@ func (c *Cart) Total() int {
         ("shop.js", JAVASCRIPT_USAGES, [(7, Enclosing(UnitKind.METHOD, "Cart.total"))]),
         ("inline.ts", "function helper() { return 1 }\nclass Cart { total() { return helper() } }\n", [(2, Enclosing(UnitKind.METHOD, "Cart.total"))]),
         ("shop.go", GO_USAGES, [(5, Enclosing(UnitKind.MODULE, "")), (10, Enclosing(UnitKind.METHOD, "Cart.Total"))]),
+        (
+            "scopes.py",
+            PYTHON_SCOPES,
+            [
+                (10, Enclosing(UnitKind.FUNCTION, "compat")),
+                (13, Enclosing(UnitKind.MODULE, "")),
+                (14, Enclosing(UnitKind.MODULE, "")),
+                (25, Enclosing(UnitKind.METHOD, "Cart.size")),
+            ],
+        ),
+        (
+            "scopes.ts",
+            TYPESCRIPT_SCOPES,
+            [(7, Enclosing(UnitKind.METHOD, "run")), (12, Enclosing(UnitKind.MODULE, "")), (15, Enclosing(UnitKind.FUNCTION, "total"))],
+        ),
     ],
 )
 def test_usages_name_the_function_method_or_class_they_live_in(

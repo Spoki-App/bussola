@@ -80,13 +80,13 @@ def _methods(body: Node | None, class_name: str) -> tuple[Span, ...]:
         return ()
     siblings = body.named_children
     return tuple(
-        with_name(span_for(siblings, index, UnitKind.METHOD, f"{class_name}.{_method_name(node)}"), node.child_by_field_name("name"))
+        with_name(span_for(siblings, index, UnitKind.METHOD, f"{class_name}.{method_name(node)}"), node.child_by_field_name("name"))
         for index, node in enumerate(siblings)
         if node.type == METHOD_DEFINITION
     )
 
 
-def _method_name(node: Node) -> str:
+def method_name(node: Node) -> str:
     accessor = next((child.type for child in node.children if not child.is_named and child.type in ACCESSOR_KEYWORDS), None)
     name = node_text(node.child_by_field_name("name"))
     return f"{accessor} {name}" if accessor else name
