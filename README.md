@@ -61,6 +61,21 @@ bussola refresh feature/x --fetch
 
 `status` refreshes the review of a branch and prints the state of each changed unit. `refresh` records a new revision if any commit changed (`--fetch` runs `git fetch --prune` first). The base defaults to `base_branch` from `.bussola.toml`, then the first of `develop`, `main`, `master` that exists. An open review page picks up new revisions by itself.
 
+### Shell completion
+
+Tab completes commands, options, paths for `--repo` and, for the branch argument and `--base`, the local and remote branches of the repository in the current folder (or of `--repo`). Completion only reads refs with `git for-each-ref`: it never fetches, touches the network or starts the server, and outside a repository it offers no branches.
+
+Run `bussola --install-completion` once in your shell to set it up (in PowerShell it also sets the execution policy of your user to `Unrestricted`, so you may prefer the line below), or add the line for your shell yourself (`bussola --show-completion` prints the script for the current shell):
+
+| Shell | Add to | Line |
+|---|---|---|
+| bash | `~/.bashrc` | `eval "$(_BUSSOLA_COMPLETE=source_bash bussola)"` |
+| zsh | `~/.zshrc`, after `compinit` | `eval "$(_BUSSOLA_COMPLETE=source_zsh bussola)"` |
+| fish | `~/.config/fish/config.fish` | `_BUSSOLA_COMPLETE=source_fish bussola \| source` |
+| PowerShell | `$PROFILE` | `$env:_BUSSOLA_COMPLETE = "source_powershell"; bussola \| Out-String \| Invoke-Expression; Remove-Item Env:_BUSSOLA_COMPLETE` |
+
+Open a new shell afterwards.
+
 ### Reviewing
 
 The review header has two actions:
