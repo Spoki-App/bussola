@@ -10,6 +10,7 @@ import { unitTitle } from '../review/logic'
 import { ReviewLinkContext } from '../review/reviewLink'
 import { useAiDescription } from '../hooks/useAiDescription'
 import type { LineLink } from '../markdown/lineLinks'
+import { dragSelection } from '../review/lineDrag'
 import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
 import { AiActionButton } from './AiActionButton'
 import { AiDescription } from './AiDescription'
@@ -212,6 +213,17 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
     setAnchor(key)
   }
 
+  const onLineNumberClick = (row: DiffRow, side: GutterSide, extend: boolean) => {
+    if (unit.row_approvable) {
+      const next = dragSelection(rows, anchor, rowKey(row), extend)
+      setSelected(next.selected)
+      setAnchor(next.anchor)
+    }
+    if (onComment && diff.data) {
+      onComment({ unit, row, side, mode: diff.data.mode, extend, selecting: true })
+    }
+  }
+
   const canSwitchMode = diff.data?.available_modes.includes('approved') ?? false
 
   return (
@@ -277,7 +289,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
         <div className="unit-body">
           <AiDescription repoId={repoId} ai={ai} onLineLink={showLine} />
           {diff.data?.approved_text_unavailable && <p className="diff-note">The approved version is too large to keep, so only the base diff is available.</p>}
-          {unit.row_approvable && unit.todo && <p className="hint">Click changed lines to select them, shift-click to extend, then approve the selection.</p>}
+          {unit.row_approvable && unit.todo && <p className="hint">Click changed lines to select them, shift-click to extend or drag over the line numbers, then approve the selection.</p>}
           {diff.isPending && <p className="diff-note">Loading diff...</p>}
           {diff.error && <ErrorNote message={describeError(diff.error)} />}
           {unit.image && <ImagePreview reviewId={reviewId} unit={unit} />}
@@ -288,7 +300,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
               selectable={unit.row_approvable}
               selected={selected}
               onRowClick={onRowClick}
-              onLineNumberClick={onComment ? (row, side, extend) => { onComment({ unit, row, side, mode: diff.data.mode, extend, selecting: true }) } : undefined}
+              onLineNumberClick={onLineNumberClick}
               onLineSelectEnd={onCommentSelectEnd}
               highlighted={highlightRows?.(unit, diff.data)}
               onNavigate={navigateFrom}

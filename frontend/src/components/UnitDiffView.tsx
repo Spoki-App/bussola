@@ -1,9 +1,10 @@
-import { useContext, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useContext, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Decoration, Diff, Hunk, getChangeKey, isDelete, isInsert, parseDiff, type ChangeData, type HunkData } from 'react-diff-view'
 import 'react-diff-view/style/index.css'
 
 import type { DiffRow, UnitDiff } from '../api/types'
 import { useViewType } from '../hooks/useDiffLayout'
+import { useLineDrag } from '../hooks/useLineDrag'
 import { useSymbolLink } from '../hooks/useSymbolLink'
 import { isNavigationClick, navigationColumn, type ScreenPoint } from '../review/codeNavigation'
 import { collapsedUnified, segmentRows, unifiedOrder, type Segment } from '../review/collapse'
@@ -46,6 +47,12 @@ interface RowIndex {
   changeKeyOf: (row: DiffRow) => string | undefined
 }
 
+interface LineDrag {
+  side: GutterSide
+  table: Element
+  key: string
+}
+
 function buildIndex(rows: DiffRow[]): RowIndex {
   const inserted = new Map<number, DiffRow>()
   const deleted = new Map<number, DiffRow>()
@@ -82,6 +89,13 @@ function buildIndex(rows: DiffRow[]): RowIndex {
       return row.old_index === null ? undefined : `N${String(row.old_index + 1)}`
     },
   }
+}
+
+function gutterAt(x: number, y: number, table: Element): HTMLElement | undefined {
+  return document
+    .elementsFromPoint(x, y)
+    .map((element) => element.closest<HTMLElement>('td.diff-gutter'))
+    .find((cell): cell is HTMLElement => cell !== null && table.contains(cell))
 }
 
 function gutterNumber(row: DiffRow | undefined, side: GutterSide): string {
@@ -157,32 +171,33 @@ function renderSegments(segments: Segment[], hunks: HunkData[], expand: (id: str
 export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted, onNavigate, canNavigate, target }: Props) {
   const modified = useMemo(() => hasModification(diff.rows), [diff.rows])
   const viewType = useViewType(modified)
-  const dragging = useRef(false)
-  const endSelection = useRef(onLineSelectEnd)
+  const lineDrag = useRef<LineDrag | null>(null)
   const makeLink = useContext(ReviewLinkContext)
   const wrap = useDiffWrap()
   const link = useSymbolLink()
 
-  useEffect(() => {
-    endSelection.current = onLineSelectEnd
-  })
-
-  useEffect(() => {
-    const onMouseUp = () => {
-      if (dragging.current) {
-        dragging.current = false
-        endSelection.current?.()
-      }
-    }
-    window.addEventListener('mouseup', onMouseUp)
-    return () => {
-      window.removeEventListener('mouseup', onMouseUp)
-    }
-  }, [])
-
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const rows = useMemo(() => (viewType === 'split' ? diff.rows : unifiedOrder(diff.rows)), [diff.rows, viewType])
   const index = useMemo(() => buildIndex(diff.rows), [diff.rows])
+  const rowByChangeKey = useMemo(() => new Map(diff.rows.flatMap((row) => {
+    const key = index.changeKeyOf(row)
+    return key === undefined ? [] : [[key, row] as const]
+  })), [diff.rows, index])
+  const startLineDrag = useLineDrag(
+    (x, y) => {
+      const drag = lineDrag.current
+      const key = drag ? gutterAt(x, y, drag.table)?.dataset.changeKey : undefined
+      const row = key === undefined ? undefined : rowByChangeKey.get(key)
+      if (drag && row && rowKey(row) !== drag.key) {
+        drag.key = rowKey(row)
+        onLineNumberClick?.(row, drag.side, true)
+      }
+    },
+    () => {
+      lineDrag.current = null
+      onLineSelectEnd?.()
+    },
+  )
   const widgetMap = widgets ? widgets(index.changeKeyOf) : undefined
   const pinnedKeys = Object.keys(widgetMap ?? {}).join(',')
   const targetIndex = targetPosition(rows, target)
@@ -247,14 +262,15 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
             return
           }
           event.preventDefault()
-          dragging.current = true
-          onLineNumberClick(row, side ?? gutterSide(row), event.shiftKey)
-        },
-        onMouseEnter: ({ change, side }) => {
-          const row = index.rowOf(change)
-          if (row && onLineNumberClick && dragging.current) {
-            onLineNumberClick(row, side ?? gutterSide(row), true)
+          const rowSide = side ?? gutterSide(row)
+          const cell = event.currentTarget
+          const table = cell.closest('table')
+          const bounds = cell.getBoundingClientRect()
+          if (table) {
+            lineDrag.current = { side: rowSide, table, key: rowKey(row) }
+            startLineDrag(bounds.left + bounds.width / 2, event.clientY)
           }
+          onLineNumberClick(row, rowSide, event.shiftKey)
         },
       }}
       codeEvents={{
