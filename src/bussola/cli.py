@@ -4,13 +4,12 @@ import webbrowser
 from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
 from bussola.access import TOKEN_ENV, allowed_hosts_for, is_local_host, new_token
 from bussola.ai.config import default_config_file
-from bussola.app import create_app
 from bussola.config import DEFAULT_HOST, DEFAULT_PORT, AppSettings, default_data_dir, load_repo_config
 from bussola.errors import DomainError
 from bussola.git import GitError, GitRepo, InvalidRefError
@@ -19,23 +18,33 @@ from bussola.handler.opening import COMMAND, USAGE_ERROR_EXIT_CODE, open_link
 from bussola.handler.server import ServerAddress
 from bussola.handler.serving import run_published
 from bussola.identity import GitConfigIdentity
-from bussola.review.context import ReviewContext
-from bussola.review.overview import unit_views
 from bussola.review.refs import NoBaseBranchError, default_base_ref
-from bussola.review.repos import register_repo
-from bussola.review.revisions import refresh_review
-from bussola.storage.database import Database
-from bussola.storage.repositories import Store
+
+if TYPE_CHECKING:
+    from bussola.review.context import ReviewContext
+    from bussola.storage.models import Repo
+    from bussola.storage.repositories import Store
 
 BROWSER_OPEN_DELAY_SECONDS = 1.0
 SHORT_SHA_LENGTH = 12
 CLI_ERRORS = (GitError, InvalidRefError, NoBaseBranchError, DomainError)
 
-app = typer.Typer(no_args_is_help=True, add_completion=False)
+app = typer.Typer(no_args_is_help=True)
+
+
+def complete_branch(ctx: typer.Context, incomplete: str) -> list[str]:
+    try:
+        local, remote = GitRepo(Path(ctx.params.get("repo") or Path.cwd()).expanduser()).branches()
+    except (GitError, OSError):
+        return []
+    return [name for name in (*local, *remote) if name.startswith(incomplete)]
+
 
 RepoOption = Annotated[Path | None, typer.Option("--repo", help="Repository path (default: current directory)")]
-BaseOption = Annotated[str | None, typer.Option("--base", help="Base branch (default: from .bussola.toml, then develop, main, master)")]
-HeadArgument = Annotated[str, typer.Argument(help="Branch or commit under review")]
+BaseOption = Annotated[
+    str | None, typer.Option("--base", help="Base branch (default: from .bussola.toml, then develop, main, master)", autocompletion=complete_branch)
+]
+HeadArgument = Annotated[str, typer.Argument(help="Branch or commit under review", autocompletion=complete_branch)]
 
 
 @app.callback()
@@ -52,6 +61,8 @@ def serve(
     register: Annotated[bool, typer.Option("--register/--no-register", hidden=True)] = True,
 ) -> None:
     """Start the review UI."""
+    from bussola.app import create_app
+
     host = host.removeprefix("[").removesuffix("]")
     if not is_local_host(host):
         typer.secho(f"warning: listening on {host} exposes your repositories to other machines on the network", fg=typer.colors.YELLOW, err=True)
@@ -105,6 +116,9 @@ def _apply_registration(steps: Callable[[registration.Registration], Sequence[re
 @app.command()
 def status(head: HeadArgument, base: BaseOption = None, repo: RepoOption = None) -> None:
     """Refresh the review of HEAD and print the state of each changed unit."""
+    from bussola.review.overview import unit_views
+    from bussola.review.revisions import refresh_review
+
     with _cli_errors(), _review_context(head, base, repo) as (context, git_repo):
         result = refresh_review(context.store, context.review, git_repo)
         views = unit_views(context, result.revision)
@@ -122,6 +136,8 @@ def refresh(
     fetch: Annotated[bool, typer.Option("--fetch", help="Run git fetch --prune first")] = False,
 ) -> None:
     """Record a new revision of the review of HEAD if any commit changed."""
+    from bussola.review.revisions import refresh_review
+
     with _cli_errors(), _review_context(head, base, repo) as (context, git_repo):
         result = refresh_review(context.store, context.review, git_repo, fetch=fetch)
         units = len(context.store.reviews.snapshots(result.revision.id))
@@ -131,17 +147,28 @@ def refresh(
 
 
 @contextmanager
-def _review_context(head: str, base: str | None, repo_path: Path | None) -> Generator[tuple[ReviewContext, GitRepo]]:
+def _review_context(head: str, base: str | None, repo_path: Path | None) -> Generator[tuple["ReviewContext", GitRepo]]:
+    from bussola.review.context import ReviewContext
+
     git_repo = GitRepo.discover(repo_path or Path.cwd())
     base_ref = base or default_base_ref(git_repo, load_repo_config(git_repo.root))
     git_repo.resolve_commit(head)
     git_repo.resolve_commit(base_ref)
-    with Database.open(default_data_dir()).session() as session:
-        store = Store(session)
-        repo = register_repo(store, git_repo.root)
+    with _registered_repo(default_data_dir(), git_repo.root) as (store, repo):
         review = store.reviews.find_or_add_review(repo.id, head, base_ref)
         identity = GitConfigIdentity(git_repo.root).current()
         yield ReviewContext(store, review, store.reviews.reviewer(identity.email, identity.name)), git_repo
+
+
+@contextmanager
+def _registered_repo(data_dir: Path, path: Path) -> Generator[tuple["Store", "Repo"]]:
+    from bussola.review.repos import register_repo
+    from bussola.storage.database import Database
+    from bussola.storage.repositories import Store
+
+    with Database.open(data_dir).session() as session:
+        store = Store(session)
+        yield store, register_repo(store, path)
         store.commit()
 
 
@@ -159,10 +186,8 @@ def _register_if_repo(data_dir: Path, path: Path) -> None:
         GitRepo.discover(path)
     except GitError:
         return
-    with Database.open(data_dir).session() as session:
-        store = Store(session)
-        register_repo(store, path)
-        store.commit()
+    with _registered_repo(data_dir, path):
+        pass
 
 
 def main() -> None:

@@ -42,6 +42,7 @@ ECMASCRIPT_DEFINITIONS = (
 )
 GO_DEFINITIONS = frozenset({go.FUNCTION_DECLARATION, go.METHOD_DECLARATION}) | go.TYPE_SPECS
 GO_VARIABLES = frozenset({"var_spec", "const_spec"})
+MEMBER_IDENTIFIERS = frozenset({"property_identifier", "field_identifier"})
 ECMASCRIPT_IDENTIFIERS = frozenset(
     {"identifier", "property_identifier", "type_identifier", "shorthand_property_identifier", "shorthand_property_identifier_pattern"}
 )
@@ -154,6 +155,11 @@ def _identifiers(language: SourceLanguage, tree: Tree) -> Iterator[Node]:
 def symbol_of(language: SourceLanguage, node: Node) -> Symbol:
     row, start = node.start_point
     return Symbol(node_text(node), row, start, language.is_definition(node))
+
+
+def is_member(node: Node) -> bool:
+    parent = node.parent
+    return node.type in MEMBER_IDENTIFIERS or (parent is not None and parent.type == "attribute" and parent.child_by_field_name("attribute") == node)
 
 
 def nodes(root: Node) -> Iterator[Node]:
