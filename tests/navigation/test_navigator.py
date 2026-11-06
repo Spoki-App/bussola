@@ -240,3 +240,17 @@ def test_a_plain_name_defined_in_its_own_file_skips_namesakes_elsewhere(
     tmp_path: Path, git_repo: GitFixture, path: str, clicked: str, expected: list[tuple[str, int]]
 ) -> None:
     assert definitions_from(tmp_path, git_repo, SAME_NAME, path, clicked) == expected
+
+
+def test_a_class_attribute_lists_its_usages(tmp_path: Path, git_repo: GitFixture) -> None:
+    source = 'class Checkout:\n    BLOCKED = (\n        "Not now"\n    )\n\n    def check(self):\n        return self.BLOCKED\n'
+    commit = git_repo.commit({"checkout.py": source})
+    starter = ManualStarter()
+    navigator = Navigator(tmp_path / "data", starter)
+    navigator.prepare(git_repo.repo, commit, ())
+    starter.run()
+
+    found = navigator.navigate(git_repo.repo, commit, (), Click("checkout.py", 2, 5))
+
+    assert (found.symbol, found.origin) == ("BLOCKED", Origin.DEFINITION)
+    assert [(target.line, target.enclosing) for target in found.targets] == [(7, Enclosing(UnitKind.METHOD, "Checkout.check"))]
