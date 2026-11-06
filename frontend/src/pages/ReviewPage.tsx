@@ -13,6 +13,7 @@ import { ExternalLink } from '../components/ExternalLink'
 import { FileTree } from '../components/FileTree'
 import { GitHubSyncStatus } from '../components/GitHubSyncStatus'
 import { LinkPullRequest } from '../components/LinkPullRequest'
+import { MergePullRequest } from '../components/MergePullRequest'
 import { PullRequestDescription } from '../components/PullRequestDescription'
 import { RateImpact } from '../components/RateImpact'
 import { ReviewTitle } from '../components/ReviewTitle'
@@ -89,6 +90,7 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
   const makeLink = reviewLinkMaker(review.pull_request?.url)
   const [message, setMessage] = useState<string | null>(null)
   const [synced, setSynced] = useState<SyncResult | null>(null)
+  const [merging, setMerging] = useState(false)
   const sync = useSync(review.id)
   const finish = useFinishReview(review.id)
   const revision = review.latest_revision
@@ -149,9 +151,15 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
         >
           Mark as reviewed
         </button>
+        {review.pull_request?.state === 'OPEN' && (
+          <button type="button" aria-expanded={merging} onClick={() => { setMerging(!merging) }}>
+            Merge
+          </button>
+        )}
       </div>
       {message && <p className="notice">{message}</p>}
       {synced && <SyncSummary result={synced} />}
+      {merging && <MergePullRequest reviewId={review.id} />}
       {needsLink && <LinkPullRequest reviewId={review.id} unsent={synced.unsent_comments} onLinked={runSync} />}
       {(sync.error ?? finish.error) && <ErrorNote message={describeError(sync.error ?? finish.error)} />}
     </header>

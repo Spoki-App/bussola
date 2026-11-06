@@ -117,6 +117,49 @@ class Asset:
     data: bytes
 
 
+class MergeMethod(StrEnum):
+    MERGE = "merge"
+    SQUASH = "squash"
+    REBASE = "rebase"
+
+
+class BranchDeletion(StrEnum):
+    OPTIONAL = "optional"
+    AUTOMATIC = "automatic"
+    UNAVAILABLE = "unavailable"
+
+
+@dataclass(frozen=True)
+class CommitText:
+    title: str
+    message: str
+
+
+@dataclass(frozen=True)
+class HeadBranch:
+    repository: str
+    name: str
+
+
+@dataclass(frozen=True)
+class MergeOptions:
+    head_sha: str
+    methods: tuple[MergeMethod, ...]
+    default_method: MergeMethod | None
+    commit_texts: dict[MergeMethod, CommitText]
+    blockers: tuple[str, ...]
+    branch_deletion: BranchDeletion
+    head_branch: HeadBranch | None
+
+
+@dataclass(frozen=True)
+class MergeRequest:
+    method: MergeMethod
+    head_sha: str
+    title: str = ""
+    message: str = ""
+
+
 class ForgeAdapter(Protocol):
     provider: str
 
@@ -136,4 +179,7 @@ class ForgeAdapter(Protocol):
     def set_files_viewed(self, pull_id: str, paths: Sequence[str], viewed: bool) -> dict[str, str]: ...
     def download_asset(self, url: str) -> Asset: ...
     def mention_candidates(self, repository: str, number: int | None) -> list[str]: ...
+    def merge_options(self, repository: str, number: int) -> MergeOptions: ...
+    def merge_pull_request(self, repository: str, number: int, request: MergeRequest) -> None: ...
+    def delete_branch(self, branch: HeadBranch) -> None: ...
     def can_reply(self, remote_id: str | None) -> bool: ...
