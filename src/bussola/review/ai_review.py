@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import threading
 from collections import Counter
 from collections.abc import Callable, Generator, Iterable
@@ -44,8 +45,21 @@ IMPACT_ORDER = {Impact.HIGH: 0, Impact.MEDIUM: 1, Impact.LOW: 2}
 UNRATED_ORDER = IMPACT_ORDER[Impact.MEDIUM]
 MAX_FINDING_CHARACTERS = MAX_BODY_LENGTH - 1_000
 CLIPPED_FINDING = "\n\n[The rest of this finding was too long to keep.]"
+MAX_TITLE_CHARACTERS = 120
 
 type RaisedKey = tuple[str, str | None, str | None, str | None, int | None, str]
+
+
+class Severity(StrEnum):
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+SEVERITY_ORDER = {Severity.CRITICAL: 0, Severity.HIGH: 1, Severity.MEDIUM: 2, Severity.LOW: 3}
+SEVERITY_MARKS = {Severity.CRITICAL: "🔴", Severity.HIGH: "🟠", Severity.MEDIUM: "🟡", Severity.LOW: "🔵"}
+SEVERITY_HEADING = re.compile(rf"\A(?:{'|'.join(SEVERITY_MARKS.values())}) \*\*\w+:\*\* [^\n]*\n\n")
 
 
 class Finding(BaseModel):
@@ -53,7 +67,17 @@ class Finding(BaseModel):
     side: Literal["after", "before"]
     start_line: int
     end_line: int
+    severity: Severity
+    title: str = Field(min_length=1)
     body: str = Field(min_length=1)
+
+    @field_validator("title")
+    @classmethod
+    def _one_line(cls, title: str) -> str:
+        text = " ".join(title.split())
+        if not text:
+            raise ValueError("must not be blank")
+        return text if len(text) <= MAX_TITLE_CHARACTERS else text[: MAX_TITLE_CHARACTERS - 3].rstrip() + "..."
 
     @field_validator("body")
     @classmethod
@@ -62,6 +86,10 @@ class Finding(BaseModel):
         if not text:
             raise ValueError("must not be blank")
         return text if len(text) <= MAX_FINDING_CHARACTERS else text[:MAX_FINDING_CHARACTERS] + CLIPPED_FINDING
+
+    @property
+    def heading(self) -> str:
+        return f"{SEVERITY_MARKS[self.severity]} **{self.severity.value.capitalize()}:** {self.title}"
 
 
 class ReviewFindings(BaseModel):
@@ -89,6 +117,22 @@ SUMMARY_LINKS = (
     "#before:PATH:N for line N of PATH in the old version, such as [the new check](#after:app/billing.py:80): the reviewer clicks it to see "
     "that line.\n\n"
 )
+REVIEW_ANSWER = (
+    "findings: one entry per problem. path: the file of the lines the finding is anchored on. side: after for lines of the new version, "
+    "before for lines the change removes. start_line and end_line: the line numbers shown before the code on that side, the same number "
+    "for a single line.\n"
+    "severity: critical when the change breaks a main flow, loses or corrupts data or opens a security hole; high when it is wrong in a "
+    "real case that users will reach; medium for an edge case or missing handling that can fail later; low for a minor risk worth a look.\n"
+    "title: one line of at most 80 characters that names the problem, such as `Prepaid customers can no longer upgrade`, in plain text "
+    "with names of code in backticks, without the severity.\n"
+    "body: GitHub-flavored Markdown for the author, at most about 90 words, without headings and without repeating the title. "
+    "Write what is wrong in one or two sentences, then why it matters in one or two sentences, then a paragraph that starts with "
+    "**Fix:** and says how to fix it. Use a bullet list for several places or options and a short code block when the fix is a few lines. "
+    "Put names of code in backticks and name other places as path:line.\n"
+    "summary: GitHub-flavored Markdown for the reviewer, without headings. Start with one sentence that gives the verdict on the change. "
+    "Then write a bullet list of at most six points, one sentence each: what you checked, what you looked up with the tools and what you found there. "
+    "Do not repeat the findings. When you mention a specific line, link to it.\n\n"
+)
 REVIEW_RULES = (
     "Report only problems that deserve the author's attention: bugs, logic errors, missing error handling, security issues, data loss, "
     "race conditions, broken edge cases and inconsistencies with the rest of the change or with the pull request description. "
@@ -96,24 +140,19 @@ REVIEW_RULES = (
     "place that another place relied on, state written in one unit and read in another. Do not report style, naming or formatting "
     "preferences, do not praise, and do not raise a point that an existing comment already raises. "
     "An empty list is the right answer when the change looks correct.\n\n"
-    "findings: one entry per problem. Anchor it on lines of the units to review, at the change that causes the problem, and name any other "
-    "place in the body as path:line. path: the file of those lines. side: after for lines of the new version, before for lines the change "
-    "removes. start_line and end_line: the line numbers shown before the code on that side, the same number for a single line. "
-    "body: GitHub-flavored Markdown for the author, short and concrete: what is wrong, why it matters and how to fix it.\n\n"
-    "summary: GitHub-flavored Markdown for the reviewer, a few sentences without a title: what you checked, what you looked up with "
-    "the tools and what you found there, and why the change looks correct or what the findings have in common. Do not repeat the findings. "
-    "When you mention a specific line, link to it."
+    "Anchor each finding on lines of the units to review, at the change that causes the problem."
 )
 
 REVIEW_PROMPT = EditablePrompt("review", REVIEW_RULES)
 
 REVIEW_PULL_REQUEST = AiTask(
     name="review_pull_request",
-    version=3,
+    version=4,
     system="You are a careful code reviewer. You review a pull request through the units it changes: "
     + UNIT_KINDS
     + REVIEW_INPUT
     + REVIEW_TOOLS
+    + REVIEW_ANSWER
     + SUMMARY_LINKS
     + RATINGS,
     output=ReviewFindings,
@@ -402,7 +441,7 @@ class _GroupReviewer:
         ai_context = replace(context, reviewer=self.author)
         per_unit: Counter[int] = Counter()
         created: list[tuple[Thread, str, str]] = []
-        for finding in findings:
+        for finding in sorted(findings, key=lambda finding: SEVERITY_ORDER[finding.severity]):
             request = place_finding(finding, group, self.snapshots)
             key = _request_key(request)
             if key in raised:
@@ -435,10 +474,10 @@ def place_finding(finding: Finding, group: list[UnitSnapshot], snapshots: list[U
             snapshot = min(candidates, key=lambda snapshot: (_distance(snapshot, side, finding.start_line), snapshot.id not in focus))
             numbers = [line.file_line for line in side_lines(snapshot, side)]
             first, last = sorted((_nearest(numbers, finding.start_line), _nearest(numbers, finding.end_line)))
-            return NewThread(ThreadScope.UNIT, finding.body, snapshot, side=side, line_offset=first, line_count=last - first + 1)
+            return NewThread(ThreadScope.UNIT, f"{finding.heading}\n\n{finding.body}", snapshot, side=side, line_offset=first, line_count=last - first + 1)
     if named:
-        return NewThread(ThreadScope.FILE, f"Line {finding.start_line}: {finding.body}", path=named[0].path)
-    return NewThread(ThreadScope.REVIEW, f"On `{finding.path}`, line {finding.start_line}:\n\n{finding.body}")
+        return NewThread(ThreadScope.FILE, f"{finding.heading}\n\nLine {finding.start_line}: {finding.body}", path=named[0].path)
+    return NewThread(ThreadScope.REVIEW, f"{finding.heading}\n\nOn `{finding.path}`, line {finding.start_line}:\n\n{finding.body}")
 
 
 def _distance(snapshot: UnitSnapshot, side: Side, line: int) -> int:
@@ -467,17 +506,22 @@ def _lookups(toolbox: Toolbox) -> list[dict[str, Any]]:
 
 
 def _request_key(request: NewThread) -> RaisedKey:
+    body = _without_heading(request.body)
     if request.snapshot is None:
-        return (request.scope.value, request.path, None, None, None, request.body)
-    return (request.scope.value, request.snapshot.path, request.snapshot.qualified_name, request.side.value, request.line_offset, request.body)
+        return (request.scope.value, request.path, None, None, None, body)
+    return (request.scope.value, request.snapshot.path, request.snapshot.qualified_name, request.side.value, request.line_offset, body)
 
 
 def _raised_key(view: ThreadView) -> RaisedKey:
     thread = view.thread
-    first = next((comment.body for comment in view.comments if comment.deleted_at is None), "")
+    first = _without_heading(next((comment.body for comment in view.comments if comment.deleted_at is None), ""))
     if thread.scope != ThreadScope.UNIT:
         return (thread.scope, thread.path, None, None, None, first)
     return (thread.scope, thread.path, thread.qualified_name, thread.side, view.anchor.line_offset if view.anchor else None, first)
+
+
+def _without_heading(body: str) -> str:
+    return SEVERITY_HEADING.sub("", body, count=1)
 
 
 def _thread_summary(view: ThreadView) -> str:
