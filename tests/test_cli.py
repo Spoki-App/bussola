@@ -267,3 +267,72 @@ def test_serve_registers_the_folder_unless_told_not_to(git_repo: GitFixture, dat
     assert "http://127.0.0.1:9123/?token=fixed-token" in registered.output
     assert [repo["path"] for repo in repos.call("GET", "/repos")] == [str(git_repo.root)]
     assert published == [server.ServerAddress("127.0.0.1", 9123, "fixed-token")] * 2
+
+
+def _complete(words: str) -> list[str]:
+    env = {"_BUSSOLA_COMPLETE": "complete_bash", "COMP_WORDS": words, "COMP_CWORD": str(len(words.split(" ")) - 1)}
+    result = runner.invoke(app, [], env=env, prog_name="bussola")
+    assert result.exit_code == 0, result.output
+    return result.output.split()
+
+
+def _repo_with_branches(git_repo: GitFixture) -> GitFixture:
+    git_repo.commit({"a.txt": "a\n"})
+    git_repo.git("branch", "feature/x")
+    git_repo.git("update-ref", "refs/remotes/origin/feature/y", "HEAD")
+    git_repo.git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/feature/y")
+    return git_repo
+
+
+def test_completes_local_then_remote_branches_of_the_current_repository(git_repo: GitFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(_repo_with_branches(git_repo).root)
+
+    assert _complete("bussola status ") == ["feature/x", "main", "origin/feature/y"]
+    assert _complete("bussola refresh feature/x --base f") == ["feature/x"]
+
+
+def test_completes_branches_of_the_repo_option(git_repo: GitFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    root = _repo_with_branches(git_repo).root
+
+    assert _complete(f"bussola status --repo {root} origin/") == ["origin/feature/y"]
+    assert _complete(f"bussola refresh --repo {root} x --base ma") == ["main"]
+
+
+def test_completes_branches_of_a_repo_option_under_the_home_folder(git_repo: GitFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    _repo_with_branches(git_repo)
+
+    assert _complete("bussola status --repo ~/repo feature/") == ["feature/x"]
+
+
+def test_completes_no_branches_outside_a_repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    assert _complete("bussola status ") == []
+    assert _complete(f"bussola status --repo {tmp_path / 'missing'} ") == []
+
+
+def test_completes_commands_and_options() -> None:
+    assert _complete("bussola ") == ["serve", "open-link", "install-handler", "uninstall-handler", "status", "refresh"]
+    assert _complete("bussola refresh --") == ["--base", "--repo", "--fetch", "--help"]
+
+
+def test_completion_loads_none_of_the_review_storage_or_web_modules(git_repo: GitFixture) -> None:
+    git_repo.commit({"a.txt": "a\n"})
+    heavy = ("alembic", "fastapi", "sqlalchemy", "bussola.app", "bussola.storage.models")
+    script = (
+        "import sys\n"
+        "from bussola.cli import app\n"
+        "try:\n"
+        "    app(prog_name='bussola')\n"
+        "except SystemExit:\n"
+        "    pass\n"
+        f"print(sorted(name for name in {heavy!r} if name in sys.modules))\n"
+    )
+    env = {**os.environ, "_BUSSOLA_COMPLETE": "complete_bash", "COMP_WORDS": "bussola status ", "COMP_CWORD": "2"}
+
+    result = subprocess.run([sys.executable, "-P", "-c", script], cwd=git_repo.root, env=env, capture_output=True, text=True, check=False)
+
+    assert result.stdout.split() == ["main", "[]"], result.stderr

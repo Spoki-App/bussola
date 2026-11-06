@@ -15,7 +15,7 @@ from bussola.navigation.positions import byte_to_utf16, preview, source_lines, u
 from bussola.navigation.scopes import Enclosing, enclosing_at
 from bussola.navigation.servers import LanguageServers, server_command
 from bussola.navigation.specs import SERVER_SPECS, ServerSpec
-from bussola.navigation.symbols import SourceLanguage, Symbol, identifier_at, language_for, references, symbol_of
+from bussola.navigation.symbols import SourceLanguage, Symbol, identifier_at, is_member, language_for, references, symbol_of
 from bussola.navigation.symbols import parse as parse_source
 from bussola.units.extractors.treesitter import parse
 
@@ -169,7 +169,7 @@ class Navigator:
             index = self.indexes.get(repo, commit, ignore)
             if index is None:
                 return Navigation(False, symbol.name, origin, missing_server=missing)
-            targets = _usages(index, language, symbol, files) if origin == Origin.DEFINITION else _definitions(index, language, symbol, click.path, files)
+            targets = _usages(index, language, symbol, files) if origin == Origin.DEFINITION else _definitions(index, language, node, click.path, files)
             return Navigation(True, symbol.name, origin, Resolver.TREE_SITTER, targets, missing)
 
     def close(self) -> None:
@@ -224,8 +224,12 @@ def _layout(root: Path, commit: str) -> ProjectLayout:
         return ProjectLayout.of(list(blobs), lambda path: reader.read(blobs[path]))
 
 
-def _definitions(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, path: str, files: SourceFiles) -> tuple[Target, ...]:
+def _definitions(index: SymbolIndex, language: SourceLanguage, node: Node, path: str, files: SourceFiles) -> tuple[Target, ...]:
+    symbol = symbol_of(language, node)
     found = sorted(index.definitions(language.family, symbol.name), key=lambda item: (item[0].path != path, item[0].path, item[1].row))
+    local = [item for item in found if item[0].path == path]
+    if local and not is_member(node):
+        found = local
     return tuple(target for file, definition in found[:MAX_TARGETS] if (target := files.symbol_target(TargetRole.DEFINITION, file, definition)))
 
 
