@@ -56,6 +56,7 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
   const [rich, setRich] = useState({ html: start.html, version: 0 })
   const [notice, setNotice] = useState(start.notice)
   const [mention, setMention] = useState<{ query: string; active: number } | null>(null)
+  const [uploading, setUploading] = useState(0)
   const textarea = useRef<HTMLTextAreaElement>(null)
   const editor = useRef<HTMLDivElement>(null)
   const candidates = useMentionCandidates(reviewId, mention !== null)
@@ -86,8 +87,9 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
       setBody(richToMarkdown(editor.current))
     }
   }
+  const canSubmit = !busy && uploading === 0 && body.trim() !== ''
   const submit = () => {
-    if (body.trim()) {
+    if (canSubmit) {
       onSubmit(body, () => {
         setBody('')
         showRich('')
@@ -125,16 +127,17 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
     }
   }
 
-  const insertPlaceholder = ({ alt, markdown }: Placeholder) => {
-    if (editor.current) {
-      insertRichImage(editor.current, alt)
+  const insertPlaceholders = (placeholders: Placeholder[]) => {
+    const root = editor.current
+    if (root) {
+      placeholders.forEach(({ alt }) => { insertRichImage(root, alt) })
       syncRich()
       return
     }
     const element = textarea.current
     const start = element?.selectionStart ?? body.length
     const end = element?.selectionEnd ?? body.length
-    setBody((current) => replaceRange(current, start, end, markdown).text)
+    setBody((current) => replaceRange(current, start, end, placeholders.map(({ markdown }) => markdown).join('\n')).text)
   }
   const replacePlaceholder = ({ alt, markdown }: Placeholder, image: { alt: string; src: string } | null) => {
     if (editor.current) {
@@ -145,23 +148,26 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
     setBody((current) => current.replace(markdown, image ? `![${image.alt}](${image.src})` : ''))
   }
   const attach = (files: File[]) => {
-    setNotice(null)
-    for (const file of files) {
-      const problem = imageProblem(file)
-      if (problem) {
-        setNotice(problem)
-        continue
-      }
-      const placeholder = uploadingImage(file.name)
-      insertPlaceholder(placeholder)
-      uploadImage(file).then(
-        (src) => { replacePlaceholder(placeholder, { alt: imageAlt(file.name), src }) },
-        (error: unknown) => {
-          replacePlaceholder(placeholder, null)
-          setNotice(`${file.name} could not be uploaded: ${describeError(error)}`)
-        },
-      )
+    const problems = files.map(imageProblem)
+    const accepted = files.filter((_, index) => problems[index] === null)
+    setNotice(problems.findLast((problem) => problem !== null) ?? null)
+    if (!accepted.length) {
+      return
     }
+    const placeholders = accepted.map((file) => uploadingImage(file.name))
+    insertPlaceholders(placeholders)
+    setUploading((count) => count + accepted.length)
+    accepted.forEach((file, index) => {
+      uploadImage(file)
+        .then(
+          (src) => { replacePlaceholder(placeholders[index], { alt: imageAlt(file.name), src }) },
+          (error: unknown) => {
+            replacePlaceholder(placeholders[index], null)
+            setNotice(`${file.name} could not be uploaded: ${describeError(error)}`)
+          },
+        )
+        .finally(() => { setUploading((count) => count - 1) })
+    })
   }
   const attachFrom = (event: ClipboardEvent | DragEvent) => {
     const files = imageFiles('clipboardData' in event ? event.clipboardData.files : event.dataTransfer.files)
@@ -214,7 +220,6 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
               onMouseDown={(event) => {
                 event.preventDefault()
                 runCommand(action.command, action.value)
-                syncRich()
               }}
             >
               {action.text}
@@ -252,7 +257,11 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
               updateRichMention()
             }}
             onKeyDown={onKeyDown}
-            onKeyUp={updateRichMention}
+            onKeyUp={(event) => {
+              if (event.key !== 'Escape') {
+                updateRichMention()
+              }
+            }}
             onBlur={() => { setMention(null) }}
           />
         ) : (
@@ -275,13 +284,13 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
       </div>
       {notice && <ErrorNote message={notice} />}
       <div className="composer-actions">
-        <span className="muted">Ctrl/Cmd + Enter to send</span>
+        <span className="muted">{uploading ? 'Uploading images...' : 'Ctrl/Cmd + Enter to send'}</span>
         {onCancel && (
           <button type="button" onClick={onCancel}>
             Cancel
           </button>
         )}
-        <button type="button" className="primary" disabled={busy || !body.trim()} onClick={submit}>
+        <button type="button" className="primary" disabled={!canSubmit} onClick={submit}>
           {submitLabel}
         </button>
       </div>

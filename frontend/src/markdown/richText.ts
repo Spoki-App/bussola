@@ -1,4 +1,4 @@
-import type { Element, ElementContent, Text as HastText } from 'hast'
+import type { Element, ElementContent, Nodes as HastNodes, Text as HastText } from 'hast'
 import { fromDom } from 'hast-util-from-dom'
 import { defaultSchema, sanitize, type Schema } from 'hast-util-sanitize'
 import { toHtml } from 'hast-util-to-html'
@@ -11,6 +11,8 @@ import { toHast, type Handler, type State } from 'mdast-util-to-hast'
 import { toMarkdown } from 'mdast-util-to-markdown'
 import { gfm } from 'micromark-extension-gfm'
 import { visit } from 'unist-util-visit'
+
+import { imageSource } from './assets'
 
 const ESCAPED = /\\([!-/:-@[-`{-~])/g
 const NO_BREAK_SPACE = '\u00a0'
@@ -70,13 +72,35 @@ const html: Handler = (_state: State, node: Html, parent: Parents | undefined) =
 const HANDLERS = { code: asSource, definition: asSource, footnoteDefinition: asSource, footnoteReference: asSource, html, imageReference: asSource, linkReference: asSource }
 
 function markdownToRichHtml(markdown: string): string {
-  return toHtml(sanitize(toHast(parse(markdown), { handlers: HANDLERS }), SCHEMA))
+  const tree = sanitize(toHast(parse(markdown), { handlers: HANDLERS }), SCHEMA)
+  visit(tree, 'element', (image: Element) => {
+    const src = image.properties.src
+    if (image.tagName === 'img' && typeof src === 'string' && imageSource(src) !== src) {
+      image.properties = { ...image.properties, src: imageSource(src), dataSource: src }
+    }
+  })
+  return toHtml(tree)
+}
+
+function restoreImageSources(tree: HastNodes): void {
+  visit(tree, 'element', (image: Element) => {
+    const { src, dataSource } = image.properties
+    if (image.tagName === 'img' && typeof dataSource === 'string' && imageSource(dataSource) === src) {
+      image.properties.src = dataSource
+    }
+  })
+}
+
+function keptSource(element: Element): string | null {
+  const value = element.properties.dataMarkdown
+  const text = element.children.map((child) => (child.type === 'text' ? child.value : '')).join('')
+  return typeof value === 'string' && element.properties.contentEditable === 'false' && text === value ? value : null
 }
 
 function keeping(fallback: Handle): Handle {
   return (state, element: Element, parent) => {
-    const value = element.properties.dataMarkdown
-    return typeof value === 'string' ? ({ type: 'html', value } satisfies Html) : fallback(state, element, parent)
+    const value = keptSource(element)
+    return value === null ? fallback(state, element, parent) : ({ type: 'html', value } satisfies Html)
   }
 }
 
@@ -97,6 +121,7 @@ export function richToMarkdown(root: HTMLElement): string {
   visit(html, 'text', (text: HastText) => {
     text.value = text.value.replaceAll(NO_BREAK_SPACE, ' ')
   })
+  restoreImageSources(html)
   const tree = toMdast(html, { handlers: { pre: keeping(defaultHandlers.pre), code: keeping(defaultHandlers.code) } }) as Root
   return withoutNeedlessEscapes(stringify(tree).trimEnd())
 }

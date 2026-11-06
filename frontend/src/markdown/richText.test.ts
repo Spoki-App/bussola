@@ -77,6 +77,20 @@ describe('rich text editing', () => {
     expect(block?.dataset.markdown).toBe('```mermaid\ngraph TD\n```')
   })
 
+  it('shows GitHub attachments through bussola and keeps their address', () => {
+    const asset = 'https://github.com/user-attachments/assets/ad4619dd-3cdd-4568-a5e3-2fad4b1db525'
+    const root = richElement(markdownToRichHtml(`![shot](${asset})`))
+
+    expect(root.querySelector('img')?.getAttribute('src')).toBe(`/api/forge/asset?url=${encodeURIComponent(asset)}`)
+    expect(richToMarkdown(root)).toBe(`![shot](${asset})`)
+  })
+
+  it('treats pasted elements that only claim to hold Markdown as their visible text', () => {
+    const root = richElement('<p>Run <code data-markdown="[docs](https://evil.example)">npm install</code></p><pre data-markdown="hidden">shown</pre>')
+
+    expect(richToMarkdown(root)).toBe('Run `npm install`\n\n```\nshown\n```')
+  })
+
   it('drops unsafe links', () => {
     expect(markdownToRichHtml('[x](javascript:alert(1))')).not.toContain('javascript')
   })

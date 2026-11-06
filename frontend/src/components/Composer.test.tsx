@@ -63,9 +63,9 @@ function type(value: string) {
   fireEvent.select(element)
 }
 
-function attach(file: File) {
+function attach(...files: File[]) {
   const input = screen.getByLabelText<HTMLInputElement>('Attach image')
-  fireEvent.change(input, { target: { files: [file] } })
+  fireEvent.change(input, { target: { files } })
 }
 
 const png = (name = 'shot.png') => new File(['png'], name, { type: 'image/png' })
@@ -140,6 +140,40 @@ describe('Composer image upload', () => {
     })
     await waitFor(() => {
       expect(textarea()).toHaveValue(`Look: ![shot.png](${IMAGE_URL})`)
+    })
+  })
+
+  it('keeps the comment from being sent until its images are uploaded', async () => {
+    const upload = deferred()
+    stubApi([], () => upload.promise)
+    const { onSubmit } = renderComposer()
+    type('Look ')
+
+    attach(png())
+    fireEvent.keyDown(textarea(), { key: 'Enter', ctrlKey: true })
+
+    expect(screen.getByRole('button', { name: 'Comment' })).toBeDisabled()
+    expect(onSubmit).not.toHaveBeenCalled()
+    await act(async () => {
+      upload.resolve(Response.json({ url: IMAGE_URL }, { status: 201 }))
+      await upload.promise
+    })
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Comment' })).toBeEnabled()
+    })
+  })
+
+  it('replaces selected text with one placeholder per image', async () => {
+    stubApi([])
+    renderComposer()
+    type('Before SELECTED after')
+    textarea().setSelectionRange(7, 15)
+
+    attach(png('one.png'), png('two.png'))
+
+    expect(textarea()).toHaveValue('Before ![Uploading one.png...]()\n![Uploading two.png...]() after')
+    await waitFor(() => {
+      expect(textarea()).toHaveValue(`Before ![one.png](${IMAGE_URL})\n![two.png](${IMAGE_URL}) after`)
     })
   })
 
@@ -263,6 +297,27 @@ describe('Composer rich text mode', () => {
     fireEvent.mouseDown(await screen.findByRole('option', { name: '@carol' }))
 
     expect(editor.textContent).toBe('Hi @carol ')
+  })
+
+  it('closes the rich text mention list with Escape', async () => {
+    stubApi(['carol'])
+    window.localStorage.setItem(MODE_KEY, 'rich')
+    const onCancel = vi.fn()
+    renderComposer({ initial: 'Hi @ca', onCancel })
+
+    const editor = richEditor()
+    const text = editor.querySelector('p')?.firstChild
+    if (!text) {
+      throw new Error('no text')
+    }
+    window.getSelection()?.collapse(text, 6)
+    fireEvent.keyUp(editor, { key: 'a' })
+    await screen.findByRole('listbox')
+    fireEvent.keyDown(editor, { key: 'Escape' })
+    fireEvent.keyUp(editor, { key: 'Escape' })
+
+    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(onCancel).not.toHaveBeenCalled()
   })
 
   it('keeps review shortcuts disabled while typing in either mode', () => {
