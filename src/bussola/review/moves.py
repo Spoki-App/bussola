@@ -13,6 +13,7 @@ MIN_LINE_SIMILARITY = 0.6
 MIN_MATCHED_LINES = 3
 MIN_MATCHED_CHARACTERS = 60
 MIN_SIGNIFICANT_WORD_CHARACTERS = 4
+MAX_UNIT_LINES = 2000
 
 
 @dataclass(frozen=True)
@@ -89,6 +90,8 @@ def _claims(code: CodeRange) -> Iterator[tuple[int, Side, int]]:
 def _blocks(snapshot: UnitSnapshot) -> tuple[list[_Block], list[_Block]]:
     old = side_lines(snapshot, Side.BASE)
     new = side_lines(snapshot, Side.HEAD)
+    if max(len(old), len(new)) > MAX_UNIT_LINES:
+        return [], []
     lines = compute_diff_lines([line.text for line in old], [line.text for line in new])
     changed_runs = (list(run) for changed, run in groupby(lines, key=lambda line: line.change != LineChange.CONTEXT) if changed)
     removed: list[_Block] = []

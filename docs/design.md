@@ -79,7 +79,7 @@ At each refresh every unit thread, open or resolved, gets an anchor on the lates
 
 ## Moved code
 
-Moves are found per revision, on the base to head diff of every unit. Each run of changed rows of a unit is a hunk; its removed lines form a removed block and its added lines an added block. Blank lines and nested unit placeholders are left out, and a block needs at least three significant lines (four or more letters, digits or underscores).
+Moves are found per revision, on the base to head diff of every unit. Each run of changed rows of a unit is a hunk; its removed lines form a removed block and its added lines an added block. Units longer than 2,000 lines on either side, such as lockfiles and generated files, are skipped. Blank lines and nested unit placeholders are left out, and a block needs at least three significant lines (four or more letters, digits or underscores).
 
 A removed block is compared with the added blocks that share at least one significant line, ignoring spaces, except the added block of its own hunk, which is an edit in place. Lines are aligned in order: equal lines count fully, and in a run of replaced lines each pair counts by its character similarity when it is at least 0.6. The match covers the lines from the first to the last aligned pair on each side, and its similarity is the shared characters over all the characters of both spans. A match needs a similarity of at least 0.8, three aligned significant lines and 60 aligned characters. It is identical when both spans have the same lines once trimmed.
 

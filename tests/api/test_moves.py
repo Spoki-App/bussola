@@ -1,3 +1,6 @@
+import pytest
+
+from bussola.review import moves as move_detection
 from tests.apiclient import ApiClient, Json
 from tests.gitrepo import GitFixture
 
@@ -131,3 +134,31 @@ def test_a_range_outside_the_unit_is_rejected(api: ApiClient, git_repo: GitFixtu
 
 def _request(code: Json) -> Json:
     return {"unit_id": code["unit_id"], "side": code["side"], "line_offset": code["line_offset"], "line_count": code["line_count"]}
+
+
+def test_very_long_units_are_skipped(api: ApiClient, git_repo: GitFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(move_detection, "MAX_UNIT_LINES", 3)
+    git_repo.commit({"cart.py": TOTAL, "prices.py": "RATE = 1\n"})
+    git_repo.branch("feature")
+    git_repo.commit({"cart.py": "", "prices.py": "RATE = 1\n\n\n" + TOTAL})
+    review = api.start_review()
+
+    assert moves(api, review) == []
+
+
+def test_a_long_range_can_be_compared(api: ApiClient, git_repo: GitFixture) -> None:
+    long_file = "".join(f"line_{index} = {index}\n" for index in range(6000))
+    git_repo.commit({"data.txt": long_file})
+    git_repo.branch("feature")
+    git_repo.commit({"data.txt": long_file.replace("line_5 = 5", "line_5 = 6")})
+    review = api.start_review()
+    unit = api.unit(review, "data.txt")
+
+    body = {
+        "left": {"unit_id": unit["id"], "side": "base", "line_offset": 0, "line_count": 6000},
+        "right": {"unit_id": unit["id"], "side": "head", "line_offset": 0, "line_count": 6000},
+    }
+    comparison = api.call("POST", f"/reviews/{review}/compare", body=body)
+
+    assert comparison["left"]["line_count"] == 6000
+    assert not comparison["identical"]

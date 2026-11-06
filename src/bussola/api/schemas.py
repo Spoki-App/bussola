@@ -14,7 +14,6 @@ from bussola.review.thread_types import ThreadScope, ThreadStatus
 from bussola.units.model import UnitKind
 
 MAX_THREAD_LINES = 500
-MAX_COMPARE_LINES = 5000
 MAX_CALL_ID_LENGTH = 100
 
 LineRangeIn = Annotated[tuple[int, int], Field(description="Inclusive file line range")]
@@ -155,7 +154,7 @@ class CodeRangeIn(BaseModel):
     unit_id: int
     side: Side
     line_offset: int = Field(ge=0)
-    line_count: int = Field(ge=1, le=MAX_COMPARE_LINES)
+    line_count: int = Field(ge=1)
 
 
 class CompareIn(BaseModel):

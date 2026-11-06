@@ -26,6 +26,10 @@ interface CompareStart {
   label: string
 }
 
+function sameRange(first: CodeRangeRequest, second: CodeRangeRequest): boolean {
+  return first.unit_id === second.unit_id && first.side === second.side && first.line_offset === second.line_offset && first.line_count === second.line_count
+}
+
 export function ReviewRoute({ reviewId }: { reviewId: number }) {
   const review = useReview(reviewId)
   const revisionId = review.data?.latest_revision?.id
@@ -77,6 +81,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
       if (draft?.unitId === unit.id && draft.mode === diff.mode && !draft.selecting) {
         const request = draftRequest(draft)
         const range = { unit_id: unit.id, ...request }
+        const isFirstRange = compareStart !== null && sameRange(compareStart.range, range)
         const compare = () => {
           if (compareStart) {
             setComparison({ left: compareStart.range, right: range })
@@ -84,16 +89,17 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
           } else {
             setCompareStart({ range, label: `${plural(request.line_count, 'line')} of ${unitTitle(unit)}` })
           }
-          setDraft(null)
         }
         place(
           draftEndRow(draft, diff.rows),
           <div key="draft" className="thread draft">
             <div className="draft-header">
               <p className="muted draft-range">{request.line_count > 1 ? `Commenting on ${String(request.line_count)} lines` : ''}</p>
-              <button type="button" className="link" title={compareStart ? `Compare with ${compareStart.label}` : 'Keep these lines as the first range, then select a second range to compare with'} onClick={compare}>
-                {compareStart ? 'Compare with first range' : 'Compare with...'}
-              </button>
+              {!isFirstRange && (
+                <button type="button" className="link" title={compareStart ? `Compare with ${compareStart.label}` : 'Keep these lines as the first range, then select a second range to compare with'} onClick={compare}>
+                  {compareStart ? 'Compare with first range' : 'Compare with...'}
+                </button>
+              )}
             </div>
             <Composer
               submitLabel="Start thread"
@@ -148,7 +154,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
       />
       {compareStart && (
         <div className="compare-bar" role="status">
-          <span>{`First range: ${compareStart.label}. Select the second range by its line numbers and choose Compare.`}</span>
+          <span>{`First range: ${compareStart.label}. Select the second range by its line numbers and choose Compare with first range.`}</span>
           <button type="button" className="link" onClick={() => { setCompareStart(null) }}>
             Cancel
           </button>
