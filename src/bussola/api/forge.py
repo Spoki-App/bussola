@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from dataclasses import asdict
 
 from fastapi import APIRouter, Request, Response
 
@@ -9,11 +10,15 @@ from bussola.api.schemas import (
     ForgeLinkIn,
     ForgeLinkOut,
     ForgeOut,
+    MergeIn,
+    MergeOptionsOut,
+    MergeOut,
 )
 from bussola.api.state import app_state
-from bussola.api.views import forge_status_out, pull_request_out
-from bussola.forge.base import Asset
+from bussola.api.views import forge_status_out, merge_options_out, pull_request_out
+from bussola.forge.base import Asset, MergeRequest
 from bussola.forge.links import ForgeOverview, forge_overview, link_pull_request
+from bussola.forge.merge import merge_pull_request, review_merge_options
 from bussola.forge.publish import require_link
 from bussola.forge.pulls import sync_conversation
 from bussola.review.context import ReviewContext
@@ -52,6 +57,19 @@ def sync(context: ContextDep, request: Request) -> ConversationSyncOut:
     result = sync_conversation(context, app_state(request).forge, require_link(context))
     context.store.commit()
     return ConversationSyncOut(changes=result.changes, new_commits=result.new_commits, state=result.state)
+
+
+@router.get("/reviews/{review_id}/forge/merge")
+def get_merge_options(context: ContextDep, request: Request) -> MergeOptionsOut:
+    return merge_options_out(review_merge_options(context, app_state(request).forge, require_link(context)))
+
+
+@router.post("/reviews/{review_id}/forge/merge")
+def merge(body: MergeIn, context: ContextDep, request: Request) -> MergeOut:
+    merge_request = MergeRequest(body.method, body.head_sha, body.title, body.message)
+    outcome = merge_pull_request(context, app_state(request).forge, require_link(context), merge_request, body.delete_branch)
+    context.store.commit()
+    return MergeOut(**asdict(outcome))
 
 
 def _overview(context: ReviewContext, request: Request) -> ForgeOut:

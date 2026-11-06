@@ -3,6 +3,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from bussola.forge.base import BranchDeletion, MergeMethod
 from bussola.navigation.navigator import Origin, Resolver, TargetRole
 from bussola.review.ai_review import AiReviewPhase, RunStatus
 from bussola.review.descriptions import Impact
@@ -410,6 +411,34 @@ class ConversationSyncOut(BaseModel):
     changes: int
     new_commits: bool
     state: str
+
+
+class CommitTextOut(BaseModel):
+    title: str
+    message: str
+
+
+class MergeOptionsOut(BaseModel):
+    head_sha: str
+    methods: list[MergeMethod]
+    default_method: MergeMethod | None
+    commit_texts: dict[MergeMethod, CommitTextOut]
+    blockers: list[str]
+    branch_deletion: BranchDeletion
+
+
+class MergeIn(BaseModel):
+    method: MergeMethod
+    head_sha: str = Field(pattern=r"^[0-9a-f]{40}$")
+    title: str = Field(default="", max_length=1024)
+    message: str = Field(default="", max_length=65536)
+    delete_branch: bool = False
+
+
+class MergeOut(BaseModel):
+    state: str
+    branch_deleted: bool
+    branch_error: str | None
 
 
 class PullRequestLinkIn(BaseModel):

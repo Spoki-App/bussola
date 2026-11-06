@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getJson, postJson, putJson } from './client'
 import { invalidate, keys, useInvalidatingMutation } from './hooks'
 import { threadsKey } from './threads'
-import type { ConversationSync, ForgeOverview, SyncResult } from './types'
+import type { ConversationSync, ForgeOverview, MergeOptions, MergeRequest, MergeResult, SyncResult } from './types'
 
 const forgeKey = (reviewId: number) => ['forge', reviewId] as const
 
@@ -45,4 +45,14 @@ export function useGitHubSync(reviewId: number, headSha: string | undefined) {
     staleTime: GITHUB_SYNC_STALE_MS,
     retry: false,
   })
+}
+
+export function useMergeOptions(reviewId: number) {
+  return useQuery({ queryKey: [...forgeKey(reviewId), 'merge'], queryFn: () => getJson<MergeOptions>(`/reviews/${String(reviewId)}/forge/merge`), retry: false })
+}
+
+export function useMerge(reviewId: number) {
+  return useInvalidatingMutation([keys.review(reviewId), forgeKey(reviewId), threadsKey(reviewId)], (request: MergeRequest) =>
+    postJson<MergeResult>(`/reviews/${String(reviewId)}/forge/merge`, request),
+  )
 }
