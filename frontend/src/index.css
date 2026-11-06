@@ -2027,7 +2027,7 @@ button.link:hover:not(:disabled) {
 
 .compare-sides {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -2039,6 +2039,11 @@ button.link:hover:not(:disabled) {
   margin: 0;
   min-width: 0;
   font-size: 12px;
+}
+
+.compare-range code {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .compare-view {
