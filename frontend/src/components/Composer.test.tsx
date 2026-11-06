@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { Composer } from './Composer'
+import { Markdown } from './Markdown'
 
 const MODE_KEY = 'bussola.commentEditor'
 const IMAGE_URL = `/api/attachments/${'a'.repeat(64)}.png`
@@ -46,6 +47,16 @@ function renderComposer(props: { initial?: string; onSubmit?: (body: string) => 
     </QueryClientProvider>,
   )
   return { onSubmit, onKey }
+}
+
+function renderPlain(initial = '') {
+  const onSubmit = vi.fn()
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <Composer reviewId={3} submitLabel="Send" initial={initial} onSubmit={onSubmit} />
+    </QueryClientProvider>,
+  )
+  return { textbox: screen.getByRole<HTMLTextAreaElement>('textbox'), onSubmit }
 }
 
 function textarea(): HTMLTextAreaElement {
@@ -330,5 +341,126 @@ describe('Composer rich text mode', () => {
     fireEvent.keyDown(document.body, { key: 'j' })
 
     expect(onKey).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Composer preview', () => {
+  it('renders the draft like a posted comment and keeps it when going back to write', () => {
+    const text = '**bold** <script>alert(1)</script> | a |\n|---|\n| b |'
+    const { textbox } = renderPlain(text)
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+
+    const preview = screen.getByRole('tabpanel')
+    const posted = render(<Markdown text={text} />).container
+    expect(preview.innerHTML).toBe(posted.innerHTML)
+    expect(preview.querySelector('script')).toBeNull()
+    expect(screen.queryByRole('toolbar')).toBeNull()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Write' }))
+
+    expect(textbox).toHaveValue(text)
+    expect(textbox).toHaveFocus()
+  })
+
+  it('says there is nothing to preview for an empty comment', () => {
+    renderPlain('  ')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('Nothing to preview')
+  })
+
+  it('toggles the preview with Ctrl/Cmd + Shift + P', () => {
+    const { textbox } = renderPlain('_hi_')
+
+    fireEvent.keyDown(textbox, { key: 'P', ctrlKey: true, shiftKey: true })
+    expect(screen.getByRole('tabpanel').querySelector('em')).toHaveTextContent('hi')
+
+    fireEvent.keyDown(screen.getByRole('tabpanel'), { key: 'p', ctrlKey: true, shiftKey: true })
+    expect(screen.queryByRole('tabpanel')).toBeNull()
+    expect(textbox).toHaveFocus()
+  })
+
+  it('goes back to rich text after the preview when that is the kept mode', () => {
+    window.localStorage.setItem(MODE_KEY, 'rich')
+    renderPlain('**hi**')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    fireEvent.keyDown(screen.getByRole('tabpanel'), { key: 'p', ctrlKey: true, shiftKey: true })
+
+    expect(screen.getByRole('textbox').querySelector('strong')).toHaveTextContent('hi')
+  })
+})
+
+describe('Composer formatting', () => {
+  it('wraps the selection from the toolbar and keeps it selected', () => {
+    const { textbox } = renderPlain('fix this')
+    textbox.setSelectionRange(4, 8)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bold' }))
+
+    expect(textbox).toHaveValue('fix **this**')
+    expect([textbox.selectionStart, textbox.selectionEnd]).toEqual([6, 10])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bold' }))
+    expect(textbox).toHaveValue('fix this')
+  })
+
+  it.each([
+    ['b', 'Bold', '**bold text**'],
+    ['i', 'Italic', '_italic text_'],
+    ['e', 'Inline code', '`code`'],
+    ['k', 'Link', '[text](url)'],
+  ])('Ctrl/Cmd + %s applies %s at the cursor', (key, _label, expected) => {
+    const { textbox } = renderPlain()
+    const event = { key, ctrlKey: true }
+
+    expect(fireEvent.keyDown(textbox, event)).toBe(false)
+
+    expect(textbox).toHaveValue(expected)
+  })
+
+  it('does not trigger the review shortcuts', () => {
+    const review = vi.fn()
+    function Page() {
+      useKeyboardShortcuts({ k: review, c: review })
+      return <Composer reviewId={3} submitLabel="Send" onSubmit={vi.fn()} />
+    }
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <Page />
+      </QueryClientProvider>,
+    )
+    const textbox = screen.getByRole('textbox')
+
+    fireEvent.keyDown(textbox, { key: 'k', ctrlKey: true })
+    fireEvent.keyDown(textbox, { key: 'c' })
+
+    expect(review).not.toHaveBeenCalled()
+    expect(textbox).toHaveValue('[text](url)')
+  })
+
+  it('leaves the preview after sending', () => {
+    const onSubmit = vi.fn((_body: string, done: () => void) => { done() })
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <Composer reviewId={3} submitLabel="Send" initial="done" onSubmit={onSubmit} />
+      </QueryClientProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    expect(screen.queryByRole('tabpanel')).toBeNull()
+    expect(screen.getByRole('textbox')).toHaveValue('')
+  })
+
+  it('sends with Ctrl/Cmd + Enter', () => {
+    const { textbox, onSubmit } = renderPlain('done')
+
+    fireEvent.keyDown(textbox, { key: 'Enter', ctrlKey: true })
+
+    expect(onSubmit).toHaveBeenCalledWith('done', expect.any(Function))
   })
 })

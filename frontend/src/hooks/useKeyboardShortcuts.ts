@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 
 export type ShortcutMap = Partial<Record<string, () => void>>
 
-function isTyping(target: EventTarget | null): boolean {
+export function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false
   }

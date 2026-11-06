@@ -44,6 +44,7 @@ export const COLOR_SLOTS: ColorSlot[] = [
   { variable: '--diff-delete-gutter', label: 'Removed line number', group: 'Diff', workbench: ['diffEditorGutter.removedLineBackground'] },
   { variable: '--diff-selected', label: 'Highlighted line', group: 'Diff', workbench: ['editor.lineHighlightBackground', 'editor.rangeHighlightBackground'] },
   { variable: '--diff-selection', label: 'Selected text', group: 'Diff', workbench: ['editor.selectionBackground'] },
+  { variable: '--diff-occurrence', label: 'Occurrences of a name', group: 'Diff', workbench: ['editor.wordHighlightBackground'] },
   { variable: '--hl-keyword', label: 'Keywords', group: 'Syntax', scopes: ['keyword.control', 'storage.type'] },
   { variable: '--hl-string', label: 'Strings', group: 'Syntax', scopes: ['string.quoted.double'] },
   { variable: '--hl-title', label: 'Functions and types', group: 'Syntax', scopes: ['entity.name.function', 'support.function', 'entity.name.type'] },
@@ -111,6 +112,7 @@ export const BUILTIN_PALETTES: Record<ThemeType, Record<string, string>> = {
     '--diff-selected': 'rgba(41, 82, 204, 0.14)',
     '--diff-selected-gutter': 'rgba(41, 82, 204, 0.22)',
     '--diff-selection': '#b3d7ff',
+    '--diff-occurrence': 'rgba(214, 160, 30, 0.3)',
   },
   dark: {
     '--text': '#e4e9f2',
@@ -156,5 +158,6 @@ export const BUILTIN_PALETTES: Record<ThemeType, Record<string, string>> = {
     '--diff-selected': 'rgba(138, 171, 255, 0.25)',
     '--diff-selected-gutter': 'rgba(138, 171, 255, 0.35)',
     '--diff-selection': 'rgba(138, 171, 255, 0.4)',
+    '--diff-occurrence': 'rgba(240, 190, 80, 0.3)',
   },
 }
