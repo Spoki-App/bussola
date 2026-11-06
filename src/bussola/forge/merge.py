@@ -29,5 +29,5 @@ def merge_pull_request(context: ReviewContext, adapter: ForgeAdapter, link: Forg
     try:
         state = sync_conversation(context, adapter, link).state
     except ForgeError:
-        state = MERGED_STATE
+        state = link.state = MERGED_STATE
     return MergeOutcome(state, deleted or options.branch_deletion == BranchDeletion.AUTOMATIC, error)

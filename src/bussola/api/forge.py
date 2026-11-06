@@ -1,11 +1,11 @@
 from collections import OrderedDict
+from dataclasses import asdict
 
 from fastapi import APIRouter, Request, Response
 
 from bussola.api.deps import ContextDep, repo_of, resolve_revision
 from bussola.api.images import image_response
 from bussola.api.schemas import (
-    CommitTextOut,
     ConversationSyncOut,
     ForgeLinkIn,
     ForgeLinkOut,
@@ -15,7 +15,7 @@ from bussola.api.schemas import (
     MergeOut,
 )
 from bussola.api.state import app_state
-from bussola.api.views import forge_status_out, pull_request_out
+from bussola.api.views import forge_status_out, merge_options_out, pull_request_out
 from bussola.forge.base import Asset, MergeRequest
 from bussola.forge.links import ForgeOverview, forge_overview, link_pull_request
 from bussola.forge.merge import merge_pull_request
@@ -62,15 +62,7 @@ def sync(context: ContextDep, request: Request) -> ConversationSyncOut:
 @router.get("/reviews/{review_id}/forge/merge")
 def get_merge_options(context: ContextDep, request: Request) -> MergeOptionsOut:
     link = require_link(context)
-    options = app_state(request).forge.merge_options(link.repository, link.pr_number)
-    return MergeOptionsOut(
-        head_sha=options.head_sha,
-        methods=list(options.methods),
-        default_method=options.default_method,
-        commit_texts={method: CommitTextOut(title=text.title, message=text.message) for method, text in options.commit_texts.items()},
-        blockers=list(options.blockers),
-        branch_deletion=options.branch_deletion,
-    )
+    return merge_options_out(app_state(request).forge.merge_options(link.repository, link.pr_number))
 
 
 @router.post("/reviews/{review_id}/forge/merge")
@@ -78,7 +70,7 @@ def merge(body: MergeIn, context: ContextDep, request: Request) -> MergeOut:
     merge_request = MergeRequest(body.method, body.head_sha, body.title, body.message)
     outcome = merge_pull_request(context, app_state(request).forge, require_link(context), merge_request, body.delete_branch)
     context.store.commit()
-    return MergeOut(state=outcome.state, branch_deleted=outcome.branch_deleted, branch_error=outcome.branch_error)
+    return MergeOut(**asdict(outcome))
 
 
 def _overview(context: ReviewContext, request: Request) -> ForgeOut:

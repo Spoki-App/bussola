@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { describeError } from '../api/client'
 import { useMerge, useMergeOptions } from '../api/forge'
-import type { CommitText, MergeMethod, MergeOptions, MergeResult } from '../api/types'
+import type { CommitText, MergeMethod, MergeOptions } from '../api/types'
 import { ErrorNote } from './Badges'
 import { Segmented } from './Segmented'
 
@@ -20,7 +20,8 @@ const CONFIRM_LABELS: Record<MergeMethod, string> = {
 
 export function MergePullRequest({ reviewId }: { reviewId: number }) {
   const options = useMergeOptions(reviewId)
-  const [result, setResult] = useState<MergeResult | null>(null)
+  const merge = useMerge(reviewId)
+  const result = merge.data
   if (result) {
     return (
       <div className="notice merge-result">
@@ -35,14 +36,13 @@ export function MergePullRequest({ reviewId }: { reviewId: number }) {
   if (options.error) {
     return <ErrorNote message={describeError(options.error)} />
   }
-  return <MergeForm reviewId={reviewId} options={options.data} onMerged={setResult} />
+  return <MergeForm options={options.data} merge={merge} />
 }
 
-function MergeForm({ reviewId, options, onMerged }: { reviewId: number; options: MergeOptions; onMerged: (result: MergeResult) => void }) {
+function MergeForm({ options, merge }: { options: MergeOptions; merge: ReturnType<typeof useMerge> }) {
   const [choice, setChoice] = useState<MergeMethod | null>(null)
   const [edits, setEdits] = useState<Partial<Record<MergeMethod, CommitText>>>({})
   const [deleteBranch, setDeleteBranch] = useState(false)
-  const merge = useMerge(reviewId)
   const method = choice ?? options.default_method
   if (method === null) {
     return <ErrorNote message="This repository allows no merge method. Enable one in its settings on GitHub." />
@@ -57,7 +57,7 @@ function MergeForm({ reviewId, options, onMerged }: { reviewId: number; options:
   }
   const submit = () => {
     const request = { method, head_sha: options.head_sha, title: text?.title ?? '', message: text?.message ?? '', delete_branch: deleteBranch }
-    merge.mutate(request, { onSuccess: onMerged })
+    merge.mutate(request)
   }
 
   return (

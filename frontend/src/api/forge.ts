@@ -48,7 +48,7 @@ export function useGitHubSync(reviewId: number, headSha: string | undefined) {
 }
 
 export function useMergeOptions(reviewId: number) {
-  return useQuery({ queryKey: ['merge-options', reviewId], queryFn: () => getJson<MergeOptions>(`/reviews/${String(reviewId)}/forge/merge`), retry: false })
+  return useQuery({ queryKey: [...forgeKey(reviewId), 'merge'], queryFn: () => getJson<MergeOptions>(`/reviews/${String(reviewId)}/forge/merge`), retry: false })
 }
 
 export function useMerge(reviewId: number) {

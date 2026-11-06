@@ -5,6 +5,7 @@ from pathlib import Path
 from bussola.api.schemas import (
     ApprovalOut,
     ForgeStatusOut,
+    MergeOptionsOut,
     PublishOut,
     PublishOutcomeOut,
     PullRequestOut,
@@ -16,7 +17,7 @@ from bussola.api.schemas import (
     RowApprovalOut,
     UnitOut,
 )
-from bussola.forge.base import ForgeStatus, PullRequest
+from bussola.forge.base import ForgeStatus, MergeOptions, PullRequest
 from bussola.forge.publish import PublishResult, pending_comment_count
 from bussola.forge.pulls import is_pull_request_review
 from bussola.review.context import ReviewContext
@@ -150,3 +151,7 @@ def pull_request_out(pull: PullRequest) -> PullRequestOut:
 
 def forge_status_out(status: ForgeStatus) -> ForgeStatusOut:
     return ForgeStatusOut(**asdict(status))
+
+
+def merge_options_out(options: MergeOptions) -> MergeOptionsOut:
+    return MergeOptionsOut(**asdict(options))

@@ -398,7 +398,9 @@ def _merge_blockers(pull: JsonObject) -> tuple[str, ...]:
         rollup: JsonObject = pull.get("statusCheckRollup") or {}
         found = (REVIEW_BLOCKERS.get(str(pull.get("reviewDecision"))), CHECK_BLOCKERS.get(str(rollup.get("state"))))
         reasons = [reason for reason in found if reason]
-        blockers += reasons or ([] if blockers else [PROTECTION_BLOCKER])
+        if not reasons and not blockers:
+            reasons = [PROTECTION_BLOCKER]
+        blockers += reasons
     return tuple(blockers)
 
 
