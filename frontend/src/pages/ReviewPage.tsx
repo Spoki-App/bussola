@@ -402,7 +402,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                   type="button"
                   className="sidebar-toggle"
                   aria-expanded={!panelHidden}
-                  aria-controls={panelHidden ? undefined : 'side-panel-content'}
+                  aria-controls="side-panel-content"
                   aria-label={panelHidden ? `Show ${sidePanel.label} (${String(sidePanel.count)} open)` : `Hide ${sidePanel.label}`}
                   title={`${panelHidden ? 'Show' : 'Hide'} ${sidePanel.label}. Shortcut: t`}
                   onClick={togglePanel}
@@ -410,7 +410,9 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                   <SidebarIcon />
                   {panelHidden && sidePanel.count > 0 && <span className="side-panel-count">{sidePanel.count}</span>}
                 </button>
-                {!panelHidden && <div id="side-panel-content">{sidePanel.content}</div>}
+                <div id="side-panel-content" hidden={panelHidden}>
+                  {sidePanel.content}
+                </div>
               </aside>
             )}
           </div>
