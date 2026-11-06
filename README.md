@@ -1,28 +1,82 @@
-<p align="center"><img src="https://raw.githubusercontent.com/Spoki-App/bussola/main/frontend/public/favicon.svg" alt="" width="72" height="72"></p>
+<div align="center">
 
-<h1 align="center">bussola</h1>
+<img src="https://raw.githubusercontent.com/Spoki-App/bussola/main/frontend/public/favicon.svg" alt="" width="72" height="72">
 
-<p align="center">
-  <a href="https://github.com/Spoki-App/bussola/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Spoki-App/bussola/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://pypi.org/project/bussola/"><img alt="PyPI" src="https://img.shields.io/pypi/v/bussola"></a>
-  <img alt="Python 3.12 and 3.13" src="https://img.shields.io/badge/python-3.12%20%7C%203.13-3776ab">
-  <a href="https://github.com/Spoki-App/bussola/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
-</p>
+# bussola
 
-Local, per-function code review for git branches. `bussola serve` opens a review UI on `localhost` that works directly on your repository, without needing a hosting service.
+**Review pull requests one function at a time, on your own machine.**
 
-*Bussola* is Italian for compass: it helps you find your way through a large change, one function at a time.
+Approvals that survive rebases, an AI reviewer that ranks what it finds,
+and comments that go straight back to GitHub.
 
-- Changes between a branch and its base (the same three-dot diff a pull request shows) are split into **reviewable units**: functions, methods, class bodies, TypeScript and Go types, module-level code, and whole files for languages that are not parsed.
-- An approval is tied to the **content** of a unit, not to a commit. After new commits, a rebase or a force-push, a unit with the same content stays approved.
-- When an approved unit changes, you see the diff between the version you approved and the current one.
-- Module-level code and whole files can also be approved **one selection of lines at a time**.
-- "Since my last review" shows only what appeared or changed after you last clicked "Mark as reviewed".
-- Comment threads are anchored to lines and follow them when the code moves. They can be sent to the GitHub pull request.
+<a href="https://github.com/Spoki-App/bussola/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Spoki-App/bussola/actions/workflows/ci.yml/badge.svg"></a>
+<a href="https://pypi.org/project/bussola/"><img alt="PyPI" src="https://img.shields.io/pypi/v/bussola"></a>
+<img alt="Python 3.12 and 3.13" src="https://img.shields.io/badge/python-3.12%20%7C%203.13-3776ab">
+<a href="https://github.com/Spoki-App/bussola/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
 
-Python (`.py`, `.pyi`), TypeScript (`.ts`), TSX, JavaScript (`.js`, `.jsx`, `.mjs`, `.cjs`) and Go (`.go`) are parsed with tree-sitter. Everything else is reviewed as whole files.
+[Quick start](#quick-start) · [Features](#features) · [Install](#install) · [AI providers](#ai-providers) · [FAQ](#faq)
 
-In Go, each function, method and type is its own unit. A method is named after its receiver type (`Service.Run`, also for `*Service` and `Stack[T]`), and its card is shown under the card of that type when both are in the same file. Each type in a grouped `type ( ... )` block is a separate unit.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/hero-dark.svg">
+  <img alt="bussola splits a pull request into a function, a method, module code and another function. Three are approved one by one, the AI review adds a high severity comment with a fix, and after a force-push the two units whose code did not change stay approved while only the module code needs another look." src="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/hero-light.svg" width="820">
+</picture>
+
+</div>
+
+*Bussola* is Italian for compass: it helps you find your way through a large change.
+
+GitHub shows a pull request as a long list of files. bussola shows it the way you read code: as the **functions, methods, classes and module code** it touches, each with its own diff and its own **Approve** button. Your approvals belong to the code, not to a commit, so after a rebase or a force-push you only look at what really changed. It runs on `localhost`, reads your local clone, and talks to GitHub through your own `gh` login.
+
+| | GitHub "Files changed" | bussola |
+|---|---|---|
+| What you approve | a file, as **Viewed** | a function, method, class or module code |
+| After new commits or a force-push | a viewed file is unmarked when anything in it changes | only the units whose code changed need another look |
+| Code you approved changes | you read the file again | you see the diff from the version you approved |
+| Where it runs | github.com | your machine, on your local clone |
+
+## Quick start
+
+```bash
+uv tool install bussola
+cd path/to/your/repository
+bussola serve
+```
+
+The browser opens on your repository. Type a branch on its card and press **Start review**, or paste a GitHub pull request link in **Settings** > **Open pull request**. Press `n` to jump to the next unit to review and `a` to approve it.
+
+## Features
+
+### Review by unit, not by file
+
+Every change is split into reviewable units: functions, methods, class bodies, TypeScript and Go types and module-level code, parsed with tree-sitter for Python, TypeScript, TSX, JavaScript and Go. Other files are reviewed whole, and module code or a whole file can be approved one selection of lines at a time. Each unit shows its state (**New**, **Approved**, **Changed since approval**, **Partly approved**, **Removed**), and the progress bar tells you how much is left.
+
+### Approvals that follow the code
+
+An approval is tied to the content of a unit. After new commits, a rebase or a force-push, a unit with the same content stays approved, a renamed function with the same body keeps its approval, and a unit that did change shows the diff between the version you approved and the current one. **Since my last review** shows only what appeared or changed after you last clicked **Mark as reviewed**.
+
+### An AI reviewer that ranks what it finds
+
+Optional, with Claude Code, the Anthropic API or any OpenAI-compatible endpoint. **AI review** reads the pull request as a whole, follows the code with the same lookups you use, and leaves comments anchored to the lines, each starting with its severity (🔴 Critical, 🟠 High, 🟡 Medium, 🔵 Low) and ending with a fix. **Describe** explains a unit and its change with links to the lines it mentions, and units get a **Low**, **Medium** or **High impact** badge so you can start from what matters. The prompts are yours to change.
+
+### Navigate like in your editor
+
+Cmd+click (Ctrl+click) a name to jump to its definition or list its usages, with the function each usage lives in. Names from libraries show their documentation and a link to it. A plain click highlights every occurrence in the unit.
+
+### Moved code, found for you
+
+Code moved or extracted elsewhere, even to another file, is linked both ways with **moved to** and **moved from**, and moves that kept the code as it was are marked **identical**. You can also compare any two ranges of the review, or a range with code copied to the clipboard.
+
+### GitHub, both ways
+
+Open any pull request from its link or from a `bussola://` link, bring in its comments, reply, resolve, write with Markdown, mentions and images, and send everything back as one review with **Comment**, **Approve** or **Request changes**. Files you have fully approved are ticked as **Viewed** on GitHub, and **Merge** finishes the job without leaving the page. No GitHub? Any two branches of a local repository can be reviewed.
+
+### Made for long reading sessions
+
+Syntax highlighting with the changed words marked, split or unified diffs that adapt to the window, line wrap, your own code font with ligatures, keyboard shortcuts for everything, and themes: light, dark, or any theme installed in VS Code, Cursor or Windsurf.
+
+### Local and private
+
+Reviews, approvals and comments live in a SQLite file on your machine. bussola listens on `127.0.0.1` with a session token, reads code only from git, and contacts GitHub or an AI provider only when you ask it to.
 
 ## Install
 
@@ -109,6 +163,8 @@ Units that still need review start open and the others closed. Approving a unit 
 | Removed | The unit was deleted; approving it confirms the deletion |
 
 Methods are shown inside their class's card. When only methods of a class changed, the class still gets a card, marked "no changes outside its methods", with nothing to approve.
+
+In Go, each function, method and type is its own unit. A method is named after its receiver type (`Service.Run`, also for `*Service` and `Stack[T]`), and its card is shown under the card of that type when both are in the same file. Each type in a grouped `type ( ... )` block is a separate unit.
 
 A unit's name starts with its module, muted: the dotted Python module (`bussola.review.anchoring.find_line`, without a leading `src/` or `__init__`), the file path without extension for TypeScript and JavaScript, and the package import path from `go.mod` for Go. Methods keep their class too (`shop.billing.invoices.InvoiceService.create`), with the module muted and the unit's own name in bold. A title too long for its card is cut at the start with an ellipsis, so the name stays visible; hover it to see it whole. The box next to the unit filters finds units by any part of their module, name or path.
 
