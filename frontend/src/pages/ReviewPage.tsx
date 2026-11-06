@@ -52,7 +52,7 @@ export interface ReviewExtensions {
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
   fileActions?: (path: string) => ReactNode
-  sidePanel?: { label: string; content: ReactNode }
+  sidePanel?: { label: string; count: number; content: ReactNode }
   link?: PendingLink
 }
 
@@ -64,6 +64,12 @@ interface Props {
 const WIDE_LAYOUT_PX = 1400
 const NO_RATINGS: ReadonlyMap<number, UnitDescription> = new Map()
 const FILES_HIDDEN_KEY = 'bussola.filesHidden'
+const PANEL_HIDDEN_KEY = 'bussola.sidePanelHidden'
+
+function loadPanelHidden(): boolean {
+  const stored = readStored(PANEL_HIDDEN_KEY)
+  return stored === null ? window.innerWidth < WIDE_LAYOUT_PX : stored === 'true'
+}
 
 const SYNC_TITLE =
   'Fetch the branch from its remote and record any new commits as a new revision. If the review is linked to a GitHub pull request, also bring in its comments and send your unsent comments as one review.'
@@ -179,13 +185,17 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const navigation = useCodeNavigation(reviewId, revisionId, (unitId) => shownUnits.has(unitId))
   const [focusedId, setFocusedId] = useState<number | null>(null)
   const actions = useRef(new Map<number, UnitActions>())
-  const [panelOpen, setPanelOpen] = useState(() => window.innerWidth >= WIDE_LAYOUT_PX)
+  const [panelHidden, setPanelHidden] = useState(loadPanelHidden)
   const [filesHidden, setFilesHidden] = useState(() => readStored(FILES_HIDDEN_KEY) === 'true')
   const [appliedLink, setAppliedLink] = useState<{ target: FocusTarget | null } | null>(null)
-  const { link } = extensions
+  const { link, sidePanel } = extensions
   const toggleFiles = () => {
     setFilesHidden(!filesHidden)
     writeStored(FILES_HIDDEN_KEY, String(!filesHidden))
+  }
+  const togglePanel = () => {
+    setPanelHidden(!panelHidden)
+    writeStored(PANEL_HIDDEN_KEY, String(!panelHidden))
   }
 
   const [seenLinkKey, setSeenLinkKey] = useState<string | null>(null)
@@ -210,7 +220,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     if (linkedTarget?.unitId != null) {
       setFocusedId(linkedTarget.unitId)
     }
-    setPanelOpen(panelOpen || linkedTarget?.unitId === null)
+    setPanelHidden(panelHidden && linkedTarget?.unitId !== null)
   }
   const [linkScroll] = useState(createLinkScroll)
   const pullRequestUrl = review.data?.pull_request?.url
@@ -267,6 +277,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     },
     a: () => { if (focusedUnit) actions.current.get(focusedUnit.id)?.toggleApproval() },
     c: () => { if (focusedUnit) actions.current.get(focusedUnit.id)?.comment() },
+    t: () => { if (sidePanel) togglePanel() },
   })
 
   if (review.isPending) {
@@ -328,22 +339,17 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           </div>
           {filesHidden && unitControls}
           <div className="summary-row">
-            <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines. Cmd or Ctrl+click a name to go to its definition or list its usages.</p>
+            <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync, t show or hide the conversation. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines. Cmd or Ctrl+click a name to go to its definition or list its usages.</p>
             <div className="summary-actions">
               <RateImpact repoId={data.repo_id} rating={rating} />
               <AiReview reviewId={reviewId} repoId={data.repo_id} review={aiReview} onShowLine={navigation.show} />
-              {extensions.sidePanel && (
-                <button type="button" aria-pressed={panelOpen} onClick={() => { setPanelOpen(!panelOpen) }}>
-                  {panelOpen ? `Hide ${extensions.sidePanel.label}` : `Show ${extensions.sidePanel.label}`}
-                </button>
-              )}
             </div>
           </div>
         </section>
       </div>
       <LinkScrollContext value={linkScroll}>
         <ReviewLinkContext value={makeLink}>
-          <div className={`review-layout${panelOpen && extensions.sidePanel ? ' with-panel' : ''}${filesHidden ? ' files-hidden' : ''}`}>
+          <div className={`review-layout${sidePanel ? (panelHidden ? ' panel-hidden' : ' with-panel') : ''}${filesHidden ? ' files-hidden' : ''}`}>
             <aside className="sidebar" aria-label="Files">
               <button type="button" className="sidebar-toggle" aria-expanded={!filesHidden} aria-controls={filesHidden ? undefined : 'file-tree'} title={filesHidden ? 'Show files' : 'Hide files'} onClick={toggleFiles}>
                 <SidebarIcon />
@@ -390,7 +396,25 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                 </section>
               ))}
             </main>
-            {panelOpen && extensions.sidePanel && <aside className="side-panel">{extensions.sidePanel.content}</aside>}
+            {sidePanel && (
+              <aside className="side-panel" aria-label={sidePanel.label}>
+                <button
+                  type="button"
+                  className="sidebar-toggle"
+                  aria-expanded={!panelHidden}
+                  aria-controls="side-panel-content"
+                  aria-label={panelHidden ? `Show ${sidePanel.label} (${String(sidePanel.count)} open)` : `Hide ${sidePanel.label}`}
+                  title={`${panelHidden ? 'Show' : 'Hide'} ${sidePanel.label}. Shortcut: t`}
+                  onClick={togglePanel}
+                >
+                  <SidebarIcon side="right" />
+                  {panelHidden && sidePanel.count > 0 && <span className="side-panel-count">{sidePanel.count}</span>}
+                </button>
+                <div id="side-panel-content" hidden={panelHidden}>
+                  {sidePanel.content}
+                </div>
+              </aside>
+            )}
           </div>
         </ReviewLinkContext>
       </LinkScrollContext>
@@ -406,11 +430,11 @@ function emptyMessage(filter: UnitFilter, query: string, impactFilter: ImpactFil
   return filter === 'all' ? 'No changes between the branches.' : 'Nothing to review here.'
 }
 
-function SidebarIcon() {
+function SidebarIcon({ side = 'left' }: { side?: 'left' | 'right' }) {
   return (
     <svg className="tree-icon" viewBox="0 0 16 16" aria-hidden="true">
       <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
-      <path d="M6 2.5v11" />
+      <path d={side === 'left' ? 'M6 2.5v11' : 'M10 2.5v11'} />
     </svg>
   )
 }

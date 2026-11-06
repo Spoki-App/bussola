@@ -134,6 +134,38 @@ test('the unit filters sit in the files bar, and above the units while it is hid
   await expect(search).toHaveValue('total')
 })
 
+test('the conversation toggle sits on the right, and the hidden panel leaves no horizontal scroll', async ({ page }) => {
+  await page.goto(`/?token=${E2E_TOKEN}`)
+  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  const panel = page.locator('.side-panel')
+  const gapToRight = async (name: RegExp) => {
+    const toggle = await panel.getByRole('button', { name }).boundingBox()
+    const box = await panel.boundingBox()
+    return (box?.x ?? 0) + (box?.width ?? 0) - (toggle?.x ?? 0) - (toggle?.width ?? 0)
+  }
+  const overflow = () =>
+    page.evaluate(() => {
+      const bar = document.querySelector('.side-panel')
+      const root = document.documentElement
+      return Math.max(root.scrollWidth - root.clientWidth, bar ? bar.scrollWidth - bar.clientWidth : 0)
+    })
+
+  expect(await gapToRight(/^Hide conversation/)).toBeLessThanOrEqual(16)
+  await page.keyboard.press('t')
+
+  for (const width of [1500, 1000, 600]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect(panel.getByRole('button', { name: /^Show conversation/ })).toBeInViewport()
+    expect(await gapToRight(/^Show conversation/)).toBeLessThanOrEqual(4)
+    expect(await overflow()).toBe(0)
+  }
+
+  await page.setViewportSize({ width: 1000, height: 900 })
+  await panel.getByRole('button', { name: /^Show conversation/ }).click()
+  await expect(panel.getByRole('button', { name: /^Hide conversation/ })).toBeInViewport()
+  expect(await gapToRight(/^Hide conversation/)).toBeLessThanOrEqual(16)
+})
+
 test('the unit filter and the diff layout are kept after a reload and in a new tab', async ({ page, context }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
   await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
