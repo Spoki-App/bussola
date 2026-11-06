@@ -175,6 +175,57 @@ The handler runs the Python that ran `install-handler`, and keeps the `BUSSOLA_D
 
 Approvals stay local, but **Sync** ticks "Viewed" on GitHub for every file whose changes you have all approved. Files approved only in part, or changed since you approved them, are left alone, and files you marked by hand are never unmarked. If the pull request gets new commits while files are being marked, the marks are undone and Sync asks you to run it again. A file that cannot be marked is listed as an error after the sync; the rest of the sync still goes through.
 
+### Themes
+
+**Theme** under **Appearance** in **Settings** chooses the colors: **System** (the default) follows the light or dark setting of your computer, **Light** and **Dark** are bussola's own palettes, and you can import any VS Code color theme. Pick the `.json` file inside the theme extension (usually in its `themes` folder; comments and trailing commas are fine). Importing a `.vsix` package is not supported yet. The theme `type` (`light` or `dark`) chooses the palette that fills in the colors the theme does not set; without a `type` the background decides. Themes that take their colors from another file with `include` are not followed: bussola says so and uses its own palette for those colors, so import the file they include instead.
+
+Themes installed in VS Code, VS Code Insiders, Cursor, Windsurf or VSCodium show up in the same list, grouped by editor, with no import step: bussola reads the extensions folder of each editor (`~/.vscode/extensions`, `~/.cursor/extensions` and so on, the same folders on Windows under your user folder) and the themes that come with the editor itself, such as Dark+ and Light+, when the editor is installed in its usual place. Only the latest version of each extension is listed. Choosing one reads its colors at that moment, following `include` within the extension, and keeps a copy in the browser, so it keeps working if the editor is closed; choosing it again picks up changes to the theme. bussola only reads these folders, and only the theme files the extensions declare.
+
+**Theme colors** lists every color of the current theme by area (text and background, borders, accents and states, diff, syntax) with a color picker and a hex field. Changes show at once, also in a small preview, and are kept on top of the theme: **Reset** next to a color, or **Reset all colors**, goes back to the theme's own colors. A warning appears when text on the background falls below the WCAG AA contrast of 4.5:1. **Export as VS Code theme** saves the current colors, your changes included, as a VS Code color theme `.json` that bussola or VS Code can import.
+
+Only colors are read from an imported file: hex (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`) and `rgb()` / `rgba()` values. Anything else, such as names, fonts or font styles, is ignored, so a theme cannot add CSS or scripts. Themes and changes are kept in this browser's local storage and never sent anywhere.
+
+Each bussola color takes the first VS Code color listed for it that the theme sets. Syntax colors look up each TextMate scope listed, in order, among the theme's `tokenColors`, with prefix matching like VS Code: a rule for `keyword` colors `keyword.control`, and the most specific rule wins (the later one on a tie). The table lives in [`frontend/src/settings/themeMapping.ts`](frontend/src/settings/themeMapping.ts).
+
+| Color | Variable | VS Code colors or TextMate scopes |
+| --- | --- | --- |
+| Text | `--text` | `editor.foreground`, `foreground` |
+| Secondary text | `--muted` | `descriptionForeground`, `tab.inactiveForeground` |
+| Faint text | `--faint` | `editorLineNumber.foreground`, `disabledForeground` |
+| Background | `--bg` | `editor.background` |
+| Panel background | `--bg-subtle` | `sideBar.background`, `editorWidget.background` |
+| Sunken background | `--bg-sunken` | `editorGroupHeader.tabsBackground`, `input.background` |
+| Border | `--border` | `panel.border`, `editorGroup.border`, `sideBar.border` |
+| Strong border | `--border-strong` | `input.border`, `editorWidget.border`, `contrastBorder` |
+| Focus ring | `--focus` | `focusBorder` |
+| Accent and links | `--accent` | `textLink.foreground`, `button.background`, `badge.background` |
+| Text on accent | `--accent-text` | `button.foreground`, `badge.foreground` |
+| Approved and success | `--sea` | `gitDecoration.addedResourceForeground`, `terminal.ansiGreen` |
+| Approved, moved | `--sea-soft` | `editorGutter.addedBackground` |
+| Changed and warning | `--amber` | `editorWarning.foreground`, `list.warningForeground` |
+| Partly approved | `--amber-soft` | `editorGutter.modifiedBackground` |
+| Removed and error | `--danger` | `editorError.foreground`, `errorForeground` |
+| Progress track | `--track` | `scrollbarSlider.background` |
+| Added line | `--diff-insert` | `diffEditor.insertedLineBackground` |
+| Removed line | `--diff-delete` | `diffEditor.removedLineBackground` |
+| Added words | `--diff-insert-word` | `diffEditor.insertedTextBackground` |
+| Removed words | `--diff-delete-word` | `diffEditor.removedTextBackground` |
+| Added line number | `--diff-insert-gutter` | `diffEditorGutter.insertedLineBackground` |
+| Removed line number | `--diff-delete-gutter` | `diffEditorGutter.removedLineBackground` |
+| Highlighted line | `--diff-selected` | `editor.lineHighlightBackground`, `editor.rangeHighlightBackground` |
+| Selected text | `--diff-selection` | `editor.selectionBackground` |
+| Keywords | `--hl-keyword` | `keyword.control`, `storage.type` |
+| Strings | `--hl-string` | `string.quoted.double` |
+| Functions and types | `--hl-title` | `entity.name.function`, `support.function`, `entity.name.type` |
+| Numbers and constants | `--hl-constant` | `constant.numeric`, `constant.language` |
+| Tags and attributes | `--hl-tag` | `entity.name.tag`, `entity.other.attribute-name` |
+| Properties and parameters | `--hl-property` | `variable.other.property`, `support.type.property-name`, `variable.parameter` |
+| Comments | `--hl-comment` | `comment.line`, `comment.block` |
+| Inserted text | `--hl-addition` | `markup.inserted` |
+| Deleted text | `--hl-deletion` | `markup.deleted` |
+
+Tinted backgrounds follow the color they belong to when the theme or your changes set it: the backgrounds of success, warning, error and info states, approved rows, the highlighted line number, and comments (from **Secondary text** when the theme has no comment color).
+
 ## Configuration
 
 Optional `.bussola.toml` at the repository root:

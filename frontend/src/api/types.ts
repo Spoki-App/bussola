@@ -267,6 +267,14 @@ export interface DirectoryListing {
   truncated: boolean
 }
 
+export interface EditorTheme {
+  id: string
+  label: string
+  editor: string
+  extension: string
+  type: 'light' | 'dark'
+}
+
 export interface FoundRepository {
   name: string
   path: string

@@ -8,6 +8,8 @@ import { CodeFontPanel } from './CodeFontPanel'
 import { DiffLayoutPanel } from './DiffLayoutPanel'
 import { DiffWrapCheckbox } from './DiffWrapToggle'
 import { OpenPullRequestForm } from './OpenPullRequestForm'
+import { ThemeColorsPanel } from './ThemeColorsPanel'
+import { ThemePanel } from './ThemePanel'
 
 export const SETTING_CATEGORIES = ['Pull requests', 'Repositories', 'Appearance', 'Diff', 'AI'] as const
 
@@ -39,6 +41,18 @@ export const SETTINGS: Setting[] = [
         }}
       />
     ),
+  },
+  {
+    category: 'Appearance',
+    name: 'Theme',
+    description: 'System, Light, Dark, a theme installed in VS Code, Cursor and similar editors or an imported VS Code color theme, and export of the current colors as a VS Code theme.',
+    render: () => <ThemePanel />,
+  },
+  {
+    category: 'Appearance',
+    name: 'Theme colors',
+    description: 'Customize single colors of the theme with a color picker or hex value, check contrast and reset them.',
+    render: () => <ThemeColorsPanel />,
   },
   {
     category: 'Appearance',
