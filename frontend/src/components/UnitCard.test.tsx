@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { Unit, UnitState } from '../api/types'
+import type { DiffRow, Unit, UnitDiff, UnitState } from '../api/types'
 import { LinkScrollContext, createLinkScroll } from '../review/linkFocus'
 import { ReviewLinkContext, reviewLinkMaker } from '../review/reviewLink'
 import { UnitCard } from './UnitCard'
@@ -159,5 +159,55 @@ describe('UnitCard', () => {
 
     rerender(card({ unitId: 1, line: 3, side: 'base' }))
     expect(fetchMock.mock.calls.map(([url]) => url).at(-1)).toBe('/api/reviews/1/units/1/diff?mode=base')
+  })
+  it('drops the line selection when the diff shows other rows', async () => {
+    const line = (change: DiffRow['change'], oldIndex: number | null, newIndex: number | null, text: string): DiffRow => ({
+      change,
+      old_index: oldIndex,
+      new_index: newIndex,
+      old_line: oldIndex === null ? null : oldIndex + 1,
+      new_line: newIndex === null ? null : newIndex + 1,
+      text,
+      row_hash: change === 'context' ? null : text,
+      approved: false,
+      selection_id: null,
+      placeholder: false,
+    })
+    const diffOf = (mode: UnitDiff['mode'], text: string): UnitDiff => ({
+      unit_id: 1,
+      mode,
+      available_modes: ['base', 'approved'],
+      approved_text_unavailable: false,
+      binary: false,
+      unified: 'diff --git a/app.py b/app.py\n--- a/app.py\n+++ b/app.py\n',
+      rows: [line('context', 0, 0, 'TOTAL = 0'), line('added', null, 1, text)],
+    })
+    vi.stubGlobal('fetch', vi.fn((url: string) => {
+      if (!url.includes('/diff')) {
+        return new Promise(() => undefined)
+      }
+      return Promise.resolve(Response.json(url.includes('mode=approved') ? diffOf('approved', 'LIMIT = 2') : diffOf('base', 'LIMIT = 1')))
+    }))
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <UnitCard reviewId={1} repoId={1} unit={unit('changed', { kind: 'module', qualified_name: '', row_approvable: true, rows_total: 1 })} focused={false} onFocus={() => undefined} register={() => undefined} />
+      </QueryClientProvider>,
+    )
+    const codeCell = async (text: string) => {
+      let cell: Element | undefined
+      await waitFor(() => {
+        cell = [...container.querySelectorAll('td.diff-code')].find((candidate) => candidate.textContent === text)
+        expect(cell).toBeDefined()
+      })
+      return cell as Element
+    }
+
+    fireEvent.click(await codeCell('LIMIT = 1'))
+    expect(screen.getByRole('button', { name: 'Approve selection (1)' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Approved → current' }))
+    await codeCell('LIMIT = 2')
+
+    expect(screen.queryByRole('button', { name: /Approve selection/ })).toBeNull()
   })
 })
