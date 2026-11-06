@@ -4,6 +4,7 @@ from pathlib import Path
 
 from bussola.api.schemas import (
     ApprovalOut,
+    DiffRowOut,
     ForgeStatusOut,
     PublishOut,
     PublishOutcomeOut,
@@ -20,6 +21,7 @@ from bussola.forge.base import ForgeStatus, PullRequest
 from bussola.forge.publish import PublishResult, pending_comment_count
 from bussola.forge.pulls import is_pull_request_review
 from bussola.review.context import ReviewContext
+from bussola.review.diffs import DiffRow
 from bussola.review.images import image_type
 from bussola.review.modules import ModulePaths
 from bussola.review.overview import UnitView
@@ -119,6 +121,21 @@ def unit_out(view: UnitView, open_threads: int, modules: ModulePaths) -> UnitOut
         open_threads=open_threads,
         head_start=snapshot.head_start,
         head_end=snapshot.head_end,
+    )
+
+
+def diff_row_out(row: DiffRow, *, approved: bool = False, selection_id: str | None = None) -> DiffRowOut:
+    return DiffRowOut(
+        change=row.change,
+        old_index=row.old_index,
+        new_index=row.new_index,
+        old_line=row.old_line,
+        new_line=row.new_line,
+        text=row.text,
+        row_hash=row.row_hash,
+        approved=approved,
+        selection_id=selection_id,
+        placeholder=row.placeholder,
     )
 
 

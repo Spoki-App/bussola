@@ -27,11 +27,11 @@ export interface TargetLine {
 }
 
 interface Props {
-  diff: Pick<UnitDiff, 'rows' | 'unified' | 'binary'>
+  diff: Pick<UnitDiff, 'rows' | 'unified'> & Partial<Pick<UnitDiff, 'binary'>>
   path: string
   selectable: boolean
-  selected: ReadonlySet<string>
-  onRowClick: (row: DiffRow, extend: boolean) => void
+  selected?: ReadonlySet<string>
+  onRowClick?: (row: DiffRow, extend: boolean) => void
   onLineNumberClick?: (row: DiffRow, side: GutterSide, extend: boolean) => void
   onLineSelectEnd?: () => void
   highlighted?: ReadonlySet<string>
@@ -212,7 +212,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
     .flatMap((hunk) => hunk.changes)
     .filter((change) => {
       const row = index.rowOf(change)
-      return row !== undefined && selected.has(rowKey(row))
+      return row !== undefined && selected?.has(rowKey(row)) === true
     })
     .map(getChangeKey)
 
@@ -283,7 +283,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
             return
           }
           if (selectable && row && isSelectable(row)) {
-            onRowClick(row, event.shiftKey)
+            onRowClick?.(row, event.shiftKey)
           }
         },
       }}

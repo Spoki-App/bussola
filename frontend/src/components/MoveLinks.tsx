@@ -1,5 +1,6 @@
 import type { ComparisonRequest } from '../api/types'
-import { moveTitle, rangeName, type MoveLink } from '../review/moves'
+import { unitTitle } from '../review/logic'
+import { moveTitle, type MoveLink } from '../review/moves'
 
 interface Props {
   links: MoveLink[]
@@ -19,7 +20,7 @@ export function MoveLinks({ links, onCompare }: Props) {
       }}
     >
       {`moved ${link.direction} `}
-      <code>{rangeName(link.other)}</code>
+      <code>{unitTitle(link.other)}</code>
       {link.identical && <span className="move-identical">identical</span>}
     </button>
   ))

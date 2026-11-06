@@ -1691,7 +1691,8 @@ button.copy-link.failed {
   white-space: pre;
 }
 
-.navigation-hint {
+.navigation-hint,
+.compare-bar {
   position: fixed;
   right: 16px;
   bottom: 16px;
@@ -1914,20 +1915,10 @@ button.link:hover:not(:disabled) {
 }
 
 .compare-bar {
-  position: fixed;
-  bottom: 16px;
+  right: auto;
   left: 50%;
-  z-index: 20;
-  display: flex;
   align-items: center;
-  gap: 12px;
   max-width: calc(100vw - 32px);
-  padding: 8px 14px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: var(--radius-control);
-  background: var(--bg);
-  box-shadow: var(--shadow-lift);
   transform: translateX(-50%);
 }
 

@@ -1,9 +1,10 @@
+from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from itertools import groupby
 
-from bussola.review.rows import LineChange, Side, UnitLine, diff_lines, side_lines
+from bussola.review.rows import LineChange, Side, UnitLine, compute_diff_lines, side_lines, without_spaces
 from bussola.storage.models import UnitSnapshot
 from bussola.units.normalize import UNIT_PLACEHOLDER
 
@@ -19,14 +20,11 @@ class CodeRange:
     snapshot: UnitSnapshot
     side: Side
     start: int
-    end: int
+    lines: Sequence[UnitLine]
 
     @property
-    def count(self) -> int:
-        return self.end - self.start + 1
-
-    def lines(self) -> list[UnitLine]:
-        return side_lines(self.snapshot, self.side)[self.start : self.end + 1]
+    def stop(self) -> int:
+        return self.start + len(self.lines)
 
 
 @dataclass(frozen=True)
@@ -40,10 +38,9 @@ class Move:
 @dataclass(frozen=True)
 class _Block:
     snapshot: UnitSnapshot
-    side: Side
     hunk: int
+    lines: list[UnitLine]
     offsets: list[int]
-    texts: list[str]
     compact: list[str]
 
 
@@ -58,10 +55,15 @@ def detect_moves(snapshots: Sequence[UnitSnapshot]) -> list[Move]:
     removed: list[_Block] = []
     added: list[_Block] = []
     for snapshot in snapshots:
-        for block in _blocks(snapshot):
-            (removed if block.side == Side.BASE else added).append(block)
-    candidates = [move for block in removed for move in _matches(block, added)]
-    candidates.sort(key=lambda move: (-min(move.removed.count, move.added.count), -move.similarity))
+        removed_blocks, added_blocks = _blocks(snapshot)
+        removed += removed_blocks
+        added += added_blocks
+    index: defaultdict[str, list[_Block]] = defaultdict(list)
+    for block in added:
+        for text in {text for text in block.compact if _is_significant(text)}:
+            index[text].append(block)
+    candidates = [move for block in removed for move in _matches(block, index)]
+    candidates.sort(key=lambda move: (-min(len(move.removed.lines), len(move.added.lines)), -move.similarity))
     claimed: set[tuple[int, Side, int]] = set()
     moves: list[Move] = []
     for move in candidates:
@@ -73,34 +75,36 @@ def detect_moves(snapshots: Sequence[UnitSnapshot]) -> list[Move]:
 
 
 def same_code(old: Sequence[UnitLine], new: Sequence[UnitLine]) -> bool:
-    return _stripped(old) == _stripped(new)
+    return _code_texts(old) == _code_texts(new)
 
 
-def _stripped(lines: Sequence[UnitLine]) -> list[str]:
-    return [line.text.strip() for line in lines if line.text.strip()]
+def _code_texts(lines: Sequence[UnitLine]) -> list[str]:
+    return [line.text.strip() for line in lines if _is_code(line.text)]
 
 
 def _claims(code: CodeRange) -> Iterator[tuple[int, Side, int]]:
-    return ((code.snapshot.id, code.side, offset) for offset in range(code.start, code.end + 1))
+    return ((code.snapshot.id, code.side, offset) for offset in range(code.start, code.stop))
 
 
-def _blocks(snapshot: UnitSnapshot) -> Iterator[_Block]:
+def _blocks(snapshot: UnitSnapshot) -> tuple[list[_Block], list[_Block]]:
     old = side_lines(snapshot, Side.BASE)
     new = side_lines(snapshot, Side.HEAD)
-    lines = diff_lines([line.text for line in old], [line.text for line in new])
+    lines = compute_diff_lines([line.text for line in old], [line.text for line in new])
     changed_runs = (list(run) for changed, run in groupby(lines, key=lambda line: line.change != LineChange.CONTEXT) if changed)
+    removed: list[_Block] = []
+    added: list[_Block] = []
     for hunk, run in enumerate(changed_runs):
-        removed = [line.old_index for line in run if line.change == LineChange.REMOVED and line.old_index is not None]
-        added = [line.new_index for line in run if line.change == LineChange.ADDED and line.new_index is not None]
-        yield from _block(snapshot, Side.BASE, hunk, removed, old)
-        yield from _block(snapshot, Side.HEAD, hunk, added, new)
+        removed += _block(snapshot, hunk, [line.old_index for line in run if line.change == LineChange.REMOVED and line.old_index is not None], old)
+        added += _block(snapshot, hunk, [line.new_index for line in run if line.change == LineChange.ADDED and line.new_index is not None], new)
+    return removed, added
 
 
-def _block(snapshot: UnitSnapshot, side: Side, hunk: int, offsets: list[int], lines: list[UnitLine]) -> Iterator[_Block]:
+def _block(snapshot: UnitSnapshot, hunk: int, offsets: list[int], lines: list[UnitLine]) -> list[_Block]:
     kept = [offset for offset in offsets if _is_code(lines[offset].text)]
-    texts = [lines[offset].text.strip() for offset in kept]
-    if sum(1 for text in texts if _is_significant(text)) >= MIN_MATCHED_LINES:
-        yield _Block(snapshot, side, hunk, kept, texts, ["".join(text.split()) for text in texts])
+    compact = [without_spaces(lines[offset].text) for offset in kept]
+    if sum(1 for text in compact if _is_significant(text)) < MIN_MATCHED_LINES:
+        return []
+    return [_Block(snapshot, hunk, lines, kept, compact)]
 
 
 def _is_code(text: str) -> bool:
@@ -112,18 +116,14 @@ def _is_significant(text: str) -> bool:
     return sum(1 for character in text if character.isalnum() or character == "_") >= MIN_SIGNIFICANT_WORD_CHARACTERS
 
 
-def _matches(removed: _Block, added: list[_Block]) -> Iterator[Move]:
-    for block in _candidates(removed, added):
+def _matches(removed: _Block, index: dict[str, list[_Block]]) -> Iterator[Move]:
+    candidates = {id(block): block for text in removed.compact for block in index.get(text, [])}
+    for block in candidates.values():
         if block.snapshot.id == removed.snapshot.id and block.hunk == removed.hunk:
             continue
         move = _compare(removed, block)
         if move is not None:
             yield move
-
-
-def _candidates(removed: _Block, added: list[_Block]) -> list[_Block]:
-    wanted = {text for text in removed.compact if _is_significant(text)}
-    return [block for block in added if not wanted.isdisjoint(block.compact)]
 
 
 def _compare(removed: _Block, added: _Block) -> Move | None:
@@ -134,17 +134,18 @@ def _compare(removed: _Block, added: _Block) -> Move | None:
     shared = sum(pair.ratio * (len(removed.compact[pair.removed]) + len(added.compact[pair.added])) for pair in pairs)
     total = sum(map(len, removed.compact[first.removed : last.removed + 1])) + sum(map(len, added.compact[first.added : last.added + 1]))
     similarity = shared / total
-    significant = sum(1 for pair in pairs if _is_significant(removed.texts[pair.removed]))
+    significant = sum(1 for pair in pairs if _is_significant(removed.compact[pair.removed]))
     matched = sum(len(removed.compact[pair.removed]) for pair in pairs)
     if similarity < MIN_SIMILARITY or significant < MIN_MATCHED_LINES or matched < MIN_MATCHED_CHARACTERS:
         return None
-    identical = removed.texts[first.removed : last.removed + 1] == added.texts[first.added : last.added + 1]
-    return Move(
-        CodeRange(removed.snapshot, Side.BASE, removed.offsets[first.removed], removed.offsets[last.removed]),
-        CodeRange(added.snapshot, Side.HEAD, added.offsets[first.added], added.offsets[last.added]),
-        round(similarity, 3),
-        identical,
-    )
+    old = _range(removed, Side.BASE, first.removed, last.removed)
+    new = _range(added, Side.HEAD, first.added, last.added)
+    return Move(old, new, round(similarity, 3), same_code(old.lines, new.lines))
+
+
+def _range(block: _Block, side: Side, first: int, last: int) -> CodeRange:
+    start, stop = block.offsets[first], block.offsets[last] + 1
+    return CodeRange(block.snapshot, side, start, block.lines[start:stop])
 
 
 def _pairs(old: list[str], new: list[str]) -> list[_Pair]:
@@ -154,7 +155,14 @@ def _pairs(old: list[str], new: list[str]) -> list[_Pair]:
             pairs.extend(_Pair(index, new_start + step, 1.0) for step, index in enumerate(range(old_start, old_end)))
         elif tag == "replace":
             for index, other in zip(range(old_start, old_end), range(new_start, new_end), strict=False):
-                ratio = SequenceMatcher(None, old[index], new[other], autojunk=False).ratio()
+                ratio = _line_ratio(old[index], new[other])
                 if ratio >= MIN_LINE_SIMILARITY:
                     pairs.append(_Pair(index, other, ratio))
     return pairs
+
+
+def _line_ratio(old: str, new: str) -> float:
+    matcher = SequenceMatcher(None, old, new, autojunk=False)
+    if matcher.real_quick_ratio() < MIN_LINE_SIMILARITY or matcher.quick_ratio() < MIN_LINE_SIMILARITY:
+        return 0.0
+    return matcher.ratio()

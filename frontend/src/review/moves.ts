@@ -1,4 +1,5 @@
 import type { CodeRange, CodeRangeRequest, ComparisonRequest, Move } from '../api/types'
+import { unitTitle } from './logic'
 
 export interface MoveLink {
   direction: 'to' | 'from'
@@ -14,7 +15,12 @@ export function rangeRequest({ unit_id, side, line_offset, line_count }: CodeRan
 export function moveLinksByUnit(moves: Move[]): Map<number, MoveLink[]> {
   const links = new Map<number, MoveLink[]>()
   const add = (unitId: number, link: MoveLink) => {
-    links.set(unitId, [...(links.get(unitId) ?? []), link])
+    const unitLinks = links.get(unitId)
+    if (unitLinks) {
+      unitLinks.push(link)
+    } else {
+      links.set(unitId, [link])
+    }
   }
   for (const move of moves) {
     const comparison = { left: rangeRequest(move.removed), right: rangeRequest(move.added) }
@@ -22,10 +28,6 @@ export function moveLinksByUnit(moves: Move[]): Map<number, MoveLink[]> {
     add(move.added.unit_id, { direction: 'from', other: move.removed, identical: move.identical, comparison })
   }
   return links
-}
-
-export function rangeName(range: Pick<CodeRange, 'qualified_name' | 'path'>): string {
-  return range.qualified_name || range.path
 }
 
 export function rangeLines(range: Pick<CodeRange, 'first_line' | 'last_line'>): string {
@@ -36,8 +38,11 @@ export function rangeLines(range: Pick<CodeRange, 'first_line' | 'last_line'>): 
   return first === last ? `line ${String(first)}` : `lines ${String(first)}-${String(last)}`
 }
 
+export function rangeLocation(range: Pick<CodeRange, 'path' | 'first_line' | 'last_line'>): string {
+  return [range.path, rangeLines(range)].filter(Boolean).join(' ')
+}
+
 export function moveTitle(link: MoveLink): string {
-  const where = [link.other.path, rangeLines(link.other)].filter(Boolean).join(' ')
   const verb = link.direction === 'to' ? 'Moved to' : 'Moved from'
-  return `${verb} ${rangeName(link.other)} (${where})${link.identical ? ', identical' : ', with changes'}. Click to compare.`
+  return `${verb} ${unitTitle(link.other)} (${rangeLocation(link.other)})${link.identical ? ', identical' : ', with changes'}. Click to compare.`
 }

@@ -2,7 +2,8 @@ import { describeError } from '../api/client'
 import { useComparison } from '../api/compare'
 import type { CodeRange, ComparisonRequest } from '../api/types'
 import { useModalDialog } from '../hooks/useModalDialog'
-import { rangeLines, rangeName } from '../review/moves'
+import { unitTitle } from '../review/logic'
+import { rangeLocation } from '../review/moves'
 import { ErrorNote } from './Badges'
 import { UnitDiffView } from './UnitDiffView'
 
@@ -12,16 +13,13 @@ interface Props {
   onClose: () => void
 }
 
-const NOTHING_SELECTED: ReadonlySet<string> = new Set()
 const IDENTICAL_TITLE = 'Same code, ignoring indentation and blank lines'
-
-function ignore() {}
 
 function RangeHeading({ range }: { range: CodeRange }) {
   return (
     <p className="compare-range">
-      <code>{rangeName(range)}</code>
-      <span className="muted">{[range.path, rangeLines(range), range.side === 'base' ? '(base)' : ''].filter(Boolean).join(' ')}</span>
+      <code>{unitTitle(range)}</code>
+      <span className="muted">{range.side === 'base' ? `${rangeLocation(range)} (base)` : rangeLocation(range)}</span>
     </p>
   )
 }
@@ -35,11 +33,12 @@ export function CompareDialog({ reviewId, request, onClose }: Props) {
       <header className="picker-header">
         <div className="compare-title">
           <h2 id="compare-dialog-title">Compare</h2>
-          {data && (
-            <span className={data.identical ? 'label move-identical' : 'label'} title={data.identical ? IDENTICAL_TITLE : undefined}>
-              {data.identical ? 'identical' : 'changed'}
+          {data?.identical === true && (
+            <span className="label move-identical" title={IDENTICAL_TITLE}>
+              identical
             </span>
           )}
+          {data?.identical === false && <span className="label">changed</span>}
         </div>
         <button type="button" className="link" data-autofocus onClick={close}>
           Close
@@ -54,7 +53,7 @@ export function CompareDialog({ reviewId, request, onClose }: Props) {
             <RangeHeading range={data.right} />
           </div>
           <div className="compare-view">
-            <UnitDiffView diff={{ ...data, binary: false }} path={data.right.path} viewType="split" selectable={false} selected={NOTHING_SELECTED} onRowClick={ignore} />
+            <UnitDiffView diff={data} path={data.right.path} viewType="split" selectable={false} />
           </div>
         </>
       )}

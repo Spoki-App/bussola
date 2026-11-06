@@ -16,5 +16,6 @@ export function useComparison(reviewId: number, request: ComparisonRequest) {
   return useQuery({
     queryKey: ['compare', reviewId, request],
     queryFn: () => postJson<Comparison>(`/reviews/${String(reviewId)}/compare`, request),
+    staleTime: Infinity,
   })
 }
