@@ -178,12 +178,15 @@ def click_views(api: ApiClient, review: int) -> Json:
     return wait_for(lambda: api.call("GET", f"/reviews/{review}/navigation?path=shop/views.py&line=5&column={column}"), lambda result: result["ready"])
 
 
+SHORTCUTS = 'def render(request, template_name):\n    """Return an HttpResponse for the template."""\n'
+
+
 def install_django(git_repo: GitFixture) -> str:
     site = git_repo.root / ".venv" / "lib" / "python3.12" / "site-packages"
     git_repo.write(
         {
             ".venv/lib/python3.12/site-packages/django/__init__.py": "",
-            ".venv/lib/python3.12/site-packages/django/shortcuts.py": "def render(request):\n    pass\n",
+            ".venv/lib/python3.12/site-packages/django/shortcuts.py": SHORTCUTS,
             ".venv/lib/python3.12/site-packages/Django-5.1.dist-info/METADATA": "Metadata-Version: 2.1\nName: Django\nVersion: 5.1\nHome-page: https://www.djangoproject.com/\n",
             ".venv/lib/python3.12/site-packages/Django-5.1.dist-info/top_level.txt": "django\n",
         }
@@ -202,15 +205,14 @@ def test_an_external_name_without_a_language_server_shows_its_package_and_link(n
         "qualified_name": "django.shortcuts.render",
         "package": "Django",
         "version": "5.1",
-        "url": "https://www.djangoproject.com/",
-        "text": None,
+        "url": "https://docs.djangoproject.com/en/5.1/topics/http/shortcuts/#django.shortcuts.render",
+        "home_url": "https://www.djangoproject.com/",
+        "signature": "def render(request, template_name)",
+        "language": "python",
+        "docstring": "Return an HttpResponse for the template.",
         "source": {"path": shortcuts, "line": 1},
     }
-    assert nav_api.call("GET", f"/reviews/{review}/library-source?path={shortcuts}") == {
-        "path": shortcuts,
-        "text": "def render(request):\n    pass\n",
-        "url": None,
-    }
+    assert nav_api.call("GET", f"/reviews/{review}/library-source?path={shortcuts}") == {"path": shortcuts, "text": SHORTCUTS, "url": None}
 
 
 def test_an_external_name_shows_the_language_server_hover(nav_api: ApiClient, git_repo: GitFixture, servers: LanguageServerPath) -> None:
@@ -220,8 +222,17 @@ def test_an_external_name_shows_the_language_server_hover(nav_api: ApiClient, gi
 
     result = wait_for(lambda: click_views(nav_api, review), lambda result: result["resolver"] == "language-server")
 
-    assert result["documentation"]["text"] == hover
-    assert (result["documentation"]["package"], result["documentation"]["url"]) == ("django", "https://pypi.org/project/django/")
+    documentation = result["documentation"]
+    assert (documentation["signature"], documentation["language"], documentation["docstring"]) == (
+        "def render(request, template_name) -> HttpResponse",
+        "python",
+        "Return an HttpResponse.",
+    )
+    assert (documentation["package"], documentation["url"], documentation["home_url"]) == (
+        "django",
+        "https://docs.djangoproject.com/en/stable/topics/http/shortcuts/#django.shortcuts.render",
+        "https://pypi.org/project/django/",
+    )
     request = next(message for message in servers.messages() if message.get("method") == "textDocument/hover")
     assert request["params"]["position"] == {"line": 4, "character": 11}
 

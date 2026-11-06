@@ -2,7 +2,7 @@ import { useEffect, type KeyboardEvent, type MouseEvent } from 'react'
 
 import type { Documentation, LibrarySource, NavigationResult, NavigationTarget } from '../api/navigation'
 import { useModalDialog } from '../hooks/useModalDialog'
-import { emptyMessage, groupTargets, missingDocumentation, titleOf, type ScreenPoint } from '../review/codeNavigation'
+import { emptyMessage, groupTargets, missingDocumentation, signatureMarkdown, titleOf, type ScreenPoint } from '../review/codeNavigation'
 import { plural } from '../review/text'
 import { ErrorNote } from './Badges'
 import { ExternalLink } from './ExternalLink'
@@ -100,18 +100,33 @@ function Results({ result, onChoose }: { result: NavigationResult; onChoose: (ta
 
 function DocumentationView({ documentation, onOpenSource }: { documentation: Documentation; onOpenSource: (source: LibrarySource) => void }) {
   const missing = missingDocumentation(documentation)
-  const { source, url } = documentation
+  const signature = signatureMarkdown(documentation)
+  const { source, url, home_url: homeUrl } = documentation
   return (
     <div className="navigation-documentation">
+      {signature && (
+        <div className="navigation-signature" aria-label="Signature">
+          <Markdown text={signature} media={false} />
+        </div>
+      )}
+      {documentation.docstring && (
+        <div className="navigation-docstring" aria-label="Docstring">
+          <Markdown text={documentation.docstring} media={false} />
+        </div>
+      )}
+      {missing && <p className="muted">{missing}</p>}
       <p className="navigation-package">
         <code>{documentation.package}</code>
         {documentation.version && <span className="label">{documentation.version}</span>}
       </p>
-      {missing && <p className="muted">{missing}</p>}
-      {documentation.text && <Markdown text={documentation.text} media={false} />}
-      {(url ?? source) && (
+      {(url ?? homeUrl ?? source) && (
         <p className="navigation-documentation-actions">
           {url && <ExternalLink href={url}>Documentation</ExternalLink>}
+          {homeUrl && (
+            <ExternalLink href={homeUrl} className="muted">
+              Package home
+            </ExternalLink>
+          )}
           {source && (
             <button type="button" className="link" onClick={() => { onOpenSource(source) }}>
               Open source

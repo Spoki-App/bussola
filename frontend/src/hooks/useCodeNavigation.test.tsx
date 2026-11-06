@@ -13,7 +13,7 @@ const CART = 'from lib import price\n\n\ndef total(items):\n    return price(ite
 const GITHUB = 'https://github.com/acme/widgets/blob/abc123'
 const SHORTCUTS = '/work/.venv/lib/python3.12/site-packages/django/shortcuts.py'
 const SHORTCUTS_SOURCE = 'def render(request, template_name):\n    pass\n'
-const RENDER: Documentation = { qualified_name: 'django.shortcuts.render', package: 'Django', version: '5.1', url: 'https://docs.djangoproject.com/', text: null, source: null }
+const RENDER: Documentation = { qualified_name: 'django.shortcuts.render', package: 'Django', version: '5.1', url: 'https://docs.djangoproject.com/en/5.1/topics/http/shortcuts/#django.shortcuts.render', home_url: 'https://www.djangoproject.com/', signature: null, language: 'python', docstring: null, source: null }
 
 function target(path: string, line: number, unitId: number | null, role: NavigationTarget['role'] = 'definition'): NavigationTarget {
   return { role, path, line, column: 4, preview: `preview of ${path}:${String(line)}`, side: 'head', unit_id: unitId }
@@ -321,38 +321,52 @@ describe('useCodeNavigation', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('shows the documentation of an external name with its signature, package, version and link, rendered safely', async () => {
-    const text = '```python\ndef render(request, template_name)\n```\n---\nRenders **a template**.<script>window.hacked = true</script><img src="https://example.com/x.png">\n\n![remote](https://example.com/y.png)'
-    serve(() => found([], { documentation: { ...RENDER, text } }))
+  it('shows the signature and docstring of an external name first, then its package and links, rendered safely', async () => {
+    const docstring = 'Renders **a template**.<script>window.hacked = true</script><img src="https://example.com/x.png">\n\n![remote](https://example.com/y.png)'
+    serve(() => found([], { documentation: { ...RENDER, signature: 'def render(request, template_name)', docstring } }))
     renderHarness()
 
     const popup = await screen.findByRole('dialog', { name: 'django.shortcuts.render' })
-    expect(within(popup).getByText('Django')).toBeInTheDocument()
+    const signature = within(popup).getByLabelText('Signature')
+    expect(signature.querySelector('pre code')).toHaveTextContent('def render(request, template_name)')
+    expect(signature.querySelector('.hljs-keyword')).toHaveTextContent('def')
+    expect(within(within(popup).getByLabelText('Docstring')).getByText('a template').tagName).toBe('STRONG')
+    expect(signature.compareDocumentPosition(within(popup).getByText('Django')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(within(popup).getByText('5.1')).toBeInTheDocument()
-    expect(popup.querySelector('pre code')).toHaveTextContent('def render(request, template_name)')
-    expect(within(popup).getByText('a template').tagName).toBe('STRONG')
-    expect(within(popup).getByRole('link', { name: 'Documentation' })).toHaveAttribute('href', 'https://docs.djangoproject.com/')
+    expect(within(popup).getByRole('link', { name: 'Documentation' })).toHaveAttribute('href', RENDER.url)
+    expect(within(popup).getByRole('link', { name: 'Package home' })).toHaveAttribute('href', 'https://www.djangoproject.com/')
     expect(popup.querySelector('script, img')).toBeNull()
+    expect(within(popup).queryByText(/No docstring/)).not.toBeInTheDocument()
     expect(within(popup).queryByRole('button', { name: 'Open source' })).not.toBeInTheDocument()
   })
 
-  it('says when an external name has no documentation instead of doing nothing', async () => {
+  it('says when there is no docstring and still shows the signature', async () => {
+    serve(() => found([], { documentation: { ...RENDER, signature: 'def render(request)' } }))
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'django.shortcuts.render' })
+    expect(within(popup).getByLabelText('Signature')).toHaveTextContent('def render(request)')
+    expect(within(popup).getByText('No docstring for django.shortcuts.render.')).toBeInTheDocument()
+  })
+
+  it('says when an external name has no documentation instead of doing nothing, keeping the package home apart', async () => {
     serve(() => found([], { documentation: { ...RENDER, url: null, version: null } }))
     renderHarness()
 
     const popup = await screen.findByRole('dialog', { name: 'django.shortcuts.render' })
     expect(within(popup).getByText('No documentation found for django.shortcuts.render.')).toBeInTheDocument()
     expect(within(popup).getByText('Django')).toBeInTheDocument()
-    expect(within(popup).queryByRole('link')).not.toBeInTheDocument()
+    expect(within(popup).queryByRole('link', { name: 'Documentation' })).not.toBeInTheDocument()
+    expect(within(popup).getByRole('link', { name: 'Package home' })).toBeInTheDocument()
   })
 
-  it('shows only the package and the documentation link when the language server gives no text', async () => {
+  it('links the page of the function when no signature or docstring is available here', async () => {
     serve(() => found([], { documentation: RENDER }))
     renderHarness()
 
     const popup = await screen.findByRole('dialog', { name: 'django.shortcuts.render' })
-    expect(within(popup).getByRole('link', { name: 'Documentation' })).toHaveAttribute('href', 'https://docs.djangoproject.com/')
-    expect(within(popup).queryByText(/No documentation found/)).not.toBeInTheDocument()
+    expect(within(popup).getByRole('link', { name: 'Documentation' })).toHaveAttribute('href', RENDER.url)
+    expect(within(popup).getByText('No signature or docstring found for django.shortcuts.render.')).toBeInTheDocument()
   })
 
   it('opens the installed library source read only from the documentation shown inside the modal, with Back', async () => {

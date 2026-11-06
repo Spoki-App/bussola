@@ -13,27 +13,17 @@ from typing import Any, cast
 
 from tree_sitter import Node, Tree
 
-from bussola.navigation.index import MAX_FILE_BYTES
-from bussola.navigation.symbols import SourceLanguage, file_symbols, language_for, nodes
+from bussola.navigation.definitions import Definition, find_definition, python_module_file
+from bussola.navigation.docs_links import GO_DOCS, NODE_DOCS, NODE_SCHEME, node_builtin, symbol_docs_url
+from bussola.navigation.symbols import SourceLanguage, language_for, nodes
 from bussola.units.extractors.treesitter import node_text
 from bussola.units.modules import GO_MOD, go_module_name
 
-PYTHON_DOCS = "https://docs.python.org/3/library/{module}.html#{qualified}"
 PYPI = "https://pypi.org/project/{name}/"
-NODE_DOCS = "https://nodejs.org/api/{module}.html"
 NPM = "https://www.npmjs.com/package/{name}"
-GO_DOCS = "https://pkg.go.dev/{path}"
 PYTHON_ENVIRONMENTS = (".venv", "venv")
 SITE_PACKAGES = ("lib/python*/site-packages", "Lib/site-packages")
 NODE_MODULES = "node_modules"
-NODE_SCHEME = "node:"
-NODE_BUILTINS = frozenset(
-    {
-        *("assert", "async_hooks", "buffer", "child_process", "cluster", "console", "crypto", "dgram", "dns", "events", "fs", "http", "http2"),
-        *("https", "inspector", "module", "net", "os", "path", "perf_hooks", "process", "querystring", "readline", "repl", "stream"),
-        *("string_decoder", "timers", "tls", "tty", "url", "util", "v8", "vm", "worker_threads", "zlib"),
-    }
-)
 LOCAL_SPECIFIERS = (".", "/", "@/", "~/", "#")
 DOCUMENTATION_LABELS = (("documentation", "docs"), ("homepage", "home", "source", "repository"))
 GO_TEST_SUFFIX = "_test.go"
@@ -56,8 +46,12 @@ class Imported:
         return f"{self.module}.{self.name}" if self.name else self.module
 
     @property
-    def first_name(self) -> str | None:
-        return self.name.split(".")[0] if self.name else None
+    def names(self) -> tuple[str, ...]:
+        return tuple(self.name.split(".")) if self.name else ()
+
+    @property
+    def docs_url(self) -> str | None:
+        return symbol_docs_url(self.family, self.module, self.name, None, None)
 
 
 @dataclass(frozen=True)
@@ -71,7 +65,8 @@ class PackageInfo:
     name: str
     version: str | None = None
     url: str | None = None
-    source: LibrarySource | None = None
+    home_url: str | None = None
+    definition: Definition | None = None
 
 
 @dataclass(frozen=True)
@@ -379,14 +374,15 @@ def _jsonc(content: bytes) -> dict[str, Any]:
 def _python_package(imported: Imported, root: Path) -> PackageInfo:
     top = imported.module.split(".")[0]
     if top in sys.stdlib_module_names:
-        return PackageInfo(top, url=PYTHON_DOCS.format(module=imported.module, qualified=imported.qualified_name))
+        return PackageInfo(top, url=imported.docs_url)
     for site in _site_packages(root):
         found = _distributions(site, site.stat().st_mtime_ns).get(top)
-        source = _python_source(site, imported)
-        if found is not None or source is not None:
-            name, version, url = found or (top, None, None)
-            return PackageInfo(name, version, url or PYPI.format(name=name), source)
-    return PackageInfo(top, url=PYPI.format(name=top))
+        definition = _python_definition(site, imported)
+        if found is not None or definition is not None:
+            name, version, docs = found or (top, None, None)
+            url = symbol_docs_url(imported.family, imported.module, imported.name, version, docs)
+            return PackageInfo(name, version, url, docs or PYPI.format(name=name), definition)
+    return PackageInfo(top, url=imported.docs_url, home_url=PYPI.format(name=top))
 
 
 def _site_packages(root: Path) -> list[Path]:
@@ -425,25 +421,24 @@ def _project_url(distribution: Distribution) -> str | None:
     return home if home and _is_web(home) else None
 
 
-def _python_source(site: Path, imported: Imported) -> LibrarySource | None:
+def _python_definition(site: Path, imported: Imported) -> Definition | None:
     parts = imported.qualified_name.split(".")
     for end in range(len(parts), 0, -1):
-        base = site.joinpath(*parts[:end])
-        for candidate in (base.with_name(f"{base.name}.py"), base / "__init__.py", base.with_name(f"{base.name}.pyi"), base / "__init__.pyi"):
-            if candidate.is_file():
-                rest = parts[end : end + 1]
-                return LibrarySource(str(candidate), (_defined_at(candidate, rest[0]) if rest else None) or 1)
+        module = python_module_file(site.joinpath(*parts[:end]))
+        if module is not None:
+            return find_definition(module, tuple(parts[end:]), site) or Definition(module, 1)
     return None
 
 
 def _node_package(imported: Imported, root: Path, origin_dir: str) -> PackageInfo:
-    specifier = imported.module.removeprefix(NODE_SCHEME)
+    builtin = node_builtin(imported.module)
+    if builtin is not None:
+        return PackageInfo(builtin, url=imported.docs_url, home_url=NODE_DOCS.format(module=builtin))
+    specifier = imported.module
     segments = specifier.split("/")
-    if imported.module.startswith(NODE_SCHEME) or segments[0] in NODE_BUILTINS:
-        return PackageInfo(segments[0], url=NODE_DOCS.format(module=segments[0]))
     count = 2 if specifier.startswith("@") else 1
     if len(segments) < count or any(segment in ("", ".", "..") for segment in segments):
-        return PackageInfo(specifier)
+        return PackageInfo(specifier, url=imported.docs_url)
     name, subpath = "/".join(segments[:count]), "/".join(segments[count:])
     project = root.resolve()
     directory = project / origin_dir
@@ -453,15 +448,16 @@ def _node_package(imported: Imported, root: Path, origin_dir: str) -> PackageInf
         if manifest is not None:
             version = manifest.get("version")
             homepage = manifest.get("homepage")
-            url = homepage if isinstance(homepage, str) and _is_web(homepage) else NPM.format(name=name)
-            return PackageInfo(name, version if isinstance(version, str) else None, url, _node_source(modules, name, subpath, manifest, imported.first_name))
+            home = homepage if isinstance(homepage, str) and _is_web(homepage) else NPM.format(name=name)
+            definition = _node_definition(modules, name, subpath, manifest, imported.names)
+            return PackageInfo(name, version if isinstance(version, str) else None, imported.docs_url, home, definition)
         if directory == project:
             break
         directory = directory.parent
-    return PackageInfo(name, url=NPM.format(name=name))
+    return PackageInfo(name, url=imported.docs_url, home_url=NPM.format(name=name))
 
 
-def _node_source(modules: Path, name: str, subpath: str, manifest: dict[str, Any], symbol: str | None) -> LibrarySource | None:
+def _node_definition(modules: Path, name: str, subpath: str, manifest: dict[str, Any], names: tuple[str, ...]) -> Definition | None:
     package = modules / name
     typings = modules / "@types" / name.removeprefix("@").replace("/", "__")
     if subpath:
@@ -477,35 +473,30 @@ def _node_source(modules: Path, name: str, subpath: str, manifest: dict[str, Any
         named = [package / entry for entry in declared if isinstance(entry, str) and entry]
         entries = [*named, *(path.with_name(f"{path.name}.js") for path in named), package / "index.d.ts", package / "index.js", typings / "index.d.ts"]
     existing = [entry for entry in entries if entry.is_file() and language_for(entry.name) is not None]
-    for entry in existing:
-        line = _defined_at(entry, symbol) if symbol else None
-        if line is not None:
-            return LibrarySource(str(entry), line)
-    return LibrarySource(str(existing[0]), 1) if existing else None
+    found = next((definition for entry in existing if names and (definition := find_definition(entry, names)) is not None), None)
+    return found or (Definition(existing[0], 1) if existing else None)
 
 
 def _go_package(imported: Imported, layout: ProjectLayout) -> PackageInfo:
-    url = GO_DOCS.format(path=imported.module) + (f"#{imported.name}" if imported.name else "")
+    home = GO_DOCS.format(path=imported.module) if imported.name else None
     if "." not in imported.module.split("/")[0]:
         go_root = _go_root()
-        return PackageInfo(imported.module, url=url, source=_go_source(go_root / "src" / imported.module, imported.first_name) if go_root else None)
+        definition = _go_definition(go_root / "src" / imported.module, imported.names) if go_root else None
+        return PackageInfo(imported.module, url=imported.docs_url, home_url=home, definition=definition)
     requirement = layout.go_requirement(imported.module)
     if requirement is None:
-        return PackageInfo(imported.module, url=url)
+        return PackageInfo(imported.module, url=imported.docs_url, home_url=home)
     module, version = requirement
     cache = _go_module_cache()
     directory = cache / f"{_go_escape(module)}@{_go_escape(version)}" / imported.module.removeprefix(module).lstrip("/") if cache else None
-    return PackageInfo(module, version, url, _go_source(directory, imported.first_name) if directory else None)
+    return PackageInfo(module, version, imported.docs_url, home, _go_definition(directory, imported.names) if directory else None)
 
 
-def _go_source(directory: Path, symbol: str | None) -> LibrarySource | None:
-    if symbol is None or not directory.is_dir():
+def _go_definition(directory: Path, names: tuple[str, ...]) -> Definition | None:
+    if not names or not directory.is_dir():
         return None
-    for path in sorted(directory.glob("*.go")):
-        line = None if path.name.endswith(GO_TEST_SUFFIX) else _defined_at(path, symbol)
-        if line is not None:
-            return LibrarySource(str(path), line)
-    return None
+    files = (path for path in sorted(directory.glob("*.go")) if not path.name.endswith(GO_TEST_SUFFIX))
+    return next((definition for path in files if (definition := find_definition(path, names)) is not None), None)
 
 
 def _go_root() -> Path | None:
@@ -526,29 +517,6 @@ def _go_module_cache() -> Path | None:
 
 def _go_escape(path: str) -> str:
     return re.sub(r"[A-Z]", lambda match: f"!{match.group(0).lower()}", path)
-
-
-def _defined_at(path: Path, name: str) -> int | None:
-    try:
-        status = path.stat()
-    except OSError:
-        return None
-    return _definition_lines(path, status.st_mtime_ns, status.st_size).get(name)
-
-
-@lru_cache(maxsize=64)
-def _definition_lines(path: Path, _modified: int, size: int) -> dict[str, int]:
-    language = language_for(path.name)
-    try:
-        source = path.read_bytes() if language is not None and size <= MAX_FILE_BYTES else None
-    except OSError:
-        source = None
-    if language is None or source is None:
-        return {}
-    lines: dict[str, int] = {}
-    for symbol in file_symbols(language, source).definitions:
-        lines.setdefault(symbol.name, symbol.row + 1)
-    return lines
 
 
 def _json(path: Path) -> dict[str, Any] | None:

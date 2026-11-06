@@ -189,5 +189,22 @@ export function titleOf(result: NavigationResult): string {
 }
 
 export function missingDocumentation(documentation: Documentation): string | null {
-  return documentation.text || documentation.url ? null : `No documentation found for ${documentation.qualified_name}.`
+  const name = documentation.qualified_name
+  if (documentation.docstring) {
+    return null
+  }
+  if (documentation.signature) {
+    return `No docstring for ${name}.`
+  }
+  return documentation.url ? `No signature or docstring found for ${name}.` : `No documentation found for ${name}.`
+}
+
+export function signatureMarkdown(documentation: Documentation): string | null {
+  const { signature, language } = documentation
+  if (!signature) {
+    return null
+  }
+  const longestRun = Math.max(2, ...(signature.match(/`+/g) ?? []).map((run) => run.length))
+  const fence = '`'.repeat(longestRun + 1)
+  return `${fence}${language}\n${signature}\n${fence}`
 }

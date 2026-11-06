@@ -418,7 +418,10 @@ class DocumentationOut(BaseModel):
     package: str
     version: str | None
     url: str | None
-    text: str | None
+    home_url: str | None
+    signature: str | None
+    language: str
+    docstring: str | None
     source: LibrarySourceOut | None
 
 

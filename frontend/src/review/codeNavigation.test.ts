@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { Documentation, NavigationResult, NavigationTarget } from '../api/navigation'
 import { clearCaret, placeCaret } from '../test/caret'
-import { columnAt, directTarget, emptyMessage, groupTargets, isNavigable, isNavigationClick, isSymbolToken, missingDocumentation, rangeOf, symbolAt, symbolSpan, textOffset, titleOf } from './codeNavigation'
+import { columnAt, directTarget, emptyMessage, groupTargets, isNavigable, isNavigationClick, isSymbolToken, missingDocumentation, rangeOf, signatureMarkdown, symbolAt, symbolSpan, textOffset, titleOf } from './codeNavigation'
 
 function target(role: NavigationTarget['role'], path: string, line: number, unitId: number | null = null): NavigationTarget {
   return { role, path, line, column: 0, preview: `line ${String(line)}`, side: 'head', unit_id: unitId }
@@ -12,7 +12,7 @@ function result(targets: NavigationTarget[], origin: NavigationResult['origin'] 
   return { ready: true, symbol: 'price', origin, resolver: 'tree-sitter', targets, server_hint: null, documentation: null }
 }
 
-const RENDER: Documentation = { qualified_name: 'django.shortcuts.render', package: 'Django', version: '5.1', url: null, text: null, source: null }
+const RENDER: Documentation = { qualified_name: 'django.shortcuts.render', package: 'Django', version: '5.1', url: null, home_url: null, signature: null, language: 'python', docstring: null, source: null }
 
 function codeCell(): HTMLElement {
   const cell = document.createElement('td')
@@ -109,8 +109,16 @@ describe('code navigation helpers', () => {
     expect(isNavigable(external)).toBe(true)
     expect(titleOf(external)).toBe('django.shortcuts.render')
     expect(missingDocumentation(RENDER)).toBe('No documentation found for django.shortcuts.render.')
-    expect(missingDocumentation({ ...RENDER, text: 'Renders a template.' })).toBeNull()
-    expect(missingDocumentation({ ...RENDER, url: 'https://docs.djangoproject.com/' })).toBeNull()
+    expect(missingDocumentation({ ...RENDER, home_url: 'https://pypi.org/project/django/' })).toBe('No documentation found for django.shortcuts.render.')
+    expect(missingDocumentation({ ...RENDER, url: 'https://docs.djangoproject.com/' })).toBe('No signature or docstring found for django.shortcuts.render.')
+    expect(missingDocumentation({ ...RENDER, signature: 'def render(request)' })).toBe('No docstring for django.shortcuts.render.')
+    expect(missingDocumentation({ ...RENDER, docstring: 'Renders a template.' })).toBeNull()
+  })
+
+  it('fences a signature as code in its language, longer than any backticks inside it', () => {
+    expect(signatureMarkdown(RENDER)).toBeNull()
+    expect(signatureMarkdown({ ...RENDER, signature: 'def render(request)' })).toBe('```python\ndef render(request)\n```')
+    expect(signatureMarkdown({ ...RENDER, signature: 'x = "````"' })).toBe('`````python\nx = "````"\n`````')
   })
 
   it('lists definitions first, then usages grouped by file in their order', () => {

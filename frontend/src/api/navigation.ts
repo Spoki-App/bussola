@@ -31,7 +31,10 @@ export interface Documentation {
   package: string
   version: string | null
   url: string | null
-  text: string | null
+  home_url: string | null
+  signature: string | null
+  language: string
+  docstring: string | null
   source: LibrarySource | null
 }
 

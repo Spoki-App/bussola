@@ -1590,6 +1590,11 @@ button.copy-link.failed {
   gap: 8px;
 }
 
+.navigation-signature pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .navigation-package,
 .navigation-documentation-actions {
   display: flex;
