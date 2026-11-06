@@ -6,7 +6,7 @@ export interface TextState {
 
 export type FormatAction = 'h1' | 'h2' | 'h3' | 'bold' | 'italic' | 'strike' | 'code' | 'codeBlock' | 'quote' | 'link' | 'bullets' | 'numbers' | 'tasks'
 
-export function toggleWrap(state: TextState, before: string, after: string, placeholder: string): TextState {
+function toggleWrap(state: TextState, before: string, after: string, placeholder: string): TextState {
   const { text, start, end } = state
   const selected = text.slice(start, end)
   if (text.slice(start - before.length, start) === before && text.slice(end, end + after.length) === after) {
@@ -28,19 +28,10 @@ interface LineStyle {
 
 const LIST = /^(?:[-*+] \[[ xX]\] |[-*+] |\d+\. )/
 const HEADING = /^#{1,6} /
+const QUOTE = /^> ?/
 
 function heading(level: number): LineStyle {
   return { prefix: () => `${'#'.repeat(level)} `, is: new RegExp(`^#{${String(level)}} `), family: HEADING }
-}
-
-const LINE_STYLES: Partial<Record<FormatAction, LineStyle>> = {
-  h1: heading(1),
-  h2: heading(2),
-  h3: heading(3),
-  quote: { prefix: () => '> ', is: /^> ?/, family: /^> ?/ },
-  bullets: { prefix: () => '- ', is: /^[-*+] (?!\[[ xX]\] )/, family: LIST },
-  numbers: { prefix: (index) => `${String(index + 1)}. `, is: /^\d+\. /, family: LIST },
-  tasks: { prefix: () => '- [ ] ', is: /^[-*+] \[[ xX]\] /, family: LIST },
 }
 
 function toggleLinePrefix(state: TextState, style: LineStyle): TextState {
@@ -86,25 +77,32 @@ function toggleCodeBlock(state: TextState): TextState {
   return toggleWrap(state, `${lead}\`\`\`\n`, `\n\`\`\`${trail}`, 'code')
 }
 
+const BULLETS: LineStyle = { prefix: () => '- ', is: /^[-*+] (?!\[[ xX]\] )/, family: LIST }
+const NUMBERS: LineStyle = { prefix: (index) => `${String(index + 1)}. `, is: /^\d+\. /, family: LIST }
+const TASKS: LineStyle = { prefix: () => '- [ ] ', is: /^[-*+] \[[ xX]\] /, family: LIST }
+const QUOTED: LineStyle = { prefix: () => '> ', is: QUOTE, family: QUOTE }
+const H1 = heading(1)
+const H2 = heading(2)
+const H3 = heading(3)
+
+const FORMATS: Record<FormatAction, (state: TextState) => TextState> = {
+  h1: (state) => toggleLinePrefix(state, H1),
+  h2: (state) => toggleLinePrefix(state, H2),
+  h3: (state) => toggleLinePrefix(state, H3),
+  bold: (state) => toggleWrap(state, '**', '**', 'bold text'),
+  italic: (state) => toggleWrap(state, '_', '_', 'italic text'),
+  strike: (state) => toggleWrap(state, '~~', '~~', 'strikethrough text'),
+  code: (state) => toggleWrap(state, '`', '`', 'code'),
+  codeBlock: toggleCodeBlock,
+  quote: (state) => toggleLinePrefix(state, QUOTED),
+  link: toggleLink,
+  bullets: (state) => toggleLinePrefix(state, BULLETS),
+  numbers: (state) => toggleLinePrefix(state, NUMBERS),
+  tasks: (state) => toggleLinePrefix(state, TASKS),
+}
+
 export function applyFormat(state: TextState, action: FormatAction): TextState {
-  const lineStyle = LINE_STYLES[action]
-  if (lineStyle) {
-    return toggleLinePrefix(state, lineStyle)
-  }
-  switch (action) {
-    case 'bold':
-      return toggleWrap(state, '**', '**', 'bold text')
-    case 'italic':
-      return toggleWrap(state, '_', '_', 'italic text')
-    case 'strike':
-      return toggleWrap(state, '~~', '~~', 'strikethrough text')
-    case 'code':
-      return toggleWrap(state, '`', '`', 'code')
-    case 'codeBlock':
-      return toggleCodeBlock(state)
-    default:
-      return toggleLink(state)
-  }
+  return FORMATS[action](state)
 }
 
 export function changedRange(before: string, after: string): { from: number; to: number; insert: string } {

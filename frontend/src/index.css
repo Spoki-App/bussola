@@ -1798,34 +1798,6 @@ button.copy-link.failed {
   gap: 6px;
 }
 
-.composer-tabs {
-  display: inline-flex;
-  gap: 2px;
-}
-
-.composer-tabs button,
-.composer-tool {
-  min-height: 24px;
-  padding: 0 8px;
-  border: none;
-  border-radius: var(--radius-control);
-  background: none;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.composer-tabs button:hover:not(:disabled),
-.composer-tool:hover:not(:disabled) {
-  background: var(--bg-sunken);
-  color: var(--text);
-}
-
-.composer-tabs button.active {
-  background: var(--bg-sunken);
-  color: var(--text);
-  font-weight: 600;
-}
-
 .composer-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -1838,20 +1810,19 @@ button.copy-link.failed {
 
 .composer-tool {
   min-width: 24px;
+  min-height: 24px;
   padding: 0 5px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--muted);
   font-family: var(--mono);
+  font-size: 12px;
 }
 
-.composer-tool.tool-bold {
-  font-weight: 700;
-}
-
-.composer-tool.tool-italic {
-  font-style: italic;
-}
-
-.composer-tool.tool-strike {
-  text-decoration: line-through;
+.composer-tool:hover:not(:disabled) {
+  background: var(--bg-sunken);
+  color: var(--text);
 }
 
 .composer-preview {

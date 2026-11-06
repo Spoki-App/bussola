@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { applyFormat, changedRange, toggleWrap, type FormatAction, type TextState } from './format'
+import { applyFormat, changedRange, type FormatAction, type TextState } from './format'
 
 function parse(marked: string): TextState {
   const start = marked.indexOf('[')
@@ -16,24 +16,6 @@ function format(marked: string, action: FormatAction): string {
   return show(applyFormat(parse(marked), action))
 }
 
-describe('toggleWrap', () => {
-  it('wraps the selection and keeps it selected', () => {
-    expect(show(toggleWrap(parse('a [word] b'), '**', '**', 'bold'))).toBe('a **[word]** b')
-  })
-
-  it('inserts a selected placeholder at the cursor', () => {
-    expect(show(toggleWrap(parse('a []b'), '**', '**', 'bold'))).toBe('a **[bold]**b')
-  })
-
-  it('unwraps when applied again to the same selection', () => {
-    expect(show(toggleWrap(parse('a **[word]** b'), '**', '**', 'bold'))).toBe('a [word] b')
-  })
-
-  it('unwraps a selection that includes the markers', () => {
-    expect(show(toggleWrap(parse('a [**word**] b'), '**', '**', 'bold'))).toBe('a [word] b')
-  })
-})
-
 describe('applyFormat', () => {
   it.each<[FormatAction, string]>([
     ['bold', '**[x]**'],
@@ -43,6 +25,14 @@ describe('applyFormat', () => {
   ])('%s wraps and toggles back', (action, wrapped) => {
     expect(format('[x]', action)).toBe(wrapped)
     expect(format(wrapped, action)).toBe('[x]')
+  })
+
+  it('inserts a selected placeholder at the cursor', () => {
+    expect(format('a []b', 'bold')).toBe('a **[bold text]**b')
+  })
+
+  it('unwraps a selection that includes the markers', () => {
+    expect(format('a [**word**] b', 'bold')).toBe('a [word] b')
   })
 
   it('wraps a code block on its own lines', () => {

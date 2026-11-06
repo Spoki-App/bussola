@@ -1,8 +1,9 @@
-import { useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 
 import { applyFormat, changedRange, type FormatAction } from '../markdown/format'
 import { Markdown } from './Markdown'
+import { Segmented } from './Segmented'
 
 interface Props {
   placeholder?: string
@@ -17,7 +18,7 @@ interface Props {
 interface Tool {
   action: FormatAction
   label: string
-  glyph: string
+  glyph: ReactNode
   shortcut?: string
 }
 
@@ -28,9 +29,9 @@ const TOOL_GROUPS: Tool[][] = [
     { action: 'h3', label: 'Heading 3', glyph: 'H3' },
   ],
   [
-    { action: 'bold', label: 'Bold', glyph: 'B', shortcut: 'b' },
-    { action: 'italic', label: 'Italic', glyph: 'I', shortcut: 'i' },
-    { action: 'strike', label: 'Strikethrough', glyph: 'S' },
+    { action: 'bold', label: 'Bold', glyph: <b>B</b>, shortcut: 'b' },
+    { action: 'italic', label: 'Italic', glyph: <i>I</i>, shortcut: 'i' },
+    { action: 'strike', label: 'Strikethrough', glyph: <s>S</s> },
   ],
   [
     { action: 'code', label: 'Inline code', glyph: '<>', shortcut: 'e' },
@@ -65,7 +66,6 @@ export function Composer({ placeholder = 'Leave a comment (Markdown)', submitLab
   const [previewing, setPreviewing] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
-  const id = useId()
   const submit = () => {
     if (body.trim()) {
       onSubmit(body, () => { setBody('') })
@@ -113,14 +113,7 @@ export function Composer({ placeholder = 'Leave a comment (Markdown)', submitLab
   return (
     <div className="composer" onKeyDown={onKeyDown}>
       <div className="composer-bar">
-        <div className="composer-tabs" role="tablist" aria-label="Comment mode">
-          <button type="button" role="tab" id={`${id}-write`} aria-controls={`${id}-editor`} aria-selected={!previewing} className={previewing ? '' : 'active'} onClick={() => { showPreview(false) }}>
-            Write
-          </button>
-          <button type="button" role="tab" id={`${id}-preview`} aria-controls={`${id}-rendered`} aria-selected={previewing} className={previewing ? 'active' : ''} title="Ctrl/Cmd + Shift + P" onClick={() => { showPreview(true) }}>
-            Preview
-          </button>
-        </div>
+        <Segmented label="Comment mode" labels={{ write: 'Write', preview: 'Preview' }} value={previewing ? 'preview' : 'write'} onChange={(mode) => { showPreview(mode === 'preview') }} />
         {!previewing && (
           <div className="composer-toolbar" role="toolbar" aria-label="Formatting">
             {TOOL_GROUPS.map((group) => (
@@ -129,7 +122,7 @@ export function Composer({ placeholder = 'Leave a comment (Markdown)', submitLab
                   <button
                     key={tool.action}
                     type="button"
-                    className={`composer-tool tool-${tool.action}`}
+                    className="composer-tool"
                     aria-label={tool.label}
                     title={tool.shortcut ? `${tool.label} (Ctrl/Cmd + ${tool.shortcut.toUpperCase()})` : tool.label}
                     onMouseDown={(event) => { event.preventDefault() }}
@@ -145,7 +138,6 @@ export function Composer({ placeholder = 'Leave a comment (Markdown)', submitLab
       </div>
       <textarea
         ref={textareaRef}
-        id={`${id}-editor`}
         aria-label={placeholder}
         hidden={previewing}
         value={body}
@@ -155,7 +147,7 @@ export function Composer({ placeholder = 'Leave a comment (Markdown)', submitLab
         onChange={(event) => { setBody(event.target.value) }}
       />
       {previewing && (
-        <div ref={previewRef} id={`${id}-rendered`} className="composer-preview" role="tabpanel" aria-labelledby={`${id}-preview`} tabIndex={0}>
+        <div ref={previewRef} className="composer-preview" role="tabpanel" aria-label="Preview" tabIndex={0}>
           {body.trim() ? <Markdown text={body} /> : <p className="muted">Nothing to preview</p>}
         </div>
       )}
