@@ -41,7 +41,7 @@ describe('Composer preview', () => {
   it('toggles the preview with Ctrl/Cmd + Shift + P', () => {
     const { textbox } = renderComposer('_hi_')
 
-    fireEvent.keyDown(textbox, { key: 'P', metaKey: true, shiftKey: true })
+    fireEvent.keyDown(textbox, { key: 'P', ctrlKey: true, shiftKey: true })
     expect(screen.getByRole('tabpanel').querySelector('em')).toHaveTextContent('hi')
 
     fireEvent.keyDown(screen.getByRole('tabpanel'), { key: 'p', ctrlKey: true, shiftKey: true })
@@ -87,11 +87,22 @@ describe('Composer formatting', () => {
     render(<Page />)
     const textbox = screen.getByRole('textbox')
 
-    fireEvent.keyDown(textbox, { key: 'k', metaKey: true })
+    fireEvent.keyDown(textbox, { key: 'k', ctrlKey: true })
     fireEvent.keyDown(textbox, { key: 'c' })
 
     expect(review).not.toHaveBeenCalled()
     expect(textbox).toHaveValue('[text](url)')
+  })
+
+  it('leaves the preview after sending', () => {
+    const onSubmit = vi.fn((_body: string, done: () => void) => { done() })
+    render(<Composer submitLabel="Send" initial="done" onSubmit={onSubmit} />)
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    expect(screen.queryByRole('tabpanel')).toBeNull()
+    expect(screen.getByRole('textbox')).toHaveValue('')
   })
 
   it('sends with Ctrl/Cmd + Enter', () => {

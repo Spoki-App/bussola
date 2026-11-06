@@ -49,8 +49,21 @@ describe('applyFormat', () => {
     expect(show(applyFormat({ text: 'see [docs](url) now', start: 11, end: 14 }, 'link'))).toBe('see [docs] now')
   })
 
-  it('inserts a link placeholder at the cursor', () => {
-    expect(applyFormat({ text: 'a ', start: 2, end: 2 }, 'link')).toEqual({ text: 'a [text](url)', start: 3, end: 7 })
+  it('inserts a link placeholder at the cursor and removes it when applied again', () => {
+    const linked = applyFormat({ text: 'a ', start: 2, end: 2 }, 'link')
+    expect(linked).toEqual({ text: 'a [text](url)', start: 3, end: 7 })
+    expect(applyFormat(linked, 'link')).toEqual({ text: 'a text', start: 2, end: 6 })
+  })
+
+  it('does not take underscores inside a word for italic markers', () => {
+    expect(format('snake_[case]_name', 'italic')).toBe('snake__[case]__name')
+    expect(format('a _[word]_ b', 'italic')).toBe('a [word] b')
+  })
+
+  it('leaves blank lines out of lists', () => {
+    const numbered = applyFormat({ text: 'a\n\nb', start: 0, end: 4 }, 'numbers')
+    expect(numbered.text).toBe('1. a\n\n2. b')
+    expect(applyFormat(numbered, 'numbers').text).toBe('a\n\nb')
   })
 
   it('prefixes every selected line and toggles back', () => {

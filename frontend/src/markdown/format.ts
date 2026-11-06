@@ -6,10 +6,13 @@ export interface TextState {
 
 export type FormatAction = 'h1' | 'h2' | 'h3' | 'bold' | 'italic' | 'strike' | 'code' | 'codeBlock' | 'quote' | 'link' | 'bullets' | 'numbers' | 'tasks'
 
-function toggleWrap(state: TextState, before: string, after: string, placeholder: string): TextState {
+const WORD = /\w/
+
+function toggleWrap(state: TextState, before: string, after: string, placeholder: string, intraword = true): TextState {
   const { text, start, end } = state
   const selected = text.slice(start, end)
-  if (text.slice(start - before.length, start) === before && text.slice(end, end + after.length) === after) {
+  const inWord = !intraword && (WORD.test(text.charAt(start - before.length - 1)) || WORD.test(text.charAt(end + after.length)))
+  if (!inWord && text.slice(start - before.length, start) === before && text.slice(end, end + after.length) === after) {
     return { text: text.slice(0, start - before.length) + selected + text.slice(end + after.length), start: start - before.length, end: end - before.length }
   }
   if (selected.length >= before.length + after.length && selected.startsWith(before) && selected.endsWith(after)) {
@@ -41,8 +44,19 @@ function toggleLinePrefix(state: TextState, style: LineStyle): TextState {
   const lineEnd = text.indexOf('\n', end)
   const blockEnd = lineEnd === -1 ? text.length : lineEnd
   const lines = text.slice(blockStart, blockEnd).split('\n')
-  const remove = lines.every((line) => style.is.test(line))
-  const changed = lines.map((line, index) => (remove ? line.replace(style.is, '') : style.prefix(index) + line.replace(style.family, '')))
+  const blank = (line: string) => !line.trim() && lines.some((other) => other.trim())
+  const remove = lines.every((line) => blank(line) || style.is.test(line))
+  let item = 0
+  const changed = lines.map((line) => {
+    if (blank(line)) {
+      return line
+    }
+    if (remove) {
+      return line.replace(style.is, '')
+    }
+    item += 1
+    return style.prefix(item - 1) + line.replace(style.family, '')
+  })
   const block = changed.join('\n')
   const next = text.slice(0, blockStart) + block + text.slice(blockEnd)
   if (state.start !== state.end) {
@@ -58,6 +72,10 @@ function toggleLink(state: TextState): TextState {
   if (text.slice(start - 2, start) === '](' && text[end] === ')' && labelStart !== -1) {
     const label = text.slice(labelStart + 1, start - 2)
     return { text: text.slice(0, labelStart) + label + text.slice(end + 1), start: labelStart, end: labelStart + label.length }
+  }
+  const close = text.indexOf(')', end + 2)
+  if (text[start - 1] === '[' && text.slice(end, end + 2) === '](' && close !== -1) {
+    return { text: text.slice(0, start - 1) + text.slice(start, end) + text.slice(close + 1), start: start - 1, end: end - 1 }
   }
   if (start === end) {
     return toggleWrap(state, '[', '](url)', 'text')
@@ -90,7 +108,7 @@ const FORMATS: Record<FormatAction, (state: TextState) => TextState> = {
   h2: (state) => toggleLinePrefix(state, H2),
   h3: (state) => toggleLinePrefix(state, H3),
   bold: (state) => toggleWrap(state, '**', '**', 'bold text'),
-  italic: (state) => toggleWrap(state, '_', '_', 'italic text'),
+  italic: (state) => toggleWrap(state, '_', '_', 'italic text', false),
   strike: (state) => toggleWrap(state, '~~', '~~', 'strikethrough text'),
   code: (state) => toggleWrap(state, '`', '`', 'code'),
   codeBlock: toggleCodeBlock,

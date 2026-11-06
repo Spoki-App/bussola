@@ -46,6 +46,8 @@ const TOOL_GROUPS: Tool[][] = [
   ],
 ]
 
+const MAC = /Mac|iPhone|iPad/.test(navigator.userAgent)
+
 const SHORTCUTS = new Map(TOOL_GROUPS.flat().flatMap((tool) => (tool.shortcut ? [[tool.shortcut, tool.action] as const] : [])))
 
 function replaceText(textarea: HTMLTextAreaElement, from: number, to: number, insert: string): boolean {
@@ -68,7 +70,10 @@ export function Composer({ placeholder = 'Leave a comment (Markdown)', submitLab
   const previewRef = useRef<HTMLDivElement>(null)
   const submit = () => {
     if (body.trim()) {
-      onSubmit(body, () => { setBody('') })
+      onSubmit(body, () => {
+        setBody('')
+        setPreviewing(false)
+      })
     }
   }
   const showPreview = (show: boolean) => {
@@ -92,7 +97,7 @@ export function Composer({ placeholder = 'Leave a comment (Markdown)', submitLab
     textarea.setSelectionRange(next.start, next.end)
   }
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const command = event.metaKey || event.ctrlKey
+    const command = MAC ? event.metaKey : event.ctrlKey
     const key = event.key.toLowerCase()
     if (command && event.shiftKey && key === 'p') {
       event.preventDefault()
@@ -103,7 +108,7 @@ export function Composer({ placeholder = 'Leave a comment (Markdown)', submitLab
     if (action) {
       event.preventDefault()
       format(action)
-    } else if (event.key === 'Enter' && command) {
+    } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
       event.preventDefault()
       submit()
     } else if (event.key === 'Escape' && onCancel) {
