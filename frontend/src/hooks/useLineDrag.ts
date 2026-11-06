@@ -20,15 +20,20 @@ export function useLineDrag<T>(onMove: (target: T, y: number) => void, onEnd: ()
     let movedY = y
     let frame = 0
     const onMouseMove = (event: MouseEvent) => {
+      if ((event.buttons & 1) === 0) {
+        finish()
+        return
+      }
       pointerY = event.clientY
     }
     const stop = () => {
       cancelAnimationFrame(frame)
       window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
+      window.removeEventListener('mouseup', finish)
+      window.removeEventListener('blur', finish)
       stopDrag.current = null
     }
-    const onMouseUp = () => {
+    const finish = () => {
       stop()
       end.current()
     }
@@ -44,8 +49,9 @@ export function useLineDrag<T>(onMove: (target: T, y: number) => void, onEnd: ()
       frame = requestAnimationFrame(tick)
     }
     window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
+    window.addEventListener('mouseup', finish)
+    window.addEventListener('blur', finish)
     frame = requestAnimationFrame(tick)
-    stopDrag.current = stop
+    stopDrag.current = finish
   }, [])
 }

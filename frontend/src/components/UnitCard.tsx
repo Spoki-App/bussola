@@ -214,10 +214,12 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
   }
 
   const onLineNumberClick = (row: DiffRow, side: GutterSide, extend: boolean) => {
-    if (unit.row_approvable) {
-      const next = dragSelection(rows, anchor, rowKey(row), extend)
+    if (unit.row_approvable && extend) {
+      const next = dragSelection(rows, anchor, rowKey(row), true)
       setSelected(next.selected)
       setAnchor(next.anchor)
+    } else if (unit.row_approvable) {
+      setAnchor(rowKey(row))
     }
     if (onComment && diff.data) {
       onComment({ unit, row, side, mode: diff.data.mode, extend, selecting: true })

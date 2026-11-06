@@ -120,3 +120,12 @@ test('dragging over the code text selects text to copy and leaves the line selec
   expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toContain('ROWS.append(1)')
   await expect(card.getByRole('button', { name: /^Approve selection/ })).toHaveCount(0)
 })
+
+test('clicking a line number to comment leaves the lines to approve unselected', async ({ page }) => {
+  const card = await openReview(page, 'comment')
+
+  await gutter(card, 3).click()
+
+  await expect(card.getByPlaceholder('Leave a comment (Markdown)')).toBeVisible()
+  await expect(card.getByRole('button', { name: /^Approve selection/ })).toHaveCount(0)
+})
