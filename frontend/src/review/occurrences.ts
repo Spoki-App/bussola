@@ -44,26 +44,30 @@ export function occurrenceSpans(line: TokenNode[], name: string): SymbolSpan[] {
   return spans
 }
 
-function wrap(nodes: TokenNode[], spans: SymbolSpan[], offset: { at: number }): TokenNode[] {
-  return nodes.flatMap((node): TokenNode[] => {
-    if (!isText(node)) {
-      return [{ ...node, children: wrap(node.children ?? [], spans, offset) }]
-    }
-    const start = offset.at
-    const end = start + node.value.length
-    offset.at = end
-    const cuts = [start, end, ...spans.flatMap((span) => [span.start, span.end]).filter((cut) => cut > start && cut < end)].sort((a, b) => a - b)
-    return cuts.slice(1).map((cut, index) => {
-      const piece = { ...node, value: node.value.slice(cuts[index] - start, cut - start) }
-      const inside = spans.some((span) => cuts[index] >= span.start && cut <= span.end)
-      return inside ? { type: 'occurrence', className: OCCURRENCE_CLASS, children: [piece] } : piece
+function wrap(line: TokenNode[], spans: SymbolSpan[]): TokenNode[] {
+  const bounds = spans.flatMap((span) => [span.start, span.end])
+  let offset = 0
+  const visit = (nodes: TokenNode[]): TokenNode[] =>
+    nodes.flatMap((node): TokenNode[] => {
+      if (!isText(node)) {
+        return [{ ...node, children: visit(node.children ?? []) }]
+      }
+      const start = offset
+      const end = start + node.value.length
+      offset = end
+      const cuts = [start, ...bounds.filter((cut) => cut > start && cut < end), end].sort((a, b) => a - b)
+      return cuts.slice(1).map((cut, index) => {
+        const piece = { ...node, value: node.value.slice(cuts[index] - start, cut - start) }
+        const inside = spans.some((span) => cuts[index] >= span.start && cut <= span.end)
+        return inside ? { type: 'occurrence', className: OCCURRENCE_CLASS, children: [piece] } : piece
+      })
     })
-  })
+  return visit(line)
 }
 
 function markLine(line: TokenNode[], name: string): TokenNode[] {
   const spans = occurrenceSpans(line, name)
-  return spans.length === 0 ? line : wrap(line, spans, { at: 0 })
+  return spans.length === 0 ? line : wrap(line, spans)
 }
 
 export function markOccurrences(tokens: HunkTokens, name: string): HunkTokens {

@@ -4,6 +4,7 @@ import 'react-diff-view/style/index.css'
 
 import type { DiffRow, UnitDiff } from '../api/types'
 import { useViewType } from '../hooks/useDiffLayout'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useSymbolLink } from '../hooks/useSymbolLink'
 import { hasNavigationModifier, isNavigationClick, navigationColumn, symbolAt, type ScreenPoint } from '../review/codeNavigation'
 import { collapsedUnified, segmentRows, unifiedOrder, type Segment } from '../review/collapse'
@@ -164,7 +165,6 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
   const wrap = useDiffWrap()
   const link = useSymbolLink()
   const [occurrence, setOccurrence] = useState<string | null>(null)
-  const claimedClick = useRef<Event | null>(null)
 
   useEffect(() => {
     endSelection.current = onLineSelectEnd
@@ -187,23 +187,18 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
     if (occurrence === null) {
       return
     }
-    const onClick = (event: Event) => {
-      if (event !== claimedClick.current) {
+    const onClick = (event: globalThis.MouseEvent) => {
+      if (!isNavigationClick(event)) {
         setOccurrence(null)
       }
     }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOccurrence(null)
-      }
-    }
-    window.addEventListener('click', onClick)
-    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('click', onClick, true)
     return () => {
-      window.removeEventListener('click', onClick)
-      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('click', onClick, true)
     }
   }, [occurrence])
+
+  useKeyboardShortcuts({ Escape: occurrence === null ? undefined : () => { setOccurrence(null) } })
 
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const rows = useMemo(() => (viewType === 'split' ? diff.rows : unifiedOrder(diff.rows)), [diff.rows, viewType])
@@ -299,7 +294,6 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
         },
         onClick: ({ change, side }, event: MouseEvent<HTMLElement>) => {
           const row = index.rowOf(change)
-          claimedClick.current = event.nativeEvent
           if (onNavigate && isNavigationClick(event)) {
             const column = navigationColumn(event.currentTarget, event.clientX, event.clientY)
             if (row && column !== null) {
