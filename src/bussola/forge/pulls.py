@@ -15,6 +15,7 @@ from bussola.storage.repositories import Store
 
 PULL_REF_PREFIX = "refs/bussola/pull/"
 OPEN_STATE = "OPEN"
+MERGED_STATE = "MERGED"
 
 
 class PullRequestFetchError(GitError):

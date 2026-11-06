@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Sequence
 from typing import Any
@@ -11,13 +12,19 @@ from typing import Any
 from bussola.errors import InvalidRequestError
 from bussola.forge.base import (
     Asset,
+    BranchDeletion,
+    CommitText,
     Conversation,
     DiffSide,
     FileViews,
     ForgeError,
     ForgeStatus,
+    HeadBranch,
     InlineComment,
     LineRanges,
+    MergeMethod,
+    MergeOptions,
+    MergeRequest,
     PullRequest,
     RemoteComment,
     RemoteNote,
@@ -102,6 +109,38 @@ ASSET_URL = re.compile(r"https://github\.com/(?:user-attachments/assets/[0-9a-f-
 MAX_ASSET_BYTES = 25 * 1024 * 1024
 IMAGE_TYPE_PREFIX = "image/"
 REVIEW_PREFIX = "review-"
+MERGE_OPTIONS_QUERY = """
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    nameWithOwner mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed viewerDefaultMergeMethod deleteBranchOnMerge
+    pullRequest(number: $number) {
+      state isDraft mergeable mergeStateStatus reviewDecision headRefOid headRefName
+      headRepository { nameWithOwner }
+      statusCheckRollup { state }
+      mergeTitle: viewerMergeHeadlineText(mergeType: MERGE)
+      mergeMessage: viewerMergeBodyText(mergeType: MERGE)
+      squashTitle: viewerMergeHeadlineText(mergeType: SQUASH)
+      squashMessage: viewerMergeBodyText(mergeType: SQUASH)
+    }
+  }
+}
+"""
+METHOD_ALLOWED_FIELDS = {MergeMethod.MERGE: "mergeCommitAllowed", MergeMethod.SQUASH: "squashMergeAllowed", MergeMethod.REBASE: "rebaseMergeAllowed"}
+EDITABLE_METHODS = (MergeMethod.MERGE, MergeMethod.SQUASH)
+REVIEW_BLOCKERS = {
+    "CHANGES_REQUESTED": "A reviewer requested changes.",
+    "REVIEW_REQUIRED": "An approving review is required.",
+}
+CHECK_BLOCKERS = {
+    "FAILURE": "Some checks are failing.",
+    "ERROR": "Some checks are failing.",
+    "PENDING": "Some checks have not finished yet.",
+    "EXPECTED": "Some required checks have not run yet.",
+}
+CONFLICTS_BLOCKER = "This branch has conflicts with the base branch that must be resolved."
+BEHIND_BLOCKER = "This branch is out of date with the base branch."
+DRAFT_BLOCKER = "This pull request is still a draft."
+PROTECTION_BLOCKER = "The branch protection rules of the base branch block merging."
 
 type JsonObject = dict[str, Any]
 
@@ -231,6 +270,28 @@ class GitHubAdapter:
             raise ForgeError(f"{url} is not an image bussola can show")
         return Asset(content_type, data)
 
+    def merge_options(self, repository: str, number: int) -> MergeOptions:
+        owner, name = _repo(repository).split("/")
+        response = self._graphql(MERGE_OPTIONS_QUERY, owner=owner, name=name, number=number)
+        try:
+            settings: JsonObject = response["data"]["repository"]
+            pull: JsonObject = settings["pullRequest"]
+            return _merge_options(settings, pull)
+        except (KeyError, TypeError) as error:
+            raise ForgeError(f"GitHub did not return the merge settings of pull request #{number}") from error
+
+    def merge_pull_request(self, repository: str, number: int, request: MergeRequest) -> None:
+        payload: JsonObject = {"merge_method": request.method.value, "sha": request.head_sha}
+        if request.method in EDITABLE_METHODS:
+            payload["commit_message"] = request.message
+            if request.title.strip():
+                payload["commit_title"] = request.title
+        self._json(["api", "--method", "PUT", f"repos/{_repo(repository)}/pulls/{number}/merge", "--input", "-"], payload)
+
+    def delete_branch(self, branch: HeadBranch) -> None:
+        ref = urllib.parse.quote(branch.name, safe="/")
+        self._run(["api", "--method", "DELETE", f"repos/{_repo(branch.repository)}/git/refs/heads/{ref}"])
+
     def _graphql(self, query: str, *flags: str, **variables: str | int) -> Any:
         return self._json(_graphql_args(query, flags, variables))
 
@@ -299,6 +360,54 @@ def _failed_fields(output: bytes, paths: Sequence[str]) -> dict[str, str]:
             return {}
         failed[fields[location[0]]] = str(error.get("message") or "GitHub refused the change")
     return failed
+
+
+def _merge_options(settings: JsonObject, pull: JsonObject) -> MergeOptions:
+    methods = tuple(method for method, field in METHOD_ALLOWED_FIELDS.items() if settings.get(field))
+    preferred = str(settings.get("viewerDefaultMergeMethod") or "").lower()
+    default = next((method for method in methods if method == preferred), methods[0] if methods else None)
+    texts = {
+        method: CommitText(str(pull.get(f"{method}Title") or ""), str(pull.get(f"{method}Message") or "")) for method in EDITABLE_METHODS if method in methods
+    }
+    head_repository: JsonObject = pull.get("headRepository") or {}
+    head = HeadBranch(str(head_repository["nameWithOwner"]), str(pull["headRefName"])) if head_repository else None
+    return MergeOptions(
+        head_sha=str(pull["headRefOid"]),
+        methods=methods,
+        default_method=default,
+        commit_texts=texts,
+        blockers=_merge_blockers(pull),
+        branch_deletion=_branch_deletion(settings, head),
+        head_branch=head,
+    )
+
+
+def _merge_blockers(pull: JsonObject) -> tuple[str, ...]:
+    state = str(pull.get("state") or "")
+    if state != "OPEN":
+        return (f"This pull request is {state.lower()}.",)
+    status = pull.get("mergeStateStatus")
+    blockers: list[str] = []
+    if pull.get("isDraft"):
+        blockers.append(DRAFT_BLOCKER)
+    if pull.get("mergeable") == "CONFLICTING" or status == "DIRTY":
+        blockers.append(CONFLICTS_BLOCKER)
+    if status == "BEHIND":
+        blockers.append(BEHIND_BLOCKER)
+    if status == "BLOCKED":
+        rollup: JsonObject = pull.get("statusCheckRollup") or {}
+        found = (REVIEW_BLOCKERS.get(str(pull.get("reviewDecision"))), CHECK_BLOCKERS.get(str(rollup.get("state"))))
+        reasons = [reason for reason in found if reason]
+        blockers += reasons or ([] if blockers else [PROTECTION_BLOCKER])
+    return tuple(blockers)
+
+
+def _branch_deletion(settings: JsonObject, head: HeadBranch | None) -> BranchDeletion:
+    if head is None:
+        return BranchDeletion.UNAVAILABLE
+    if settings.get("deleteBranchOnMerge") and head.repository.lower() == str(settings.get("nameWithOwner") or "").lower():
+        return BranchDeletion.AUTOMATIC
+    return BranchDeletion.OPTIONAL
 
 
 def _nodes(connection: JsonObject | None) -> list[JsonObject]:
