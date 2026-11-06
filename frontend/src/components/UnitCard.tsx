@@ -11,7 +11,7 @@ import { ReviewLinkContext } from '../review/reviewLink'
 import { useAiDescription } from '../hooks/useAiDescription'
 import type { LineLink } from '../markdown/lineLinks'
 import { dragSelection } from '../review/lineDrag'
-import { approvedSelections, rowKey, selectRange, selectionRanges } from '../review/selection'
+import { approvedSelections, clickRow, NO_SELECTION, rowKey, selectionRanges, type LineSelection } from '../review/selection'
 import { AiActionButton } from './AiActionButton'
 import { AiDescription } from './AiDescription'
 import { ErrorNote, ImpactBadge, KindBadge, StateBadge } from './Badges'
@@ -84,9 +84,13 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
       setMode('base')
     }
   }
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
-  const [anchor, setAnchor] = useState<string | null>(null)
+  const [{ selected }, setSelection] = useState<LineSelection>(NO_SELECTION)
   const diff = useUnitDiff(reviewId, unit, mode, expanded)
+  const [selectionRows, setSelectionRows] = useState(diff.data?.rows)
+  if (selectionRows !== diff.data?.rows) {
+    setSelectionRows(diff.data?.rows)
+    setSelection(NO_SELECTION)
+  }
   const { ref: linkedRef, linked } = useLinkedScroll<HTMLElement>(unitElementId(unit.id), unit.id, expanded && !diff.isPending)
   if (linked && !expanded) {
     setExpanded(true)
@@ -101,8 +105,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
   const failure = approve.error ?? revoke.error ?? revokeSelections.error
 
   const clearSelection = () => {
-    setSelected(new Set())
-    setAnchor(null)
+    setSelection(NO_SELECTION)
   }
   const approveUnit = () => {
     approve.mutate({ unit_id: unit.id })
@@ -198,28 +201,13 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
     })
 
   const onRowClick = (row: DiffRow, extend: boolean) => {
-    const key = rowKey(row)
-    if (extend && anchor) {
-      setSelected(selectRange(rows, anchor, key))
-      return
-    }
-    const next = new Set(selected)
-    if (next.has(key)) {
-      next.delete(key)
-    } else {
-      next.add(key)
-    }
-    setSelected(next)
-    setAnchor(key)
+    setSelection((current) => clickRow(rows, current, rowKey(row), extend))
   }
 
   const onLineNumberClick = (row: DiffRow, side: GutterSide, extend: boolean) => {
-    if (unit.row_approvable && extend) {
-      const next = dragSelection(rows, anchor, rowKey(row), true)
-      setSelected(next.selected)
-      setAnchor(next.anchor)
-    } else if (unit.row_approvable) {
-      setAnchor(rowKey(row))
+    if (unit.row_approvable) {
+      const key = rowKey(row)
+      setSelection((current) => (extend ? dragSelection(rows, current, key) : { ...current, anchor: key }))
     }
     if (onComment && diff.data) {
       onComment({ unit, row, side, mode: diff.data.mode, extend, selecting: true })

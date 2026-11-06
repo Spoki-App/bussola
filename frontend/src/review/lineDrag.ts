@@ -1,17 +1,12 @@
 import type { DiffRow } from '../api/types'
-import { selectRange } from './selection'
+import { selectRange, type LineSelection } from './selection'
 
 export const EDGE_SCROLL_ZONE = 48
 export const EDGE_SCROLL_MAX_STEP = 24
 
-export interface LineSelection {
-  anchor: string
-  selected: Set<string>
-}
-
-export function dragSelection(rows: DiffRow[], anchor: string | null, key: string, extend: boolean): LineSelection {
-  const start = extend && anchor !== null ? anchor : key
-  return { anchor: start, selected: selectRange(rows, start, key) }
+export function dragSelection(rows: DiffRow[], current: LineSelection, key: string): LineSelection {
+  const anchor = current.anchor ?? key
+  return { anchor, selected: selectRange(rows, anchor, key) }
 }
 
 export function edgeScrollStep(pointerY: number, viewportHeight: number): number {
