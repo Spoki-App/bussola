@@ -87,10 +87,10 @@ Matches are taken from the largest down, and a line already part of a match is n
 
 ```
 GET  /reviews/{review_id}/moves?revision_id=
-POST /reviews/{review_id}/compare    {left: {unit_id, side, line_offset, line_count}, right: {...}}
+POST /reviews/{review_id}/compare    {left: {unit_id, side, line_offset, line_count} | pasted: text, right: {...}}
 ```
 
-`compare` diffs any two ranges of unit lines with the same line matching as unit diffs, and says whether they are identical by the same rule.
+`compare` diffs any two ranges of unit lines with the same line matching as unit diffs, and says whether they are identical by the same rule. Instead of `left` it can take `pasted`, code copied to the clipboard (at most 200,000 characters): its lines are numbered from 1, its common indentation is replaced by the smallest indentation of the right range, the unified diff names it `clipboard`, and `left` is null in the answer.
 
 ## GitHub
 

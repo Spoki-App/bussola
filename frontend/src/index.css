@@ -1985,8 +1985,11 @@ button.link:hover:not(:disabled) {
 .draft-header {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
+}
+
+.draft-header .draft-range {
+  margin-right: auto;
 }
 
 .move-link {

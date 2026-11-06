@@ -15,7 +15,15 @@ interface Props {
 
 const IDENTICAL_TITLE = 'Same code, ignoring indentation and blank lines'
 
-function RangeHeading({ range }: { range: CodeRange }) {
+function RangeHeading({ range }: { range: CodeRange | null }) {
+  if (range === null) {
+    return (
+      <p className="compare-range">
+        <code>Clipboard</code>
+        <span className="muted">pasted code</span>
+      </p>
+    )
+  }
   return (
     <p className="compare-range">
       <code>{unitTitle(range)}</code>

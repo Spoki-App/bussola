@@ -26,6 +26,14 @@ interface CompareStart {
   label: string
 }
 
+function readClipboard(): Promise<string> {
+  try {
+    return navigator.clipboard.readText()
+  } catch (error) {
+    return Promise.reject(error instanceof Error ? error : new Error(String(error)))
+  }
+}
+
 function sameRange(first: CodeRangeRequest, second: CodeRangeRequest): boolean {
   return first.unit_id === second.unit_id && first.side === second.side && first.line_offset === second.line_offset && first.line_count === second.line_count
 }
@@ -38,6 +46,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [compareStart, setCompareStart] = useState<CompareStart | null>(null)
   const [comparison, setComparison] = useState<ComparisonRequest | null>(null)
+  const [clipboardError, setClipboardError] = useState<string | null>(null)
   const moveLinks = useMemo(() => moveLinksByUnit(moves.data ?? []), [moves.data])
   const { mutate: createThread, isPending: creating, error: createError } = useCreateThread(reviewId)
   const threadsByUnit = useMemo(() => {
@@ -82,6 +91,21 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
         const request = draftRequest(draft)
         const range = { unit_id: unit.id, ...request }
         const isFirstRange = compareStart !== null && sameRange(compareStart.range, range)
+        const compareWithClipboard = () => {
+          setClipboardError(null)
+          readClipboard().then(
+            (pasted) => {
+              if (pasted.trim()) {
+                setComparison({ pasted, right: range })
+              } else {
+                setClipboardError('The clipboard has no text to compare.')
+              }
+            },
+            () => {
+              setClipboardError('The clipboard could not be read. Allow this page to see the clipboard and try again.')
+            },
+          )
+        }
         const compare = () => {
           if (compareStart) {
             setComparison({ left: compareStart.range, right: range })
@@ -100,7 +124,13 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
                   {compareStart ? 'Compare with first range' : 'Compare with...'}
                 </button>
               )}
+              {!compareStart && (
+                <button type="button" className="link" title="Compare these lines with the code copied to the clipboard" onClick={compareWithClipboard}>
+                  Compare with clipboard
+                </button>
+              )}
             </div>
+            {clipboardError && <ErrorNote message={clipboardError} />}
             <Composer
               reviewId={reviewId}
               submitLabel="Start thread"
@@ -115,7 +145,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
       }
       return Object.fromEntries(Object.entries(widgets).map(([key, nodes]) => [key, <div key={key} className="widgets">{nodes}</div>]))
     },
-    [threadsByUnit, draft, createThread, creating, createError, reviewId, compareStart],
+    [threadsByUnit, draft, createThread, creating, createError, reviewId, compareStart, clipboardError],
   )
 
   const onComment = useCallback((target: CommentTarget) => {

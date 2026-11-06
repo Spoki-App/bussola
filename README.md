@@ -122,7 +122,7 @@ Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve
 
 Code moved or extracted elsewhere is found automatically: a block of removed lines and a block of added lines with nearly the same code, in the same file or in another one, are linked both ways. The unit the code left gets **moved to `validate`**, the unit it arrived in gets **moved from `checkout`**, and a click on either opens the two blocks side by side, with the changed words highlighted. Moves that kept the code as it was, apart from indentation and blank lines, are marked **identical**. Small blocks (fewer than three lines with some code on them) and trivial lines such as `}` or `else:` are left out, so short or common snippets do not show up as moves.
 
-To compare any two pieces of code, select lines by their numbers in a unit, as for a comment, and choose **Compare with...**. Then select a second range, in any unit or file of the review, and choose **Compare with first range**. **Cancel** in the bar at the bottom drops the first range.
+To compare any two pieces of code, select lines by their numbers in a unit, as for a comment, and choose **Compare with...**. Then select a second range, in any unit or file of the review, and choose **Compare with first range**. **Cancel** in the bar at the bottom drops the first range. To compare the selected lines with code from elsewhere, such as another branch, an editor or a web page, copy it and choose **Compare with clipboard**: the copied code is shown on the left, moved to the indentation of the selected lines, and the browser may ask once to let the page read the clipboard.
 
 ### Comments
 

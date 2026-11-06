@@ -1,3 +1,5 @@
+import textwrap
+
 import pytest
 
 from bussola.review import moves as move_detection
@@ -130,6 +132,38 @@ def test_a_range_outside_the_unit_is_rejected(api: ApiClient, git_repo: GitFixtu
     }
 
     api.call("POST", f"/reviews/{review}/compare", 400, body)
+
+
+def test_pasted_code_is_compared_with_a_range(api: ApiClient, git_repo: GitFixture) -> None:
+    git_repo.commit({"cart.py": TOTAL})
+    git_repo.branch("feature")
+    git_repo.commit({"cart.py": TOTAL.replace("0.1", "0.2")})
+    review = api.start_review()
+    unit = api.unit(review, "cart.py::total")
+    right = {"unit_id": unit["id"], "side": "head", "line_offset": 1, "line_count": 2}
+
+    edited = "subtotal = sum(items)\r\ndiscount = subtotal * 0.2 if subtotal > 100 else 0\r\n"
+    copied = textwrap.dedent("\n".join(TOTAL.replace("0.1", "0.2").splitlines()[1:3]))
+
+    changed = api.call("POST", f"/reviews/{review}/compare", body={"pasted": edited, "right": right})
+    same = api.call("POST", f"/reviews/{review}/compare", body={"pasted": copied, "right": right})
+
+    assert changed["left"] is None
+    assert not changed["identical"]
+    assert [(row["change"], row["old_line"], row["new_line"]) for row in changed["rows"]] == [("removed", 1, None), ("added", None, 2), ("context", 2, 3)]
+    assert "--- a/clipboard\n+++ b/cart.py\n" in changed["unified"]
+    assert same["identical"]
+
+
+@pytest.mark.parametrize("body", [{}, {"pasted": ""}, {"pasted": "x = 1", "left": {"unit_id": 1, "side": "head", "line_offset": 0, "line_count": 1}}])
+def test_a_comparison_needs_exactly_one_left_side(api: ApiClient, git_repo: GitFixture, body: Json) -> None:
+    git_repo.commit({"cart.py": TOTAL})
+    git_repo.branch("feature")
+    git_repo.commit({"cart.py": TOTAL.replace("0.1", "0.2")})
+    review = api.start_review()
+    unit = api.unit(review, "cart.py::total")
+
+    api.call("POST", f"/reviews/{review}/compare", 422, {**body, "right": {"unit_id": unit["id"], "side": "head", "line_offset": 0, "line_count": 1}})
 
 
 def _request(code: Json) -> Json:

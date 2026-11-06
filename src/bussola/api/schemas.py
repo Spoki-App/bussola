@@ -16,6 +16,7 @@ from bussola.units.model import UnitKind
 
 MAX_THREAD_LINES = 500
 MAX_CALL_ID_LENGTH = 100
+MAX_PASTED_CHARACTERS = 200_000
 
 LineRangeIn = Annotated[tuple[int, int], Field(description="Inclusive file line range")]
 
@@ -163,8 +164,15 @@ class CodeRangeIn(BaseModel):
 
 
 class CompareIn(BaseModel):
-    left: CodeRangeIn
+    left: CodeRangeIn | None = None
+    pasted: str | None = Field(default=None, min_length=1, max_length=MAX_PASTED_CHARACTERS)
     right: CodeRangeIn
+
+    @model_validator(mode="after")
+    def _one_left_side(self) -> "CompareIn":
+        if (self.left is None) == (self.pasted is None):
+            raise ValueError("give either left or pasted")
+        return self
 
 
 class CodeRangeOut(BaseModel):
@@ -187,7 +195,7 @@ class MoveOut(BaseModel):
 
 
 class CompareOut(BaseModel):
-    left: CodeRangeOut
+    left: CodeRangeOut | None
     right: CodeRangeOut
     identical: bool
     unified: str

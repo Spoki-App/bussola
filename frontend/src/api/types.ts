@@ -481,13 +481,10 @@ export interface Move {
   identical: boolean
 }
 
-export interface ComparisonRequest {
-  left: CodeRangeRequest
-  right: CodeRangeRequest
-}
+export type ComparisonRequest = { left: CodeRangeRequest; right: CodeRangeRequest } | { pasted: string; right: CodeRangeRequest }
 
 export interface Comparison {
-  left: CodeRange
+  left: CodeRange | null
   right: CodeRange
   identical: boolean
   unified: string

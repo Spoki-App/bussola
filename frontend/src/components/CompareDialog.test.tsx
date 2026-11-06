@@ -60,4 +60,18 @@ describe('CompareDialog', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
     expect(onClose).toHaveBeenCalled()
   })
+
+  it('names the clipboard as the left side of a comparison with pasted code', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(Response.json({ ...COMPARISON, left: null, identical: true }))))
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <CompareDialog reviewId={5} request={{ pasted: 'check(item, 1)', right: REQUEST.right }} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    const dialog = await screen.findByRole('dialog', { name: 'Compare' })
+    expect(await within(dialog).findByText('identical')).toBeInTheDocument()
+    expect(within(dialog).getByText('Clipboard')).toBeInTheDocument()
+    expect(within(dialog).getByText('shop.py lines 9-10')).toBeInTheDocument()
+  })
 })
