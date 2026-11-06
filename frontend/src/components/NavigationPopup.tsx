@@ -1,10 +1,12 @@
-import { useEffect, type KeyboardEvent, type MouseEvent } from 'react'
+import { useEffect, useMemo, type KeyboardEvent, type MouseEvent } from 'react'
 
 import type { EnclosingUnit, NavigationResult, NavigationTarget } from '../api/navigation'
 import { useModalDialog } from '../hooks/useModalDialog'
 import { emptyMessage, groupTargets, titleOf, type ScreenPoint } from '../review/codeNavigation'
+import { sourceLines } from '../review/sourceLines'
 import { plural } from '../review/text'
 import { ErrorNote } from './Badges'
+import { LineCode } from './LineCode'
 import { QualifiedName } from './QualifiedName'
 
 export type PopupState = { status: 'loading'; building: boolean } | { status: 'ready'; result: NavigationResult } | { status: 'error'; message: string }
@@ -59,6 +61,7 @@ function Enclosing({ unit }: { unit: EnclosingUnit }) {
 }
 
 function Entry({ target, onChoose }: { target: NavigationTarget; onChoose: (target: NavigationTarget) => void }) {
+  const preview = useMemo(() => sourceLines(target.preview, target.path)[0], [target.preview, target.path])
   return (
     <li>
       <button type="button" className="navigation-entry" onClick={() => { onChoose(target) }}>
@@ -68,7 +71,9 @@ function Entry({ target, onChoose }: { target: NavigationTarget; onChoose: (targ
           {target.side === 'base' && <span className="label">base</span>}
           {target.unit_id !== null && <span className="label in-review">in review</span>}
         </span>
-        <code className="navigation-preview">{target.preview}</code>
+        <code className="navigation-preview">
+          <LineCode tokens={preview} />
+        </code>
       </button>
     </li>
   )

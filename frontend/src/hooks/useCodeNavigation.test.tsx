@@ -160,6 +160,25 @@ describe('useCodeNavigation', () => {
     expect(entries[1].querySelector('.qualified-name')).toHaveAttribute('title', 'Cart.total')
   })
 
+  it('colors each preview like review code, by the language of its file, and leaves unknown languages plain', async () => {
+    serve(() =>
+      found([
+        { ...target('cart.py', 5, null, 'usage'), preview: 'return price(items)  # total' },
+        { ...target('shop.go', 2, null, 'usage'), preview: 'return price("item")' },
+        { ...target('notes.txt', 1, null, 'usage'), preview: 'return price' },
+      ]),
+    )
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'Definitions of price' })
+    const previews = [...popup.querySelectorAll('.navigation-preview')]
+    expect(previews.map((preview) => preview.textContent)).toEqual(['return price(items)  # total', 'return price("item")', 'return price'])
+    expect(previews[0].querySelector('.hljs-keyword')).toHaveTextContent('return')
+    expect(previews[0].querySelector('.hljs-comment')).toHaveTextContent('# total')
+    expect(previews[1].querySelector('.hljs-string')).toHaveTextContent('"item"')
+    expect(previews[2].querySelector('span')).toBeNull()
+  })
+
   it('opens targets outside the review in a modal with nested navigation, a back control and a GitHub link', async () => {
     serve((params) => (params.get('path') === 'lib.py' ? found([target('cart.py', 1, null, 'usage'), target('cart.py', 5, null, 'usage')], { origin: 'definition' }) : found([target('lib.py', 1, null), target('other/lib.py', 3, null)])))
     renderHarness()
