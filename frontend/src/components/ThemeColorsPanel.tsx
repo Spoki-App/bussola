@@ -11,14 +11,37 @@ interface ColorRowProps {
   overridden: boolean
 }
 
+const SHORT_HEX = /^#[0-9a-f]{3,4}$/i
+
+interface HexEdit {
+  text: string
+  start: string
+  overridden: boolean
+}
+
 function ColorRow({ themeId, slot, value, overridden }: ColorRowProps) {
-  const [text, setText] = useState<string | null>(null)
+  const [edit, setEdit] = useState<HexEdit | null>(null)
   const color = parseColor(value) ?? value
   const id = `theme-color-${slot.variable.slice(2)}`
 
-  const changeText = (next: string) => {
-    setText(next)
-    setOverride(themeId, slot.variable, next)
+  const changeText = (text: string) => {
+    if (!edit) {
+      return
+    }
+    setEdit({ ...edit, text })
+    if (!SHORT_HEX.test(text.trim())) {
+      setOverride(themeId, slot.variable, text)
+    }
+  }
+  const finishText = () => {
+    if (edit && edit.text !== edit.start && !setOverride(themeId, slot.variable, edit.text)) {
+      if (edit.overridden) {
+        setOverride(themeId, slot.variable, edit.start)
+      } else {
+        resetOverrides(themeId, slot.variable)
+      }
+    }
+    setEdit(null)
   }
   const pick = (hex: string) => {
     setOverride(themeId, slot.variable, `${hex}${color.slice(7, 9)}`)
@@ -32,10 +55,10 @@ function ColorRow({ themeId, slot, value, overridden }: ColorRowProps) {
         id={id}
         className="theme-color-hex"
         spellCheck={false}
-        value={text ?? color}
-        aria-invalid={text !== null && parseColor(text) === null}
-        onFocus={() => { setText(color) }}
-        onBlur={() => { setText(null) }}
+        value={edit?.text ?? color}
+        aria-invalid={edit !== null && parseColor(edit.text) === null}
+        onFocus={() => { setEdit({ text: color, start: color, overridden }) }}
+        onBlur={finishText}
         onChange={(event) => { changeText(event.target.value) }}
       />
       <button type="button" className="link" disabled={!overridden} onClick={() => { resetOverrides(themeId, slot.variable) }}>

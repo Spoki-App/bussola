@@ -108,6 +108,49 @@ describe('ThemeColorsPanel', () => {
     expect(rootStyle('--bg')).toBe(BUILTIN_PALETTES.dark['--bg'])
   })
 
+  it('does not save a partly typed hex value', () => {
+    render(<ThemeColorsPanel />)
+    const background = screen.getByLabelText<HTMLInputElement>('Background')
+
+    fireEvent.focus(background)
+    for (const value of ['#1', '#12', '#123', '#1234', '#12345']) {
+      fireEvent.change(background, { target: { value } })
+      expect(rootStyle('--bg')).toBe(BUILTIN_PALETTES.dark['--bg'])
+    }
+    fireEvent.blur(background)
+
+    expect(rootStyle('--bg')).toBe(BUILTIN_PALETTES.dark['--bg'])
+    expect(within(background.closest('.theme-color') as HTMLElement).getByRole('button', { name: 'Reset' })).toBeDisabled()
+    expect(background.value).toBe(BUILTIN_PALETTES.dark['--bg'])
+  })
+
+  it('applies a short hex value when the field is left', () => {
+    render(<ThemeColorsPanel />)
+    const background = screen.getByLabelText<HTMLInputElement>('Background')
+
+    fireEvent.focus(background)
+    fireEvent.change(background, { target: { value: '#fff' } })
+    expect(rootStyle('--bg')).toBe(BUILTIN_PALETTES.dark['--bg'])
+    fireEvent.blur(background)
+
+    expect(rootStyle('--bg')).toBe('#ffffff')
+  })
+
+  it('goes back to the previous override when the field is left invalid', () => {
+    render(<ThemeColorsPanel />)
+    const background = screen.getByLabelText<HTMLInputElement>('Background')
+    fireEvent.change(screen.getByLabelText('Background color picker'), { target: { value: '#202020' } })
+
+    fireEvent.focus(background)
+    fireEvent.change(background, { target: { value: '#303030' } })
+    expect(rootStyle('--bg')).toBe('#303030')
+    fireEvent.change(background, { target: { value: '#30303' } })
+    fireEvent.blur(background)
+
+    expect(rootStyle('--bg')).toBe('#202020')
+    expect(background.value).toBe('#202020')
+  })
+
   it('keeps the transparency of a color when picking a new one', () => {
     render(<ThemeColorsPanel />)
 
