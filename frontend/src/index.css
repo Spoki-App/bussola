@@ -48,6 +48,7 @@
   --diff-selected: rgba(41, 82, 204, 0.14);
   --diff-selected-gutter: rgba(41, 82, 204, 0.22);
   --diff-selection: #b3d7ff;
+  --diff-occurrence: rgba(214, 160, 30, 0.3);
   --sans: 'Instrument Sans Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --code-size: 12px;
@@ -109,6 +110,7 @@
     --diff-selected: rgba(138, 171, 255, 0.25);
     --diff-selected-gutter: rgba(138, 171, 255, 0.35);
     --diff-selection: rgba(138, 171, 255, 0.4);
+    --diff-occurrence: rgba(240, 190, 80, 0.3);
   }
 }
 
@@ -1473,6 +1475,11 @@ button.copy-link.failed {
   border-radius: 2px;
 }
 
+.diff .diff-code .diff-occurrence {
+  background-color: var(--diff-occurrence);
+  border-radius: 2px;
+}
+
 .diff.selectable .diff-code-insert,
 .diff.selectable .diff-code-delete {
   cursor: pointer;
@@ -1808,6 +1815,48 @@ button.copy-link.failed {
   resize: vertical;
   font-family: var(--sans);
   line-height: 1.5;
+}
+
+.composer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.composer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.composer-tool-group {
+  display: inline-flex;
+}
+
+.composer-tool {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0 5px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.composer-tool:hover:not(:disabled) {
+  background: var(--bg-sunken);
+  color: var(--text);
+}
+
+.composer-preview {
+  min-height: 72px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
 }
 
 .composer-actions {
