@@ -14,7 +14,7 @@ and comments that go straight back to GitHub.
 <img alt="Python 3.12 and 3.13" src="https://img.shields.io/badge/python-3.12%20%7C%203.13-3776ab">
 <a href="https://github.com/Spoki-App/bussola/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
 
-[Quick start](#quick-start) · [Features](#features) · [Install](#install) · [AI providers](#ai-providers) · [FAQ](#faq)
+[Quick start](#quick-start) · [Features](#features) · [All features](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md) · [Install](#install) · [AI providers](#ai-providers) · [FAQ](#faq)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/hero-dark.svg">
@@ -46,37 +46,97 @@ The browser opens on your repository. Type a branch on its card and press **Star
 
 ## Features
 
+Below are the main features. [See all features](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md) to find what each one looks like and how to use it.
+
 ### Review by unit, not by file
 
 Every change is split into reviewable units: functions, methods, class bodies, TypeScript and Go types and module-level code, parsed with tree-sitter for Python, TypeScript, TSX, JavaScript and Go. Other files are reviewed whole, and module code or a whole file can be approved one selection of lines at a time. Each unit shows its state (**New**, **Approved**, **Changed since approval**, **Partly approved**, **Removed**), and the progress bar tells you how much is left.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/units-dark.svg">
+  <img alt="A pull request shown as one file, then split into a function, a method, a class and module code. Two units are approved and the module code is partly approved, three of five lines." src="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/units-light.svg" width="760">
+</picture>
+
+[How to use it](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#review-by-unit-not-by-file)
 
 ### Approvals that follow the code
 
 An approval is tied to the content of a unit. After new commits, a rebase or a force-push, a unit with the same content stays approved, a renamed function with the same body keeps its approval, and a unit that did change shows the diff between the version you approved and the current one. **Since my last review** shows only what appeared or changed after you last clicked **Mark as reviewed**.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/approvals-dark.svg">
+  <img alt="Three approved units. After a force-push, the two with the same code stay approved, the third shows Changed since approval with the diff from the approved version, and the Since my last review filter hides the others." src="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/approvals-light.svg" width="760">
+</picture>
+
+[How to use it](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#approvals-that-follow-the-code)
+
 ### An AI reviewer that ranks what it finds
 
 Optional, with Claude Code, the Anthropic API or any OpenAI-compatible endpoint. **AI review** reads the pull request as a whole, follows the code with the same lookups you use, and leaves comments anchored to the lines, each starting with its severity (🔴 Critical, 🟠 High, 🟡 Medium, 🔵 Low) and ending with a fix. **Describe** explains a unit and its change with links to the lines it mentions, and units get a **Low**, **Medium** or **High impact** badge so you can start from what matters. The prompts are yours to change.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/ai-review-dark.svg">
+  <img alt="The AI review button is pressed. bussola reports its progress, rates each unit High, Medium or Low impact, and lists three findings: critical, high and low, each linked to its thread." src="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/ai-review-light.svg" width="760">
+</picture>
+
+[How to use it](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#an-ai-reviewer-that-ranks-what-it-finds)
 
 ### Navigate like in your editor
 
 Cmd+click (Ctrl+click) a name to jump to its definition or list its usages, with the function each usage lives in. Names from libraries show their documentation and a link to it. A plain click highlights every occurrence in the unit.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/navigation-dark.svg">
+  <img alt="Cmd+click on a call to apply_discount jumps to its definition with the line highlighted. Cmd+click on the definition lists its three usages with the function each one is in." src="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/navigation-light.svg" width="760">
+</picture>
+
+[How to use it](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#navigate-like-in-your-editor)
+
 ### Moved code, found for you
 
 Code moved or extracted elsewhere, even to another file, is linked both ways with **moved to** and **moved from**, and moves that kept the code as it was are marked **identical**. You can also compare any two ranges of the review, or a range with code copied to the clipboard.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/moves-dark.svg">
+  <img alt="A function moved into another is linked with moved to and moved from. Opening the link compares the two places, identical. Then selected lines are compared with code from the clipboard." src="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/moves-light.svg" width="760">
+</picture>
+
+[How to use it](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#moved-code-found-for-you)
 
 ### GitHub, both ways
 
 Open any pull request from its link or from a `bussola://` link, bring in its comments, reply, resolve, write with Markdown, mentions and images, and send everything back as one review with **Comment**, **Approve** or **Request changes**. Files you have fully approved are ticked as **Viewed** on GitHub, and **Merge** finishes the job without leaving the page. No GitHub? Any two branches of a local repository can be reviewed.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/github-dark.svg">
+  <img alt="A pull request link is opened. A comment from GitHub appears as a thread with your reply, the review is submitted as Approve, and bussola confirms it was sent to GitHub with three files marked Viewed." src="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/github-light.svg" width="760">
+</picture>
+
+[How to use it](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#github-both-ways)
+
 ### Made for long reading sessions
 
 Syntax highlighting with the changed words marked, split or unified diffs that adapt to the window, line wrap, your own code font with ligatures, keyboard shortcuts for everything, and themes: light, dark, or any theme installed in VS Code, Cursor or Windsurf.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/reading-dark.svg">
+  <img alt="A split diff with the changed words marked, shown in the default theme, a Dracula theme from VS Code and the other built-in theme, with the keyboard shortcuts j, k, n, a and c." src="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/reading-light.svg" width="760">
+</picture>
+
+[How to use it](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#made-for-long-reading-sessions)
+
 ### Local and private
 
 Reviews, approvals and comments live in a SQLite file on your machine. bussola listens on `127.0.0.1` with a session token, reads code only from git, and contacts GitHub or an AI provider only when you ask it to.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/local-dark.svg">
+  <img alt="Your machine runs bussola, your git clone and the SQLite data. A connection to GitHub lights up only on sync, and one to an AI provider only on request." src="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/local-light.svg" width="760">
+</picture>
+
+[How to use it](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#local-and-private)
+
+**[See all features, with how to use each one](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md)**
 
 ## Install
 
