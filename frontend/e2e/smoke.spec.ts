@@ -6,7 +6,7 @@ test('review a branch: open it, approve a unit and comment on a line', async ({ 
   await page.goto(`/?token=${E2E_TOKEN}`)
   await expect(page.getByRole('heading', { name: 'demo' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'New review' }).click()
+  await page.locator('section.repo', { has: page.getByRole('heading', { name: 'demo' }) }).getByRole('button', { name: 'New review' }).click()
   await page.getByRole('button', { name: 'Start review' }).click()
   await expect(page.getByRole('heading', { name: /feature\s+into\s+main/ })).toBeVisible()
 

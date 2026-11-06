@@ -114,7 +114,7 @@ A unit's name starts with its module, muted: the dotted Python module (`bussola.
 
 A unit's own name does not count towards its content, so renaming a function with an unchanged body keeps the approval.
 
-To approve part of a module or file, click a changed line in its diff (click it again to clear the selection), shift-click another to select the lines between them, and press "Approve selection". An approved line needs review again if it or the line next to it changes.
+To approve part of a module or file, click a changed line in its diff (click it again to clear the selection), shift-click another to select the lines between them, or drag over the line numbers to select the lines covered (the page scrolls at the top and bottom edges), and press "Approve selection". An approved line needs review again if it or the line next to it changes.
 
 Keyboard: `j` / `k` next and previous unit, `n` next unit to review, `a` approve or revoke (or approve the selected lines), `c` comment, `r` check for new commits, `t` show or hide the conversation panel. Cmd/Ctrl+click a name to go to its definition or usages.
 

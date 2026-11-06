@@ -1,10 +1,11 @@
-import { useContext, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useContext, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { Decoration, Diff, Hunk, getChangeKey, isDelete, isInsert, parseDiff, type ChangeData, type HunkData } from 'react-diff-view'
 import 'react-diff-view/style/index.css'
 
 import type { DiffRow, UnitDiff } from '../api/types'
 import { useViewType } from '../hooks/useDiffLayout'
 import { isTyping } from '../hooks/useKeyboardShortcuts'
+import { useLineDrag } from '../hooks/useLineDrag'
 import { useSymbolLink } from '../hooks/useSymbolLink'
 import { hasNavigationModifier, isNavigationClick, navigationColumn, symbolAt, type ScreenPoint } from '../review/codeNavigation'
 import { collapsedUnified, segmentRows, unifiedOrder, type Segment } from '../review/collapse'
@@ -46,13 +47,36 @@ interface Props {
 interface RowIndex {
   rowOf: (change: ChangeData | null) => DiffRow | undefined
   changeKeyOf: (row: DiffRow) => string | undefined
+  rowOfKey: (changeKey: string) => DiffRow | undefined
+}
+
+interface LineDrag {
+  x: number
+  side: GutterSide
+  table: Element
+  changeKey: string | undefined
+}
+
+function changeKeyOf(row: DiffRow): string | undefined {
+  if (row.change === 'added' && row.new_index !== null) {
+    return `I${String(row.new_index + 1)}`
+  }
+  if (row.change === 'removed' && row.old_index !== null) {
+    return `D${String(row.old_index + 1)}`
+  }
+  return row.old_index === null ? undefined : `N${String(row.old_index + 1)}`
 }
 
 function buildIndex(rows: DiffRow[]): RowIndex {
   const inserted = new Map<number, DiffRow>()
   const deleted = new Map<number, DiffRow>()
   const normal = new Map<number, DiffRow>()
+  const byChangeKey = new Map<string, DiffRow>()
   for (const row of rows) {
+    const changeKey = changeKeyOf(row)
+    if (changeKey !== undefined) {
+      byChangeKey.set(changeKey, row)
+    }
     if (row.change === 'added' && row.new_index !== null) {
       inserted.set(row.new_index + 1, row)
     } else if (row.change === 'removed' && row.old_index !== null) {
@@ -74,16 +98,19 @@ function buildIndex(rows: DiffRow[]): RowIndex {
       }
       return normal.get(change.newLineNumber)
     },
-    changeKeyOf: (row) => {
-      if (row.change === 'added' && row.new_index !== null) {
-        return `I${String(row.new_index + 1)}`
-      }
-      if (row.change === 'removed' && row.old_index !== null) {
-        return `D${String(row.old_index + 1)}`
-      }
-      return row.old_index === null ? undefined : `N${String(row.old_index + 1)}`
-    },
+    changeKeyOf,
+    rowOfKey: (changeKey) => byChangeKey.get(changeKey),
   }
+}
+
+function gutterAt(x: number, y: number, table: Element): HTMLElement | undefined {
+  for (const element of document.elementsFromPoint(x, y)) {
+    const cell = element.closest<HTMLElement>('td.diff-gutter')
+    if (cell && table.contains(cell)) {
+      return cell
+    }
+  }
+  return undefined
 }
 
 function gutterNumber(row: DiffRow | undefined, side: GutterSide): string {
@@ -163,29 +190,10 @@ function renderSegments(segments: Segment[], hunks: HunkData[], expand: (id: str
 export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted, onNavigate, canNavigate, target }: Props) {
   const modified = useMemo(() => hasModification(diff.rows), [diff.rows])
   const viewType = useViewType(modified)
-  const dragging = useRef(false)
-  const endSelection = useRef(onLineSelectEnd)
   const makeLink = useContext(ReviewLinkContext)
   const wrap = useDiffWrap()
   const link = useSymbolLink()
   const [occurrence, setOccurrence] = useState<string | null>(null)
-
-  useEffect(() => {
-    endSelection.current = onLineSelectEnd
-  })
-
-  useEffect(() => {
-    const onMouseUp = () => {
-      if (dragging.current) {
-        dragging.current = false
-        endSelection.current?.()
-      }
-    }
-    window.addEventListener('mouseup', onMouseUp)
-    return () => {
-      window.removeEventListener('mouseup', onMouseUp)
-    }
-  }, [])
 
   useEffect(() => {
     if (occurrence === null) {
@@ -212,6 +220,19 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const rows = useMemo(() => (viewType === 'split' ? diff.rows : unifiedOrder(diff.rows)), [diff.rows, viewType])
   const index = useMemo(() => buildIndex(diff.rows), [diff.rows])
+  const startLineDrag = useLineDrag(
+    (drag: LineDrag, y) => {
+      const changeKey = gutterAt(drag.x, y, drag.table)?.dataset.changeKey
+      const row = changeKey === undefined ? undefined : index.rowOfKey(changeKey)
+      if (row && changeKey !== drag.changeKey) {
+        drag.changeKey = changeKey
+        onLineNumberClick?.(row, drag.side, true)
+      }
+    },
+    () => {
+      onLineSelectEnd?.()
+    },
+  )
   const widgetMap = widgets ? widgets(index.changeKeyOf) : undefined
   const pinnedKeys = Object.keys(widgetMap ?? {}).join(',')
   const targetIndex = targetPosition(rows, target)
@@ -277,14 +298,14 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
             return
           }
           event.preventDefault()
-          dragging.current = true
-          onLineNumberClick(row, side ?? gutterSide(row), event.shiftKey)
-        },
-        onMouseEnter: ({ change, side }) => {
-          const row = index.rowOf(change)
-          if (row && onLineNumberClick && dragging.current) {
-            onLineNumberClick(row, side ?? gutterSide(row), true)
+          const rowSide = side ?? gutterSide(row)
+          const cell = event.currentTarget
+          const table = cell.closest('table')
+          if (table) {
+            const bounds = cell.getBoundingClientRect()
+            startLineDrag({ x: bounds.left + bounds.width / 2, side: rowSide, table, changeKey: cell.dataset.changeKey }, event.clientY)
           }
+          onLineNumberClick(row, rowSide, event.shiftKey)
         },
       }}
       codeEvents={{
