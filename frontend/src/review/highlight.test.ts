@@ -142,6 +142,21 @@ describe('diffTokens', () => {
     expect(tokens?.new.map(markedRuns)).toEqual([['CREDIT_BALANCE_KEY_PATTERN.format(account_id=', ')']])
   })
 
+  it('marks only the changed parts of a name that moved behind a module', () => {
+    const diff = [
+      '--- a/x.py',
+      '+++ b/x.py',
+      '@@ -1,1 +1,1 @@',
+      '-    return SELF_SERVE_V4_PLAN_SLUGS.index(slug) if slug in SELF_SERVE_V4_PLAN_SLUGS else -1',
+      '+    return settings.V4_PLAN_SLUGS.index(slug) if slug in settings.V4_PLAN_SLUGS else -1',
+      '',
+    ].join('\n')
+    const tokens = diffTokens(parseDiff(diff)[0].hunks, 'python')
+
+    expect(tokens?.old.map(markedRuns)).toEqual([['SELF_SERVE_', 'SELF_SERVE_']])
+    expect(tokens?.new.map(markedRuns)).toEqual([['settings.', 'settings.']])
+  })
+
   it('marks only the added indentation of a line that moved into a block, at the start of the line', () => {
     const diff = ['--- a/x.py', '+++ b/x.py', '@@ -1,1 +1,1 @@', '-    load(page)', '+        load(page)', ''].join('\n')
     const tokens = diffTokens(parseDiff(diff)[0].hunks, null)
