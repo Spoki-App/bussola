@@ -48,10 +48,14 @@ describe('clickRow', () => {
     expect(second.anchor).toBe(rowKey(rows[4]))
   })
 
-  it('keeps a line selected when it is clicked again', () => {
-    const again = click(click(NO_SELECTION, 2), 2)
+  it('clears the selection when its only line is clicked again', () => {
+    expect(click(click(NO_SELECTION, 2), 2)).toEqual(NO_SELECTION)
+  })
 
-    expect([...again.selected]).toEqual([rowKey(rows[2])])
+  it('selects only the clicked line when it is part of a larger selection', () => {
+    const narrowed = click(click(click(NO_SELECTION, 1), 4, true), 2)
+
+    expect(narrowed).toEqual({ selected: new Set([rowKey(rows[2])]), anchor: rowKey(rows[2]) })
   })
 
   it('extends the selection from the anchor with shift, skipping approved and context lines', () => {
@@ -69,6 +73,12 @@ describe('clickRow', () => {
     expect([...shrunk.selected]).toEqual([rowKey(rows[2])])
     expect([...flipped.selected]).toEqual([rowKey(rows[1]), rowKey(rows[2])])
     expect(flipped.anchor).toBe(rowKey(rows[2]))
+  })
+
+  it('starts a new selection on shift click when the anchor is not in the rows', () => {
+    const stale: LineSelection = { selected: new Set(['added:null:9']), anchor: 'added:null:9' }
+
+    expect(click(stale, 4, true)).toEqual({ selected: new Set([rowKey(rows[4])]), anchor: rowKey(rows[4]) })
   })
 
   it('starts a new selection on shift click when there is no anchor', () => {

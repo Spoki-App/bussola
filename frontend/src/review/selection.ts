@@ -40,7 +40,13 @@ export function selectRange(diffRows: DiffRow[], anchorKey: string, focusKey: st
 
 export function clickRow(diffRows: DiffRow[], current: LineSelection, key: string, extend: boolean): LineSelection {
   if (extend && current.anchor !== null) {
-    return { selected: selectRange(diffRows, current.anchor, key), anchor: current.anchor }
+    const range = selectRange(diffRows, current.anchor, key)
+    if (range.size > 0) {
+      return { selected: range, anchor: current.anchor }
+    }
+  }
+  if (!extend && current.selected.size === 1 && current.selected.has(key)) {
+    return NO_SELECTION
   }
   return { selected: new Set([key]), anchor: key }
 }

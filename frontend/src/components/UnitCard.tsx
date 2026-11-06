@@ -85,6 +85,11 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
   }
   const [{ selected }, setSelection] = useState<LineSelection>(NO_SELECTION)
   const diff = useUnitDiff(reviewId, unit, mode, expanded)
+  const [selectionRows, setSelectionRows] = useState(diff.data?.rows)
+  if (selectionRows !== diff.data?.rows) {
+    setSelectionRows(diff.data?.rows)
+    setSelection(NO_SELECTION)
+  }
   const { ref: linkedRef, linked } = useLinkedScroll<HTMLElement>(unitElementId(unit.id), unit.id, expanded && !diff.isPending)
   if (linked && !expanded) {
     setExpanded(true)
