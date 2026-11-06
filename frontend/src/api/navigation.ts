@@ -1,9 +1,11 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
 
 import { getJson, postJson } from './client'
-import type { Side } from './types'
+import type { Side, Unit } from './types'
 
 export type TargetRole = 'definition' | 'usage'
+
+export type EnclosingUnit = Pick<Unit, 'kind' | 'qualified_name'>
 
 export interface NavigationTarget {
   role: TargetRole
@@ -11,6 +13,7 @@ export interface NavigationTarget {
   line: number
   column: number
   preview: string
+  enclosing: EnclosingUnit | null
   side: Side
   unit_id: number | null
 }

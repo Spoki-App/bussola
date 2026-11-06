@@ -44,6 +44,7 @@ def test_a_definition_outside_the_review_has_no_unit(nav_api: ApiClient, git_rep
 
     assert targets(result) == [("definition", "shop/prices.py", 5, "def discount(item):")]
     assert result["targets"][0]["unit_id"] is None
+    assert result["targets"][0]["enclosing"] is None
 
 
 def test_a_definition_lists_its_usages(nav_api: ApiClient, git_repo: GitFixture) -> None:
@@ -59,6 +60,10 @@ def test_a_definition_lists_its_usages(nav_api: ApiClient, git_repo: GitFixture)
     assert [target["unit_id"] for target in result["targets"]] == [
         nav_api.unit(review, "shop/cart.py")["id"],
         nav_api.unit(review, "shop/cart.py::total")["id"],
+    ]
+    assert [target["enclosing"] for target in result["targets"]] == [
+        {"kind": "module", "qualified_name": ""},
+        {"kind": "function", "qualified_name": "total"},
     ]
 
 
@@ -114,6 +119,23 @@ def test_an_installed_language_server_gives_the_results(nav_api: ApiClient, git_
     assert result["server_hint"] is None
     request = next(message for message in servers.messages() if message.get("method") == "textDocument/definition")
     assert request["params"]["position"] == {"line": 4, "character": column - 1}
+
+
+def test_usages_from_a_language_server_name_their_enclosing_unit(nav_api: ApiClient, git_repo: GitFixture, servers: LanguageServerPath) -> None:
+    references = [{"path": "shop/cart.py", "line": 0, "character": 33}, {"path": "shop/cart.py", "line": 4, "character": 15}]
+    servers.install("basedpyright-langserver", references=references)
+    review = start(git_repo, nav_api)
+    column = NEW_PRICES.index("price") + 1
+
+    result = wait_for(
+        lambda: nav_api.call("GET", f"/reviews/{review}/navigation?path=shop/prices.py&line=1&column={column}"),
+        lambda result: result["resolver"] == "language-server",
+    )
+
+    assert [(target["line"], target["enclosing"]) for target in result["targets"]] == [
+        (1, {"kind": "module", "qualified_name": ""}),
+        (5, {"kind": "function", "qualified_name": "total"}),
+    ]
 
 
 def test_a_failing_language_server_falls_back_to_the_index(nav_api: ApiClient, git_repo: GitFixture, servers: LanguageServerPath) -> None:

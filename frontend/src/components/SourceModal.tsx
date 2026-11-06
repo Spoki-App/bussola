@@ -8,6 +8,7 @@ import { isNavigationClick, navigationColumn, type NavigationClick } from '../re
 import { sourceLines, type SourceLine } from '../review/sourceLines'
 import { ErrorNote } from './Badges'
 import { ExternalLink } from './ExternalLink'
+import { LineCode } from './LineCode'
 
 interface Props {
   reviewId: number
@@ -17,18 +18,6 @@ interface Props {
   onClose: () => void
   onNavigate: (click: NavigationClick) => void
   canNavigate: (request: NavigationRequest) => Promise<boolean>
-}
-
-function LineCode({ tokens }: { tokens: SourceLine }) {
-  return tokens.map((token, index) =>
-    token.className ? (
-      <span key={index} className={token.className}>
-        {token.text}
-      </span>
-    ) : (
-      token.text
-    ),
-  )
 }
 
 const SourceLines = memo(function SourceLines({ lines, target }: { lines: SourceLine[]; target: number }) {
