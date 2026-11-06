@@ -1,4 +1,4 @@
-import { useContext, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useContext, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { Decoration, Diff, Hunk, getChangeKey, isDelete, isInsert, parseDiff, type ChangeData, type HunkData } from 'react-diff-view'
 import 'react-diff-view/style/index.css'
 
@@ -45,19 +45,36 @@ interface Props {
 interface RowIndex {
   rowOf: (change: ChangeData | null) => DiffRow | undefined
   changeKeyOf: (row: DiffRow) => string | undefined
+  rowOfKey: (changeKey: string) => DiffRow | undefined
 }
 
 interface LineDrag {
+  x: number
   side: GutterSide
   table: Element
-  key: string
+  changeKey: string | undefined
+}
+
+function changeKeyOf(row: DiffRow): string | undefined {
+  if (row.change === 'added' && row.new_index !== null) {
+    return `I${String(row.new_index + 1)}`
+  }
+  if (row.change === 'removed' && row.old_index !== null) {
+    return `D${String(row.old_index + 1)}`
+  }
+  return row.old_index === null ? undefined : `N${String(row.old_index + 1)}`
 }
 
 function buildIndex(rows: DiffRow[]): RowIndex {
   const inserted = new Map<number, DiffRow>()
   const deleted = new Map<number, DiffRow>()
   const normal = new Map<number, DiffRow>()
+  const byChangeKey = new Map<string, DiffRow>()
   for (const row of rows) {
+    const changeKey = changeKeyOf(row)
+    if (changeKey !== undefined) {
+      byChangeKey.set(changeKey, row)
+    }
     if (row.change === 'added' && row.new_index !== null) {
       inserted.set(row.new_index + 1, row)
     } else if (row.change === 'removed' && row.old_index !== null) {
@@ -79,23 +96,19 @@ function buildIndex(rows: DiffRow[]): RowIndex {
       }
       return normal.get(change.newLineNumber)
     },
-    changeKeyOf: (row) => {
-      if (row.change === 'added' && row.new_index !== null) {
-        return `I${String(row.new_index + 1)}`
-      }
-      if (row.change === 'removed' && row.old_index !== null) {
-        return `D${String(row.old_index + 1)}`
-      }
-      return row.old_index === null ? undefined : `N${String(row.old_index + 1)}`
-    },
+    changeKeyOf,
+    rowOfKey: (changeKey) => byChangeKey.get(changeKey),
   }
 }
 
 function gutterAt(x: number, y: number, table: Element): HTMLElement | undefined {
-  return document
-    .elementsFromPoint(x, y)
-    .map((element) => element.closest<HTMLElement>('td.diff-gutter'))
-    .find((cell): cell is HTMLElement => cell !== null && table.contains(cell))
+  for (const element of document.elementsFromPoint(x, y)) {
+    const cell = element.closest<HTMLElement>('td.diff-gutter')
+    if (cell && table.contains(cell)) {
+      return cell
+    }
+  }
+  return undefined
 }
 
 function gutterNumber(row: DiffRow | undefined, side: GutterSide): string {
@@ -171,7 +184,6 @@ function renderSegments(segments: Segment[], hunks: HunkData[], expand: (id: str
 export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted, onNavigate, canNavigate, target }: Props) {
   const modified = useMemo(() => hasModification(diff.rows), [diff.rows])
   const viewType = useViewType(modified)
-  const lineDrag = useRef<LineDrag | null>(null)
   const makeLink = useContext(ReviewLinkContext)
   const wrap = useDiffWrap()
   const link = useSymbolLink()
@@ -179,22 +191,16 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const rows = useMemo(() => (viewType === 'split' ? diff.rows : unifiedOrder(diff.rows)), [diff.rows, viewType])
   const index = useMemo(() => buildIndex(diff.rows), [diff.rows])
-  const rowByChangeKey = useMemo(() => new Map(diff.rows.flatMap((row) => {
-    const key = index.changeKeyOf(row)
-    return key === undefined ? [] : [[key, row] as const]
-  })), [diff.rows, index])
   const startLineDrag = useLineDrag(
-    (x, y) => {
-      const drag = lineDrag.current
-      const key = drag ? gutterAt(x, y, drag.table)?.dataset.changeKey : undefined
-      const row = key === undefined ? undefined : rowByChangeKey.get(key)
-      if (drag && row && rowKey(row) !== drag.key) {
-        drag.key = rowKey(row)
+    (drag: LineDrag, y) => {
+      const changeKey = gutterAt(drag.x, y, drag.table)?.dataset.changeKey
+      const row = changeKey === undefined ? undefined : index.rowOfKey(changeKey)
+      if (row && changeKey !== drag.changeKey) {
+        drag.changeKey = changeKey
         onLineNumberClick?.(row, drag.side, true)
       }
     },
     () => {
-      lineDrag.current = null
       onLineSelectEnd?.()
     },
   )
@@ -265,10 +271,9 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
           const rowSide = side ?? gutterSide(row)
           const cell = event.currentTarget
           const table = cell.closest('table')
-          const bounds = cell.getBoundingClientRect()
           if (table) {
-            lineDrag.current = { side: rowSide, table, key: rowKey(row) }
-            startLineDrag(bounds.left + bounds.width / 2, event.clientY)
+            const bounds = cell.getBoundingClientRect()
+            startLineDrag({ x: bounds.left + bounds.width / 2, side: rowSide, table, changeKey: cell.dataset.changeKey }, event.clientY)
           }
           onLineNumberClick(row, rowSide, event.shiftKey)
         },
