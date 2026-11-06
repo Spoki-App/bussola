@@ -8,9 +8,11 @@ import App from './App'
 import './index.css'
 import { applyCodeFont, loadCodeFont } from './settings/codeFont'
 import { syncDiffWrap } from './settings/diffWrap'
+import { syncTheme } from './settings/theme'
 
 applyCodeFont(loadCodeFont())
 syncDiffWrap()
+syncTheme()
 
 const queryClient = new QueryClient()
 const rootElement = document.getElementById('root')

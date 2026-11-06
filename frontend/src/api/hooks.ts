@@ -4,6 +4,7 @@ import { deleteJson, getJson, postJson } from './client'
 import type {
   ApprovalRequest,
   DirectoryListing,
+  EditorTheme,
   RepositoryScan,
   DiffMode,
   Refs,
@@ -62,6 +63,15 @@ export function useDirectories(path: string | undefined) {
 }
 
 const SCAN_STALE_MS = 5 * 60 * 1000
+
+export function useEditorThemes() {
+  return useQuery({
+    queryKey: ['editor-themes'],
+    queryFn: () => getJson<EditorTheme[]>('/editor-themes'),
+    staleTime: SCAN_STALE_MS,
+    retry: false,
+  })
+}
 
 export function useRepositoryScan() {
   return useQuery({
