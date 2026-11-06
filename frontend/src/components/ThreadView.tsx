@@ -77,6 +77,7 @@ export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
             <CommentItem key={comment.id} reviewId={reviewId} comment={comment} />
           ))}
           <Composer
+            reviewId={reviewId}
             submitLabel="Reply"
             placeholder="Reply (Markdown)"
             busy={reply.isPending}
@@ -156,6 +157,7 @@ function CommentItem({ reviewId, comment }: { reviewId: number; comment: Comment
       </div>
       {editing ? (
         <Composer
+          reviewId={reviewId}
           submitLabel="Save"
           initial={comment.body}
           busy={edit.isPending}

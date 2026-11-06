@@ -4,6 +4,7 @@ from bussola.api import (
     ai,
     ai_review,
     approvals,
+    attachments,
     browser,
     compare,
     descriptions,
@@ -26,6 +27,7 @@ def build_api_router() -> APIRouter:
     router = APIRouter(prefix=API_PREFIX)
     modules = (
         health,
+        attachments,
         browser,
         repos,
         directories,

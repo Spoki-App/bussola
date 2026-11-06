@@ -3,6 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from bussola.attachments import local_images_as_text
 from bussola.errors import ConflictError, InvalidRequestError
 from bussola.forge.base import DiffSide, ForgeAdapter, ForgeError, InlineComment, LineRanges, RemoteComment, ReviewEvent, ReviewSubmission
 from bussola.forge.heads import HeadMismatchError, head_mismatch
@@ -101,12 +102,13 @@ def pending_comment_count(context: ReviewContext, revision: Revision) -> int:
 
 
 def render_comment(context: ReviewContext, comment: Comment) -> str:
+    body = local_images_as_text(comment.body)
     if comment.author_id == context.reviewer.id:
-        return comment.body
+        return body
     author = context.store.reviews.get_reviewer(comment.author_id)
     if author is not None and author.ai:
-        return f"{comment.body}\n\n{_ai_marker(author.name)}"
-    return f"**{author.name if author else 'Someone'}:** {comment.body}"
+        return f"{body}\n\n{_ai_marker(author.name)}"
+    return f"**{author.name if author else 'Someone'}:** {body}"
 
 
 def local_body(context: ReviewContext, comment: Comment, published: str) -> str:

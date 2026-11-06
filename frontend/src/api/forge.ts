@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { getJson, postJson, putJson } from './client'
 import { invalidate, keys, useInvalidatingMutation } from './hooks'
+import { mentionsKey } from './mentions'
 import { threadsKey } from './threads'
 import type { ConversationSync, ForgeOverview, MergeOptions, MergeRequest, MergeResult, ReviewEvent, ReviewSubmitResult, SyncResult } from './types'
 
@@ -21,6 +22,7 @@ export function useLinkPullRequest(reviewId: number) {
     mutationFn: (prNumber: number) => putJson<ForgeOverview>(`/reviews/${String(reviewId)}/forge`, { pr_number: prNumber }),
     onSuccess: (overview) => {
       client.setQueryData(forgeKey(reviewId), overview)
+      void client.invalidateQueries({ queryKey: mentionsKey(reviewId) })
     },
   })
 }

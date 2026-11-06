@@ -102,6 +102,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
               )}
             </div>
             <Composer
+              reviewId={reviewId}
               submitLabel="Start thread"
               autoFocus
               busy={creating}
