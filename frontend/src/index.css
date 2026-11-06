@@ -1790,6 +1790,77 @@ button.copy-link.failed {
   line-height: 1.5;
 }
 
+.composer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.composer-tabs {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.composer-tabs button,
+.composer-tool {
+  min-height: 24px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.composer-tabs button:hover:not(:disabled),
+.composer-tool:hover:not(:disabled) {
+  background: var(--bg-sunken);
+  color: var(--text);
+}
+
+.composer-tabs button.active {
+  background: var(--bg-sunken);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.composer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.composer-tool-group {
+  display: inline-flex;
+}
+
+.composer-tool {
+  min-width: 24px;
+  padding: 0 5px;
+  font-family: var(--mono);
+}
+
+.composer-tool.tool-bold {
+  font-weight: 700;
+}
+
+.composer-tool.tool-italic {
+  font-style: italic;
+}
+
+.composer-tool.tool-strike {
+  text-decoration: line-through;
+}
+
+.composer-preview {
+  min-height: 72px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
 .composer-actions {
   justify-content: flex-end;
   font-size: 12px;
