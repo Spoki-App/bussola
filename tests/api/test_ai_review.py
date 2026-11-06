@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from bussola.ai.base import AiRequest, AiUnreachableError, Cancellation, run_cancellable
+from bussola.review.ai_review import SEVERITY_MARKS, Severity
 from bussola.review.context import ReviewContext
 from bussola.review.threads import NewThread, create_thread
 from bussola.storage.database import Database
@@ -28,7 +29,11 @@ def rated(*ratings: Json) -> Json:
 
 
 def finding(line: int, body: str, side: str = "after", end: int | None = None, path: str = "app.py") -> Json:
-    return {"path": path, "side": side, "start_line": line, "end_line": end or line, "body": body}
+    return {"path": path, "side": side, "start_line": line, "end_line": end or line, "severity": "medium", "title": f"About {body[:20]}", "body": body}
+
+
+def comment(body: str, severity: str = "medium") -> str:
+    return f"{SEVERITY_MARKS[Severity(severity)]} **{severity.capitalize()}:** About {body[:20]}\n\n{body}"
 
 
 @pytest.fixture
@@ -98,7 +103,7 @@ def test_one_call_reviews_the_whole_pull_request_and_rates_its_units(billing: Gi
     assert [tool.name for tool in request.tools.definitions] == ["find_definition", "find_usages", "read_file", "search", "unit_diff"]
     [thread] = ai_threads(api, review_id)
     assert (thread["qualified_name"], thread["side"], thread["line_text"], thread["anchor"]["file_line"]) == ("name", "head", "    return 'store'", 6)
-    assert thread["comments"][0]["body"] == "The shop name is now **store** everywhere."
+    assert thread["comments"][0]["body"] == comment("The shop name is now **store** everywhere.")
     assert thread["created_by"]["name"] == "Fake provider (claude-opus-5-5)"
     assert thread["comments"][0]["author"]["ai"] is True
     assert thread["comments"][0]["mine"] is False
@@ -151,10 +156,28 @@ def test_findings_are_placed_on_the_unit_and_lines_they_name(billing: GitFixture
     run(api, review_id)
 
     threads = {thread["comments"][0]["body"]: thread for thread in ai_threads(api, review_id)}
-    old_total = threads["The old total had no tax."]
+    old_total = threads[comment("The old total had no tax.")]
     assert (old_total["qualified_name"], old_total["side"], old_total["line_text"]) == ("total", "base", "    return sum(items)")
-    assert (threads["Out of range."]["qualified_name"], threads["Out of range."]["anchor"]["file_line"]) == ("name", 6)
-    assert threads["On `shop.py`, line 12:\n\nA caller elsewhere breaks."]["scope"] == "review"
+    out_of_range = threads[comment("Out of range.")]
+    assert (out_of_range["qualified_name"], out_of_range["anchor"]["file_line"]) == ("name", 6)
+    elsewhere = "A caller elsewhere breaks."
+    assert threads[f"🟡 **Medium:** About {elsewhere[:20]}\n\nOn `shop.py`, line 12:\n\n{elsewhere}"]["scope"] == "review"
+
+
+def test_findings_start_with_their_severity_and_the_most_severe_comes_first(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    minor = {**finding(6, "Renamed shop."), "severity": "low", "title": "Name   changed\nquietly"}
+    major = {**finding(2, "Prices lose cents.", path="shop.py"), "severity": "critical", "title": "Totals are rounded down"}
+    api = client(billing, data_dir, config_file, FakeProvider({"findings": [minor, major]}))
+    review_id = api.start_review()
+
+    run(api, review_id)
+
+    [last] = api.call("GET", f"/reviews/{review_id}/ai-review/runs")
+    [part] = api.call("GET", f"/reviews/{review_id}/ai-review/runs/{last['id']}")["parts"]
+    assert [found["body"] for found in part["findings"]] == [
+        "🔴 **Critical:** Totals are rounded down\n\nOn `shop.py`, line 2:\n\nPrices lose cents.",
+        "🔵 **Low:** Name changed quietly\n\nRenamed shop.",
+    ]
 
 
 def test_the_prompt_carries_the_pull_request_description_and_the_comments_already_made(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
@@ -214,8 +237,8 @@ def test_running_again_reviews_only_the_units_changed_since_the_last_ai_review(b
     assert "round(sum(items) * 1.2, 2)" in prompt
     assert "Name: name" not in prompt
     assert "app.py::name" in prompt
-    assert "an earlier version, after: return sum(items) * 1.2 (open):\n- Hard-coded rate." in prompt
-    assert sorted(thread["comments"][0]["body"] for thread in ai_threads(api, review_id)) == ["Hard-coded rate.", "Renamed shop."]
+    assert f"an earlier version, after: return sum(items) * 1.2 (open):\n- {comment('Hard-coded rate.')}" in prompt
+    assert sorted(thread["comments"][0]["body"] for thread in ai_threads(api, review_id)) == [comment("Hard-coded rate."), comment("Renamed shop.")]
 
 
 def test_review_again_reviews_every_unit_and_keeps_the_threads_already_added(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
@@ -231,7 +254,7 @@ def test_review_again_reviews_every_unit_and_keeps_the_threads_already_added(bil
     assert "Name: name" in second
     assert "Name: total" in second
     assert "Hard-coded rate." in second
-    assert sorted(thread["comments"][0]["body"] for thread in ai_threads(api, review_id)) == ["Hard-coded rate.", "Renamed shop."]
+    assert sorted(thread["comments"][0]["body"] for thread in ai_threads(api, review_id)) == [comment("Hard-coded rate."), comment("Renamed shop.")]
     assert api.call("GET", f"/reviews/{review_id}/ai-review")["reviewed_units"] == 2
 
 
@@ -275,7 +298,7 @@ def test_progress_is_reported_and_cancelling_keeps_the_findings_already_made(bil
     [last] = api.call("GET", f"/reviews/{review_id}/ai-review/runs")
     assert (last["status"], last["reviewed"]) == ("cancelled", 1)
     assert len(api.call("GET", f"/reviews/{review_id}/ai-review/runs/{last['id']}")["parts"]) == 1
-    assert [thread["comments"][0]["body"] for thread in ai_threads(api, review_id)] == ["Hard-coded rate."]
+    assert [thread["comments"][0]["body"] for thread in ai_threads(api, review_id)] == [comment("Hard-coded rate.")]
     assert api.call("GET", f"/reviews/{review_id}/ai-review")["running"] is False
     assert api.call("POST", f"/reviews/{review_id}/ai-review/cancel")["cancelled"] is False
 
@@ -337,7 +360,7 @@ def test_a_finding_too_long_for_a_comment_is_shortened(billing: GitFixture, data
     assert run(api, review_id)["findings"] == 2
 
     bodies = sorted((thread["comments"][0]["body"] for thread in ai_threads(api, review_id)), key=len)
-    assert bodies[0] == "Renamed shop."
+    assert bodies[0] == comment("Renamed shop.")
     assert bodies[1].endswith("[The rest of this finding was too long to keep.]")
     assert len(bodies[1]) < 65_536
 
