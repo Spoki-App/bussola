@@ -1,7 +1,9 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { syncTheme } from '../settings/theme'
+import type { EditorTheme } from '../api/types'
+import { loadThemeState, syncTheme } from '../settings/theme'
 import { BUILTIN_PALETTES } from '../settings/themeMapping'
 import { ThemeColorsPanel } from './ThemeColorsPanel'
 import { ThemePanel } from './ThemePanel'
@@ -16,6 +18,34 @@ const THEME = `{
 
 function rootStyle(variable: string): string {
   return document.documentElement.style.getPropertyValue(variable)
+}
+
+const INSTALLED: EditorTheme[] = [
+  { id: 'abc', label: 'Dark+', editor: 'VS Code', extension: 'Default Themes', type: 'dark' },
+  { id: 'def', label: 'Paper Light', editor: 'Cursor', extension: 'Paper', type: 'light' },
+]
+
+const CONTENTS: Record<string, unknown> = {
+  abc: { name: 'Dark+', type: 'dark', colors: { 'editor.background': '#1e1e1e', 'editor.foreground': 'url(x)' }, tokenColors: [{ scope: 'keyword', settings: { foreground: '#569cd6' } }] },
+  def: { name: 'Paper Light', type: 'light', colors: { 'editor.background': '#fafafa' }, tokenColors: [] },
+}
+
+function renderPanel(installed: EditorTheme[] = []) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) => {
+      const [, id] = url.split('/editor-themes/') as [string, string?]
+      if (id === undefined) {
+        return Promise.resolve(Response.json(installed))
+      }
+      return Promise.resolve(id in CONTENTS ? Response.json(CONTENTS[id]) : Response.json({ detail: 'This theme is no longer installed' }, { status: 404 }))
+    }),
+  )
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <ThemePanel />
+    </QueryClientProvider>,
+  )
 }
 
 function importTheme(text: string, name = 'paper.json') {
@@ -35,7 +65,7 @@ describe('ThemePanel', () => {
   })
 
   it('lists System, Light and Dark with System selected', () => {
-    render(<ThemePanel />)
+    renderPanel()
 
     const select = screen.getByLabelText<HTMLSelectElement>('Theme')
     expect([...select.options].map((option) => option.text)).toEqual(['System', 'Light', 'Dark'])
@@ -43,7 +73,7 @@ describe('ThemePanel', () => {
   })
 
   it('imports a VS Code theme and applies it', async () => {
-    render(<ThemePanel />)
+    renderPanel()
 
     importTheme(THEME)
 
@@ -59,7 +89,7 @@ describe('ThemePanel', () => {
   })
 
   it('explains why a theme cannot be imported', async () => {
-    render(<ThemePanel />)
+    renderPanel()
 
     importTheme('{"include": "./base.json"}')
 
@@ -67,11 +97,44 @@ describe('ThemePanel', () => {
     expect(screen.getByLabelText<HTMLSelectElement>('Theme').options).toHaveLength(3)
   })
 
+  it('lists the themes installed in editors and applies one when chosen', async () => {
+    renderPanel(INSTALLED)
+    const select = screen.getByLabelText<HTMLSelectElement>('Theme')
+
+    expect(await screen.findByText('2 themes found in VS Code and similar editors on this computer.')).toBeInTheDocument()
+    expect([...select.querySelectorAll('optgroup')].map((group) => group.label)).toEqual(['Installed in VS Code', 'Installed in Cursor'])
+
+    fireEvent.change(select, { target: { value: 'editor-abc' } })
+
+    expect(await screen.findByText('Using "Dark+" from VS Code.')).toBeInTheDocument()
+    expect(select.value).toBe('editor-abc')
+    expect(rootStyle('--bg')).toBe('#1e1e1e')
+    expect(rootStyle('--text')).toBe(BUILTIN_PALETTES.dark['--text'])
+    expect(rootStyle('--hl-keyword')).toBe('#569cd6')
+    expect(screen.queryByRole('button', { name: /^Remove/ })).not.toBeInTheDocument()
+
+    fireEvent.change(select, { target: { value: 'light' } })
+    fireEvent.change(select, { target: { value: 'editor-abc' } })
+    await waitFor(() => { expect(select.value).toBe('editor-abc') })
+
+    expect(loadThemeState().themes.map((theme) => theme.id)).toEqual(['editor-abc'])
+    expect(select.querySelectorAll('option')).toHaveLength(5)
+  })
+
+  it('explains when an installed theme can no longer be read', async () => {
+    renderPanel([{ id: 'gone', label: 'Gone', editor: 'VS Code', extension: 'Gone', type: 'dark' }])
+
+    fireEvent.change(screen.getByLabelText('Theme'), { target: { value: (await screen.findByRole('option', { name: 'Gone' })).getAttribute('value') } })
+
+    expect(await screen.findByRole('status')).toHaveTextContent('This theme is no longer installed')
+    expect(screen.getByLabelText<HTMLSelectElement>('Theme').value).toBe('system')
+  })
+
   it('exports the current colors as a VS Code theme', async () => {
     const createObjectURL = vi.fn<(blob: Blob) => string>(() => 'blob:theme')
     vi.stubGlobal('URL', Object.assign(class extends URL {}, { createObjectURL, revokeObjectURL: vi.fn() }))
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
-    render(<ThemePanel />)
+    renderPanel()
     fireEvent.change(screen.getByLabelText('Theme'), { target: { value: 'light' } })
 
     fireEvent.click(screen.getByRole('button', { name: 'Export as VS Code theme' }))

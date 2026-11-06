@@ -139,6 +139,10 @@ export function parseVscodeTheme(text: string, fileName = ''): ParsedTheme {
   } catch {
     throw new Error('This file is not a VS Code color theme: it is not valid JSON.')
   }
+  return themeFromJson(parsed, fileName)
+}
+
+export function themeFromJson(parsed: unknown, fileName = ''): ParsedTheme {
   if (!isRecord(parsed)) {
     throw new Error('This file is not a VS Code color theme: it has no colors or tokenColors.')
   }

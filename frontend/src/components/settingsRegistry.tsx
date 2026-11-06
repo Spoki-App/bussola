@@ -45,7 +45,7 @@ export const SETTINGS: Setting[] = [
   {
     category: 'Appearance',
     name: 'Theme',
-    description: 'System, Light, Dark or an imported VS Code color theme, and export of the current colors as a VS Code theme.',
+    description: 'System, Light, Dark, a theme installed in VS Code, Cursor and similar editors or an imported VS Code color theme, and export of the current colors as a VS Code theme.',
     render: () => <ThemePanel />,
   },
   {

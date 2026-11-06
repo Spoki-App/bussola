@@ -67,7 +67,7 @@ export function loadThemeState(): ThemeState {
 
 const darkQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-color-scheme: dark)') : null
 
-export function allThemes(state: ThemeState): Theme[] {
+function allThemes(state: ThemeState): Theme[] {
   return [...BUILTIN_THEMES, ...state.themes]
 }
 
@@ -151,10 +151,10 @@ export function selectTheme(id: string): void {
   commit({ ...snapshot(), selected: id })
 }
 
-export function addTheme(parsed: ParsedTheme): Theme {
-  const theme: Theme = { id: `imported-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: parsed.name, type: parsed.type, colors: cleanColors(parsed.colors) }
+export function addTheme(parsed: ParsedTheme, id = `imported-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`): Theme {
+  const theme: Theme = { id, name: parsed.name, type: parsed.type, colors: cleanColors(parsed.colors) }
   const state = snapshot()
-  commit({ ...state, selected: theme.id, themes: [...state.themes, theme] })
+  commit({ ...state, selected: theme.id, themes: [...state.themes.filter((candidate) => candidate.id !== id), theme] })
   return theme
 }
 

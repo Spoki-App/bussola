@@ -347,6 +347,14 @@ class RepositoryScanOut(BaseModel):
     truncated: bool
 
 
+class EditorThemeOut(BaseModel):
+    id: str
+    label: str
+    editor: str
+    extension: str
+    type: str
+
+
 class PullRequestRowOut(BaseModel):
     pull: PullRequestOut
     review_id: int | None
