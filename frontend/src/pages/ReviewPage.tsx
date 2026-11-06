@@ -51,6 +51,7 @@ export interface ReviewExtensions {
   onCommentSelectEnd?: () => void
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
+  unitLabels?: (unit: Unit) => ReactNode
   fileActions?: (path: string) => ReactNode
   sidePanel?: { label: string; count: number; content: ReactNode }
   link?: PendingLink
@@ -339,7 +340,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           </div>
           {filesHidden && unitControls}
           <div className="summary-row">
-            <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync, t show or hide the conversation. Click a line number to comment; drag over line numbers or shift-click another to comment on several lines. Cmd or Ctrl+click a name to go to its definition or list its usages.</p>
+            <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync, t show or hide the conversation. Click a line number to comment or compare; drag over line numbers or shift-click another to select several lines. Cmd or Ctrl+click a name to go to its definition or list its usages.</p>
             <div className="summary-actions">
               <RateImpact repoId={data.repo_id} rating={rating} />
               <AiReview reviewId={reviewId} repoId={data.repo_id} review={aiReview} onShowLine={navigation.show} />
@@ -386,6 +387,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                         onCommentSelectEnd={extensions.onCommentSelectEnd}
                         renderWidgets={extensions.renderWidgets}
                         highlightRows={extensions.highlightRows}
+                        unitLabels={extensions.unitLabels}
                         onNavigate={navigation.navigate}
                         canNavigate={navigation.canNavigate}
                         navigationTarget={navigation.target?.unitId === unit.id ? navigation.target : undefined}

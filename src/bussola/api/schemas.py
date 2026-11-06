@@ -154,6 +154,45 @@ class DiffOut(BaseModel):
     rows: list[DiffRowOut]
 
 
+class CodeRangeIn(BaseModel):
+    unit_id: int
+    side: Side
+    line_offset: int = Field(ge=0)
+    line_count: int = Field(ge=1)
+
+
+class CompareIn(BaseModel):
+    left: CodeRangeIn
+    right: CodeRangeIn
+
+
+class CodeRangeOut(BaseModel):
+    unit_id: int
+    path: str
+    qualified_name: str
+    kind: str
+    side: Side
+    line_offset: int
+    line_count: int
+    first_line: int | None
+    last_line: int | None
+
+
+class MoveOut(BaseModel):
+    removed: CodeRangeOut
+    added: CodeRangeOut
+    similarity: float
+    identical: bool
+
+
+class CompareOut(BaseModel):
+    left: CodeRangeOut
+    right: CodeRangeOut
+    identical: bool
+    unified: str
+    rows: list[DiffRowOut]
+
+
 class ApprovalIn(BaseModel):
     unit_id: int | None = None
     path: str | None = None
