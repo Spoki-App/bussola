@@ -32,10 +32,13 @@ export function useSync(reviewId: number) {
 }
 
 export function useSubmitReview(reviewId: number) {
-  return useInvalidatingMutation(
-    [keys.review(reviewId), threadsKey(reviewId), githubSyncKey(reviewId)],
-    (request: { event: ReviewEvent; body: string }) => postJson<ReviewSubmitResult>(`/reviews/${String(reviewId)}/forge/review`, request),
-  )
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (request: { event: ReviewEvent; body: string }) => postJson<ReviewSubmitResult>(`/reviews/${String(reviewId)}/forge/review`, request),
+    onSuccess: () => {
+      void invalidate(client, [keys.review(reviewId), threadsKey(reviewId), githubSyncKey(reviewId)])
+    },
+  })
 }
 
 export function useGitHubSync(reviewId: number, headSha: string | undefined) {

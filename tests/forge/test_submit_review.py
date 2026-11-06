@@ -61,6 +61,22 @@ def test_comment_needs_a_summary_or_a_pending_comment(api: ApiClient, git_repo: 
     assert [post["input"]["event"] for post in fake_gh.api_posts("/reviews")] == ["COMMENT"]
 
 
+def test_comment_with_only_a_reply_sends_the_reply_without_a_review(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
+    review = setup_review(api, git_repo, fake_gh)
+    link(api, review)
+    thread = comment_on(api, review, "app.py::total", 2, "First")
+    api.call("POST", f"/reviews/{review}/sync")
+    api.call("POST", f"/threads/{thread['id']}/comments", 201, {"body": "Second"})
+    fake_gh.clear_log()
+
+    result = submit(api, review, "COMMENT")
+
+    assert fake_gh.api_posts("/reviews") == []
+    assert [post["input"] for post in fake_gh.api_posts("/replies")] == [{"body": "Second"}]
+    assert result["published"]["review_url"] is None
+    assert result["unsent_comments"] == 0
+
+
 def test_a_refused_review_keeps_the_comments_unsent(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
     review = setup_review(api, git_repo, fake_gh)
     link(api, review)

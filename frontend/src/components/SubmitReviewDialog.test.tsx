@@ -42,16 +42,34 @@ const SUBMITTED: ReviewSubmitResult = {
 
 function Harness({ pending, onSubmitted, onClose }: { pending: number; onSubmitted: (result: ReviewSubmitResult) => void; onClose: () => void }) {
   const [summary, setSummary] = useState('')
-  return <SubmitReviewDialog reviewId={1} pendingComments={pending} summary={summary} onSummaryChange={setSummary} onSubmitted={onSubmitted} onClose={onClose} />
+  const [open, setOpen] = useState(true)
+  const close = () => {
+    setOpen(false)
+    onClose()
+  }
+  return open && <SubmitReviewDialog reviewId={1} pendingComments={pending} summary={summary} onSummaryChange={setSummary} onSubmitted={onSubmitted} onClose={close} />
 }
 
-function renderDialog({ viewer = 'alice', pending = 0, answer = () => Promise.resolve(Response.json(SUBMITTED)) } = {}) {
+function deferred(): { promise: Promise<Response>; resolve: (response: Response) => void } {
+  let resolve: (response: Response) => void = () => undefined
+  const promise = new Promise<Response>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
+function renderDialog({
+  viewer = 'alice',
+  pending = 0,
+  answer = () => Promise.resolve(Response.json(SUBMITTED)),
+  forge = () => Promise.resolve(Response.json(overview(viewer))),
+} = {}) {
   const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>((url, init) => {
     if (url === '/api/reviews/1/forge/review' && init?.method === 'POST') {
       return answer()
     }
     if (url === '/api/reviews/1/forge') {
-      return Promise.resolve(Response.json(overview(viewer)))
+      return forge()
     }
     return Promise.resolve(Response.json([]))
   })
@@ -138,6 +156,33 @@ describe('SubmitReviewDialog', () => {
     expect(screen.getByRole('radio', { name: /^Request changes/ })).toBeDisabled()
     expect(screen.getByRole('radio', { name: /^Comment/ })).toBeEnabled()
     expect(screen.getByText('You cannot approve or request changes on your own pull request.')).toBeInTheDocument()
+  })
+
+  it('falls back to Comment when the pull request turns out to be your own', async () => {
+    const pendingForge = deferred()
+    const { fetchMock } = renderDialog({ pending: 1, forge: () => pendingForge.promise })
+
+    fireEvent.click(screen.getByRole('radio', { name: /^Approve/ }))
+    pendingForge.resolve(Response.json(overview('bob')))
+
+    await waitFor(() => { expect(screen.getByRole('radio', { name: /^Approve/ })).toBeDisabled() })
+    expect(screen.getByRole('radio', { name: /^Approve/ })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: /^Comment/ })).toBeChecked()
+    fireEvent.click(submitButton())
+    await waitFor(() => { expect(posted(fetchMock)).toEqual([{ event: 'COMMENT', body: '' }]) })
+  })
+
+  it('reports the review submitted after the dialog was closed', async () => {
+    const pendingAnswer = deferred()
+    const { onSubmitted, onClose } = renderDialog({ answer: () => pendingAnswer.promise })
+
+    fireEvent.click(screen.getByRole('radio', { name: /^Approve/ }))
+    fireEvent.click(submitButton())
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onClose).toHaveBeenCalled()
+    pendingAnswer.resolve(Response.json(SUBMITTED))
+
+    await waitFor(() => { expect(onSubmitted).toHaveBeenCalledWith(SUBMITTED) })
   })
 
   it('shows the error and keeps the summary when GitHub refuses', async () => {

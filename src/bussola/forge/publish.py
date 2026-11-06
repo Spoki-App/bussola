@@ -177,7 +177,7 @@ class _Publisher:
 
     def submit_review(self, plan: PublishPlan, verdict: ReviewVerdict | None) -> str | None:
         if verdict is not None:
-            return self.submit(plan, verdict)
+            return None if _only_follow_ups(plan, verdict) else self.submit(plan, verdict)
         if not plan.inline and not plan.body_parts:
             return None
         try:
@@ -224,6 +224,11 @@ class _Publisher:
         for comment in comments:
             record = PublishedComment(comment.id, self.adapter.provider, remote.remote_id, remote.url, body_hash(self.context, comment))
             self.context.store.forge.save_published(record)
+
+
+def _only_follow_ups(plan: PublishPlan, verdict: ReviewVerdict) -> bool:
+    empty_review = not verdict.summary.strip() and not plan.inline and not plan.body_parts
+    return verdict.event == ReviewEvent.COMMENT and empty_review and bool(plan.files or plan.replies or plan.updates)
 
 
 def _require_summary(event: ReviewEvent, body: str, plan: PublishPlan) -> None:

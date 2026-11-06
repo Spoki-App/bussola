@@ -29,22 +29,21 @@ export function SubmitReviewDialog({ reviewId, pendingComments, summary, onSumma
   const forge = useForge(reviewId)
   const submit = useSubmitReview(reviewId)
   const [tab, setTab] = useState<Tab>('write')
-  const [event, setEvent] = useState<ReviewEvent>('COMMENT')
+  const [chosen, setEvent] = useState<ReviewEvent>('COMMENT')
   const own = isOwnPullRequest(forge.data)
+  const event = own ? 'COMMENT' : chosen
   const missingSummary = needsSummary(event, pendingComments) && !summary.trim()
 
   const send = () => {
     if (missingSummary || submit.isPending) {
       return
     }
-    submit.mutate(
-      { event, body: summary },
-      {
-        onSuccess: (result) => {
-          onSubmitted(result)
-          close()
-        },
+    submit.mutateAsync({ event, body: summary }).then(
+      (result) => {
+        onSubmitted(result)
+        close()
       },
+      () => undefined,
     )
   }
   const onKeyDown = (keyEvent: KeyboardEvent<HTMLTextAreaElement>) => {
