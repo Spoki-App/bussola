@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
-import { Decoration, Diff, Hunk, getChangeKey, isDelete, isInsert, parseDiff, type ChangeData, type HunkData } from 'react-diff-view'
+import { Decoration, Diff, Hunk, getChangeKey, isDelete, isInsert, parseDiff, type ChangeData, type HunkData, type ViewType } from 'react-diff-view'
 import 'react-diff-view/style/index.css'
 
 import type { DiffRow, UnitDiff } from '../api/types'
@@ -30,11 +30,11 @@ export interface TargetLine {
 }
 
 interface Props {
-  diff: UnitDiff
+  diff: Pick<UnitDiff, 'rows' | 'unified'> & Partial<Pick<UnitDiff, 'binary'>>
   path: string
   selectable: boolean
-  selected: ReadonlySet<string>
-  onRowClick: (row: DiffRow, extend: boolean) => void
+  selected?: ReadonlySet<string>
+  onRowClick?: (row: DiffRow, extend: boolean) => void
   onLineNumberClick?: (row: DiffRow, side: GutterSide, extend: boolean) => void
   onLineSelectEnd?: () => void
   highlighted?: ReadonlySet<string>
@@ -42,6 +42,7 @@ interface Props {
   onNavigate?: (row: DiffRow, side: GutterSide, column: number, point: ScreenPoint) => void
   canNavigate?: (row: DiffRow, side: GutterSide, column: number) => Promise<boolean>
   target?: TargetLine
+  viewType?: ViewType
 }
 
 interface RowIndex {
@@ -187,9 +188,10 @@ function renderSegments(segments: Segment[], hunks: HunkData[], expand: (id: str
   })
 }
 
-export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted, onNavigate, canNavigate, target }: Props) {
+export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted, onNavigate, canNavigate, target, viewType: fixedViewType }: Props) {
   const modified = useMemo(() => hasModification(diff.rows), [diff.rows])
-  const viewType = useViewType(modified)
+  const preferredViewType = useViewType(modified)
+  const viewType = fixedViewType ?? preferredViewType
   const makeLink = useContext(ReviewLinkContext)
   const wrap = useDiffWrap()
   const link = useSymbolLink()
@@ -261,7 +263,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
     .flatMap((hunk) => hunk.changes)
     .filter((change) => {
       const row = index.rowOf(change)
-      return row !== undefined && selected.has(rowKey(row))
+      return row !== undefined && selected?.has(rowKey(row)) === true
     })
     .map(getChangeKey)
 
@@ -336,7 +338,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
             setOccurrence(span && event.currentTarget.textContent.slice(span.start, span.end))
           }
           if (selectable && row && isSelectable(row)) {
-            onRowClick(row, event.shiftKey)
+            onRowClick?.(row, event.shiftKey)
           }
         },
       }}

@@ -1718,7 +1718,8 @@ button.copy-link.failed {
   white-space: pre;
 }
 
-.navigation-hint {
+.navigation-hint,
+.compare-bar {
   position: fixed;
   right: 16px;
   bottom: 16px;
@@ -1916,6 +1917,78 @@ button.link:hover:not(:disabled) {
 .draft-range {
   margin: 0 0 4px;
   font-size: 12px;
+}
+
+.draft-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.move-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-height: 0;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-subtle);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.move-link code {
+  color: var(--text);
+}
+
+.move-identical {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.picker.compare-dialog {
+  width: min(1400px, calc(100vw - 32px));
+  height: min(860px, calc(100vh - 48px));
+}
+
+.compare-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.compare-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.compare-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.compare-view {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-box);
+}
+
+.compare-bar {
+  right: auto;
+  left: 50%;
+  align-items: center;
+  max-width: calc(100vw - 32px);
+  transform: translateX(-50%);
 }
 
 .confirm {

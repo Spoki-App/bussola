@@ -82,7 +82,7 @@ def diff_lines(old: Sequence[str], new: Sequence[str]) -> list[DiffLine]:
     key = _content_key(old, new)
     cached = _diff_cache.get(key)
     if cached is None:
-        cached = _diff_cache[key] = _compute_diff_lines(old, new)
+        cached = _diff_cache[key] = compute_diff_lines(old, new)
         while len(_diff_cache) > DIFF_CACHE_SIZE:
             _diff_cache.popitem(last=False)
     _diff_cache.move_to_end(key)
@@ -97,8 +97,8 @@ def _content_key(old: Sequence[str], new: Sequence[str]) -> tuple[int, int, str]
     return len(old), len(new), digest.hexdigest()
 
 
-def _compute_diff_lines(old: Sequence[str], new: Sequence[str]) -> tuple[DiffLine, ...]:
-    matcher = SequenceMatcher(None, [_without_spaces(line) for line in old], [_without_spaces(line) for line in new], autojunk=False)
+def compute_diff_lines(old: Sequence[str], new: Sequence[str]) -> tuple[DiffLine, ...]:
+    matcher = SequenceMatcher(None, [without_spaces(line) for line in old], [without_spaces(line) for line in new], autojunk=False)
     result: list[DiffLine] = []
     for tag, old_start, old_end, new_start, new_end in matcher.get_opcodes():
         for old_index, new_index in zip_longest(range(old_start, old_end), range(new_start, new_end)):
@@ -112,7 +112,7 @@ def _compute_diff_lines(old: Sequence[str], new: Sequence[str]) -> tuple[DiffLin
     return tuple(result)
 
 
-def _without_spaces(line: str) -> str:
+def without_spaces(line: str) -> str:
     return "".join(line.split())
 
 

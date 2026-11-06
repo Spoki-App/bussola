@@ -80,7 +80,7 @@ export function clampIndex(index: number, length: number): number {
   return length === 0 ? -1 : Math.min(Math.max(index, 0), length - 1)
 }
 
-export function unitTitle(unit: Unit): string {
+export function unitTitle(unit: Pick<Unit, 'qualified_name' | 'kind'>): string {
   if (unit.qualified_name) {
     return unit.qualified_name
   }
