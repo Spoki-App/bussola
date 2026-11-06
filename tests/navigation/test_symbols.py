@@ -116,8 +116,8 @@ def usages(path: str, source: str, name: str) -> list[int]:
     return [symbol.row + 1 for symbol in references(language(path), source.encode(), name)]
 
 
-def test_python_definitions_are_functions_methods_classes_and_module_variables() -> None:
-    assert definitions("cart.py", PYTHON_SOURCE) == [("LIMIT", 1), ("A", 2), ("B", 2), ("Cart", 5), ("total", 8), ("helper", 13), ("main", 17)]
+def test_python_definitions_are_functions_methods_classes_and_module_and_class_variables() -> None:
+    assert definitions("cart.py", PYTHON_SOURCE) == [("LIMIT", 1), ("A", 2), ("B", 2), ("Cart", 5), ("size", 6), ("total", 8), ("helper", 13), ("main", 17)]
 
 
 def test_python_references_include_calls_attributes_and_names_but_not_definitions() -> None:
@@ -125,7 +125,7 @@ def test_python_references_include_calls_attributes_and_names_but_not_definition
     assert usages("cart.py", PYTHON_SOURCE, "total") == [18]
     assert usages("cart.py", PYTHON_SOURCE, "LIMIT") == [9]
     assert "local" in symbols_of("cart.py", PYTHON_SOURCE).used_names
-    assert "size" in symbols_of("cart.py", PYTHON_SOURCE).used_names
+    assert "size" not in symbols_of("cart.py", PYTHON_SOURCE).used_names
 
 
 def test_typescript_definitions_cover_declarations_methods_types_and_module_constants() -> None:

@@ -54,17 +54,19 @@ def _is_name_of(node: Node, parent_types: frozenset[str]) -> bool:
 
 
 def _python_definition(node: Node) -> bool:
-    return _is_name_of(node, PYTHON_DEFINITIONS) or _is_module_assignment_target(node)
+    return _is_name_of(node, PYTHON_DEFINITIONS) or _is_declared_assignment_target(node)
 
 
-def _is_module_assignment_target(node: Node) -> bool:
+def _is_declared_assignment_target(node: Node) -> bool:
     assignment = node.parent
     if assignment is None or assignment.type != "assignment" or assignment.child_by_field_name("left") != node:
         return False
     while assignment.parent is not None and assignment.parent.type == "assignment":
         assignment = assignment.parent
     statement = assignment.parent
-    return statement is not None and statement.type == "expression_statement" and _parent_type(statement) == "module"
+    if statement is None or statement.type != "expression_statement" or statement.parent is None:
+        return False
+    return statement.parent.type == "module" or (statement.parent.type == "block" and _parent_type(statement.parent) == python.CLASS_DEFINITION)
 
 
 def _ecmascript_definition(node: Node) -> bool:

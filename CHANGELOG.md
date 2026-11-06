@@ -48,6 +48,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Fixed
 
+- Cmd+click on a Python class attribute where it is assigned, such as `BLOCKED_DETAIL = (...)` in a class body, lists where it is used. It was taken for a use of the name and went to the assignment itself.
 - Cmd+click on a plain name, such as a call to `_kind(...)`, lists only its definition in the same file when the file has one. Before the language server was ready, functions with the same name in other files were listed too. A name after a dot, such as `other._kind()`, still lists every definition with that name.
 - Unit cards no longer scroll on their own when the mouse wheel is over them. The button that copies a link to a line stuck out one pixel below the last line, which gave each card a vertical scrollbar.
 - Added and removed lines and changed words use the dark theme colors in dark mode. The light theme colors were applied instead and were hard to see.
