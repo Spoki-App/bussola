@@ -36,6 +36,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Changed
 
+- Selecting lines to approve works like in an editor: a click selects only the clicked line, leaving none of the earlier ones selected, and Shift+click selects the lines from the last plain click to the clicked one. Consecutive Shift+clicks grow or shrink that range from the same line, in split and unified layout. Clicking the only selected line again clears the selection, and the selection is cleared when the diff changes, such as when switching between **Base → head** and **Approved → current** ([#42](https://github.com/Spoki-App/bussola/issues/42)).
 - `bussola://` links start opening the browser in about a fifth of a second instead of half a second: the link handler no longer loads the web server, the database layer and FastAPI just to find the running server. Registered handlers keep working as they are.
 - Lines are matched ignoring spaces, so code moved into a new block stays next to its old version in split view, with only the indentation it gained or lost highlighted at the start of the line, instead of showing as a block removed and a different block added. In such a block the lines added or removed with no counterpart are highlighted in full.
 - Cmd+click with a single result outside the review opens the file in a window at once, instead of a list with one entry.

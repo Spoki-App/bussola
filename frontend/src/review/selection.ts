@@ -6,6 +6,13 @@ export interface SelectionRanges {
   base_range: LineRange | null
 }
 
+export interface LineSelection {
+  selected: ReadonlySet<string>
+  anchor: string | null
+}
+
+export const NO_SELECTION: LineSelection = { selected: new Set(), anchor: null }
+
 export function rowKey(row: DiffRow): string {
   return `${row.change}:${String(row.old_index)}:${String(row.new_index)}`
 }
@@ -29,6 +36,19 @@ export function selectRange(diffRows: DiffRow[], anchorKey: string, focusKey: st
       .filter(isSelectable)
       .map(rowKey),
   )
+}
+
+export function clickRow(diffRows: DiffRow[], current: LineSelection, key: string, extend: boolean): LineSelection {
+  if (extend && current.anchor !== null) {
+    const range = selectRange(diffRows, current.anchor, key)
+    if (range.size > 0) {
+      return { selected: range, anchor: current.anchor }
+    }
+  }
+  if (!extend && current.selected.size === 1 && current.selected.has(key)) {
+    return NO_SELECTION
+  }
+  return { selected: new Set([key]), anchor: key }
 }
 
 export function selectionRanges(rows: DiffRow[], selected: ReadonlySet<string>): SelectionRanges {
