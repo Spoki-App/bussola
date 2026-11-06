@@ -1021,18 +1021,25 @@ button.busy {
   background: var(--bg-subtle);
 }
 
-.files-hidden .sidebar,
-.panel-hidden .side-panel {
+.files-hidden .sidebar {
   padding: 12px 6px;
+}
+
+.side-panel > .sidebar-toggle {
+  width: fit-content;
+  margin-left: auto;
 }
 
 .panel-hidden .side-panel {
   height: 100vh;
+  overflow: hidden;
+  padding: 12px 4px;
 }
 
 .panel-hidden .side-panel .sidebar-toggle {
   flex-direction: column;
-  padding: 6px;
+  max-width: 100%;
+  padding: 6px 4px;
 }
 
 .sidebar-toggle {

@@ -130,6 +130,15 @@ describe('ReviewPage conversation panel', () => {
     expect(window.localStorage.getItem('bussola.sidePanelHidden')).toBe('false')
   })
 
+  it('draws the conversation toggle as a right column and the files toggle as a left one', async () => {
+    window.localStorage.setItem('bussola.sidePanelHidden', 'true')
+    renderPage(extensions)
+    const divider = (button: HTMLElement) => button.querySelector('path')?.getAttribute('d')
+
+    expect(divider(await screen.findByRole('button', { name: 'Show conversation (2 open)' }))).toBe('M10 2.5v11')
+    expect(divider(screen.getByRole('button', { name: 'Files' }))).toBe('M6 2.5v11')
+  })
+
   it('keeps an unsent comment while the panel is hidden', async () => {
     window.localStorage.setItem('bussola.sidePanelHidden', 'false')
     renderPage(extensions)

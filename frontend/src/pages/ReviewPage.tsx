@@ -407,7 +407,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                   title={`${panelHidden ? 'Show' : 'Hide'} ${sidePanel.label}. Shortcut: t`}
                   onClick={togglePanel}
                 >
-                  <SidebarIcon />
+                  <SidebarIcon side="right" />
                   {panelHidden && sidePanel.count > 0 && <span className="side-panel-count">{sidePanel.count}</span>}
                 </button>
                 <div id="side-panel-content" hidden={panelHidden}>
@@ -430,11 +430,11 @@ function emptyMessage(filter: UnitFilter, query: string, impactFilter: ImpactFil
   return filter === 'all' ? 'No changes between the branches.' : 'Nothing to review here.'
 }
 
-function SidebarIcon() {
+function SidebarIcon({ side = 'left' }: { side?: 'left' | 'right' }) {
   return (
     <svg className="tree-icon" viewBox="0 0 16 16" aria-hidden="true">
       <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
-      <path d="M6 2.5v11" />
+      <path d={side === 'left' ? 'M6 2.5v11' : 'M10 2.5v11'} />
     </svg>
   )
 }
