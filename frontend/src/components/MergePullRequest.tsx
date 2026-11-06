@@ -43,7 +43,7 @@ function MergeForm({ options, merge }: { options: MergeOptions; merge: ReturnTyp
   const [choice, setChoice] = useState<MergeMethod | null>(null)
   const [edits, setEdits] = useState<Partial<Record<MergeMethod, CommitText>>>({})
   const [deleteBranch, setDeleteBranch] = useState(false)
-  const method = choice ?? options.default_method
+  const method = choice !== null && options.methods.includes(choice) ? choice : options.default_method
   if (method === null) {
     return <ErrorNote message="This repository allows no merge method. Enable one in its settings on GitHub." />
   }

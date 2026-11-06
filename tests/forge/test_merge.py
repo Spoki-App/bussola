@@ -2,7 +2,7 @@ from typing import Any
 
 from tests.apiclient import ApiClient, Json
 from tests.forge.conftest import FakeGh
-from tests.forge.test_viewed import setup_review
+from tests.forge.test_viewed import point_pull_request_at, setup_review
 from tests.gitrepo import GitFixture
 
 
@@ -133,10 +133,25 @@ def test_a_refused_merge_shows_the_reason_from_github(api: ApiClient, git_repo: 
 
 def test_refuses_a_head_that_moved_since_the_options_were_read(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
     review = setup_review(api, git_repo, fake_gh)
+    head = pull_head(fake_gh)
+    point_pull_request_at(fake_gh, "1" * 40)
 
-    error = api.call("POST", f"/reviews/{review}/forge/merge", 502, {"method": "merge", "head_sha": "0" * 40})
+    error = api.call("POST", f"/reviews/{review}/forge/merge", 502, {"method": "merge", "head_sha": head})
 
     assert "Head branch was modified" in error["detail"]
+
+
+def test_blocks_merging_commits_pushed_after_the_review(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
+    review = setup_review(api, git_repo, fake_gh)
+    reviewed = pull_head(fake_gh)
+    point_pull_request_at(fake_gh, "1" * 40)
+
+    blockers = merge_options(api, review)["blockers"]
+    error = api.call("POST", f"/reviews/{review}/forge/merge", 409, {"method": "merge", "head_sha": "1" * 40})
+
+    expected = f"The pull request head (11111111) differs from the reviewed head ({reviewed[:8]}). Sync to review the new commits before merging."
+    assert (blockers, error["detail"]) == ([expected], expected)
+    assert "merged" not in fake_gh.state()
 
 
 def test_refuses_a_method_the_repository_does_not_allow(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:

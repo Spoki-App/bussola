@@ -83,6 +83,17 @@ describe('MergePullRequest', () => {
     expect(screen.getByRole('button', { name: 'Confirm squash and merge' })).toBeDisabled()
   })
 
+  it('falls back to the default method when the chosen one is no longer allowed', async () => {
+    const fetchMock = renderMerge()
+
+    fireEvent.click(await screen.findByRole('tab', { name: 'Rebase and merge' }))
+    fetchMock.mockImplementation(() => Promise.resolve(Response.json({ ...OPTIONS, methods: ['merge', 'squash'] })))
+    fireEvent.focus(window)
+    window.dispatchEvent(new Event('visibilitychange'))
+
+    expect(await screen.findByRole('button', { name: 'Confirm squash and merge' })).toBeInTheDocument()
+  })
+
   it('says when GitHub deletes the branch by itself', async () => {
     renderMerge({ branch_deletion: 'automatic' })
 

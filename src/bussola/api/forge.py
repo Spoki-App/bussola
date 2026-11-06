@@ -18,7 +18,7 @@ from bussola.api.state import app_state
 from bussola.api.views import forge_status_out, merge_options_out, pull_request_out
 from bussola.forge.base import Asset, MergeRequest
 from bussola.forge.links import ForgeOverview, forge_overview, link_pull_request
-from bussola.forge.merge import merge_pull_request
+from bussola.forge.merge import merge_pull_request, review_merge_options
 from bussola.forge.publish import require_link
 from bussola.forge.pulls import sync_conversation
 from bussola.review.context import ReviewContext
@@ -61,8 +61,7 @@ def sync(context: ContextDep, request: Request) -> ConversationSyncOut:
 
 @router.get("/reviews/{review_id}/forge/merge")
 def get_merge_options(context: ContextDep, request: Request) -> MergeOptionsOut:
-    link = require_link(context)
-    return merge_options_out(app_state(request).forge.merge_options(link.repository, link.pr_number))
+    return merge_options_out(review_merge_options(context, app_state(request).forge, require_link(context)))
 
 
 @router.post("/reviews/{review_id}/forge/merge")
