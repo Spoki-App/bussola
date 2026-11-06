@@ -201,3 +201,42 @@ def test_usages_in_a_file_that_does_not_parse_have_no_enclosing_unit(tmp_path: P
     usages = usages_with_enclosing(tmp_path, git_repo, files, "shop.py")
 
     assert usages == [(1, None), (4, None)]
+
+
+def definitions_from(tmp_path: Path, git_repo: GitFixture, files: dict[str, str], path: str, clicked: str) -> list[tuple[str, int]]:
+    commit = git_repo.commit(files)
+    starter = ManualStarter()
+    navigator = Navigator(tmp_path / "data", starter)
+    navigator.prepare(git_repo.repo, commit, ())
+    starter.run()
+    line, text = next((number, text) for number, text in enumerate(files[path].split("\n"), start=1) if clicked in text)
+    found = navigator.navigate(git_repo.repo, commit, (), Click(path, line, text.index(clicked) + len(clicked) - len("kind")))
+    assert found.origin == Origin.REFERENCE
+    return [(target.path, target.line) for target in found.targets]
+
+
+SAME_NAME = {
+    "plans.py": "def _kind(plan):\n    return plan.kind\n\n\ndef preview(plan, other):\n    return _kind(plan), other._kind()\n",
+    "pixel.py": "def _kind(event):\n    return event\n",
+    "pixel.ts": "export function kind(event: string): string {\n  return event\n}\n",
+    "plans.ts": "function kind(plan: string): string {\n  return plan\n}\n\nexport const preview = (plan: string, other: Plan) => [kind(plan), other.kind()]\n",
+    "pixel.go": "package shop\n\nfunc kind() int { return 1 }\n",
+    "plans.go": "package shop\n\nfunc kind() int { return 2 }\n\nfunc preview(other Plan) int { return kind() + other.kind() }\n",
+}
+
+
+@pytest.mark.parametrize(
+    ("path", "clicked", "expected"),
+    [
+        ("plans.py", "return _kind", [("plans.py", 1)]),
+        ("plans.py", "other._kind", [("plans.py", 1), ("pixel.py", 1)]),
+        ("plans.ts", "[kind", [("plans.ts", 1)]),
+        ("plans.ts", "other.kind", [("plans.ts", 1), ("pixel.ts", 1)]),
+        ("plans.go", "return kind", [("plans.go", 3)]),
+        ("plans.go", "other.kind", [("plans.go", 3), ("pixel.go", 3)]),
+    ],
+)
+def test_a_plain_name_defined_in_its_own_file_skips_namesakes_elsewhere(
+    tmp_path: Path, git_repo: GitFixture, path: str, clicked: str, expected: list[tuple[str, int]]
+) -> None:
+    assert definitions_from(tmp_path, git_repo, SAME_NAME, path, clicked) == expected

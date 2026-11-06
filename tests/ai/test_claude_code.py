@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 
 from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiProviderError, AiRequest, AiTimeoutError, Cancellation, ToolDefinition, ToolOutcome
-from bussola.ai.claude_code import READER_NAME, ClaudeCodeProvider, find_claude
+from bussola.ai.claude_code import HELP_TIMEOUT_SECONDS, READER_NAME, ClaudeCodeProvider, find_claude
 from bussola.ai.config import AiSettings, ProviderName
 from bussola.ai.providers import build_provider
 
@@ -260,19 +260,22 @@ def test_the_version_check_runs_like_the_real_call_and_is_asked_once(tmp_path: P
 
 
 def test_a_version_check_that_failed_is_tried_again_later(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    log = tmp_path / "calls.log"
-    slow = tmp_path / "claude"
-    slow.write_text(f"#!/bin/sh\necho run >> {log}\n{shutil.which('sleep')} 5\n")
-    slow.chmod(0o755)
+    claude = tmp_path / "claude"
+    claude.write_text(f"#!/bin/sh\n{shutil.which('sleep')} 5\n")
+    claude.chmod(0o755)
     monkeypatch.setenv("PATH", str(tmp_path))
     monkeypatch.setattr("bussola.ai.claude_code.HELP_TIMEOUT_SECONDS", 0.2)
     monkeypatch.setattr("bussola.ai.claude_code.FAILED_CHECK_SECONDS", 0.0)
 
-    for _ in range(2):
-        with pytest.raises(AiNotConfiguredError, match="did not answer"):
-            find_claude()
+    with pytest.raises(AiNotConfiguredError, match="did not answer"):
+        find_claude()
 
-    assert log.read_text().splitlines() == ["run", "run"]
+    slow = claude.stat()
+    claude.write_text("#!/bin/sh\necho '--safe-mode'\n")
+    os.utime(claude, ns=(slow.st_atime_ns, slow.st_mtime_ns))
+    monkeypatch.setattr("bussola.ai.claude_code.HELP_TIMEOUT_SECONDS", HELP_TIMEOUT_SECONDS)
+
+    assert find_claude() == str(claude)
 
 
 def test_a_claude_that_disappears_is_reported(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

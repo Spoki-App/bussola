@@ -6,7 +6,7 @@ const MAX_COMPARISONS = 2500
 const MIN_PART_SIMILARITY = 0.5
 const WORD = /\w+|\s+|[^\w\s]/g
 const PART = /\p{Lu}+(?!\p{Ll})|\p{Lu}?\p{Ll}+|\p{N}+|[^\p{L}\p{N}]/gu
-const IDENTIFIER = /^\w+$/
+const UNSPACED = /^\S+$/
 
 const matcher = new DiffMatchPatch()
 
@@ -94,7 +94,7 @@ function similarity(diffs: Diff[], before: string, after: string): number {
 }
 
 function renamedParts(removed: Diff, added: Diff | undefined): Diff[] | null {
-  if (removed[0] !== DiffMatchPatch.DIFF_DELETE || added?.[0] !== DiffMatchPatch.DIFF_INSERT || !IDENTIFIER.test(removed[1]) || !IDENTIFIER.test(added[1])) {
+  if (removed[0] !== DiffMatchPatch.DIFF_DELETE || added?.[0] !== DiffMatchPatch.DIFF_INSERT || !UNSPACED.test(removed[1]) || !UNSPACED.test(added[1])) {
     return null
   }
   const parts = tokenDiff(removed[1], added[1], PART)
