@@ -4,7 +4,7 @@ import 'react-diff-view/style/index.css'
 
 import type { DiffRow, UnitDiff } from '../api/types'
 import { useViewType } from '../hooks/useDiffLayout'
-import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { isTyping } from '../hooks/useKeyboardShortcuts'
 import { useSymbolLink } from '../hooks/useSymbolLink'
 import { hasNavigationModifier, isNavigationClick, navigationColumn, symbolAt, type ScreenPoint } from '../review/codeNavigation'
 import { collapsedUnified, segmentRows, unifiedOrder, type Segment } from '../review/collapse'
@@ -102,6 +102,10 @@ function linkedHeadLine(row: DiffRow | undefined, side: GutterSide): number | nu
   return side === 'new' && row && !row.placeholder && row.change !== 'removed' ? row.new_line : null
 }
 
+function hasTextSelection(): boolean {
+  return window.getSelection()?.isCollapsed === false
+}
+
 function gutterSide(row: DiffRow): GutterSide {
   return row.change === 'removed' ? 'old' : 'new'
 }
@@ -188,17 +192,22 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       return
     }
     const onClick = (event: globalThis.MouseEvent) => {
-      if (!isNavigationClick(event)) {
+      if (!isNavigationClick(event) && !hasTextSelection()) {
+        setOccurrence(null)
+      }
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isTyping(event.target)) {
         setOccurrence(null)
       }
     }
     window.addEventListener('click', onClick, true)
+    window.addEventListener('keydown', onKeyDown)
     return () => {
       window.removeEventListener('click', onClick, true)
+      window.removeEventListener('keydown', onKeyDown)
     }
   }, [occurrence])
-
-  useKeyboardShortcuts({ Escape: occurrence === null ? undefined : () => { setOccurrence(null) } })
 
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const rows = useMemo(() => (viewType === 'split' ? diff.rows : unifiedOrder(diff.rows)), [diff.rows, viewType])
@@ -301,7 +310,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
             }
             return
           }
-          if (!hasNavigationModifier(event)) {
+          if (!hasNavigationModifier(event) && !hasTextSelection()) {
             const span = symbolAt(event.currentTarget, event.clientX, event.clientY)
             setOccurrence(span && event.currentTarget.textContent.slice(span.start, span.end))
           }

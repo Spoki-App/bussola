@@ -371,6 +371,37 @@ describe('UnitDiffView navigation', () => {
     expect(table.querySelector('.diff-occurrence')).toBeNull()
   })
 
+  it('leaves a text selection alone instead of moving or clearing the mark', () => {
+    const table = view()
+    const cell = codeCell(table, '    return sum(items)')
+    caretIn(cell, 17)
+    fireEvent.click(cell, { button: 0 })
+    const marks = () => [...table.querySelectorAll('.diff-occurrence')].map((mark) => mark.textContent)
+    const before = marks()
+    const selection = window.getSelection() as Selection
+    selection.selectAllChildren(cell)
+
+    caretIn(cell, 12)
+    fireEvent.click(cell, { button: 0 })
+    fireEvent.click(document.body)
+
+    expect(before).toContain('items')
+    expect(marks()).toEqual(before)
+    selection.removeAllRanges()
+  })
+
+  it('clears the mark on Esc without cancelling it, so an open dialog still closes', () => {
+    const table = view()
+    const cell = codeCell(table, '    return sum(items)')
+    caretIn(cell, 17)
+    fireEvent.click(cell, { button: 0 })
+
+    const handled = fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(handled).toBe(true)
+    expect(table.querySelector('.diff-occurrence')).toBeNull()
+  })
+
   it('reveals and marks the target line even inside a collapsed context', () => {
     chooseLayout('unified')
     const context = Array.from({ length: 20 }, (_, index) => row('context', index + 2, index + 2, `    step_${String(index)}()`))
