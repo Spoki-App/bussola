@@ -5,7 +5,7 @@ import { clearCaret, placeCaret } from '../test/caret'
 import { columnAt, directTarget, emptyMessage, groupTargets, isNavigable, isNavigationClick, isSymbolToken, rangeOf, symbolAt, symbolSpan, textOffset, titleOf } from './codeNavigation'
 
 function target(role: NavigationTarget['role'], path: string, line: number, unitId: number | null = null): NavigationTarget {
-  return { role, path, line, column: 0, preview: `line ${String(line)}`, side: 'head', unit_id: unitId }
+  return { role, path, line, column: 0, preview: `line ${String(line)}`, enclosing: null, side: 'head', unit_id: unitId }
 }
 
 function result(targets: NavigationTarget[], origin: NavigationResult['origin'] = 'reference'): NavigationResult {

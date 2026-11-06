@@ -11,6 +11,7 @@ from bussola.review.rows import LineChange, Side
 from bussola.review.scope import ChangeType
 from bussola.review.states import ApprovalAction, UnitState
 from bussola.review.thread_types import ThreadScope, ThreadStatus
+from bussola.units.model import UnitKind
 
 MAX_THREAD_LINES = 500
 MAX_CALL_ID_LENGTH = 100
@@ -400,12 +401,18 @@ class NavigationIndexOut(BaseModel):
     ready: bool
 
 
+class EnclosingOut(BaseModel):
+    kind: UnitKind
+    qualified_name: str
+
+
 class NavigationTargetOut(BaseModel):
     role: TargetRole
     path: str
     line: int
     column: int
     preview: str
+    enclosing: EnclosingOut | None
     side: Side
     unit_id: int | None
 
