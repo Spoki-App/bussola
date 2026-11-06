@@ -46,6 +46,7 @@ interface Props {
   onCommentSelectEnd?: () => void
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
+  unitLabels?: (unit: Unit) => ReactNode
   onNavigate?: (click: NavigationClick) => void
   canNavigate?: (request: NavigationRequest) => Promise<boolean>
   navigationTarget?: UnitTarget
@@ -63,7 +64,7 @@ function targetLine(target: LineLink | undefined, linkedLine: number | undefined
   return linkedLine === undefined ? undefined : { side: 'new', line: linkedLine }
 }
 
-export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, onNavigate, canNavigate, navigationTarget, linkedLine }: Props) {
+export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, unitLabels, onNavigate, canNavigate, navigationTarget, linkedLine }: Props) {
   const todo = unit.todo
   const [expanded, setExpanded] = useState(todo)
   const [wasTodo, setWasTodo] = useState(todo)
@@ -231,6 +232,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
         {unit.base_changed && <span className="label" title="The base changed since you approved this unit">base changed</span>}
         {unit.rows_total > 0 && <span className="label">{`${String(unit.rows_approved)}/${String(unit.rows_total)} lines approved`}</span>}
         {unit.open_threads > 0 && <span className={`label threads${unit.todo ? '' : ' warn'}`}>{`${String(unit.open_threads)} open thread${unit.open_threads > 1 ? 's' : ''}`}</span>}
+        {unitLabels?.(unit)}
         <span className="spacer" />
         {!unit.binary && ai.loaded && !ai.description && !ai.pending && (
           <AiActionButton
