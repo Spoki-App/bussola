@@ -309,3 +309,22 @@ def test_completes_no_branches_outside_a_repository(tmp_path: Path, monkeypatch:
 def test_completes_commands_and_options() -> None:
     assert _complete("bussola ") == ["serve", "open-link", "install-handler", "uninstall-handler", "status", "refresh"]
     assert _complete("bussola refresh --") == ["--base", "--repo", "--fetch", "--help"]
+
+
+def test_completion_loads_none_of_the_review_storage_or_web_modules(git_repo: GitFixture) -> None:
+    git_repo.commit({"a.txt": "a\n"})
+    heavy = ("alembic", "fastapi", "sqlalchemy", "bussola.app", "bussola.storage.models")
+    script = (
+        "import sys\n"
+        "from bussola.cli import app\n"
+        "try:\n"
+        "    app(prog_name='bussola')\n"
+        "except SystemExit:\n"
+        "    pass\n"
+        f"print(sorted(name for name in {heavy!r} if name in sys.modules))\n"
+    )
+    env = {**os.environ, "_BUSSOLA_COMPLETE": "complete_bash", "COMP_WORDS": "bussola status ", "COMP_CWORD": "2"}
+
+    result = subprocess.run([sys.executable, "-P", "-c", script], cwd=git_repo.root, env=env, capture_output=True, text=True, check=False)
+
+    assert result.stdout.split() == ["main", "[]"], result.stderr

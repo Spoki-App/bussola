@@ -22,6 +22,8 @@ from bussola.review.refs import NoBaseBranchError, default_base_ref
 
 if TYPE_CHECKING:
     from bussola.review.context import ReviewContext
+    from bussola.storage.models import Repo
+    from bussola.storage.repositories import Store
 
 BROWSER_OPEN_DELAY_SECONDS = 1.0
 SHORT_SHA_LENGTH = 12
@@ -79,7 +81,7 @@ def serve(
     if not no_open:
         threading.Timer(BROWSER_OPEN_DELAY_SECONDS, webbrowser.open, args=[url]).start()
     typer.echo(f"bussola listening on {url}")
-    from bussola.app import create_app  # noqa: PLC0415
+    from bussola.app import create_app
 
     run_published(create_app(settings), settings.data_dir, address)
 
@@ -114,8 +116,8 @@ def _apply_registration(steps: Callable[[registration.Registration], Sequence[re
 @app.command()
 def status(head: HeadArgument, base: BaseOption = None, repo: RepoOption = None) -> None:
     """Refresh the review of HEAD and print the state of each changed unit."""
-    from bussola.review.overview import unit_views  # noqa: PLC0415
-    from bussola.review.revisions import refresh_review  # noqa: PLC0415
+    from bussola.review.overview import unit_views
+    from bussola.review.revisions import refresh_review
 
     with _cli_errors(), _review_context(head, base, repo) as (context, git_repo):
         result = refresh_review(context.store, context.review, git_repo)
@@ -134,7 +136,7 @@ def refresh(
     fetch: Annotated[bool, typer.Option("--fetch", help="Run git fetch --prune first")] = False,
 ) -> None:
     """Record a new revision of the review of HEAD if any commit changed."""
-    from bussola.review.revisions import refresh_review  # noqa: PLC0415
+    from bussola.review.revisions import refresh_review
 
     with _cli_errors(), _review_context(head, base, repo) as (context, git_repo):
         result = refresh_review(context.store, context.review, git_repo, fetch=fetch)
@@ -146,21 +148,27 @@ def refresh(
 
 @contextmanager
 def _review_context(head: str, base: str | None, repo_path: Path | None) -> Generator[tuple["ReviewContext", GitRepo]]:
-    from bussola.review.context import ReviewContext  # noqa: PLC0415
-    from bussola.review.repos import register_repo  # noqa: PLC0415
-    from bussola.storage.database import Database  # noqa: PLC0415
-    from bussola.storage.repositories import Store  # noqa: PLC0415
+    from bussola.review.context import ReviewContext
 
     git_repo = GitRepo.discover(repo_path or Path.cwd())
     base_ref = base or default_base_ref(git_repo, load_repo_config(git_repo.root))
     git_repo.resolve_commit(head)
     git_repo.resolve_commit(base_ref)
-    with Database.open(default_data_dir()).session() as session:
-        store = Store(session)
-        repo = register_repo(store, git_repo.root)
+    with _registered_repo(default_data_dir(), git_repo.root) as (store, repo):
         review = store.reviews.find_or_add_review(repo.id, head, base_ref)
         identity = GitConfigIdentity(git_repo.root).current()
         yield ReviewContext(store, review, store.reviews.reviewer(identity.email, identity.name)), git_repo
+
+
+@contextmanager
+def _registered_repo(data_dir: Path, path: Path) -> Generator[tuple["Store", "Repo"]]:
+    from bussola.review.repos import register_repo
+    from bussola.storage.database import Database
+    from bussola.storage.repositories import Store
+
+    with Database.open(data_dir).session() as session:
+        store = Store(session)
+        yield store, register_repo(store, path)
         store.commit()
 
 
@@ -178,14 +186,8 @@ def _register_if_repo(data_dir: Path, path: Path) -> None:
         GitRepo.discover(path)
     except GitError:
         return
-    from bussola.review.repos import register_repo  # noqa: PLC0415
-    from bussola.storage.database import Database  # noqa: PLC0415
-    from bussola.storage.repositories import Store  # noqa: PLC0415
-
-    with Database.open(data_dir).session() as session:
-        store = Store(session)
-        register_repo(store, path)
-        store.commit()
+    with _registered_repo(data_dir, path):
+        pass
 
 
 def main() -> None:
