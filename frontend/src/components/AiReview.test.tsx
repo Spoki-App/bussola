@@ -93,12 +93,14 @@ describe('AI review', () => {
     expect(await screen.findByText('Cancelled, 2 units reviewed, 1 finding added as threads.')).toBeInTheDocument()
   })
 
-  it('says how much of the pull request already has an AI review and offers both reviews', async () => {
+  it('says how much of the pull request already has an AI review and how many units each review covers', async () => {
     renderReview(() => new Promise<Response>(() => undefined), () => ({ ...IDLE, reviewed_units: 3 }))
 
     expect(await screen.findByText('3 of 5 units have an AI review.')).toBeInTheDocument()
-    expect(await screen.findByRole('button', { name: 'AI review' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Review again' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Review 2 units' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review all 5' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'AI review' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Review again' })).toBeNull()
   })
 
   it('reviews the whole pull request again once every unit has an AI review', async () => {

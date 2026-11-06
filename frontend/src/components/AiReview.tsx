@@ -4,6 +4,7 @@ import { describeError } from '../api/client'
 import type { AiReviewState } from '../hooks/useAiReview'
 import type { CodeTarget } from '../hooks/useCodeNavigation'
 import { aiReviewCoverage, aiReviewProgress, aiReviewSummary } from '../review/aiReview'
+import { plural } from '../review/text'
 import { AiActionButton } from './AiActionButton'
 import { AiReviewDetails } from './AiReviewDetails'
 import { ErrorNote } from './Badges'
@@ -42,6 +43,8 @@ export function AiReview({ reviewId, repoId, review, onShowLine }: Props) {
   }
   const note = review.result ? aiReviewSummary(review.result) : aiReviewCoverage(review.status)
   const status = review.status
+  const missing = status ? status.units - status.reviewed_units : 0
+  const partial = status !== null && status.reviewed_units > 0 && missing > 0
   return (
     <span className="summary-action">
       {note && (
@@ -53,7 +56,7 @@ export function AiReview({ reviewId, repoId, review, onShowLine }: Props) {
       {(!status || status.reviewed_units < status.units) && (
         <AiActionButton
           repoId={repoId}
-          label="AI review"
+          label={partial ? `Review ${plural(missing, 'unit')}` : 'AI review'}
           title="Ask the AI provider to review each unit changed since the last AI review, with the whole pull request in view, rate their impact and add what it finds as threads"
           onRun={(target) => { review.run(target) }}
         />
@@ -61,7 +64,7 @@ export function AiReview({ reviewId, repoId, review, onShowLine }: Props) {
       {status && status.reviewed_units > 0 && (
         <AiActionButton
           repoId={repoId}
-          label="Review again"
+          label={partial ? `Review all ${String(status.units)}` : 'Review again'}
           title="Ask the AI provider to review the whole pull request again, also the units it already reviewed, keeping the threads it added before"
           onRun={(target) => { review.run(target, true) }}
         />

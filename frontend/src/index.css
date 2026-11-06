@@ -1940,7 +1940,15 @@ button.danger {
 }
 
 .markdown p {
-  margin: 4px 0;
+  margin: 8px 0;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
 }
 
 .markdown pre {
