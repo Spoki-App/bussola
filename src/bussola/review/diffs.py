@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -56,9 +57,14 @@ def build_diff(snapshot: UnitSnapshot, mode: DiffMode, approval: Approval | None
         old = [UnitLine(line.text, index + 1) for index, line in enumerate(approved)]
     else:
         old = side_lines(snapshot, Side.BASE)
-    rows = _rows(old, new, with_hashes=mode == DiffMode.BASE and UnitKind(snapshot.kind) in ROW_APPROVABLE_KINDS)
-    rows = [_labelled(row) for row in rows]
-    return UnitDiff(mode, rows, _unified(snapshot.old_path or snapshot.path, snapshot.path, rows), is_binary(snapshot))
+    with_hashes = mode == DiffMode.BASE and UnitKind(snapshot.kind) in ROW_APPROVABLE_KINDS
+    rows, unified = compare_lines(old, new, snapshot.old_path or snapshot.path, snapshot.path, with_hashes=with_hashes)
+    return UnitDiff(mode, rows, unified, is_binary(snapshot))
+
+
+def compare_lines(old: Sequence[UnitLine], new: Sequence[UnitLine], old_path: str, new_path: str, *, with_hashes: bool = False) -> tuple[list[DiffRow], str]:
+    rows = [_labelled(row) for row in _rows(old, new, with_hashes=with_hashes)]
+    return rows, _unified(old_path, new_path, rows)
 
 
 def _labelled(row: DiffRow) -> DiffRow:
@@ -67,7 +73,7 @@ def _labelled(row: DiffRow) -> DiffRow:
     return DiffRow(row.change, row.old_index, row.new_index, row.old_line, row.new_line, PLACEHOLDER_LABEL, row.row_hash, placeholder=True)
 
 
-def _rows(old: list[UnitLine], new: list[UnitLine], *, with_hashes: bool) -> list[DiffRow]:
+def _rows(old: Sequence[UnitLine], new: Sequence[UnitLine], *, with_hashes: bool) -> list[DiffRow]:
     old_texts = [line.text for line in old]
     new_texts = [line.text for line in new]
     lines = diff_lines(old_texts, new_texts)

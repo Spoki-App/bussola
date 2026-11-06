@@ -2,8 +2,8 @@ from fastapi import APIRouter, Response
 
 from bussola.api.deps import ContextDep, repo_of, resolve_revision, snapshot_of
 from bussola.api.images import image_response
-from bussola.api.schemas import DiffOut, DiffRowOut, UnitOut
-from bussola.api.views import unit_out
+from bussola.api.schemas import DiffOut, UnitOut
+from bussola.api.views import diff_row_out, unit_out
 from bussola.errors import InvalidRequestError, NotFoundError
 from bussola.review.diffs import DiffMode, build_diff, choose_diff_mode
 from bussola.review.images import image_type
@@ -35,17 +35,10 @@ def get_diff(context: ContextDep, unit_id: int, mode: DiffMode | None = None) ->
     diff = build_diff(snapshot, choice.effective, status.approval)
     selections = {row.row_hash: row.selection_id for row in approvals.row_approvals if key_of(row) == key_of(snapshot) and row.revoked_at is None}
     rows = [
-        DiffRowOut(
-            change=row.change,
-            old_index=row.old_index,
-            new_index=row.new_index,
-            old_line=row.old_line,
-            new_line=row.new_line,
-            text=row.text,
-            row_hash=row.row_hash,
+        diff_row_out(
+            row,
             approved=row.row_hash is not None and row.row_hash in status.approved_row_hashes,
             selection_id=selections.get(row.row_hash) if row.row_hash else None,
-            placeholder=row.placeholder,
         )
         for row in diff.rows
     ]
