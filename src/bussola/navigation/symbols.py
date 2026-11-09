@@ -17,6 +17,7 @@ class Symbol:
     row: int
     start: int
     definition: bool
+    member: bool = False
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,7 @@ class SourceLanguage:
     grammar: Language
     identifiers: frozenset[str]
     is_definition: Callable[[Node], bool]
+    is_member_definition: Callable[[Node], bool]
 
 
 @dataclass(frozen=True)
@@ -34,13 +36,10 @@ class FileSymbols:
 
 
 PYTHON_DEFINITIONS = frozenset({python.FUNCTION_DEFINITION, python.CLASS_DEFINITION})
-ECMASCRIPT_DEFINITIONS = (
-    ecmascript.FUNCTION_DECLARATIONS
-    | ecmascript.CLASS_DECLARATIONS
-    | ecmascript.TYPE_DECLARATIONS
-    | {ecmascript.METHOD_DEFINITION, "method_signature", "abstract_method_signature"}
-)
-GO_DEFINITIONS = frozenset({go.FUNCTION_DECLARATION, go.METHOD_DECLARATION}) | go.TYPE_SPECS
+ECMASCRIPT_MEMBERS = frozenset({ecmascript.METHOD_DEFINITION, "method_signature", "abstract_method_signature"})
+ECMASCRIPT_DEFINITIONS = ecmascript.FUNCTION_DECLARATIONS | ecmascript.CLASS_DECLARATIONS | ecmascript.TYPE_DECLARATIONS | ECMASCRIPT_MEMBERS
+GO_MEMBERS = frozenset({go.METHOD_DECLARATION})
+GO_DEFINITIONS = frozenset({go.FUNCTION_DECLARATION}) | GO_MEMBERS | go.TYPE_SPECS
 GO_VARIABLES = frozenset({"var_spec", "const_spec"})
 MEMBER_IDENTIFIERS = frozenset({"property_identifier", "field_identifier"})
 ECMASCRIPT_IDENTIFIERS = frozenset(
@@ -69,6 +68,17 @@ def _is_declared_assignment_target(node: Node) -> bool:
     return statement.parent.type == "module" or (statement.parent.type == "block" and _parent_type(statement.parent) == python.CLASS_DEFINITION)
 
 
+def _python_member(node: Node) -> bool:
+    scope = node.parent
+    while scope is not None and scope.type not in {"block", "module"}:
+        scope = scope.parent
+    return scope is not None and scope.type == "block" and _parent_type(scope) == python.CLASS_DEFINITION
+
+
+def _ecmascript_member(node: Node) -> bool:
+    return _is_name_of(node, ECMASCRIPT_MEMBERS)
+
+
 def _ecmascript_definition(node: Node) -> bool:
     if _is_name_of(node, ECMASCRIPT_DEFINITIONS):
         return True
@@ -93,15 +103,19 @@ def _go_definition(node: Node) -> bool:
     return declaration is not None and _parent_type(declaration) == "source_file"
 
 
+def _go_member(node: Node) -> bool:
+    return _is_name_of(node, GO_MEMBERS)
+
+
 def _parent_type(node: Node) -> str | None:
     return node.parent.type if node.parent else None
 
 
-PYTHON = SourceLanguage("python", python.PYTHON, frozenset({"identifier"}), _python_definition)
-TYPESCRIPT = SourceLanguage("ecmascript", TYPESCRIPT_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition)
-TSX = SourceLanguage("ecmascript", TSX_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition)
-JAVASCRIPT = SourceLanguage("ecmascript", JAVASCRIPT_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition)
-GO = SourceLanguage("go", go.GO, frozenset({"identifier", "field_identifier", "type_identifier"}), _go_definition)
+PYTHON = SourceLanguage("python", python.PYTHON, frozenset({"identifier"}), _python_definition, _python_member)
+TYPESCRIPT = SourceLanguage("ecmascript", TYPESCRIPT_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition, _ecmascript_member)
+TSX = SourceLanguage("ecmascript", TSX_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition, _ecmascript_member)
+JAVASCRIPT = SourceLanguage("ecmascript", JAVASCRIPT_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition, _ecmascript_member)
+GO = SourceLanguage("go", go.GO, frozenset({"identifier", "field_identifier", "type_identifier"}), _go_definition, _go_member)
 
 LANGUAGES_BY_EXTRACTOR: dict[str, SourceLanguage] = {"python": PYTHON, "typescript": TYPESCRIPT, "tsx": TSX, "javascript": JAVASCRIPT, "go": GO}
 
@@ -156,7 +170,8 @@ def _identifiers(language: SourceLanguage, tree: Tree) -> Iterator[Node]:
 
 def symbol_of(language: SourceLanguage, node: Node) -> Symbol:
     row, start = node.start_point
-    return Symbol(node_text(node), row, start, language.is_definition(node))
+    definition = language.is_definition(node)
+    return Symbol(node_text(node), row, start, definition, definition and language.is_member_definition(node))
 
 
 def is_member(node: Node) -> bool:
