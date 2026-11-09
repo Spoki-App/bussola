@@ -1,6 +1,10 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 import { E2E_TOKEN } from './constants.ts'
+
+function demoReviewLink(page: Page) {
+  return page.locator('section.repo', { has: page.getByRole('heading', { name: 'demo', exact: true }) }).getByRole('link', { name: /feature\s+into\s+main/ })
+}
 
 test('review a branch: open it, approve a unit and comment on a line', async ({ page }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
@@ -28,7 +32,7 @@ test('review a branch: open it, approve a unit and comment on a line', async ({ 
 test('narrow screens show the files above the units, which stay visible and hoverable', async ({ page }) => {
   await page.setViewportSize({ width: 600, height: 800 })
   await page.goto(`/?token=${E2E_TOKEN}`)
-  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  await demoReviewLink(page).click()
 
   const sidebar = page.getByRole('complementary', { name: 'Files' })
   const card = page.locator('article.unit-card', { hasText: 'total' })
@@ -43,7 +47,7 @@ test('narrow screens show the files above the units, which stay visible and hove
 
 test('a review link with a path and line expands and focuses the unit containing that line', async ({ page }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
-  const href = await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().getAttribute('href')
+  const href = await demoReviewLink(page).getAttribute('href')
 
   await page.goto(`${href ?? ''}?path=app.py&line=2`)
 
@@ -54,7 +58,7 @@ test('a review link with a path and line expands and focuses the unit containing
 
 test('a review link with a thread opens its collapsed unit and shows the thread', async ({ page }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
-  const href = (await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().getAttribute('href')) ?? ''
+  const href = (await demoReviewLink(page).getAttribute('href')) ?? ''
   await page.goto(href)
   const card = page.locator('article.unit-card', { hasText: 'total' })
   await card.getByRole('button', { name: 'Expand unit' }).click()
@@ -68,7 +72,7 @@ test('a review link with a thread opens its collapsed unit and shows the thread'
 
 test('a link to the review already open is applied too', async ({ page }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
-  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  await demoReviewLink(page).click()
   const card = page.locator('article.unit-card', { hasText: 'total' })
   await expect(card.getByRole('button', { name: 'Expand unit' })).toBeVisible()
 
@@ -102,7 +106,7 @@ test('a pull request link of an unknown repository opens the add repository flow
 test('the header of an open unit stays below the file header while its diff scrolls past', async ({ page }) => {
   await page.setViewportSize({ width: 1000, height: 260 })
   await page.goto(`/?token=${E2E_TOKEN}`)
-  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  await demoReviewLink(page).click()
   const card = page.locator('article.unit-card', { hasText: 'total' })
   await card.getByRole('button', { name: 'Expand unit' }).click()
   await expect(card.getByTestId('thread')).toBeVisible()
@@ -119,7 +123,7 @@ test('the header of an open unit stays below the file header while its diff scro
 
 test('the unit filters sit in the files bar, and above the units while it is hidden', async ({ page }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
-  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  await demoReviewLink(page).click()
   const sidebar = page.getByRole('complementary', { name: 'Files' })
   const search = page.getByRole('searchbox', { name: 'Find units by module, name or path' })
 
@@ -136,7 +140,7 @@ test('the unit filters sit in the files bar, and above the units while it is hid
 
 test('the conversation toggle sits on the right, and the hidden panel leaves no horizontal scroll', async ({ page }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
-  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  await demoReviewLink(page).click()
   const panel = page.locator('.side-panel')
   const gapToRight = async (name: RegExp) => {
     const toggle = await panel.getByRole('button', { name }).boundingBox()
@@ -168,7 +172,7 @@ test('the conversation toggle sits on the right, and the hidden panel leaves no 
 
 test('the unit filter and the diff layout are kept after a reload and in a new tab', async ({ page, context }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
-  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  await demoReviewLink(page).click()
   const sidebar = (on: typeof page) => on.getByRole('complementary', { name: 'Files' })
   await sidebar(page).getByRole('tablist', { name: 'Filter units' }).getByRole('tab', { name: 'To review' }).click()
   await sidebar(page).getByRole('tablist', { name: 'Diff layout' }).getByRole('tab', { name: 'Unified' }).click()
@@ -182,7 +186,7 @@ test('the unit filter and the diff layout are kept after a reload and in a new t
 
 test('the wrap button of an open unit turns line wrap off and on, and split view then scrolls each side on its own', async ({ page }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
-  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  await demoReviewLink(page).click()
   const layout = page.getByRole('complementary', { name: 'Files' }).getByRole('tablist', { name: 'Diff layout' })
   const card = page.locator('article.unit-card', { hasText: 'total' })
   await card.getByRole('button', { name: 'Expand unit' }).click()
@@ -211,7 +215,7 @@ test('the window title names the open review and goes back to bussola elsewhere'
   await page.goto(`/?token=${E2E_TOKEN}`)
   await expect(page).toHaveTitle('bussola')
 
-  await page.getByRole('link', { name: /feature\s+into\s+main/ }).first().click()
+  await demoReviewLink(page).click()
   await expect(page).toHaveTitle('demo feature')
 
   await page.getByRole('link', { name: 'demo', exact: true }).click()
