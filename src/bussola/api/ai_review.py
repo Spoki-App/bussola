@@ -74,8 +74,12 @@ def get_ai_review_run(context: ContextDep, run_id: int, request: Request) -> AiR
     return AiReviewRunDetailOut(**brief.model_dump(), rating=run.details.get("rating"), parts=shown, links=links)
 
 
+def link_targets(text: str) -> set[tuple[str, str, int]]:
+    return {(match["side"], match["path"], int(match["line"])) for match in SUMMARY_LINK.finditer(text)}
+
+
 def line_links(context: ReviewContext, texts: Iterable[str]) -> list[AiReviewLinkOut]:
-    found = sorted({(match["side"], match["path"], int(match["line"])) for text in texts for match in SUMMARY_LINK.finditer(text)})
+    found = sorted({target for text in texts for target in link_targets(text)})
     if not found:
         return []
     revision = resolve_revision(context, None)

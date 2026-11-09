@@ -117,3 +117,17 @@ def test_a_blank_message_or_a_range_outside_the_unit_is_refused(billing: GitFixt
     send(api, review_id, "Why?", [{"unit_id": total["id"], "side": "head", "line_offset": 9, "line_count": 1}], expected=400)
 
     assert provider.requests == []
+
+
+def test_each_answer_keeps_only_the_links_it_mentions(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    provider = FakeProvider({"answer": "See [the tax](#after:app.py:2)."}, {"answer": "And [the old name](#before:app.py:6)."})
+    api = client(billing, data_dir, config_file, provider)
+    review_id = api.start_review()
+    total, name = api.unit(review_id, "app.py::total"), api.unit(review_id, "app.py::name")
+
+    send(api, review_id, "What changed in total?")
+    send(api, review_id, "And in name?")
+
+    first, second = (message for message in api.call("GET", f"/reviews/{review_id}/ai-chat") if message["role"] == "assistant")
+    assert first["links"] == [{"path": "app.py", "side": "head", "line": 2, "unit_id": total["id"]}]
+    assert second["links"] == [{"path": "app.py", "side": "base", "line": 6, "unit_id": name["id"]}]

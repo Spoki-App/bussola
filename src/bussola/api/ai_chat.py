@@ -2,17 +2,17 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Request
 
-from bussola.api.ai_review import line_links
+from bussola.api.ai_review import line_links, link_targets
 from bussola.api.compare import code_range
 from bussola.api.deps import ContextDep, repo_of, resolve_revision
 from bussola.api.descriptions import ai_provider, ai_runner
-from bussola.api.schemas import AiChatIn, AiChatMessageOut, AiChatSnippetOut, AiReviewLookupOut
+from bussola.api.schemas import AiChatIn, AiChatMessageOut, AiChatSnippetOut, AiReviewLinkOut, AiReviewLookupOut
 from bussola.api.state import app_state
 from bussola.config import load_repo_config
 from bussola.review.ai_chat import ASSISTANT, USER, ChatQuestion, answer_chat, chat_snippet
 from bussola.review.context import ReviewContext
 from bussola.review.repos import open_repo
-from bussola.review.review_tools import ReviewTools
+from bussola.review.review_tools import SIDES, ReviewTools
 from bussola.storage.models import AiChatMessage
 
 router = APIRouter(tags=["ai-chat"])
@@ -20,7 +20,7 @@ router = APIRouter(tags=["ai-chat"])
 
 @router.get("/reviews/{review_id}/ai-chat")
 def list_chat(context: ContextDep) -> list[AiChatMessageOut]:
-    return [_message_out(context, message) for message in context.store.ai_chat.messages(context.review.id)]
+    return _messages_out(context, context.store.ai_chat.messages(context.review.id))
 
 
 @router.post("/reviews/{review_id}/ai-chat")
@@ -42,7 +42,7 @@ def send_chat(context: ContextDep, body: AiChatIn, request: Request) -> list[AiC
     answer = AiChatMessage(review_id, ASSISTANT, reply.answer, lookups=reply.lookups, provider_label=provider.label, model=provider.model)
     answer = context.store.ai_chat.add(answer)
     context.store.commit()
-    return [_message_out(context, question), _message_out(context, answer)]
+    return _messages_out(context, [question, answer])
 
 
 @router.delete("/reviews/{review_id}/ai-chat")
@@ -52,14 +52,26 @@ def clear_chat(context: ContextDep) -> list[AiChatMessageOut]:
     return []
 
 
-def _message_out(context: ReviewContext, message: AiChatMessage) -> AiChatMessageOut:
+def _messages_out(context: ReviewContext, messages: list[AiChatMessage]) -> list[AiChatMessageOut]:
+    links = line_links(context, [message.body for message in messages if message.role == ASSISTANT])
+    return [_message_out(message, _links_in(message, links)) for message in messages]
+
+
+def _links_in(message: AiChatMessage, links: list[AiReviewLinkOut]) -> list[AiReviewLinkOut]:
+    if message.role != ASSISTANT:
+        return []
+    targets = {(SIDES[name], path, line) for name, path, line in link_targets(message.body)}
+    return [link for link in links if (link.side, link.path, link.line) in targets]
+
+
+def _message_out(message: AiChatMessage, links: list[AiReviewLinkOut]) -> AiChatMessageOut:
     return AiChatMessageOut(
         id=message.id,
         role=USER if message.role == USER else ASSISTANT,
         body=message.body,
         snippets=[AiChatSnippetOut.model_validate(snippet) for snippet in message.snippets],
         lookups=[AiReviewLookupOut.model_validate(lookup) for lookup in message.lookups],
-        links=line_links(context, [message.body]) if message.role == ASSISTANT else [],
+        links=links,
         provider_label=message.provider_label,
         model=message.model,
         created_at=message.created_at,
