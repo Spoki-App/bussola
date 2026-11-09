@@ -242,6 +242,50 @@ def test_a_plain_name_defined_in_its_own_file_skips_namesakes_elsewhere(
     assert definitions_from(tmp_path, git_repo, SAME_NAME, path, clicked) == expected
 
 
+METHODS_AND_FUNCTIONS = {
+    "orders.py": "class Order:\n    def requeue(self):\n        return 1\n",
+    "jobs.py": "def requeue():\n    return 2\n",
+    "tasks.py": (
+        "import jobs\nfrom orders import Order\n\n\ndef requeue(order_id):\n"
+        "    order = Order()\n    return order.requeue(), requeue(order_id), jobs.requeue()\n"
+    ),
+    "order.ts": "export class Order {\n  requeue(): number {\n    return 1\n  }\n}\n",
+    "jobs.ts": "export function requeue(): number {\n  return 2\n}\n",
+    "tasks.ts": (
+        "import { Order } from './order'\nimport * as jobs from './jobs'\n\nexport function requeue(): number {\n"
+        "  const order = new Order()\n  return order.requeue() + jobs.requeue()\n}\n"
+    ),
+    "go.mod": "module example.com/shop\n\ngo 1.22\n",
+    "order.go": "package shop\n\ntype Order struct{}\n\nfunc (c Order) Requeue() int { return 1 }\n",
+    "go-jobs/jobs.go": "package jobs\n\nfunc Requeue() int { return 2 }\n",
+    "tasks.go": 'package shop\n\nimport "example.com/shop/go-jobs"\n\nfunc Requeue(c Order) int { return c.Requeue() + jobs.Requeue() }\n',
+    "tasks.js": (
+        "const jobs = require('./jobs')\nconst { Order } = require('./order')\n\nfunction requeue() {\n"
+        "  const order = new Order()\n  return order.requeue() + jobs.requeue()\n}\n"
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("path", "clicked", "expected"),
+    [
+        ("tasks.py", "order.requeue", [("orders.py", 2)]),
+        ("tasks.py", ", requeue", [("tasks.py", 5)]),
+        ("tasks.py", "jobs.requeue", [("tasks.py", 5), ("jobs.py", 1), ("orders.py", 2)]),
+        ("tasks.ts", "order.requeue", [("order.ts", 2)]),
+        ("tasks.ts", "jobs.requeue", [("tasks.ts", 4), ("jobs.ts", 1), ("order.ts", 2), ("tasks.js", 4)]),
+        ("tasks.go", "c.Requeue", [("order.go", 5)]),
+        ("tasks.go", "jobs.Requeue", [("tasks.go", 5), ("go-jobs/jobs.go", 3), ("order.go", 5)]),
+        ("tasks.js", "order.requeue", [("order.ts", 2)]),
+        ("tasks.js", "jobs.requeue", [("tasks.js", 4), ("jobs.ts", 1), ("order.ts", 2), ("tasks.ts", 4)]),
+    ],
+)
+def test_a_call_on_an_object_lists_methods_and_a_plain_call_lists_functions(
+    tmp_path: Path, git_repo: GitFixture, path: str, clicked: str, expected: list[tuple[str, int]]
+) -> None:
+    assert definitions_from(tmp_path, git_repo, METHODS_AND_FUNCTIONS, path, clicked) == expected
+
+
 def test_a_class_attribute_lists_its_usages(tmp_path: Path, git_repo: GitFixture) -> None:
     source = 'class Checkout:\n    BLOCKED = (\n        "Not now"\n    )\n\n    def check(self):\n        return self.BLOCKED\n'
     commit = git_repo.commit({"checkout.py": source})

@@ -8,7 +8,7 @@ from tree_sitter import Node, Tree
 
 from bussola.git import BlobReader, GitRepo
 from bussola.navigation.definitions import CODE_LANGUAGES, HoverDoc, from_hover
-from bussola.navigation.external import Imported, LibrarySource, ProjectLayout, imported_symbol, is_library_file, package_info
+from bussola.navigation.external import Imported, LibrarySource, ProjectLayout, called_on_import, imported_symbol, is_library_file, package_info
 from bussola.navigation.index import MAX_FILE_BYTES, IndexCache, IndexedFile, Starter, SymbolIndex, start_daemon
 from bussola.navigation.lsp import ServerLocation
 from bussola.navigation.positions import byte_to_utf16, preview, source_lines, utf16_to_byte
@@ -227,10 +227,19 @@ def _layout(root: Path, commit: str) -> ProjectLayout:
 def _definitions(index: SymbolIndex, language: SourceLanguage, node: Node, path: str, files: SourceFiles) -> tuple[Target, ...]:
     symbol = symbol_of(language, node)
     found = sorted(index.definitions(language.family, symbol.name), key=lambda item: (item[0].path != path, item[0].path, item[1].row))
+    found = _same_kind(found, language, node)
     local = [item for item in found if item[0].path == path]
     if local and not is_member(node):
         found = local
     return tuple(target for file, definition in found[:MAX_TARGETS] if (target := files.symbol_target(TargetRole.DEFINITION, file, definition)))
+
+
+def _same_kind(found: list[tuple[IndexedFile, Symbol]], language: SourceLanguage, node: Node) -> list[tuple[IndexedFile, Symbol]]:
+    member = is_member(node)
+    if member and called_on_import(language, node):
+        return found
+    same = [item for item in found if item[1].member == member]
+    return same or found
 
 
 def _usages(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, files: SourceFiles) -> tuple[Target, ...]:

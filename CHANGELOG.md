@@ -8,6 +8,10 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 - **AI chat** in the panel on the right of the review page answers questions about the pull request, with its description, the units it changes and the conversation so far, and can follow the code with the same lookups as the AI review. Select lines and choose **Ask AI** to attach them to the next message. Answers link to the lines they mention and list the lookups made; the conversation is kept per review and **Clear** deletes it ([#77](https://github.com/Spoki-App/bussola/issues/77)).
 
+### Fixed
+
+- Cmd+click on a method call, such as `order.requeue()`, no longer lists module-level functions with the same name when the language server cannot tell the type of the object: a call on an object lists methods, a plain call lists functions, and a call on an imported module still lists both ([#80](https://github.com/Spoki-App/bussola/issues/80)).
+
 ## [0.2.0] - 2026-11-06
 
 ### Added

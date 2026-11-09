@@ -14,12 +14,11 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend (${{ matrix.os }}, Python ${{ matrix.python }})
-    runs-on: ${{ matrix.os }}
+    name: Backend (Python ${{ matrix.python }})
+    runs-on: self-hosted
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
         python: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v7
@@ -35,7 +34,7 @@ jobs:
 
   frontend:
     name: Frontend
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -50,7 +49,7 @@ jobs:
       - run: npm --prefix frontend run typecheck
       - run: npm --prefix frontend test
       - run: npm --prefix frontend run build
-      - run: npx --prefix frontend playwright install --with-deps chromium
+      - run: npx --prefix frontend playwright install chromium
       - run: npm --prefix frontend run e2e
       - uses: actions/upload-artifact@v7
         if: failure()
