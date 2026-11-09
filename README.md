@@ -74,7 +74,7 @@ An approval is tied to the content of a unit. After new commits, a rebase or a f
 
 ### An AI reviewer that ranks what it finds
 
-Optional, with Claude Code, the Anthropic API or any OpenAI-compatible endpoint. **AI review** reads the pull request as a whole, follows the code with the same lookups you use, and leaves comments anchored to the lines, each starting with its severity (🔴 Critical, 🟠 High, 🟡 Medium, 🔵 Low) and ending with a fix. **AI chat** answers your questions about the pull request, with the code you select and the same lookups. **Describe** explains a unit and its change with links to the lines it mentions, and units get a **Low**, **Medium** or **High impact** badge so you can start from what matters. The prompts are yours to change.
+Optional, with Claude Code, the Anthropic API or any OpenAI-compatible endpoint. **AI review** reads the pull request as a whole, follows the code with the same lookups you use, and leaves comments anchored to the lines, each starting with its severity (🔴 Critical, 🟠 High, 🟡 Medium, 🔵 Low) and ending with a fix. **AI chat** answers your questions about the pull request, with the code you select and the same lookups, and adds comments to the lines when you ask it to. **Describe** explains a unit and its change with links to the lines it mentions, and units get a **Low**, **Medium** or **High impact** badge so you can start from what matters. The prompts are yours to change.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Spoki-App/bussola/main/docs/assets/features/ai-review-dark.svg">
@@ -455,6 +455,8 @@ While it runs the review page shows how many units are done out of the total and
 ### AI chat
 
 **AI chat** in the panel on the right of the review page (next to **Conversation**, shortcut `t` to show or hide it) answers questions about the pull request. Each message is sent with the reviewed commits, the pull request title and description, the list of the units it changes and the conversation so far, and the model can follow the code with the same lookups as the [AI review](#ai-review): definitions, usages, any file, a text search and the diff of a changed unit. To ask about specific code, select lines by their numbers in a unit, as for a comment, and choose **Ask AI**: the panel opens on the chat with the lines attached, named by file, unit and side, and you can add more ranges (up to ten) before sending or remove them with ×. The model gets them with their line numbers.
+
+The chat can also write comments for you: ask it to add, write or leave a comment, for example "add a comment that points out this problem" after it explained one, and it adds each comment to the review as yours, anchored to the lines it is about (on the whole review when they are not part of the pull request). They work like comments you write: you can edit or delete them, and they reach GitHub only when you publish. The answer lists the comments it added, and a click on one opens its thread.
 
 **Enter** sends the message and **Shift+Enter** starts a new line. While the model answers, **Cancel** stops it, and a failed answer keeps your message and the selected lines so you can send them again. Answers are Markdown, with links to the lines they mention (a click scrolls the review to the line), the provider and model, and the code lookups the model made with their results. The conversation is kept for each review in the local database, and **Clear** deletes it. Answers are not cached, so asking again asks the model again.
 

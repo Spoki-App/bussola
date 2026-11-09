@@ -306,6 +306,7 @@ class AiChatMessage(Base):
     body: Mapped[str] = mapped_column()
     snippets: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default_factory=list)
     lookups: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default_factory=list)
+    comments: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default_factory=list)
     provider_label: Mapped[str | None] = mapped_column(default=None)
     model: Mapped[str | None] = mapped_column(default=None)
     id: Mapped[int] = mapped_column(primary_key=True, init=False)

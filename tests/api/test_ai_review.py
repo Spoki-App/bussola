@@ -361,7 +361,7 @@ def test_a_finding_too_long_for_a_comment_is_shortened(billing: GitFixture, data
 
     bodies = sorted((thread["comments"][0]["body"] for thread in ai_threads(api, review_id)), key=len)
     assert bodies[0] == comment("Renamed shop.")
-    assert bodies[1].endswith("[The rest of this finding was too long to keep.]")
+    assert bodies[1].endswith("[The rest of this comment was too long to keep.]")
     assert len(bodies[1]) < 65_536
 
 

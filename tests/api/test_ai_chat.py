@@ -52,7 +52,7 @@ def test_a_question_is_answered_with_the_pull_request_and_the_selected_code(bill
     assert "The conversation so far" not in request.prompt
     assert request.tools is not None
     assert [tool.name for tool in request.tools.definitions] == ["find_definition", "find_usages", "read_file", "search", "unit_diff"]
-    assert request.schema["required"] == ["answer"]
+    assert request.schema["required"] == ["answer", "comments"]
     assert (question["role"], question["body"], question["links"]) == ("user", "Why 1.2?", [])
     assert question["snippets"] == [
         {"unit": "app.py::total", "path": "app.py", "side": "after", "first_line": 2, "last_line": 2, "code": "2:     return sum(items) * 1.2"}
@@ -131,3 +131,36 @@ def test_each_answer_keeps_only_the_links_it_mentions(billing: GitFixture, data_
     first, second = (message for message in api.call("GET", f"/reviews/{review_id}/ai-chat") if message["role"] == "assistant")
     assert first["links"] == [{"path": "app.py", "side": "head", "line": 2, "unit_id": total["id"]}]
     assert second["links"] == [{"path": "app.py", "side": "base", "line": 6, "unit_id": name["id"]}]
+
+
+def test_comments_the_reviewer_asks_for_are_added_to_the_review_as_theirs(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    comment = {"path": "app.py", "side": "after", "start_line": 2, "end_line": 2, "body": "  The tax rate should come from the settings.  "}
+    provider = FakeProvider({"answer": "I added a comment on [the tax](#after:app.py:2).", "comments": [comment]}, {"answer": "Done."})
+    api = client(billing, data_dir, config_file, provider)
+    review_id = api.start_review()
+    total = api.unit(review_id, "app.py::total")
+
+    _, answer = send(api, review_id, "Add a comment about the hard-coded rate")
+
+    [thread] = api.call("GET", f"/reviews/{review_id}/threads")
+    assert (thread["scope"], thread["side"], thread["anchor"]["unit_id"], thread["anchor"]["file_line"]) == ("unit", "head", total["id"], 2)
+    [added] = thread["comments"]
+    assert (added["body"], added["mine"], added["author"]["ai"]) == ("The tax rate should come from the settings.", True, False)
+    assert answer["comments"] == [{"thread_id": thread["id"], "place": "app.py::total, line 2 after", "body": "The tax rate should come from the settings."}]
+    assert "comments: an empty list, unless" in provider.requests[0].system
+
+    send(api, review_id, "Thanks")
+
+    assert "You added these comments:\n- On app.py::total, line 2 after: The tax rate should come from the settings." in provider.requests[1].prompt
+
+
+def test_a_comment_on_a_file_the_pull_request_does_not_change_goes_on_the_whole_review(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    comment = {"path": "docs/tax.md", "side": "after", "start_line": 4, "end_line": 4, "body": "Document the new rate here."}
+    api = client(billing, data_dir, config_file, FakeProvider({"answer": "Added.", "comments": [comment]}))
+    review_id = api.start_review()
+
+    send(api, review_id, "Leave a comment asking for docs")
+
+    [thread] = api.call("GET", f"/reviews/{review_id}/threads")
+    assert thread["scope"] == "review"
+    assert thread["comments"][0]["body"] == "On `docs/tax.md`, line 4:\n\nDocument the new rate here."

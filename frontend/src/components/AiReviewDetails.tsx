@@ -6,10 +6,9 @@ import type { AiReviewFinding, AiReviewLookup, AiReviewPart, AiReviewRunDetail }
 import type { CodeTarget } from '../hooks/useCodeNavigation'
 import { useModalDialog } from '../hooks/useModalDialog'
 import type { LineLink } from '../markdown/lineLinks'
-import { showReview } from '../navigation'
 import { lookupCall, runHeadline, runLabel } from '../review/aiReview'
 import { IMPACT_LABELS } from '../review/impact'
-import { withoutLinkFocus } from '../review/linkFocus'
+import { showThread } from '../review/linkFocus'
 import { plural } from '../review/text'
 import { ErrorNote } from './Badges'
 import { Markdown } from './Markdown'
@@ -28,10 +27,8 @@ export function AiReviewDetails({ reviewId, onClose, onShowLine }: Props) {
   const runId = chosen ?? runs.data?.at(0)?.id ?? null
   const detail = useAiReviewRun(reviewId, runId)
   const openThread = (threadId: string) => {
-    const params = new URLSearchParams(withoutLinkFocus(window.location.search))
-    params.set('thread', threadId)
     close()
-    showReview(reviewId, `?${params.toString()}`, false)
+    showThread(reviewId, threadId)
   }
   const showLine = (link: LineLink) => {
     const path = link.path
@@ -130,7 +127,7 @@ function Part({ part, title, onOpenThread, onLineLink }: { part: AiReviewPart; t
   )
 }
 
-function Findings({ findings, onOpenThread }: { findings: AiReviewFinding[]; onOpenThread: (threadId: string) => void }) {
+export function Findings({ findings, onOpenThread }: { findings: AiReviewFinding[]; onOpenThread: (threadId: string) => void }) {
   return (
     <ul className="ai-review-findings">
       {findings.map((finding) => (

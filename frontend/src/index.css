@@ -2025,6 +2025,15 @@ button.link:hover:not(:disabled) {
   background: var(--bg);
 }
 
+.ai-chat-comments {
+  width: 100%;
+}
+
+.ai-chat-comments h3 {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
 .ai-chat-meta {
   width: 100%;
   font-size: 12px;

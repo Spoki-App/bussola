@@ -6,10 +6,10 @@ from bussola.api.ai_review import line_links, link_targets
 from bussola.api.compare import code_range
 from bussola.api.deps import ContextDep, repo_of, resolve_revision
 from bussola.api.descriptions import ai_provider, ai_runner
-from bussola.api.schemas import AiChatIn, AiChatMessageOut, AiChatSnippetOut, AiReviewLinkOut, AiReviewLookupOut
+from bussola.api.schemas import AiChatIn, AiChatMessageOut, AiChatSnippetOut, AiReviewFindingOut, AiReviewLinkOut, AiReviewLookupOut
 from bussola.api.state import app_state
 from bussola.config import load_repo_config
-from bussola.review.ai_chat import ASSISTANT, USER, ChatQuestion, answer_chat, chat_snippet
+from bussola.review.ai_chat import ASSISTANT, USER, ChatQuestion, add_chat_comments, answer_chat, chat_snippet
 from bussola.review.context import ReviewContext
 from bussola.review.repos import open_repo
 from bussola.review.review_tools import SIDES, ReviewTools
@@ -39,7 +39,8 @@ def send_chat(context: ContextDep, body: AiChatIn, request: Request) -> list[AiC
         reply = answer_chat(context, ai_runner(state, provider), tools, ChatQuestion(body.message, snippets, history))
     review_id = context.review.id
     question = context.store.ai_chat.add(AiChatMessage(review_id, USER, body.message, [asdict(snippet) for snippet in snippets]))
-    answer = AiChatMessage(review_id, ASSISTANT, reply.answer, lookups=reply.lookups, provider_label=provider.label, model=provider.model)
+    comments = add_chat_comments(context, revision, snapshots, reply.comments)
+    answer = AiChatMessage(review_id, ASSISTANT, reply.answer, lookups=reply.lookups, comments=comments, provider_label=provider.label, model=provider.model)
     answer = context.store.ai_chat.add(answer)
     context.store.commit()
     return _messages_out(context, [question, answer])
@@ -71,6 +72,7 @@ def _message_out(message: AiChatMessage, links: list[AiReviewLinkOut]) -> AiChat
         body=message.body,
         snippets=[AiChatSnippetOut.model_validate(snippet) for snippet in message.snippets],
         lookups=[AiReviewLookupOut.model_validate(lookup) for lookup in message.lookups],
+        comments=[AiReviewFindingOut.model_validate(comment) for comment in message.comments],
         links=links,
         provider_label=message.provider_label,
         model=message.model,

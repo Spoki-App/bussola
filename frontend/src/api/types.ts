@@ -468,6 +468,7 @@ export interface AiChatMessage {
   body: string
   snippets: AiChatSnippet[]
   lookups: AiReviewLookup[]
+  comments: AiReviewFinding[]
   links: AiReviewLink[]
   provider_label: string | null
   model: string | null

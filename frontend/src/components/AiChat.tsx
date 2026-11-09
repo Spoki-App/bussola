@@ -7,9 +7,10 @@ import type { AiChatMessage } from '../api/types'
 import type { CodeTarget } from '../hooks/useCodeNavigation'
 import type { LineLink } from '../markdown/lineLinks'
 import { snippetPlace, type ChatSnippetDraft } from '../review/askAi'
+import { showThread } from '../review/linkFocus'
 import { plural } from '../review/text'
 import { AiActionButton } from './AiActionButton'
-import { Lookups } from './AiReviewDetails'
+import { Findings, Lookups } from './AiReviewDetails'
 import { ErrorNote } from './Badges'
 import { Markdown } from './Markdown'
 import { Spinner } from './Spinner'
@@ -112,7 +113,7 @@ export function AiChat({ reviewId, repoId, snippets, onSnippetsChange, onShowLin
             {item.role === 'user' ? (
               <Question body={item.body} quoted={item.snippets.map((snippet) => ({ place: snippetPlace(snippet), code: snippet.code }))} />
             ) : (
-              <Answer message={item} onLineLink={showLine(item)} />
+              <Answer message={item} onLineLink={showLine(item)} onOpenThread={(threadId) => { showThread(reviewId, threadId) }} />
             )}
           </li>
         ))}
@@ -200,11 +201,23 @@ function Question({ body, quoted }: { body: string; quoted: QuotedCode[] }) {
   )
 }
 
-function Answer({ message, onLineLink }: { message: AiChatMessage; onLineLink: (link: LineLink) => void }) {
+interface AnswerProps {
+  message: AiChatMessage
+  onLineLink: (link: LineLink) => void
+  onOpenThread: (threadId: string) => void
+}
+
+function Answer({ message, onLineLink, onOpenThread }: AnswerProps) {
   const author = message.model ? `${message.provider_label ?? 'AI'} (${message.model})` : message.provider_label
   return (
     <>
       <Markdown text={message.body} media={false} onLineLink={onLineLink} />
+      {message.comments.length > 0 && (
+        <section className="ai-chat-comments" aria-label="Comments added to the review">
+          <h3>{plural(message.comments.length, 'comment')} added to the review</h3>
+          <Findings findings={message.comments} onOpenThread={onOpenThread} />
+        </section>
+      )}
       <div className="ai-chat-meta muted">
         {author}
         {message.lookups.length > 0 && (

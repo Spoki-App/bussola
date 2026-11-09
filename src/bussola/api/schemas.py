@@ -774,6 +774,7 @@ class AiChatMessageOut(BaseModel):
     body: str
     snippets: list[AiChatSnippetOut]
     lookups: list[AiReviewLookupOut]
+    comments: list[AiReviewFindingOut]
     links: list[AiReviewLinkOut]
     provider_label: str | None
     model: str | None

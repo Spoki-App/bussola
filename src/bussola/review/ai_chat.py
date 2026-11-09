@@ -1,25 +1,40 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
 from bussola.ai.runner import AiRunner, AiTask
-from bussola.review.ai_review import pull_request_text, tool_lookups
+from bussola.review.ai_review import clipped_body, place_comment, pull_request_text, request_place, tool_lookups
 from bussola.review.context import ReviewContext
 from bussola.review.descriptions import UNIT_KINDS, marked
 from bussola.review.moves import CodeRange
 from bussola.review.review_tools import ReviewTools, unit_label
 from bussola.review.rows import Side, side_path
-from bussola.storage.models import AiChatMessage
+from bussola.review.threads import create_thread
+from bussola.storage.models import AiChatMessage, Revision, UnitSnapshot
 
 USER = "user"
 ASSISTANT = "assistant"
 MAX_HISTORY_MESSAGES = 20
 
 
+class ChatComment(BaseModel):
+    path: str
+    side: Literal["after", "before"]
+    start_line: int
+    end_line: int
+    body: str = Field(min_length=1)
+
+    @field_validator("body")
+    @classmethod
+    def _trimmed(cls, body: str) -> str:
+        return clipped_body(body)
+
+
 class ChatAnswer(BaseModel):
     answer: str = Field(min_length=1)
+    comments: list[ChatComment] = []
 
     @field_validator("answer")
     @classmethod
@@ -46,6 +61,15 @@ CHAT_ANSWER = (
     "answer: GitHub-flavored Markdown, short and concrete, in the language of the reviewer's message. Lead with the answer, then the "
     "reasons. Put names of code in backticks and use a short code block when you suggest a change.\n\n"
 )
+CHAT_COMMENTS = (
+    "comments: an empty list, unless the reviewer's new message asks you to add, write or leave comments on the code. Then one entry per "
+    "comment to add. path: the file of the lines the comment is about. side: after for lines of the new version, before for lines the "
+    "change removes. start_line and end_line: the line numbers in the file on that side, the same number for a single line. body: the "
+    "comment for the author of the pull request, written as the reviewer would write it, in the language of the reviewer's message: "
+    "GitHub-flavored Markdown, short and concrete, without headings, with names of code in backticks. Anchor each comment on lines the "
+    "pull request changes when you can. The comments are added to the review as the reviewer's own, so in answer only say briefly which "
+    "comments you added and where.\n\n"
+)
 CHAT_LINKS = (
     "To point the reviewer at a line, write a Markdown link to #after:PATH:N for line N of PATH in the new version or #before:PATH:N "
     "for line N of PATH in the old version, such as [the new check](#after:app/billing.py:80): the reviewer clicks it to see that line."
@@ -59,6 +83,7 @@ CHAT_ABOUT_PULL_REQUEST = AiTask(
     + CHAT_INPUT
     + CHAT_TOOLS
     + CHAT_ANSWER
+    + CHAT_COMMENTS
     + CHAT_LINKS,
     output=ChatAnswer,
 )
@@ -91,6 +116,7 @@ class ChatQuestion:
 @dataclass(frozen=True)
 class ChatReply:
     answer: str
+    comments: list[ChatComment]
     lookups: list[dict[str, Any]]
 
 
@@ -106,7 +132,16 @@ def answer_chat(context: ReviewContext, runner: AiRunner, tools: ReviewTools, qu
     tools.prepare()
     toolbox = tools.toolbox()
     answer = runner.with_tools(toolbox).run(CHAT_ABOUT_PULL_REQUEST, chat_prompt(context, tools, question), tools.cancellation)
-    return ChatReply(answer.answer, tool_lookups(toolbox))
+    return ChatReply(answer.answer, answer.comments, tool_lookups(toolbox))
+
+
+def add_chat_comments(context: ReviewContext, revision: Revision, snapshots: list[UnitSnapshot], comments: Sequence[ChatComment]) -> list[dict[str, Any]]:
+    added: list[dict[str, Any]] = []
+    for comment in comments:
+        request = place_comment(comment, "", comment.body, snapshots, set())
+        thread = create_thread(context, revision, request)
+        added.append({"thread_id": thread.id, "place": request_place(request), "body": request.body})
+    return added
 
 
 def chat_prompt(context: ReviewContext, tools: ReviewTools, question: ChatQuestion) -> str:
@@ -128,7 +163,8 @@ def chat_prompt(context: ReviewContext, tools: ReviewTools, question: ChatQuesti
 
 def _turn(message: AiChatMessage) -> str:
     if message.role != USER:
-        return f"You answered:\n{message.body}"
+        added = "".join(f"\n- On {comment['place']}: {comment['body']}" for comment in message.comments)
+        return f"You answered:\n{message.body}" + (f"\n\nYou added these comments:{added}" if added else "")
     selected = [ChatSnippet(**snippet) for snippet in message.snippets]
     shown = f"\n\nWith this code selected:\n{_snippets_text(selected)}" if selected else ""
     return f"The reviewer wrote:\n{message.body}{shown}"

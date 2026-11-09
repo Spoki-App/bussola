@@ -68,7 +68,7 @@ Optional, and off until you choose a provider. **AI review** sends the pull requ
 3. Read the findings as threads with an **AI** badge: reply, resolve or delete them like any other thread. **Details** shows the summary, every code lookup and the units reviewed.
 4. Use the impact filter in the **Files** bar (**High**, **Medium**, **Low**) to start from the units that matter, or press **Rate impact** to rate them without a review.
 5. Press **Describe** on a unit card for an explanation of the unit and its change, with links to the lines it talks about.
-6. To ask your own questions, open **AI chat** in the panel on the right. Select lines by their numbers and choose **Ask AI** to attach them to the next message; the model can look up definitions, usages and files to answer.
+6. To ask your own questions, open **AI chat** in the panel on the right. Select lines by their numbers and choose **Ask AI** to attach them to the next message; the model can look up definitions, usages and files to answer. Ask it to add a comment and it leaves one on the lines, as yours, ready to edit or publish.
 
 **AI prompts** in **Settings** changes what the model is told for **Describe**, **Rate impact** and **AI review**, for example to focus on security. Running **AI review** again only reviews the units that changed since; **Review all** (or **Review again** once every unit has an AI review) reviews everything once more.
 

@@ -6,7 +6,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Added
 
-- **AI chat** in the panel on the right of the review page answers questions about the pull request, with its description, the units it changes and the conversation so far, and can follow the code with the same lookups as the AI review. Select lines and choose **Ask AI** to attach them to the next message. Answers link to the lines they mention and list the lookups made; the conversation is kept per review and **Clear** deletes it ([#77](https://github.com/Spoki-App/bussola/issues/77)).
+- **AI chat** in the panel on the right of the review page answers questions about the pull request, with its description, the units it changes and the conversation so far, and can follow the code with the same lookups as the AI review. Select lines and choose **Ask AI** to attach them to the next message. Ask it to add a comment and it adds one to the review as yours, on the lines it is about. Answers link to the lines they mention and list the lookups made and the comments added; the conversation is kept per review and **Clear** deletes it ([#77](https://github.com/Spoki-App/bussola/issues/77)).
 
 ### Fixed
 

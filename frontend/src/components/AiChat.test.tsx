@@ -32,6 +32,7 @@ const QUESTION: AiChatMessage = {
   body: 'Why 1.2?',
   snippets: [{ unit: 'app.py::total', path: 'app.py', side: 'after', first_line: 2, last_line: 3, code: '2:     return sum(items) * 1.2' }],
   lookups: [],
+  comments: [],
   links: [],
   provider_label: null,
   model: null,
@@ -44,6 +45,7 @@ const ANSWER: AiChatMessage = {
   body: 'It adds a [20% tax](#after:app.py:2).',
   snippets: [],
   lookups: [{ tool: 'read_file', arguments: { path: 'app.py', side: 'before', start_line: 2, end_line: 2 }, result: '2:     return sum(items)', error: false }],
+  comments: [],
   links: [{ path: 'app.py', side: 'head', line: 2, unit_id: 7 }],
   provider_label: 'Anthropic API',
   model: 'claude-opus-5-5',
@@ -133,6 +135,21 @@ describe('AI chat', () => {
     fireEvent.click(await screen.findByText('20% tax'))
 
     expect(onShowLine).toHaveBeenCalledWith({ path: 'app.py', side: 'head', line: 2, unit_id: 7 })
+  })
+
+  it('lists the comments an answer added and opens their thread', async () => {
+    const comment = { thread_id: 't1', place: 'app.py::total, line 2 after', body: 'The rate should come from the settings.' }
+    renderChat({ answer: () => Promise.resolve(Response.json([QUESTION, { ...ANSWER, body: 'I added a comment.', comments: [comment] }])) })
+    const input = await screen.findByRole('textbox', { name: 'Message to the AI' })
+    fireEvent.change(input, { target: { value: 'Add a comment about the rate' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    expect(await screen.findByText('1 comment added to the review')).toBeInTheDocument()
+    expect(screen.getByText('The rate should come from the settings.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'app.py::total, line 2 after' }))
+
+    expect(window.location.pathname).toBe('/reviews/1')
+    expect(new URLSearchParams(window.location.search).get('thread')).toBe('t1')
   })
 
   it('keeps the message when the answer fails, and Shift+Enter does not send', async () => {

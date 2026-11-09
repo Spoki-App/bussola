@@ -1,6 +1,8 @@
 import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { deleteJson, getJson, postJson } from './client'
+import { keys } from './hooks'
+import { threadsKey } from './threads'
 import type { AiChatMessage, CodeRangeRequest } from './types'
 
 export interface AiChatRequest {
@@ -23,8 +25,11 @@ export function useSendAiChat(reviewId: number) {
   return useMutation({
     mutationKey: sendKey(reviewId),
     mutationFn: (request: AiChatRequest) => postJson<AiChatMessage[]>(chatPath(reviewId), request),
-    onSuccess: (added) => {
+    onSuccess: async (added) => {
       client.setQueryData<AiChatMessage[]>(chatKey(reviewId), (current) => [...(current ?? []), ...added])
+      if (added.some((message) => message.comments.length > 0)) {
+        await Promise.all([threadsKey(reviewId), keys.units(reviewId), keys.review(reviewId)].map((queryKey) => client.invalidateQueries({ queryKey })))
+      }
     },
   })
 }
