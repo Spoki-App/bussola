@@ -144,6 +144,14 @@ def imported_symbol(language: SourceLanguage, tree: Tree, node: Node) -> Importe
     return Imported(family, imported.module, ".".join(part for part in (imported.name, *chain[1:]) if part))
 
 
+def called_on_import(language: SourceLanguage, node: Node) -> bool:
+    chain = _chain(LINKS[language.family], node)
+    root = node
+    while root.parent is not None:
+        root = root.parent
+    return chain is not None and len(chain) > 1 and chain[0] in IMPORTS[language.family](root)
+
+
 def package_info(imported: Imported, root: Path, origin_dir: str, layout: ProjectLayout) -> PackageInfo:
     if imported.family == "python":
         return _python_package(imported, root)

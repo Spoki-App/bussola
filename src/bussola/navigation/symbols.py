@@ -1,4 +1,3 @@
-import re
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 
@@ -28,7 +27,6 @@ class SourceLanguage:
     identifiers: frozenset[str]
     is_definition: Callable[[Node], bool]
     is_member_definition: Callable[[Node], bool]
-    imports: Callable[[Node], Iterator[str]]
 
 
 @dataclass(frozen=True)
@@ -43,9 +41,7 @@ ECMASCRIPT_DEFINITIONS = ecmascript.FUNCTION_DECLARATIONS | ecmascript.CLASS_DEC
 GO_MEMBERS = frozenset({go.METHOD_DECLARATION})
 GO_DEFINITIONS = frozenset({go.FUNCTION_DECLARATION}) | GO_MEMBERS | go.TYPE_SPECS
 GO_VARIABLES = frozenset({"var_spec", "const_spec"})
-GO_MAJOR_VERSION = re.compile(r"v\d+")
 MEMBER_IDENTIFIERS = frozenset({"property_identifier", "field_identifier"})
-RECEIVERS = {"attribute": "object", "member_expression": "object", "selector_expression": "operand"}
 ECMASCRIPT_IDENTIFIERS = frozenset(
     {"identifier", "property_identifier", "type_identifier", "shorthand_property_identifier", "shorthand_property_identifier_pattern"}
 )
@@ -79,33 +75,8 @@ def _python_member(node: Node) -> bool:
     return scope is not None and scope.type == "block" and _parent_type(scope) == python.CLASS_DEFINITION
 
 
-def _python_imports(root: Node) -> Iterator[str]:
-    for node in nodes(root):
-        if node.type in {"import_statement", "import_from_statement"}:
-            for name in node.children_by_field_name("name"):
-                bound = name.child_by_field_name("alias") if name.type == "aliased_import" else name.named_child(0)
-                if bound is not None:
-                    yield node_text(bound)
-
-
 def _ecmascript_member(node: Node) -> bool:
     return _is_name_of(node, ECMASCRIPT_MEMBERS)
-
-
-def _ecmascript_imports(root: Node) -> Iterator[str]:
-    for clause in nodes(root):
-        if clause.type != "import_clause":
-            continue
-        for child in clause.named_children:
-            if child.type == "identifier":
-                yield node_text(child)
-            elif child.type == "namespace_import" and (name := child.named_child(0)) is not None:
-                yield node_text(name)
-            elif child.type == "named_imports":
-                for specifier in child.named_children:
-                    bound = specifier.child_by_field_name("alias") or specifier.child_by_field_name("name")
-                    if bound is not None:
-                        yield node_text(bound)
 
 
 def _ecmascript_definition(node: Node) -> bool:
@@ -136,36 +107,15 @@ def _go_member(node: Node) -> bool:
     return _is_name_of(node, GO_MEMBERS)
 
 
-def _go_imports(root: Node) -> Iterator[str]:
-    for spec in nodes(root):
-        if spec.type != "import_spec":
-            continue
-        name, path = spec.child_by_field_name("name"), spec.child_by_field_name("path")
-        if name is not None:
-            yield node_text(name)
-        elif path is not None:
-            yield _go_package(node_text(path).strip('"`'))
-
-
-def _go_package(path: str) -> str:
-    parts = path.split("/")
-    last = parts[-2] if len(parts) > 1 and GO_MAJOR_VERSION.fullmatch(parts[-1]) else parts[-1]
-    return last.split(".")[0]
-
-
 def _parent_type(node: Node) -> str | None:
     return node.parent.type if node.parent else None
 
 
-PYTHON = SourceLanguage("python", python.PYTHON, frozenset({"identifier"}), _python_definition, _python_member, _python_imports)
-TYPESCRIPT = SourceLanguage(
-    "ecmascript", TYPESCRIPT_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition, _ecmascript_member, _ecmascript_imports
-)
-TSX = SourceLanguage("ecmascript", TSX_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition, _ecmascript_member, _ecmascript_imports)
-JAVASCRIPT = SourceLanguage(
-    "ecmascript", JAVASCRIPT_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition, _ecmascript_member, _ecmascript_imports
-)
-GO = SourceLanguage("go", go.GO, frozenset({"identifier", "field_identifier", "type_identifier"}), _go_definition, _go_member, _go_imports)
+PYTHON = SourceLanguage("python", python.PYTHON, frozenset({"identifier"}), _python_definition, _python_member)
+TYPESCRIPT = SourceLanguage("ecmascript", TYPESCRIPT_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition, _ecmascript_member)
+TSX = SourceLanguage("ecmascript", TSX_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition, _ecmascript_member)
+JAVASCRIPT = SourceLanguage("ecmascript", JAVASCRIPT_EXTRACTOR.language, ECMASCRIPT_IDENTIFIERS, _ecmascript_definition, _ecmascript_member)
+GO = SourceLanguage("go", go.GO, frozenset({"identifier", "field_identifier", "type_identifier"}), _go_definition, _go_member)
 
 LANGUAGES_BY_EXTRACTOR: dict[str, SourceLanguage] = {"python": PYTHON, "typescript": TYPESCRIPT, "tsx": TSX, "javascript": JAVASCRIPT, "go": GO}
 
@@ -227,23 +177,6 @@ def symbol_of(language: SourceLanguage, node: Node) -> Symbol:
 def is_member(node: Node) -> bool:
     parent = node.parent
     return node.type in MEMBER_IDENTIFIERS or (parent is not None and parent.type == "attribute" and parent.child_by_field_name("attribute") == node)
-
-
-def receiver_root(node: Node) -> Node | None:
-    access = node.parent
-    if access is None or access.type not in RECEIVERS:
-        return None
-    receiver = access.child_by_field_name(RECEIVERS[access.type])
-    while receiver is not None and receiver.type in RECEIVERS:
-        receiver = receiver.child_by_field_name(RECEIVERS[receiver.type])
-    return receiver
-
-
-def imported_names(language: SourceLanguage, node: Node) -> frozenset[str]:
-    root = node
-    while root.parent is not None:
-        root = root.parent
-    return frozenset(language.imports(root))
 
 
 def nodes(root: Node) -> Iterator[Node]:

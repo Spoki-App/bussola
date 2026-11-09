@@ -8,16 +8,16 @@ from tree_sitter import Node, Tree
 
 from bussola.git import BlobReader, GitRepo
 from bussola.navigation.definitions import CODE_LANGUAGES, HoverDoc, from_hover
-from bussola.navigation.external import Imported, LibrarySource, ProjectLayout, imported_symbol, is_library_file, package_info
+from bussola.navigation.external import Imported, LibrarySource, ProjectLayout, called_on_import, imported_symbol, is_library_file, package_info
 from bussola.navigation.index import MAX_FILE_BYTES, IndexCache, IndexedFile, Starter, SymbolIndex, start_daemon
 from bussola.navigation.lsp import ServerLocation
 from bussola.navigation.positions import byte_to_utf16, preview, source_lines, utf16_to_byte
 from bussola.navigation.scopes import Enclosing, enclosing_at
 from bussola.navigation.servers import LanguageServers, server_command
 from bussola.navigation.specs import SERVER_SPECS, ServerSpec
-from bussola.navigation.symbols import SourceLanguage, Symbol, identifier_at, imported_names, is_member, language_for, receiver_root, references, symbol_of
+from bussola.navigation.symbols import SourceLanguage, Symbol, identifier_at, is_member, language_for, references, symbol_of
 from bussola.navigation.symbols import parse as parse_source
-from bussola.units.extractors.treesitter import node_text, parse
+from bussola.units.extractors.treesitter import parse
 
 MAX_TARGETS = 200
 CHECKOUTS_DIR = "checkouts"
@@ -236,8 +236,7 @@ def _definitions(index: SymbolIndex, language: SourceLanguage, node: Node, path:
 
 def _same_kind(found: list[tuple[IndexedFile, Symbol]], language: SourceLanguage, node: Node) -> list[tuple[IndexedFile, Symbol]]:
     member = is_member(node)
-    receiver = receiver_root(node) if member else None
-    if receiver is not None and receiver.type in language.identifiers and node_text(receiver) in imported_names(language, receiver):
+    if member and called_on_import(language, node):
         return found
     same = [item for item in found if item[1].member == member]
     return same or found

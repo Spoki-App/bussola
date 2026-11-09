@@ -257,8 +257,12 @@ METHODS_AND_FUNCTIONS = {
     ),
     "go.mod": "module example.com/shop\n\ngo 1.22\n",
     "order.go": "package shop\n\ntype Order struct{}\n\nfunc (c Order) Requeue() int { return 1 }\n",
-    "jobs/jobs.go": "package jobs\n\nfunc Requeue() int { return 2 }\n",
-    "tasks.go": 'package shop\n\nimport "example.com/shop/jobs"\n\nfunc Requeue(c Order) int { return c.Requeue() + jobs.Requeue() }\n',
+    "go-jobs/jobs.go": "package jobs\n\nfunc Requeue() int { return 2 }\n",
+    "tasks.go": 'package shop\n\nimport "example.com/shop/go-jobs"\n\nfunc Requeue(c Order) int { return c.Requeue() + jobs.Requeue() }\n',
+    "tasks.js": (
+        "const jobs = require('./jobs')\nconst { Order } = require('./order')\n\nfunction requeue() {\n"
+        "  const order = new Order()\n  return order.requeue() + jobs.requeue()\n}\n"
+    ),
 }
 
 
@@ -269,9 +273,11 @@ METHODS_AND_FUNCTIONS = {
         ("tasks.py", ", requeue", [("tasks.py", 5)]),
         ("tasks.py", "jobs.requeue", [("tasks.py", 5), ("jobs.py", 1), ("orders.py", 2)]),
         ("tasks.ts", "order.requeue", [("order.ts", 2)]),
-        ("tasks.ts", "jobs.requeue", [("tasks.ts", 4), ("jobs.ts", 1), ("order.ts", 2)]),
+        ("tasks.ts", "jobs.requeue", [("tasks.ts", 4), ("jobs.ts", 1), ("order.ts", 2), ("tasks.js", 4)]),
         ("tasks.go", "c.Requeue", [("order.go", 5)]),
-        ("tasks.go", "jobs.Requeue", [("tasks.go", 5), ("jobs/jobs.go", 3), ("order.go", 5)]),
+        ("tasks.go", "jobs.Requeue", [("tasks.go", 5), ("go-jobs/jobs.go", 3), ("order.go", 5)]),
+        ("tasks.js", "order.requeue", [("order.ts", 2)]),
+        ("tasks.js", "jobs.requeue", [("tasks.js", 4), ("jobs.ts", 1), ("order.ts", 2), ("tasks.ts", 4)]),
     ],
 )
 def test_a_call_on_an_object_lists_methods_and_a_plain_call_lists_functions(
