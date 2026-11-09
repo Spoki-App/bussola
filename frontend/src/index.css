@@ -1957,6 +1957,125 @@ button.link:hover:not(:disabled) {
   font-weight: 650;
 }
 
+#side-panel-content > .segmented {
+  margin-bottom: 12px;
+}
+
+.ai-chat-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ai-chat-header h2 {
+  margin-bottom: 8px;
+}
+
+.ai-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-chat-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ai-chat-message.user {
+  align-self: flex-end;
+  max-width: 90%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--info-bg);
+}
+
+.ai-chat-message.assistant {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.ai-chat-message.assistant > .markdown {
+  width: 100%;
+}
+
+.ai-chat-text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.ai-chat-snippet {
+  margin: 0 0 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.ai-chat-snippet pre {
+  max-height: 200px;
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  overflow: auto;
+  border-radius: var(--radius-control);
+  background: var(--bg);
+}
+
+.ai-chat-meta {
+  width: 100%;
+  font-size: 12px;
+}
+
+.ai-chat-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.ai-chat-compose textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  font-family: var(--sans);
+  line-height: 1.5;
+}
+
+.ai-chat-snippets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-chat-snippets li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 4px 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  font-size: 12px;
+}
+
+.ai-chat-snippets span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-chat-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .thread-location {
   margin: 8px 0 0;
   font-family: var(--mono);

@@ -145,7 +145,7 @@ function Findings({ findings, onOpenThread }: { findings: AiReviewFinding[]; onO
   )
 }
 
-function Lookups({ lookups }: { lookups: AiReviewLookup[] }) {
+export function Lookups({ lookups }: { lookups: AiReviewLookup[] }) {
   return (
     <ol className="ai-review-lookups">
       {lookups.map((lookup, index) => (

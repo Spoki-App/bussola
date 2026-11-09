@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type Ref } from 'react'
 
 import { useAiStatus } from '../api/ai'
 import { describeError } from '../api/client'
@@ -13,10 +13,11 @@ interface AiActionButtonProps {
   label: string
   title?: string
   disabled?: boolean
+  ref?: Ref<HTMLButtonElement>
   onRun: (target: string) => void
 }
 
-export function AiActionButton({ repoId, label, title, disabled = false, onRun }: AiActionButtonProps) {
+export function AiActionButton({ repoId, label, title, disabled = false, ref, onRun }: AiActionButtonProps) {
   const status = useAiStatus(repoId)
   const [asking, setAsking] = useState<AiStatus | null>(null)
   const starting = useRef(false)
@@ -65,6 +66,7 @@ export function AiActionButton({ repoId, label, title, disabled = false, onRun }
   return (
     <>
       <button
+        ref={ref}
         type="button"
         className={checking ? 'busy' : undefined}
         title={ai.problem ?? title}

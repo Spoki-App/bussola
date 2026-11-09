@@ -392,18 +392,18 @@ class _GroupReviewer:
         except AiCancelledError:
             raise
         except Exception as error:
-            self.record.part(self._units(group, {}) | {"lookups": _lookups(toolbox), "error": str(error) or type(error).__name__})
+            self.record.part(self._units(group, {}) | {"lookups": tool_lookups(toolbox), "error": str(error) or type(error).__name__})
             context.store.commit()
             raise
         findings = [{"thread_id": thread.id, "place": place, "body": body} for thread, place, body in created]
-        part = self._units(group, rated) | {"summary": answer.summary.strip(), "findings": findings, "lookups": _lookups(toolbox), "error": None}
+        part = self._units(group, rated) | {"summary": answer.summary.strip(), "findings": findings, "lookups": tool_lookups(toolbox), "error": None}
         self.record.part(part)
         context.store.commit()
         return len(created)
 
     def _prompt(self, group: list[UnitSnapshot], views: list[ThreadView]) -> str:
         revision, clip = self.job.revision, self.job.limit is not None
-        pull_request = _pull_request_text(self.job.context)
+        pull_request = pull_request_text(self.job.context)
         lines = [f"Reviewed commits: before {revision.merge_base_sha}, after {revision.head_sha}", ""]
         if pull_request:
             lines += ["The pull request:", *marked("description", pull_request, clip=clip), ""]
@@ -501,7 +501,7 @@ def _request_place(request: NewThread) -> str:
     return f"{unit_label(snapshot)}, {span} {'before' if request.side == Side.BASE else 'after'}"
 
 
-def _lookups(toolbox: Toolbox) -> list[dict[str, Any]]:
+def tool_lookups(toolbox: Toolbox) -> list[dict[str, Any]]:
     return [{"tool": call.name, "arguments": call.arguments, "result": call.result, "error": call.error} for call in toolbox.log]
 
 
@@ -545,7 +545,7 @@ def _thread_place(view: ThreadView) -> str:
     return f"On {unit}, {span} {side}: {selected_lines(thread)[0].strip()}"
 
 
-def _pull_request_text(context: ReviewContext) -> str | None:
+def pull_request_text(context: ReviewContext) -> str | None:
     link = context.store.forge.link(context.review.id)
     if link is None:
         return None

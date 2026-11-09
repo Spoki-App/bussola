@@ -296,3 +296,17 @@ class AiReviewRun(Base):
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     started_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(default=None)
+
+
+class AiChatMessage(Base):
+    __tablename__ = "ai_chat_messages"
+
+    review_id: Mapped[int] = mapped_column(ForeignKey("reviews.id"), index=True)
+    role: Mapped[str] = mapped_column()
+    body: Mapped[str] = mapped_column()
+    snippets: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default_factory=list)
+    lookups: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default_factory=list)
+    provider_label: Mapped[str | None] = mapped_column(default=None)
+    model: Mapped[str | None] = mapped_column(default=None)
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 
 import { describeError } from './api/client'
 import { useMoves } from './api/compare'
@@ -15,6 +15,7 @@ import { ThreadPanel } from './components/ThreadPanel'
 import { ThreadView } from './components/ThreadView'
 import { useSearch } from './navigation'
 import { ReviewPage } from './pages/ReviewPage'
+import { AskAiContext, sameRange, snippetLabel, type ChatSnippetDraft } from './review/askAi'
 import { linkFocusFromSearch, resolveLinkFocus } from './review/linkFocus'
 import { unitTitle } from './review/logic'
 import { moveLinksByUnit } from './review/moves'
@@ -34,8 +35,24 @@ function readClipboard(): Promise<string> {
   }
 }
 
-function sameRange(first: CodeRangeRequest, second: CodeRangeRequest): boolean {
-  return first.unit_id === second.unit_id && first.side === second.side && first.line_offset === second.line_offset && first.line_count === second.line_count
+function AskAiButton({ snippet, onAsked }: { snippet: ChatSnippetDraft; onAsked: () => void }) {
+  const askAi = useContext(AskAiContext)
+  if (!askAi) {
+    return null
+  }
+  return (
+    <button
+      type="button"
+      className="link"
+      title="Add these lines to the AI chat and ask about them"
+      onClick={() => {
+        askAi(snippet)
+        onAsked()
+      }}
+    >
+      Ask AI
+    </button>
+  )
 }
 
 export function ReviewRoute({ reviewId }: { reviewId: number }) {
@@ -129,6 +146,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
                   Compare with clipboard
                 </button>
               )}
+              <AskAiButton snippet={{ range, label: snippetLabel(unit, request.line_count, request.side) }} onAsked={() => { setDraft(null) }} />
             </div>
             {clipboardError && <ErrorNote message={clipboardError} />}
             <Composer

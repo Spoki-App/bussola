@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from bussola.api import (
     ai,
+    ai_chat,
     ai_review,
     approvals,
     attachments,
@@ -43,6 +44,7 @@ def build_api_router() -> APIRouter:
         ai,
         descriptions,
         ai_review,
+        ai_chat,
     )
     for module in modules:
         router.include_router(module.router)

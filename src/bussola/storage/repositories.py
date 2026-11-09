@@ -1,8 +1,9 @@
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session, defer
 
 from bussola.storage.models import (
+    AiChatMessage,
     AiReviewedUnit,
     AiReviewRun,
     Approval,
@@ -287,6 +288,17 @@ class SqlAiReviewRepository(_SqlRepository):
         return self._session.scalar(select(func.count()).select_from(AiReviewRun).where(AiReviewRun.review_id == review_id)) or 0
 
 
+class SqlAiChatRepository(_SqlRepository):
+    def messages(self, review_id: int) -> list[AiChatMessage]:
+        return list(self._session.scalars(select(AiChatMessage).where(AiChatMessage.review_id == review_id).order_by(AiChatMessage.id)))
+
+    def add(self, message: AiChatMessage) -> AiChatMessage:
+        return self._add(message)
+
+    def clear(self, review_id: int) -> None:
+        self._session.execute(delete(AiChatMessage).where(AiChatMessage.review_id == review_id))
+
+
 class Store:
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -296,6 +308,7 @@ class Store:
         self.forge = SqlForgeRepository(session)
         self.descriptions = SqlDescriptionRepository(session)
         self.ai_reviews = SqlAiReviewRepository(session)
+        self.ai_chat = SqlAiChatRepository(session)
 
     def commit(self) -> None:
         self.session.commit()
