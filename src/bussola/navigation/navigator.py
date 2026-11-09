@@ -15,9 +15,9 @@ from bussola.navigation.positions import byte_to_utf16, preview, source_lines, u
 from bussola.navigation.scopes import Enclosing, enclosing_at
 from bussola.navigation.servers import LanguageServers, server_command
 from bussola.navigation.specs import SERVER_SPECS, ServerSpec
-from bussola.navigation.symbols import SourceLanguage, Symbol, identifier_at, is_member, language_for, references, symbol_of
+from bussola.navigation.symbols import SourceLanguage, Symbol, identifier_at, imported_names, is_member, language_for, receiver_root, references, symbol_of
 from bussola.navigation.symbols import parse as parse_source
-from bussola.units.extractors.treesitter import parse
+from bussola.units.extractors.treesitter import node_text, parse
 
 MAX_TARGETS = 200
 CHECKOUTS_DIR = "checkouts"
@@ -227,10 +227,20 @@ def _layout(root: Path, commit: str) -> ProjectLayout:
 def _definitions(index: SymbolIndex, language: SourceLanguage, node: Node, path: str, files: SourceFiles) -> tuple[Target, ...]:
     symbol = symbol_of(language, node)
     found = sorted(index.definitions(language.family, symbol.name), key=lambda item: (item[0].path != path, item[0].path, item[1].row))
+    found = _same_kind(found, language, node)
     local = [item for item in found if item[0].path == path]
     if local and not is_member(node):
         found = local
     return tuple(target for file, definition in found[:MAX_TARGETS] if (target := files.symbol_target(TargetRole.DEFINITION, file, definition)))
+
+
+def _same_kind(found: list[tuple[IndexedFile, Symbol]], language: SourceLanguage, node: Node) -> list[tuple[IndexedFile, Symbol]]:
+    member = is_member(node)
+    receiver = receiver_root(node) if member else None
+    if receiver is not None and receiver.type in language.identifiers and node_text(receiver) in imported_names(language, receiver):
+        return found
+    same = [item for item in found if item[1].member == member]
+    return same or found
 
 
 def _usages(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, files: SourceFiles) -> tuple[Target, ...]:
