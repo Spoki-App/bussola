@@ -1,6 +1,6 @@
 # Design notes
 
-How bussola works under the hood. The [README](../README.md) describes what it does from the user's side; this file covers the rules behind it.
+How bussola works under the hood. The [README](../README.md), [features](FEATURES.md) and [guide](GUIDE.md) describe what it does from the user's side; this file covers the rules behind it.
 
 ## Units
 

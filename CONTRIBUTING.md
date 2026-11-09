@@ -70,7 +70,7 @@ rm dev.db
 - Match the code around your change: naming, structure and the small-function style.
 - Prefer self-explanatory names over comments.
 - Every behaviour change comes with a test. Backend tests go through the HTTP API where possible (`tests/apiclient.py`).
-- Update the [README](README.md) when user-visible behaviour changes, and [docs/design.md](docs/design.md) when the rules behind it change.
+- Update the [README](README.md) or [docs/GUIDE.md](docs/GUIDE.md) when user-visible behaviour changes, and [docs/design.md](docs/design.md) when the rules behind it change.
 - Add a line under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md).
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:`, `perf:`, `refactor:`, `docs:`, `test:`, `chore:`).
 - English, short sentences, and no em dash characters (a test checks).
