@@ -22,4 +22,4 @@ Only the latest release receives security fixes.
 
 ## Scope
 
-The protections bussola relies on are described in the Security section of the [README](README.md#security): the loopback-only default, the session token cookie, the `Host` check, ref validation, HTML sanitizing and the limits on GitHub image downloads. Running bussola with `--host` set to a non-loopback address exposes it to your network and is outside what it is designed for.
+The protections bussola relies on are described in the Security section of the [guide](docs/GUIDE.md#security): the loopback-only default, the session token cookie, the `Host` check, ref validation, HTML sanitizing and the limits on GitHub image downloads. Running bussola with `--host` set to a non-loopback address exposes it to your network and is outside what it is designed for.

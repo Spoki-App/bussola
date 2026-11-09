@@ -1,6 +1,6 @@
 # bussola features
 
-Everything bussola does, one feature at a time: what it is, what it looks like and how to use it. For every option and detail, see the [README](../README.md).
+Everything bussola does, one feature at a time: what it is, what it looks like and how to use it. For every option and detail, see the [guide](GUIDE.md).
 
 - [Review by unit, not by file](#review-by-unit-not-by-file)
 - [Approvals that follow the code](#approvals-that-follow-the-code)
@@ -30,7 +30,7 @@ GitHub shows a pull request as a list of files. bussola splits every change into
 
 Files that should never be parsed or reviewed can be listed in `.bussola.toml` with `file_level` and `ignore`.
 
-More in the README: [Reviewing](../README.md#reviewing), [Configuration](../README.md#configuration).
+More in the guide: [Reviewing](GUIDE.md#reviewing), [Configuration](GUIDE.md#configuration).
 
 ## Approvals that follow the code
 
@@ -50,7 +50,7 @@ An approval belongs to the content of a unit, not to a commit. After new commits
 
 Approvals stay on your machine. On a pull request, **Sync** ticks **Viewed** on GitHub for every file whose changes you have all approved.
 
-More in the README: [Reviewing](../README.md#reviewing).
+More in the guide: [Reviewing](GUIDE.md#reviewing).
 
 ## An AI reviewer that ranks what it finds
 
@@ -72,7 +72,7 @@ Optional, and off until you choose a provider. **AI review** sends the pull requ
 
 **AI prompts** in **Settings** changes what the model is told for **Describe**, **Rate impact** and **AI review**, for example to focus on security. Running **AI review** again only reviews the units that changed since; **Review all** (or **Review again** once every unit has an AI review) reviews everything once more.
 
-More in the README: [AI providers](../README.md#ai-providers), [AI review](../README.md#ai-review), [AI chat](../README.md#ai-chat), [What leaves your machine](../README.md#what-leaves-your-machine).
+More in the guide: [AI providers](GUIDE.md#ai-providers), [AI review](GUIDE.md#ai-review), [AI chat](GUIDE.md#ai-chat), [What leaves your machine](GUIDE.md#what-leaves-your-machine).
 
 ## Navigate like in your editor
 
@@ -92,7 +92,7 @@ Cmd+click (Ctrl+click on Linux and Windows) a name in any diff to go where it is
 
 It works with nothing installed, from an index built in the background. When `basedpyright`, `typescript-language-server` or `gopls` is on your `PATH`, its more precise answers are used instead.
 
-More in the README: [Code navigation](../README.md#code-navigation).
+More in the guide: [Code navigation](GUIDE.md#code-navigation).
 
 ## Moved code, found for you
 
@@ -111,7 +111,7 @@ When code is moved or extracted, the diff shows a deletion here and an addition 
 
 Small blocks and trivial lines such as `}` or `else:` are left out of move detection, so common snippets do not show up as moves.
 
-More in the README: [Comparing code](../README.md#comparing-code).
+More in the guide: [Comparing code](GUIDE.md#comparing-code).
 
 ## GitHub, both ways
 
@@ -132,7 +132,7 @@ bussola reads and writes pull requests through your own GitHub CLI login. Open a
 
 bussola contacts GitHub only when you press one of these buttons, or every few minutes while a pull request review is open, to keep its comments in sync.
 
-More in the README: [Reviewing GitHub pull requests](../README.md#reviewing-github-pull-requests), [Opening bussola:// links](../README.md#opening-bussola-links), [Sending comments to GitHub](../README.md#sending-comments-to-github).
+More in the guide: [Reviewing GitHub pull requests](GUIDE.md#reviewing-github-pull-requests), [Opening bussola:// links](GUIDE.md#opening-bussola-links), [Sending comments to GitHub](GUIDE.md#sending-comments-to-github).
 
 ## Made for long reading sessions
 
@@ -151,7 +151,7 @@ Diffs are highlighted like on GitHub, each changed line is paired with its old v
 
 Every choice is kept in your browser, so a reload or another review opens the same way.
 
-More in the README: [Reviewing](../README.md#reviewing), [Themes](../README.md#themes).
+More in the guide: [Reviewing](GUIDE.md#reviewing), [Themes](GUIDE.md#themes).
 
 ## Local and private
 
@@ -170,4 +170,4 @@ bussola is a local app for one person. It serves the UI on `127.0.0.1` behind a 
 
 The server warns when it listens on anything other than `127.0.0.1`, and rejects requests for other hosts to block DNS rebinding.
 
-More in the README: [Data](../README.md#data), [Security](../README.md#security), [What leaves your machine](../README.md#what-leaves-your-machine).
+More in the guide: [Data](GUIDE.md#data), [Security](GUIDE.md#security), [What leaves your machine](GUIDE.md#what-leaves-your-machine).
