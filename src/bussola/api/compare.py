@@ -25,8 +25,8 @@ def list_moves(context: ContextDep, revision_id: int | None = None) -> list[Move
 
 @router.post("/reviews/{review_id}/compare")
 def compare(context: ContextDep, body: CompareIn) -> CompareOut:
-    right = _code_range(context, body.right)
-    left = _code_range(context, body.left) if body.left is not None else None
+    right = code_range(context, body.right)
+    left = code_range(context, body.left) if body.left is not None else None
     left_lines = left.lines if left is not None else _pasted_lines(body.pasted or "", right.lines)
     left_path = side_path(left.snapshot, left.side) if left is not None else PASTED_PATH
     rows, unified = compare_lines(left_lines, right.lines, left_path, side_path(right.snapshot, right.side))
@@ -39,7 +39,7 @@ def compare(context: ContextDep, body: CompareIn) -> CompareOut:
     )
 
 
-def _code_range(context: ReviewContext, request: CodeRangeIn) -> CodeRange:
+def code_range(context: ReviewContext, request: CodeRangeIn) -> CodeRange:
     snapshot = snapshot_of(context, request.unit_id)
     lines = side_lines(snapshot, request.side)
     if request.line_offset >= len(lines):

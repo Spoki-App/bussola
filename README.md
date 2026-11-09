@@ -56,7 +56,7 @@ You need Python 3.12+ and git, plus the [GitHub CLI](https://cli.github.com) sig
 |---|---|
 | **[Review by unit](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#review-by-unit-not-by-file)** | Functions, methods, classes, types and module code, parsed with tree-sitter for Python, TypeScript, JavaScript and Go. Other files are reviewed whole, a few lines at a time if you like. |
 | **[Approvals that follow the code](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#approvals-that-follow-the-code)** | After a rebase or a force-push, unchanged units stay approved, a renamed function keeps its approval, and a changed one shows the diff from what you approved. |
-| **[AI reviewer](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#an-ai-reviewer-that-ranks-what-it-finds)** | Optional. Reads the whole pull request, follows the code with your same lookups, and leaves line comments ranked 🔴 Critical to 🔵 Low, each with a fix. |
+| **[AI reviewer](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#an-ai-reviewer-that-ranks-what-it-finds)** | Optional. Reads the whole pull request, follows the code with your same lookups, and leaves line comments ranked 🔴 Critical to 🔵 Low, each with a fix. Ask the AI chat about any line, and it adds comments when you ask. |
 | **[Editor-like navigation](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#navigate-like-in-your-editor)** | Cmd+click (Ctrl+click) a name for its definition or usages. Library names show their documentation. |
 | **[Moved code, found](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#moved-code-found-for-you)** | Moved or extracted code is linked both ways, and marked **identical** when it did not change. Compare any two ranges, or a range with the clipboard. |
 | **[GitHub, both ways](https://github.com/Spoki-App/bussola/blob/main/docs/FEATURES.md#github-both-ways)** | Open a pull request from its link, reply to its comments, submit **Comment**, **Approve** or **Request changes**, and **Merge**. No GitHub? Review any two local branches. |
@@ -103,7 +103,7 @@ Every option is in the [guide](https://github.com/Spoki-App/bussola/blob/main/do
 
 ## AI review
 
-Off until you choose a provider in **Settings** > **AI**. **AI review** comments on the whole pull request, **Describe** explains a unit, **Rate impact** sorts units by **High**, **Medium** or **Low** impact, and you can rewrite the prompts.
+Off until you choose a provider in **Settings** > **AI**. **AI review** comments on the whole pull request, **AI chat** answers your questions and adds comments when you ask, **Describe** explains a unit, **Rate impact** sorts units by **High**, **Medium** or **Low** impact, and you can rewrite the prompts.
 
 | Provider | Key | |
 |---|---|---|

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -17,6 +17,8 @@ from bussola.units.model import UnitKind
 MAX_THREAD_LINES = 500
 MAX_CALL_ID_LENGTH = 100
 MAX_PASTED_CHARACTERS = 200_000
+MAX_CHAT_MESSAGE_CHARACTERS = 20_000
+MAX_CHAT_SNIPPETS = 10
 
 LineRangeIn = Annotated[tuple[int, int], Field(description="Inclusive file line range")]
 
@@ -642,6 +644,19 @@ class AiReviewIn(AiCallIn):
     again: bool = False
 
 
+class AiChatIn(AiCallIn):
+    message: str = Field(min_length=1, max_length=MAX_CHAT_MESSAGE_CHARACTERS)
+    snippets: list[CodeRangeIn] = Field(default=[], max_length=MAX_CHAT_SNIPPETS)
+
+    @field_validator("message")
+    @classmethod
+    def _trimmed(cls, message: str) -> str:
+        text = message.strip()
+        if not text:
+            raise ValueError("must not be blank")
+        return text
+
+
 class UnitDescriptionOut(BaseModel):
     unit_id: int
     description: str | None
@@ -742,3 +757,25 @@ class AiReviewRunDetailOut(AiReviewRunOut):
     rating: AiReviewRatingOut | None
     parts: list[AiReviewPartOut]
     links: list[AiReviewLinkOut]
+
+
+class AiChatSnippetOut(BaseModel):
+    unit: str
+    path: str
+    side: Literal["after", "before"]
+    first_line: int | None
+    last_line: int | None
+    code: str
+
+
+class AiChatMessageOut(BaseModel):
+    id: int
+    role: Literal["user", "assistant"]
+    body: str
+    snippets: list[AiChatSnippetOut]
+    lookups: list[AiReviewLookupOut]
+    comments: list[AiReviewFindingOut]
+    links: list[AiReviewLinkOut]
+    provider_label: str | None
+    model: str | None
+    created_at: datetime

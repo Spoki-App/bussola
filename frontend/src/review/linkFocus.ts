@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useSyncExternalStore, type RefObject } from 'react'
 
 import type { Thread, Unit } from '../api/types'
+import { showReview } from '../navigation'
 import { commentAnchors } from './pullRequestLink'
 import { isInline } from './threadPlacement'
 
@@ -58,6 +59,12 @@ export function withoutLinkFocus(search: string): string {
   }
   const rest = params.toString()
   return rest ? `?${rest}` : ''
+}
+
+export function showThread(reviewId: number, threadId: string) {
+  const params = new URLSearchParams(withoutLinkFocus(window.location.search))
+  params.set('thread', threadId)
+  showReview(reviewId, `?${params.toString()}`, false)
 }
 
 export function linkFocusFromSearch(search: string): LinkFocus | null {

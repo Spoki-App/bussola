@@ -5,6 +5,7 @@ import { useDescriptions } from '../api/descriptions'
 import { useSync } from '../api/forge'
 import { useApprove, useFinishReview, useReview, useUnits } from '../api/hooks'
 import type { DiffRow, ReviewDetail, ReviewSubmitResult, SyncResult, Unit, UnitDescription, UnitDiff, UnitFilter } from '../api/types'
+import { AiChat } from '../components/AiChat'
 import { AiReview } from '../components/AiReview'
 import { CourseStrip, ErrorNote } from '../components/Badges'
 import { CopyLinkButton } from '../components/CopyLinkButton'
@@ -27,6 +28,7 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useRateImpact } from '../hooks/useRateImpact'
 import { Link } from '../Link'
 import { navigate } from '../navigation'
+import { AskAiContext, withSnippet, type ChatSnippetDraft } from '../review/askAi'
 import { buildFileTree, filesInOrder } from '../review/fileTree'
 import { IMPACT_FILTER_LABELS, UNIT_ORDER_LABELS, byImpact, matchesImpact, type ImpactFilter, type UnitOrder } from '../review/impact'
 import {
@@ -69,6 +71,11 @@ const WIDE_LAYOUT_PX = 1400
 const NO_RATINGS: ReadonlyMap<number, UnitDescription> = new Map()
 const FILES_HIDDEN_KEY = 'bussola.filesHidden'
 const PANEL_HIDDEN_KEY = 'bussola.sidePanelHidden'
+const PANEL_TAB_KEY = 'bussola.sidePanelTab'
+
+type PanelTab = 'conversation' | 'chat'
+
+const PANEL_TABS: Record<PanelTab, string> = { conversation: 'Conversation', chat: 'AI chat' }
 
 function loadPanelHidden(): boolean {
   const stored = readStored(PANEL_HIDDEN_KEY)
@@ -236,6 +243,21 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     setPanelHidden(!panelHidden)
     writeStored(PANEL_HIDDEN_KEY, String(!panelHidden))
   }
+  const [panelTab, setPanelTab] = useState<PanelTab>(() => (readStored(PANEL_TAB_KEY) === 'chat' ? 'chat' : 'conversation'))
+  const [chatSnippets, setChatSnippets] = useState<ChatSnippetDraft[]>([])
+  const choosePanelTab = useCallback((tab: PanelTab) => {
+    setPanelTab(tab)
+    writeStored(PANEL_TAB_KEY, tab)
+  }, [])
+  const askAi = useCallback(
+    (snippet: ChatSnippetDraft) => {
+      setChatSnippets((current) => withSnippet(current, snippet))
+      choosePanelTab('chat')
+      setPanelHidden(false)
+      writeStored(PANEL_HIDDEN_KEY, 'false')
+    },
+    [choosePanelTab],
+  )
 
   const [seenLinkKey, setSeenLinkKey] = useState<string | null>(null)
   if (link === undefined && seenLinkKey !== null) {
@@ -378,7 +400,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
           </div>
           {filesHidden && unitControls}
           <div className="summary-row">
-            <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync, t show or hide the conversation. Click a line number to comment or compare; drag over line numbers or shift-click another to select several lines. Cmd or Ctrl+click a name to go to its definition or list its usages.</p>
+            <p className="shortcuts muted">j / k move, n next to review, a approve or revoke, c comment, r sync, t show or hide the conversation. Click a line number to comment, compare or ask the AI; drag over line numbers or shift-click another to select several lines. Cmd or Ctrl+click a name to go to its definition or list its usages.</p>
             <div className="summary-actions">
               <RateImpact repoId={data.repo_id} rating={rating} />
               <AiReview reviewId={reviewId} repoId={data.repo_id} review={aiReview} onShowLine={navigation.show} />
@@ -388,74 +410,81 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
       </div>
       <LinkScrollContext value={linkScroll}>
         <ReviewLinkContext value={makeLink}>
-          <div className={`review-layout${sidePanel ? (panelHidden ? ' panel-hidden' : ' with-panel') : ''}${filesHidden ? ' files-hidden' : ''}`}>
-            <aside className="sidebar" aria-label="Files">
-              <button type="button" className="sidebar-toggle" aria-expanded={!filesHidden} aria-controls={filesHidden ? undefined : 'file-tree'} title={filesHidden ? 'Show files' : 'Hide files'} onClick={toggleFiles}>
-                <SidebarIcon />
-                {!filesHidden && <span>Files</span>}
-              </button>
-              {!filesHidden && (
-                <>
-                  {unitControls}
-                  <div id="file-tree">
-                    <FileTree nodes={fileTree} activePath={focusedUnit?.path} onSelect={(path) => { scrollToElement(`file-${path}`) }} />
-                  </div>
-                </>
-              )}
-            </aside>
-            <main className="units">
-              {units.error && <ErrorNote message={describeError(units.error)} />}
-              {units.data && unitList.length === 0 && <p className="muted">{emptyMessage(filter, deferredQuery, impactFilter, units.data.length)}</p>}
-              {groups.map((group) => (
-                <section key={group.path} id={`file-${group.path}`} className="file-section">
-                  <FileHeader reviewId={reviewId} path={group.path} oldPath={group.oldPath} complete={group.complete} actions={extensions.fileActions?.(group.path)} />
-                  <UnitTree
-                    nodes={group.tree}
-                    module={group.units.at(0)?.module ?? null}
-                    renderUnit={(unit) => (
-                      <UnitCard
-                        key={unit.id}
-                        reviewId={reviewId}
-                        repoId={data.repo_id}
-                        unit={unit}
-                        focused={focusedUnit?.id === unit.id}
-                        onFocus={focusUnit}
-                        register={register}
-                        onComment={extensions.onComment}
-                        onCommentSelectEnd={extensions.onCommentSelectEnd}
-                        renderWidgets={extensions.renderWidgets}
-                        highlightRows={extensions.highlightRows}
-                        unitLabels={extensions.unitLabels}
-                        onNavigate={navigation.navigate}
-                        canNavigate={navigation.canNavigate}
-                        navigationTarget={navigation.target?.unitId === unit.id ? navigation.target : undefined}
-                        linkedLine={linkedTargetNow?.unitId === unit.id ? linkedTargetNow.line : undefined}
-                      />
-                    )}
-                  />
-                </section>
-              ))}
-            </main>
-            {sidePanel && (
-              <aside className="side-panel" aria-label={sidePanel.label}>
-                <button
-                  type="button"
-                  className="sidebar-toggle"
-                  aria-expanded={!panelHidden}
-                  aria-controls="side-panel-content"
-                  aria-label={panelHidden ? `Show ${sidePanel.label} (${String(sidePanel.count)} open)` : `Hide ${sidePanel.label}`}
-                  title={`${panelHidden ? 'Show' : 'Hide'} ${sidePanel.label}. Shortcut: t`}
-                  onClick={togglePanel}
-                >
-                  <SidebarIcon side="right" />
-                  {panelHidden && sidePanel.count > 0 && <span className="side-panel-count">{sidePanel.count}</span>}
+          <AskAiContext value={sidePanel ? askAi : null}>
+            <div className={`review-layout${sidePanel ? (panelHidden ? ' panel-hidden' : ' with-panel') : ''}${filesHidden ? ' files-hidden' : ''}`}>
+              <aside className="sidebar" aria-label="Files">
+                <button type="button" className="sidebar-toggle" aria-expanded={!filesHidden} aria-controls={filesHidden ? undefined : 'file-tree'} title={filesHidden ? 'Show files' : 'Hide files'} onClick={toggleFiles}>
+                  <SidebarIcon />
+                  {!filesHidden && <span>Files</span>}
                 </button>
-                <div id="side-panel-content" hidden={panelHidden}>
-                  {sidePanel.content}
-                </div>
+                {!filesHidden && (
+                  <>
+                    {unitControls}
+                    <div id="file-tree">
+                      <FileTree nodes={fileTree} activePath={focusedUnit?.path} onSelect={(path) => { scrollToElement(`file-${path}`) }} />
+                    </div>
+                  </>
+                )}
               </aside>
-            )}
-          </div>
+              <main className="units">
+                {units.error && <ErrorNote message={describeError(units.error)} />}
+                {units.data && unitList.length === 0 && <p className="muted">{emptyMessage(filter, deferredQuery, impactFilter, units.data.length)}</p>}
+                {groups.map((group) => (
+                  <section key={group.path} id={`file-${group.path}`} className="file-section">
+                    <FileHeader reviewId={reviewId} path={group.path} oldPath={group.oldPath} complete={group.complete} actions={extensions.fileActions?.(group.path)} />
+                    <UnitTree
+                      nodes={group.tree}
+                      module={group.units.at(0)?.module ?? null}
+                      renderUnit={(unit) => (
+                        <UnitCard
+                          key={unit.id}
+                          reviewId={reviewId}
+                          repoId={data.repo_id}
+                          unit={unit}
+                          focused={focusedUnit?.id === unit.id}
+                          onFocus={focusUnit}
+                          register={register}
+                          onComment={extensions.onComment}
+                          onCommentSelectEnd={extensions.onCommentSelectEnd}
+                          renderWidgets={extensions.renderWidgets}
+                          highlightRows={extensions.highlightRows}
+                          unitLabels={extensions.unitLabels}
+                          onNavigate={navigation.navigate}
+                          canNavigate={navigation.canNavigate}
+                          navigationTarget={navigation.target?.unitId === unit.id ? navigation.target : undefined}
+                          linkedLine={linkedTargetNow?.unitId === unit.id ? linkedTargetNow.line : undefined}
+                        />
+                      )}
+                    />
+                  </section>
+                ))}
+              </main>
+              {sidePanel && (
+                <aside className="side-panel" aria-label={sidePanel.label}>
+                  <button
+                    type="button"
+                    className="sidebar-toggle"
+                    aria-expanded={!panelHidden}
+                    aria-controls="side-panel-content"
+                    aria-label={panelHidden ? `Show ${sidePanel.label} (${String(sidePanel.count)} open)` : `Hide ${sidePanel.label}`}
+                    title={`${panelHidden ? 'Show' : 'Hide'} ${sidePanel.label}. Shortcut: t`}
+                    onClick={togglePanel}
+                  >
+                    <SidebarIcon side="right" />
+                    {panelHidden && sidePanel.count > 0 && <span className="side-panel-count">{sidePanel.count}</span>}
+                  </button>
+                  <div id="side-panel-content" hidden={panelHidden}>
+                    <Segmented label="Side panel" labels={PANEL_TABS} value={panelTab} onChange={choosePanelTab} />
+                    {panelTab === 'chat' ? (
+                      <AiChat reviewId={reviewId} repoId={data.repo_id} snippets={chatSnippets} onSnippetsChange={setChatSnippets} onShowLine={navigation.show} />
+                    ) : (
+                      sidePanel.content
+                    )}
+                  </div>
+                </aside>
+              )}
+            </div>
+          </AskAiContext>
         </ReviewLinkContext>
       </LinkScrollContext>
       {navigation.element}

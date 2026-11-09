@@ -1,4 +1,5 @@
 import re
+from collections.abc import Iterable
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -69,11 +70,16 @@ def get_ai_review_run(context: ContextDep, run_id: int, request: Request) -> AiR
     brief = _run_out(run, app_state(request).ai_reviews.progress(context.review.id) is not None)
     parts: list[dict[str, Any]] = run.details.get("parts", [])
     shown = [AiReviewPartOut.model_validate(part) for part in parts]
-    return AiReviewRunDetailOut(**brief.model_dump(), rating=run.details.get("rating"), parts=shown, links=_summary_links(context, parts))
+    links = line_links(context, [part.get("summary") or "" for part in parts])
+    return AiReviewRunDetailOut(**brief.model_dump(), rating=run.details.get("rating"), parts=shown, links=links)
 
 
-def _summary_links(context: ReviewContext, parts: list[dict[str, Any]]) -> list[AiReviewLinkOut]:
-    found = sorted({(match["side"], match["path"], int(match["line"])) for part in parts for match in SUMMARY_LINK.finditer(part.get("summary") or "")})
+def link_targets(text: str) -> set[tuple[str, str, int]]:
+    return {(match["side"], match["path"], int(match["line"])) for match in SUMMARY_LINK.finditer(text)}
+
+
+def line_links(context: ReviewContext, texts: Iterable[str]) -> list[AiReviewLinkOut]:
+    found = sorted({target for text in texts for target in link_targets(text)})
     if not found:
         return []
     revision = resolve_revision(context, None)

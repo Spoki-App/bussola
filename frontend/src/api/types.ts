@@ -453,6 +453,28 @@ export interface AiReviewRunDetail extends AiReviewRun {
   links: AiReviewLink[]
 }
 
+export interface AiChatSnippet {
+  unit: string
+  path: string
+  side: 'after' | 'before'
+  first_line: number | null
+  last_line: number | null
+  code: string
+}
+
+export interface AiChatMessage {
+  id: number
+  role: 'user' | 'assistant'
+  body: string
+  snippets: AiChatSnippet[]
+  lookups: AiReviewLookup[]
+  comments: AiReviewFinding[]
+  links: AiReviewLink[]
+  provider_label: string | null
+  model: string | null
+  created_at: string
+}
+
 export type AiPromptKey = 'describe' | 'impact' | 'review'
 
 export interface AiPrompt {

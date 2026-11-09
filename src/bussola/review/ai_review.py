@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from itertools import accumulate
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -44,7 +44,7 @@ AI_EMAIL_DOMAIN = "ai.bussola.invalid"
 IMPACT_ORDER = {Impact.HIGH: 0, Impact.MEDIUM: 1, Impact.LOW: 2}
 UNRATED_ORDER = IMPACT_ORDER[Impact.MEDIUM]
 MAX_FINDING_CHARACTERS = MAX_BODY_LENGTH - 1_000
-CLIPPED_FINDING = "\n\n[The rest of this finding was too long to keep.]"
+CLIPPED_COMMENT = "\n\n[The rest of this comment was too long to keep.]"
 MAX_TITLE_CHARACTERS = 120
 
 type RaisedKey = tuple[str, str | None, str | None, str | None, int | None, str]
@@ -82,14 +82,25 @@ class Finding(BaseModel):
     @field_validator("body")
     @classmethod
     def _trimmed(cls, body: str) -> str:
-        text = body.strip()
-        if not text:
-            raise ValueError("must not be blank")
-        return text if len(text) <= MAX_FINDING_CHARACTERS else text[:MAX_FINDING_CHARACTERS] + CLIPPED_FINDING
+        return clipped_body(body)
 
     @property
     def heading(self) -> str:
         return f"{SEVERITY_MARKS[self.severity]} **{self.severity.value.capitalize()}:** {self.title}"
+
+
+class LinePlace(Protocol):
+    path: str
+    side: Literal["after", "before"]
+    start_line: int
+    end_line: int
+
+
+def clipped_body(body: str) -> str:
+    text = body.strip()
+    if not text:
+        raise ValueError("must not be blank")
+    return text if len(text) <= MAX_FINDING_CHARACTERS else text[:MAX_FINDING_CHARACTERS] + CLIPPED_COMMENT
 
 
 class ReviewFindings(BaseModel):
@@ -392,18 +403,18 @@ class _GroupReviewer:
         except AiCancelledError:
             raise
         except Exception as error:
-            self.record.part(self._units(group, {}) | {"lookups": _lookups(toolbox), "error": str(error) or type(error).__name__})
+            self.record.part(self._units(group, {}) | {"lookups": tool_lookups(toolbox), "error": str(error) or type(error).__name__})
             context.store.commit()
             raise
         findings = [{"thread_id": thread.id, "place": place, "body": body} for thread, place, body in created]
-        part = self._units(group, rated) | {"summary": answer.summary.strip(), "findings": findings, "lookups": _lookups(toolbox), "error": None}
+        part = self._units(group, rated) | {"summary": answer.summary.strip(), "findings": findings, "lookups": tool_lookups(toolbox), "error": None}
         self.record.part(part)
         context.store.commit()
         return len(created)
 
     def _prompt(self, group: list[UnitSnapshot], views: list[ThreadView]) -> str:
         revision, clip = self.job.revision, self.job.limit is not None
-        pull_request = _pull_request_text(self.job.context)
+        pull_request = pull_request_text(self.job.context)
         lines = [f"Reviewed commits: before {revision.merge_base_sha}, after {revision.head_sha}", ""]
         if pull_request:
             lines += ["The pull request:", *marked("description", pull_request, clip=clip), ""]
@@ -446,7 +457,7 @@ class _GroupReviewer:
             key = _request_key(request)
             if key in raised:
                 continue
-            created.append((create_thread(ai_context, self.job.revision, request), _request_place(request), request.body))
+            created.append((create_thread(ai_context, self.job.revision, request), request_place(request), request.body))
             raised.add(key)
             if request.snapshot is not None:
                 per_unit[request.snapshot.id] += 1
@@ -466,18 +477,21 @@ class _GroupReviewer:
 
 
 def place_finding(finding: Finding, group: list[UnitSnapshot], snapshots: list[UnitSnapshot]) -> NewThread:
-    focus = {snapshot.id for snapshot in group}
-    named = [snapshot for snapshot in snapshots if finding.path in {snapshot.path, snapshot.old_path}]
-    for side in (SIDES[finding.side], Side.BASE if SIDES[finding.side] == Side.HEAD else Side.HEAD):
+    return place_comment(finding, f"{finding.heading}\n\n", finding.body, snapshots, {snapshot.id for snapshot in group})
+
+
+def place_comment(place: LinePlace, heading: str, body: str, snapshots: list[UnitSnapshot], focus: set[int]) -> NewThread:
+    named = [snapshot for snapshot in snapshots if place.path in {snapshot.path, snapshot.old_path}]
+    for side in (SIDES[place.side], Side.BASE if SIDES[place.side] == Side.HEAD else Side.HEAD):
         candidates = [snapshot for snapshot in named if side_lines(snapshot, side)]
         if candidates:
-            snapshot = min(candidates, key=lambda snapshot: (_distance(snapshot, side, finding.start_line), snapshot.id not in focus))
+            snapshot = min(candidates, key=lambda snapshot: (_distance(snapshot, side, place.start_line), snapshot.id not in focus))
             numbers = [line.file_line for line in side_lines(snapshot, side)]
-            first, last = sorted((_nearest(numbers, finding.start_line), _nearest(numbers, finding.end_line)))
-            return NewThread(ThreadScope.UNIT, f"{finding.heading}\n\n{finding.body}", snapshot, side=side, line_offset=first, line_count=last - first + 1)
+            first, last = sorted((_nearest(numbers, place.start_line), _nearest(numbers, place.end_line)))
+            return NewThread(ThreadScope.UNIT, f"{heading}{body}", snapshot, side=side, line_offset=first, line_count=last - first + 1)
     if named:
-        return NewThread(ThreadScope.FILE, f"{finding.heading}\n\nLine {finding.start_line}: {finding.body}", path=named[0].path)
-    return NewThread(ThreadScope.REVIEW, f"{finding.heading}\n\nOn `{finding.path}`, line {finding.start_line}:\n\n{finding.body}")
+        return NewThread(ThreadScope.FILE, f"{heading}Line {place.start_line}: {body}", path=named[0].path)
+    return NewThread(ThreadScope.REVIEW, f"{heading}On `{place.path}`, line {place.start_line}:\n\n{body}")
 
 
 def _distance(snapshot: UnitSnapshot, side: Side, line: int) -> int:
@@ -489,7 +503,7 @@ def _nearest(numbers: list[int | None], wanted: int) -> int:
     return min(range(len(numbers)), key=lambda index: (numbers[index] is None, abs((numbers[index] or 0) - wanted)))
 
 
-def _request_place(request: NewThread) -> str:
+def request_place(request: NewThread) -> str:
     snapshot, offset = request.snapshot, request.line_offset
     if request.scope == ThreadScope.REVIEW:
         return "The whole pull request"
@@ -501,7 +515,7 @@ def _request_place(request: NewThread) -> str:
     return f"{unit_label(snapshot)}, {span} {'before' if request.side == Side.BASE else 'after'}"
 
 
-def _lookups(toolbox: Toolbox) -> list[dict[str, Any]]:
+def tool_lookups(toolbox: Toolbox) -> list[dict[str, Any]]:
     return [{"tool": call.name, "arguments": call.arguments, "result": call.result, "error": call.error} for call in toolbox.log]
 
 
@@ -545,7 +559,7 @@ def _thread_place(view: ThreadView) -> str:
     return f"On {unit}, {span} {side}: {selected_lines(thread)[0].strip()}"
 
 
-def _pull_request_text(context: ReviewContext) -> str | None:
+def pull_request_text(context: ReviewContext) -> str | None:
     link = context.store.forge.link(context.review.id)
     if link is None:
         return None
