@@ -23,10 +23,13 @@ async function serveRedirectPage(page: Page) {
 
 test('the redirect page opens the bussola link of its path and offers GitHub and the install steps', async ({ page }) => {
   const requested = await serveRedirectPage(page)
+  await page.clock.install()
   await page.goto(`${SITE}/github.com/acme/shop/pull/482/files#discussion_r123`, { waitUntil: 'commit' })
 
   await expect(page.getByText('Opening bussola://github.com/acme/shop/pull/482/files#discussion_r123 in bussola.')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Open in bussola' })).toHaveAttribute('href', 'bussola://github.com/acme/shop/pull/482/files#discussion_r123')
+  await expect(page.getByText('Nothing happened?')).toBeHidden()
+  await page.clock.runFor(1500)
   await expect(page.getByText('Nothing happened?')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Open it on GitHub' })).toHaveAttribute('href', 'https://github.com/acme/shop/pull/482/files#discussion_r123')
   await expect(page.getByRole('link', { name: 'Install bussola' })).toBeVisible()
