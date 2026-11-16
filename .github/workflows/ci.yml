@@ -48,6 +48,7 @@ jobs:
       - run: npm --prefix frontend run lint
       - run: npm --prefix frontend run typecheck
       - run: npm --prefix frontend test
+      - run: node --test redirect/link.test.js
       - run: npm --prefix frontend run build
       - run: npx --prefix frontend playwright install chromium
       - run: npm --prefix frontend run e2e
