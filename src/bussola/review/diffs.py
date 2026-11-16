@@ -40,7 +40,7 @@ class UnitDiff:
 class EarlierVersion:
     mode: DiffMode
     head_hash: str | None
-    text: str | None
+    lines: list[UnitLine] | None
 
 
 @dataclass(frozen=True)
@@ -48,30 +48,36 @@ class DiffChoice:
     effective: DiffMode
     available: list[DiffMode]
     approved_text_unavailable: bool
+    earlier_lines: list[UnitLine] | None = None
 
 
-def approved_version(approval: Approval | None) -> EarlierVersion | None:
-    return None if approval is None else EarlierVersion(DiffMode.APPROVED, approval.head_hash, approval.approved_text)
+def approved_version(approval: Approval) -> EarlierVersion:
+    text = approval.approved_text
+    lines = None if text is None else [UnitLine(line.text, index + 1) for index, line in enumerate(unit_lines(text, []))]
+    return EarlierVersion(DiffMode.APPROVED, approval.head_hash, lines)
+
+
+def reviewed_version(reviewed: UnitSnapshot) -> EarlierVersion:
+    return EarlierVersion(DiffMode.REVIEWED, reviewed.head_hash, side_lines(reviewed, Side.HEAD))
 
 
 def choose_diff_mode(snapshot: UnitSnapshot, earlier: EarlierVersion | None, requested: DiffMode | None) -> DiffChoice:
     if earlier is None or earlier.head_hash == snapshot.head_hash:
         return DiffChoice(DiffMode.BASE, [DiffMode.BASE], approved_text_unavailable=False)
-    has_text = earlier.text is not None
-    wanted = requested or (earlier.mode if has_text else DiffMode.BASE)
-    effective = earlier.mode if wanted == earlier.mode and has_text else DiffMode.BASE
-    return DiffChoice(effective, [DiffMode.BASE, earlier.mode], wanted == earlier.mode and not has_text)
+    has_lines = earlier.lines is not None
+    wanted = requested or (earlier.mode if has_lines else DiffMode.BASE)
+    available = [DiffMode.BASE, earlier.mode]
+    if wanted == earlier.mode and has_lines:
+        return DiffChoice(earlier.mode, available, approved_text_unavailable=False, earlier_lines=earlier.lines)
+    return DiffChoice(DiffMode.BASE, available, approved_text_unavailable=wanted == earlier.mode)
 
 
-def build_diff(snapshot: UnitSnapshot, mode: DiffMode, earlier: EarlierVersion | None) -> UnitDiff:
+def build_diff(snapshot: UnitSnapshot, choice: DiffChoice) -> UnitDiff:
     new = side_lines(snapshot, Side.HEAD)
-    if mode != DiffMode.BASE and earlier is not None and earlier.text is not None:
-        old = [UnitLine(line.text, index + 1) for index, line in enumerate(unit_lines(earlier.text, []))]
-    else:
-        old = side_lines(snapshot, Side.BASE)
-    with_hashes = mode == DiffMode.BASE and UnitKind(snapshot.kind) in ROW_APPROVABLE_KINDS
+    old = side_lines(snapshot, Side.BASE) if choice.earlier_lines is None else choice.earlier_lines
+    with_hashes = choice.earlier_lines is None and UnitKind(snapshot.kind) in ROW_APPROVABLE_KINDS
     rows, unified = compare_lines(old, new, snapshot.old_path or snapshot.path, snapshot.path, with_hashes=with_hashes)
-    return UnitDiff(mode, rows, unified, is_binary(snapshot))
+    return UnitDiff(choice.effective, rows, unified, is_binary(snapshot))
 
 
 def compare_lines(old: Sequence[UnitLine], new: Sequence[UnitLine], old_path: str, new_path: str, *, with_hashes: bool = False) -> tuple[list[DiffRow], str]:
