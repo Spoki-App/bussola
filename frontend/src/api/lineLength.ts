@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 
 import { getJson } from './client'
 
@@ -13,5 +13,6 @@ export function useLineLength(reviewId: number, revisionId: number | undefined) 
     queryFn: () => getJson<LineLength>(`/reviews/${String(reviewId)}/line-length?revision_id=${String(revisionId)}`),
     enabled: revisionId !== undefined,
     staleTime: Infinity,
+    placeholderData: keepPreviousData,
   })
 }

@@ -23,6 +23,10 @@ def _line_length(api: ApiClient, git_repo: GitFixture, files: dict[str, FileCont
         ({"ruff.toml": "line-length = 140\n", "pyproject.toml": "[tool.ruff]\nline-length = 90\n"}, (140, "ruff.toml")),
         ({".ruff.toml": "line-length = 150\n", "ruff.toml": "line-length = 140\n"}, (150, ".ruff.toml")),
         ({".prettierrc": '{ "semi": false, "printWidth": 160 }\n'}, (160, ".prettierrc")),
+        ({"pyproject.toml": '[tool.ruff]\nselect = ["E"]\n\n[tool.black]\nline-length = 100\n'}, (88, "pyproject.toml ruff")),
+        ({"ruff.toml": '[lint]\nselect = ["E"]\n'}, (88, "ruff.toml")),
+        ({".prettierrc": '{"overrides": [{"files": "*.md", "options": {"printWidth": 80}}], "printWidth": 120}'}, (120, ".prettierrc")),
+        ({".prettierrc": "# printWidth: 100\noverrides:\n  - files: '*.md'\n    options:\n      printWidth: 80\nprintWidth: 140\n"}, (140, ".prettierrc")),
         ({".prettierrc.yaml": "semi: false\nprintWidth: 100\n"}, (100, ".prettierrc.yaml")),
         ({".prettierrc.toml": "printWidth = 90\n"}, (90, ".prettierrc.toml")),
         ({"package.json": '{"name": "web", "prettier": {"printWidth": 110}}\n'}, (110, "package.json prettier")),
@@ -44,6 +48,7 @@ def test_line_length_is_read_from_the_repository(api: ApiClient, git_repo: GitFi
         {"pyproject.toml": "[tool.isort]\nline_length = 100\n"},
         {"package.json": '{"prettier": "@company/prettier-config"}'},
         {"package.json": "not json"},
+        {".prettierrc": '{"overrides": [{"files": "*.md", "options": {"printWidth": 80}}]}'},
     ],
 )
 def test_line_length_falls_back_to_120(api: ApiClient, git_repo: GitFixture, files: dict[str, FileContent]) -> None:

@@ -7,6 +7,7 @@ from functools import cache
 from typing import cast
 
 DEFAULT_LINE_LENGTH = 120
+RUFF_DEFAULT_LINE_LENGTH = 88
 MIN_LINE_LENGTH = 20
 MAX_LINE_LENGTH = 400
 
@@ -14,7 +15,7 @@ type ReadFile = Callable[[str], bytes | None]
 
 _EDITORCONFIG_SECTION = re.compile(r"^\s*\[(.*)\]\s*$")
 _EDITORCONFIG_LENGTH = re.compile(r"^\s*max_line_length\s*=\s*(\d+)\s*(?:[#;].*)?$", re.IGNORECASE)
-_PRETTIER_PRINT_WIDTH = re.compile(r"""["']?\bprintWidth["']?\s*[:=]\s*(\d+)""")
+_YAML_PRINT_WIDTH = re.compile(r"""^["']?printWidth["']?\s*:\s*(\d+)\s*(?:#.*)?$""", re.MULTILINE)
 
 
 @dataclass(frozen=True)
@@ -47,33 +48,43 @@ def _toml(text: str) -> object:
         return None
 
 
-def _toml_field(*keys: str) -> Callable[[str], object]:
-    return lambda text: _field(_toml(text), *keys)
+def _ruff(*keys: str) -> Callable[[str], object]:
+    def find(text: str) -> object:
+        settings = _field(_toml(text), *keys)
+        return cast(dict[str, object], settings).get("line-length", RUFF_DEFAULT_LINE_LENGTH) if isinstance(settings, dict) else None
+
+    return find
 
 
-def _prettier_file(text: str) -> object:
-    found = _PRETTIER_PRINT_WIDTH.search(text)
-    return int(found.group(1)) if found else None
-
-
-def _package_json(text: str) -> object:
+def _json(text: str) -> object:
     try:
-        return _field(json.loads(text), "prettier", "printWidth")
+        return json.loads(text)
     except ValueError:
         return None
 
 
+def _yaml_print_width(text: str) -> object:
+    found = _YAML_PRINT_WIDTH.search(text)
+    return int(found.group(1)) if found else None
+
+
+def _prettierrc(text: str) -> object:
+    config = _json(text)
+    return _field(config, "printWidth") if config is not None else _yaml_print_width(text)
+
+
 _SOURCES: tuple[tuple[str, str, Callable[[str], object]], ...] = (
     (".editorconfig", ".editorconfig", _editorconfig),
-    (".ruff.toml", ".ruff.toml", _toml_field("line-length")),
-    ("ruff.toml", "ruff.toml", _toml_field("line-length")),
-    ("pyproject.toml", "pyproject.toml ruff", _toml_field("tool", "ruff", "line-length")),
-    ("pyproject.toml", "pyproject.toml black", _toml_field("tool", "black", "line-length")),
-    *(
-        (name, name, _prettier_file)
-        for name in (".prettierrc", ".prettierrc.json", ".prettierrc.json5", ".prettierrc.yaml", ".prettierrc.yml", ".prettierrc.toml")
-    ),
-    ("package.json", "package.json prettier", _package_json),
+    (".ruff.toml", ".ruff.toml", _ruff()),
+    ("ruff.toml", "ruff.toml", _ruff()),
+    ("pyproject.toml", "pyproject.toml ruff", _ruff("tool", "ruff")),
+    ("pyproject.toml", "pyproject.toml black", lambda text: _field(_toml(text), "tool", "black", "line-length")),
+    (".prettierrc", ".prettierrc", _prettierrc),
+    (".prettierrc.json", ".prettierrc.json", lambda text: _field(_json(text), "printWidth")),
+    (".prettierrc.yaml", ".prettierrc.yaml", _yaml_print_width),
+    (".prettierrc.yml", ".prettierrc.yml", _yaml_print_width),
+    (".prettierrc.toml", ".prettierrc.toml", lambda text: _field(_toml(text), "printWidth")),
+    ("package.json", "package.json prettier", lambda text: _field(_json(text), "prettier", "printWidth")),
 )
 
 
