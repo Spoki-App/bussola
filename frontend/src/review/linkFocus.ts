@@ -204,6 +204,11 @@ function linkRole(state: LinkState | null, elementId: string, unitId: number | n
 
 const noLink = () => () => undefined
 
+export function useLinkedElementId(): string | null {
+  const link = useContext(LinkScrollContext)
+  return useSyncExternalStore(link?.subscribe ?? noLink, () => link?.current()?.target.elementId ?? null)
+}
+
 const USER_INPUT_EVENTS = ['wheel', 'touchmove', 'keydown', 'mousedown'] as const
 const MOVE_TOLERANCE_PX = 2
 const FOLLOW_LINK_MS = 15_000

@@ -75,6 +75,10 @@ export function isOpen(thread: Thread): boolean {
   return thread.resolvable && thread.status === 'open'
 }
 
+export function isResolved(thread: Thread): boolean {
+  return thread.resolvable && thread.status === 'resolved'
+}
+
 export function isInline(thread: Thread): boolean {
   return thread.scope === 'unit' && thread.anchor !== null && !thread.anchor.outdated && thread.anchor.unit_id !== null
 }

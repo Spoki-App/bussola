@@ -1,10 +1,10 @@
-import { useContext, useState, useSyncExternalStore } from 'react'
+import { useState } from 'react'
 
 import { describeError } from '../api/client'
 import { useCreateThread } from '../api/threads'
 import type { Thread } from '../api/types'
-import { LinkScrollContext, showThread, threadElementId } from '../review/linkFocus'
-import { isInline, isOpen } from '../review/threadPlacement'
+import { showThread, threadElementId, useLinkedElementId } from '../review/linkFocus'
+import { isInline, isOpen, isResolved } from '../review/threadPlacement'
 import { readStored, writeStored } from '../settings/storage'
 import { ErrorNote } from './Badges'
 import { Composer } from './Composer'
@@ -28,20 +28,10 @@ function storedKind(): Kind {
   return stored === 'general' || stored === 'code' ? stored : 'all'
 }
 
-function isResolved(thread: Thread): boolean {
-  return thread.resolvable && thread.status === 'resolved'
-}
-
-const noLink = () => () => undefined
-
-function useLinkedElementId(): string | null {
-  const link = useContext(LinkScrollContext)
-  return useSyncExternalStore(link?.subscribe ?? noLink, () => link?.current()?.target.elementId ?? null)
-}
-
 function inlineLabel(thread: Thread): string {
   const line = thread.anchor?.file_line
-  const place = line == null ? thread.path ?? '' : `${thread.path ?? ''}:${String(line)}`
+  const path = thread.path ?? ''
+  const place = line == null ? path : `${path}:${String(line)}`
   return thread.qualified_name ? `${thread.qualified_name} (${place})` : place
 }
 
@@ -69,11 +59,20 @@ export function ThreadPanel({ reviewId, threads }: Props) {
   const [kind, setKind] = useState(storedKind)
   const [showResolved, setShowResolved] = useState(() => readStored(RESOLVED_KEY) === 'true')
   const linkedId = useLinkedElementId()
-  const shown = threads.filter((thread) => showResolved || !isResolved(thread) || threadElementId(thread.id) === linkedId)
+  const linked = threads.find((thread) => threadElementId(thread.id) === linkedId && !isInline(thread))
+  if (linked && !showResolved && isResolved(linked)) {
+    setShowResolved(true)
+  }
+  if (linked && kind !== 'all' && (linked.scope === 'review') !== (kind === 'general')) {
+    setKind('all')
+  }
+  const showGeneral = kind !== 'code'
+  const shown = showResolved ? threads : threads.filter((thread) => !isResolved(thread))
+  const code = kind === 'general' ? [] : shown
   const general = shown.filter((thread) => thread.scope === 'review')
-  const files = shown.filter((thread) => thread.scope === 'file')
-  const inline = shown.filter(isInline)
-  const elsewhere = shown.filter((thread) => thread.scope === 'unit' && !isInline(thread))
+  const files = code.filter((thread) => thread.scope === 'file')
+  const inline = code.filter(isInline)
+  const elsewhere = code.filter((thread) => thread.scope === 'unit' && !isInline(thread))
   const resolvedCount = threads.filter(isResolved).length
   const open = threads.filter(isOpen).length
 
@@ -102,7 +101,7 @@ export function ThreadPanel({ reviewId, threads }: Props) {
           {`Show resolved (${String(resolvedCount)})`}
         </label>
       </div>
-      {kind !== 'code' && (
+      {showGeneral && (
         <section>
           <h3>Review</h3>
           {general.map((thread) => (
@@ -118,7 +117,7 @@ export function ThreadPanel({ reviewId, threads }: Props) {
           {create.error && <ErrorNote message={describeError(create.error)} />}
         </section>
       )}
-      {kind !== 'general' && inline.length > 0 && (
+      {inline.length > 0 && (
         <section>
           <h3>In the code</h3>
           <ul className="thread-jumps">
@@ -133,7 +132,7 @@ export function ThreadPanel({ reviewId, threads }: Props) {
           </ul>
         </section>
       )}
-      {kind !== 'general' && files.length > 0 && (
+      {files.length > 0 && (
         <section>
           <h3>Files</h3>
           {files.map((thread) => (
@@ -144,7 +143,7 @@ export function ThreadPanel({ reviewId, threads }: Props) {
           ))}
         </section>
       )}
-      {kind !== 'general' && elsewhere.length > 0 && (
+      {elsewhere.length > 0 && (
         <section>
           <h3>Outdated or not shown</h3>
           {elsewhere.map((thread) => (
@@ -155,7 +154,7 @@ export function ThreadPanel({ reviewId, threads }: Props) {
           ))}
         </section>
       )}
-      {kind === 'code' && inline.length + files.length + elsewhere.length === 0 && <p className="muted">No comments on code</p>}
+      {!showGeneral && inline.length + files.length + elsewhere.length === 0 && <p className="muted">No comments on code</p>}
     </div>
   )
 }

@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { Thread } from '../api/types'
+import { LinkScrollContext, createLinkScroll } from '../review/linkFocus'
 import { ThreadPanel } from './ThreadPanel'
 
 const outdated: Thread = {
@@ -88,6 +89,27 @@ describe('ThreadPanel filters', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Show resolved (1)' }))
 
     expect(screen.getByText('subtotal')).toBeTruthy()
+  })
+
+  it('shows a hidden thread that a link points at', () => {
+    Element.prototype.scrollIntoView = () => undefined
+    window.localStorage.setItem('bussola.conversationFilter', 'general')
+    const link = createLinkScroll()
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <LinkScrollContext value={link}>
+          <ThreadPanel reviewId={1} threads={[resolved]} />
+        </LinkScrollContext>
+      </QueryClientProvider>,
+    )
+    expect(screen.queryByText('subtotal')).toBeNull()
+
+    act(() => { link.start({ unitId: null, elementId: 'thread-t4' }) })
+
+    expect(screen.getByText('subtotal')).toBeTruthy()
+    expect(screen.getByRole('checkbox', { name: 'Show resolved (1)' })).toBeChecked()
+    expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true')
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
   })
 })
 

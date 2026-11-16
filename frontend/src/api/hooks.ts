@@ -42,7 +42,7 @@ function diffVersion(unit: Unit): string {
 }
 
 export function useMe() {
-  return useQuery({ queryKey: ['me'], queryFn: () => getJson<Reviewer>('/me') })
+  return useQuery({ queryKey: ['me'], queryFn: () => getJson<Reviewer>('/me'), staleTime: Infinity })
 }
 
 export function useRepos() {

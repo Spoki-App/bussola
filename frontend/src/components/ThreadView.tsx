@@ -12,6 +12,7 @@ import { ReplyBox } from './ReplyBox'
 import { threadElementId, useLinkedScroll } from '../review/linkFocus'
 import { ReviewLinkContext } from '../review/reviewLink'
 import { plural } from '../review/text'
+import { isResolved } from '../review/threadPlacement'
 
 interface Props {
   reviewId: number
@@ -20,7 +21,7 @@ interface Props {
 }
 
 export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
-  const resolved = thread.resolvable && thread.status === 'resolved'
+  const resolved = isResolved(thread)
   const { ref: linkedRef, linked } = useLinkedScroll<HTMLDivElement>(threadElementId(thread.id))
   const [collapsed, setCollapsed] = useState(resolved)
   if (linked && collapsed) {
