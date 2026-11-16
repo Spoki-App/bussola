@@ -25,9 +25,9 @@ function rowsOf(operations: AiOperation[]): Rows {
   return Object.fromEntries(operations.map((operation) => [operation.key, { model: operation.model ?? '', effort: operation.effort ?? '' }])) as Rows
 }
 
-function choicesOf(rows: Rows): Record<AiOperationKey, AiOperationChoice> {
+function choicesOf(rows: Rows, takes: (model: string) => boolean): Record<AiOperationKey, AiOperationChoice> {
   return Object.fromEntries(
-    Object.entries(rows).map(([key, row]) => [key, { model: row.model.trim() || null, effort: row.effort === '' ? null : row.effort }]),
+    Object.entries(rows).map(([key, row]) => [key, { model: row.model.trim() || null, effort: row.effort === '' || !takes(row.model) ? null : row.effort }]),
   ) as Record<AiOperationKey, AiOperationChoice>
 }
 
@@ -53,6 +53,7 @@ function ModelsForm({ ai, models }: { ai: AiStatus; models: AiModels | undefined
   const [saved, setSaved] = useState(false)
   const save = useSaveAiOperations()
   const listed = models?.models ?? []
+  const takes = (model: string) => takesEffort(listed, model.trim() || ai.model)
   const update = (key: AiOperationKey, change: Partial<Row>) => {
     setRows({ ...rows, [key]: { ...rows[key], ...change } })
     setSaved(false)
@@ -63,7 +64,7 @@ function ModelsForm({ ai, models }: { ai: AiStatus; models: AiModels | undefined
       className="stack ai-form"
       onSubmit={(event) => {
         event.preventDefault()
-        save.mutate(choicesOf(rows), { onSuccess: (answer) => { setRows(rowsOf(answer.operations)); setSaved(true) } })
+        save.mutate(choicesOf(rows, takes), { onSuccess: (answer) => { setRows(rowsOf(answer.operations)); setSaved(true) } })
       }}
     >
       <p className="muted">
@@ -78,7 +79,7 @@ function ModelsForm({ ai, models }: { ai: AiStatus; models: AiModels | undefined
       </datalist>
       {ai.operations.map((operation) => {
         const row = rows[operation.key]
-        const effort = takesEffort(listed, row.model.trim() || ai.model)
+        const effort = takes(row.model)
         return (
           <fieldset key={operation.key} className="stack ai-operation">
             <legend>{operation.title}</legend>

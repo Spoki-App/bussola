@@ -65,6 +65,22 @@ describe('AiModelsPanel', () => {
     expect(screen.getByLabelText('Describe effort')).toBeEnabled()
   })
 
+  it('does not save an effort for a model that does not take one', async () => {
+    const fetchMock = renderPanel({ models: [{ id: 'claude-haiku-4-5', effort: false }], problem: null })
+
+    const impactModel = await screen.findByLabelText('Rate impact model')
+    await waitFor(() => {
+      expect(document.querySelectorAll('datalist option')).toHaveLength(1)
+    })
+    fireEvent.change(impactModel, { target: { value: 'claude-haiku-4-5' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save models' }))
+
+    expect(await screen.findByText('Saved')).toBeInTheDocument()
+    const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT')
+    const body = put?.[1]?.body
+    expect(JSON.parse(typeof body === 'string' ? body : '{}')).toMatchObject({ impact: { model: 'claude-haiku-4-5', effort: null } })
+  })
+
   it('saves every operation, with blank models left to the global model', async () => {
     const fetchMock = renderPanel({ models: [], problem: 'models answered HTTP 404' })
 

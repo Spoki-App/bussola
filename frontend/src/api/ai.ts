@@ -14,6 +14,7 @@ export function useAiStatus(repoId?: number) {
 }
 
 const aiConfigKey = ['ai-config'] as const
+const aiModelsKey = ['ai-models'] as const
 
 export function useAiConfig() {
   return useQuery({ queryKey: aiConfigKey, queryFn: () => getJson<AiConfig>('/ai/config'), retry: false })
@@ -23,7 +24,12 @@ export function useSaveAiConfig() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (fields: AiConfigFields) => putJson<AiStatus>('/ai/config', fields),
-    onSuccess: () => Promise.all([client.invalidateQueries({ queryKey: ['ai'] }), client.invalidateQueries({ queryKey: aiConfigKey })]),
+    onSuccess: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['ai'] }),
+        client.invalidateQueries({ queryKey: aiConfigKey }),
+        client.invalidateQueries({ queryKey: aiModelsKey }),
+      ]),
   })
 }
 
@@ -66,5 +72,5 @@ export function useSaveAiOperations() {
 }
 
 export function useAiModels(enabled: boolean) {
-  return useQuery({ queryKey: ['ai-models'], queryFn: () => getJson<AiModels>('/ai/models'), retry: false, staleTime: Infinity, enabled })
+  return useQuery({ queryKey: aiModelsKey, queryFn: () => getJson<AiModels>('/ai/models'), retry: false, staleTime: Infinity, enabled })
 }
