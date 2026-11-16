@@ -163,6 +163,26 @@ def test_the_same_change_described_again_reuses_the_cached_answer(billing: GitFi
     assert len(provider.requests) == 1
 
 
+def test_a_cached_answer_keeps_the_lookups_and_ignores_changes_to_other_units(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    def answer(request: AiRequest) -> Json:
+        assert request.tools is not None
+        request.tools.call("search", {"text": "total", "side": "after"})
+        return INSIGHT
+
+    provider = FakeProvider(answer)
+    api = ai_client(billing, data_dir, config_file, provider)
+    review_id = api.start_review()
+    describe(api, review_id, "app.py::total")
+    billing.commit({"shop.py": "def label():\n    return 'shop'\n"}, "add shop")
+    api.refresh(review_id)
+
+    again = describe(api, review_id, "app.py::total")
+
+    assert len(provider.requests) == 1
+    assert [lookup["tool"] for lookup in again["lookups"]] == ["search"]
+    assert descriptions(api, review_id)[api.unit(review_id, "app.py::total")["id"]]["outdated"] is False
+
+
 def test_nothing_is_sent_when_the_provider_changed_since_it_was_confirmed(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
     provider = FakeProvider(INSIGHT)
     api = ai_client(billing, data_dir, config_file, provider)

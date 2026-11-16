@@ -155,10 +155,11 @@ def is_outdated(description: UnitDescription, snapshot: UnitSnapshot) -> bool:
 def describe_unit(snapshot: UnitSnapshot, runner: AiRunner, cancellation: Cancellation, other_units: Sequence[str], *, regenerate: bool = False) -> UnitInsight:
     if is_binary(snapshot):
         raise InvalidRequestError("Binary files cannot be described")
-    prompt = unit_prompt(snapshot, numbered=True)
+    unit = unit_prompt(snapshot, numbered=True)
+    prompt = unit
     if other_units:
-        prompt = "\n".join([prompt, "The other units this pull request changes, which you can open with unit_diff:", *marked("units", "\n".join(other_units))])
-    return runner.run(DESCRIBE_UNIT, prompt, cancellation, content_hash=hashlib.sha256(prompt.encode()).hexdigest(), refresh=regenerate)
+        prompt = "\n".join([unit, "The other units this pull request changes, which you can open with unit_diff:", *marked("units", "\n".join(other_units))])
+    return runner.run(DESCRIBE_UNIT, prompt, cancellation, content_hash=hashlib.sha256(unit.encode()).hexdigest(), refresh=regenerate)
 
 
 def rate_units(
