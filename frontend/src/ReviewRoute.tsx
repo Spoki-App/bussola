@@ -20,7 +20,6 @@ import { AskAiContext, sameRange, snippetLabel, type ChatSnippetDraft } from './
 import { linkFocusFromSearch, resolveLinkFocus } from './review/linkFocus'
 import { unitTitle } from './review/logic'
 import { moveLinksByUnit } from './review/moves'
-import { plural } from './review/text'
 import { draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, isOpen, nextDraft, threadRow, type Draft } from './review/threadPlacement'
 
 interface CompareStart {
@@ -99,23 +98,14 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
       if (draft?.unitId === unit.id && draft.mode === diff.mode && !draft.selecting) {
         const request = draftRequest(draft)
         const range = { unit_id: unit.id, ...request }
-        const isFirstRange = compareStart !== null && sameRange(compareStart.range, range)
-        const compare = () => {
-          if (compareStart) {
-            setComparison({ left: compareStart.range, right: range })
-            setCompareStart(null)
-          } else {
-            setCompareStart({ range, title: unitTitle(unit) })
-          }
-        }
         place(
           draftEndRow(draft, diff.rows),
           <div key="draft" className="thread draft">
             <div className="draft-header">
               <p className="muted draft-range">{request.line_count > 1 ? `Commenting on ${String(request.line_count)} lines` : ''}</p>
-              {!isFirstRange && (
-                <button type="button" className="link" title={compareStart ? `Compare with ${plural(compareStart.range.line_count, 'line')} of ${compareStart.title}` : 'Keep these lines as the first range, then select a second range to compare with'} onClick={compare}>
-                  {compareStart ? 'Compare with first range' : 'Compare with...'}
+              {!compareStart && (
+                <button type="button" className="link" title="Keep these lines as the first range, then compare them with another range or the clipboard" onClick={() => { setCompareStart({ range, title: unitTitle(unit) }) }}>
+                  Compare with...
                 </button>
               )}
               <AskAiButton snippet={{ range, label: snippetLabel(unit, request.line_count, request.side) }} onAsked={() => { setDraft(null) }} />
@@ -155,13 +145,8 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
     [moveLinks],
   )
   const fileActions = useCallback((path: string) => <FileCommentButton reviewId={reviewId} path={path} />, [reviewId])
-  const secondRange = useMemo(() => {
-    if (!compareStart || !draft || draft.selecting) {
-      return null
-    }
-    const range = { unit_id: draft.unitId, ...draftRequest(draft) }
-    return sameRange(compareStart.range, range) ? null : range
-  }, [compareStart, draft])
+  const draftRange = draft && !draft.selecting ? { unit_id: draft.unitId, ...draftRequest(draft) } : null
+  const secondRange = compareStart && draftRange && !sameRange(compareStart.range, draftRange) ? draftRange : null
   const compareWith = (request: ComparisonRequest) => {
     setComparison(request)
     setCompareStart(null)

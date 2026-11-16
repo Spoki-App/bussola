@@ -10,7 +10,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Changed
 
-- **Compare with clipboard** moved from the selected lines to the compare bar that opens after **Compare with...**, as a clipboard button next to **Compare with selection** and **Cancel**. The bar shows the first range as a chip with its unit and number of lines and a short hint for the next step, instead of one long sentence ([#83](https://github.com/Spoki-App/bussola/issues/83)).
+- The selected lines offer only **Compare with...** to start a comparison. The bar it opens shows the first range as a chip with its unit and number of lines and a short hint for the next step, instead of one long sentence, and holds the actions: **Compare with selection** (which replaces **Compare with first range** above the selected lines), a clipboard button for **Compare with clipboard** (moved from the selected lines) and **Cancel** ([#83](https://github.com/Spoki-App/bussola/issues/83)).
 
 ### Fixed
 

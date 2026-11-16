@@ -39,26 +39,24 @@ export function CompareBar({ title, lineCount, onCompareSelection, onCompareClip
   }
   return (
     <section className="compare-bar" aria-label="Compare ranges">
-      <div className="compare-bar-row">
-        <span className="compare-bar-label">First range</span>
-        <span className="compare-chip" title={`${plural(lineCount, 'line')} of ${title}`}>
-          <code>{title}</code>
-          <span className="muted">{plural(lineCount, 'line')}</span>
-        </span>
-        <span className="compare-bar-hint muted">
-          {hasSelection ? 'Compare it with the selected lines or the clipboard.' : 'Select a second range by its line numbers, or compare with the clipboard.'}
-        </span>
-        <div className="compare-bar-actions">
-          <button type="button" className="primary" disabled={!hasSelection} title={hasSelection ? 'Compare the first range with the selected lines' : 'Select a second range first'} onClick={onCompareSelection}>
-            Compare with selection
-          </button>
-          <button type="button" className="compare-clipboard" aria-label="Compare with clipboard" title="Compare with clipboard" onClick={compareClipboard}>
-            <ClipboardIcon />
-          </button>
-          <button type="button" onClick={onCancel}>
-            Cancel
-          </button>
-        </div>
+      <span className="compare-bar-label">First range</span>
+      <span className="move-link compare-chip" title={title}>
+        <code>{title}</code>
+        {plural(lineCount, 'line')}
+      </span>
+      <span className="compare-bar-hint muted">
+        {hasSelection ? 'Compare it with the selected lines or the clipboard.' : 'Select a second range by its line numbers, or compare with the clipboard.'}
+      </span>
+      <div className="compare-bar-actions">
+        <button type="button" className="primary" disabled={!hasSelection} title={hasSelection ? 'Compare the first range with the selected lines' : 'Select a second range first'} onClick={onCompareSelection}>
+          Compare with selection
+        </button>
+        <button type="button" className="compare-clipboard" aria-label="Compare with clipboard" title="Compare with clipboard" onClick={compareClipboard}>
+          <ClipboardIcon />
+        </button>
+        <button type="button" onClick={onCancel}>
+          Cancel
+        </button>
       </div>
       {error && <ErrorNote message={error} />}
     </section>
