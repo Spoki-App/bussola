@@ -115,6 +115,12 @@ class SqlReviewRepository(_SqlRepository):
     def get_snapshot(self, snapshot_id: int) -> UnitSnapshot | None:
         return self._session.get(UnitSnapshot, snapshot_id)
 
+    def find_snapshot(self, revision_id: int, path: str, kind: str, qualified_name: str) -> UnitSnapshot | None:
+        query = select(UnitSnapshot).where(
+            UnitSnapshot.revision_id == revision_id, UnitSnapshot.path == path, UnitSnapshot.kind == kind, UnitSnapshot.qualified_name == qualified_name
+        )
+        return self._session.scalars(query.limit(1)).first()
+
     def reviewer(self, email: str, name: str) -> Reviewer:
         existing = self._session.scalar(select(Reviewer).where(Reviewer.email == email))
         if existing is None:

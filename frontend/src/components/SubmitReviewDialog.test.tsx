@@ -209,6 +209,7 @@ const RUN: AiReviewRun = {
   provider: 'claude-code',
   provider_label: 'Claude Code',
   model: null,
+  effort: null,
   reviewed: 2,
   findings: 1,
   failed: 0,

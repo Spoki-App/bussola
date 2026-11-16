@@ -55,7 +55,7 @@ interface Props {
 
 const APPROVE_LABELS = { approve: 'Approve', approve_under_name: 'Approve under this name', confirm_removal: 'Confirm removal' } as const
 
-const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', base: 'Base → head' }
+const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', reviewed: 'Reviewed → current', base: 'Base → head' }
 
 function targetLine(target: LineLink | undefined, linkedLine: number | undefined): TargetLine | undefined {
   if (target) {
@@ -215,7 +215,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
     }
   }
 
-  const canSwitchMode = diff.data?.available_modes.includes('approved') ?? false
+  const earlierMode = diff.data?.available_modes.find((option) => option !== 'base')
 
   return (
     <article id={unitElementId(unit.id)} ref={linkedRef} className={`unit-card state-${unit.state}${focused ? ' focused' : ''}`} onClick={() => { onFocus(unit.id) }}>
@@ -245,9 +245,9 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
             }}
           />
         )}
-        {canSwitchMode && (
+        {earlierMode && (
           <div className="segmented" role="group" aria-label="Diff mode">
-            {(['approved', 'base'] as DiffMode[]).map((option) => (
+            {[earlierMode, 'base' as const].map((option) => (
               <button key={option} type="button" className={diff.data?.mode === option ? 'active' : ''} onClick={() => { setMode(option) }}>
                 {MODE_LABELS[option]}
               </button>

@@ -9,7 +9,7 @@ from bussola.review.diffs import DiffMode, build_diff, choose_diff_mode
 from bussola.review.images import image_type
 from bussola.review.keys import key_of
 from bussola.review.modules import ModulePaths
-from bussola.review.overview import UnitFilter, approval_set, unit_views
+from bussola.review.overview import UnitFilter, approval_set, earlier_version, unit_views
 from bussola.review.repos import open_repo
 from bussola.review.rows import Side, side_commit, side_path
 from bussola.review.states import compute_statuses
@@ -31,8 +31,8 @@ def get_diff(context: ContextDep, unit_id: int, mode: DiffMode | None = None) ->
     snapshot = snapshot_of(context, unit_id)
     approvals = approval_set(context)
     status = compute_statuses([snapshot], approvals)[snapshot.id]
-    choice = choose_diff_mode(snapshot, status.approval, mode)
-    diff = build_diff(snapshot, choice.effective, status.approval)
+    choice = choose_diff_mode(snapshot, earlier_version(context, snapshot, status.approval), mode, prefer_base=bool(status.approved_row_hashes))
+    diff = build_diff(snapshot, choice)
     selections = {row.row_hash: row.selection_id for row in approvals.row_approvals if key_of(row) == key_of(snapshot) and row.revoked_at is None}
     rows = [
         diff_row_out(

@@ -73,7 +73,7 @@ Open a new shell afterwards.
 The review header has two actions:
 
 - **Sync** (shortcut `r`) first fetches the branch from its remote (on a pull request review: the pull request's latest commits and comments from GitHub), then records any new commits as a new revision. Approvals of units that did not change are kept. If the remote or GitHub cannot be reached, it checks the local branch and says so. When the review is linked to a pull request, it then sends your unsent comments to GitHub (see below); the button shows how many are waiting, as in "Sync · 3 to send".
-- **Mark as reviewed** remembers where you are. It approves and closes nothing; the **Since my last review** filter then shows only what changes after this point.
+- **Mark as reviewed** remembers where you are. It approves and closes nothing; the **Since my last review** filter then shows only what changes after this point, and a unit that changes afterwards opens on the **Reviewed → current** diff, the changes since you marked it as reviewed, unless you approved it after that (switch to **Base → head** to see the whole change).
 
 The unit filter (**All**, **To review**, **Since my last review**) is kept in this browser, like the diff layout, so a reload or another review opens with the same choice.
 
@@ -96,7 +96,7 @@ Units that still need review start open and the others closed. Approving a unit 
 | New | Not approved yet |
 | Approved | You approved this exact content |
 | Approved (moved) | You approved the same content under another name or path, which no longer exists |
-| Changed since approval | You approved an earlier version; the diff shows approved to current by default |
+| Changed since approval | You approved an earlier version; the diff shows approved to current by default, or reviewed to current when you pressed **Mark as reviewed** after approving |
 | Partly approved | Some of the changed lines of a module or file are approved |
 | Removed | The unit was deleted; approving it confirms the deletion |
 

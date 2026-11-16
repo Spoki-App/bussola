@@ -1,7 +1,13 @@
-from tests.apiclient import ApiClient
+import pytest
+
+from tests.apiclient import ApiClient, Json
 from tests.gitrepo import GitFixture
 
 TWO_FUNCTIONS = "def first():\n    return 1\n\n\ndef second():\n    return 2\n"
+
+
+def changed_lines(diff: Json) -> list[tuple[str, str]]:
+    return [(row["change"], row["text"]) for row in diff["rows"] if row["change"] != "context"]
 
 
 def feature_with(git_repo: GitFixture, base: dict[str, str], change: dict[str, str]) -> None:
@@ -33,7 +39,7 @@ def test_modified_approved_function_is_changed_and_diff_shows_only_the_new_chang
 
     assert api.states(review) == {"app.py::first": "changed"}
     assert diff["mode"] == "approved"
-    changes = [(row["change"], row["text"]) for row in diff["rows"] if row["change"] != "context"]
+    changes = changed_lines(diff)
     assert changes == [("removed", "    b = 2"), ("added", "    b = 3")]
     assert api.diff(review, "app.py::first", mode="base")["mode"] == "base"
 
@@ -148,7 +154,7 @@ def test_approve_file_includes_units_identical_to_ones_approved_in_another_file(
 
     git_repo.commit({"b.py": "def second():\n    return 2\n"})
     api.refresh(review)
-    changes = [(row["change"], row["text"]) for row in api.diff(review, "b.py::second")["rows"] if row["change"] != "context"]
+    changes = changed_lines(api.diff(review, "b.py::second"))
 
     assert changes == [("removed", "    return 1"), ("added", "    return 2")]
 
@@ -177,6 +183,74 @@ def test_since_last_review_shows_only_units_touched_afterwards(api: ApiClient, g
 
     assert api.states(review, "todo") == {"app.py::second": "new", "app.py::third": "new"}
     assert api.states(review, "since_last") == {"app.py::third": "new"}
+
+
+def test_approved_and_reviewed_units_show_the_changes_since_that_review(api: ApiClient, git_repo: GitFixture) -> None:
+    feature_with(git_repo, {"app.py": TWO_FUNCTIONS}, {"app.py": TWO_FUNCTIONS.replace("return 1", "return 10").replace("return 2", "return 20")})
+    review = api.start_review()
+    api.approve(review, "app.py::first")
+    api.call("POST", f"/reviews/{review}/sessions", 201)
+
+    git_repo.commit({"app.py": TWO_FUNCTIONS.replace("return 1", "return 11").replace("return 2", "return 22")})
+    api.refresh(review)
+    approved = api.diff(review, "app.py::first")
+    reviewed = api.diff(review, "app.py::second")
+
+    assert (approved["mode"], approved["available_modes"]) == ("approved", ["base", "approved"])
+    assert changed_lines(approved) == [("removed", "    return 10"), ("added", "    return 11")]
+    assert (reviewed["mode"], reviewed["available_modes"]) == ("reviewed", ["base", "reviewed"])
+    assert changed_lines(reviewed) == [("removed", "    return 20"), ("added", "    return 22")]
+    assert [row["old_line"] for row in reviewed["rows"] if row["change"] == "removed"] == [6]
+    assert changed_lines(api.diff(review, "app.py::second", mode="base")) == [("removed", "    return 2"), ("added", "    return 22")]
+    assert api.diff(review, "app.py::second", mode="approved")["mode"] == "reviewed"
+
+
+def test_a_review_after_a_stale_approval_shows_the_changes_since_that_review(api: ApiClient, git_repo: GitFixture) -> None:
+    feature_with(git_repo, {"app.py": TWO_FUNCTIONS}, {"app.py": TWO_FUNCTIONS.replace("return 1", "return 10")})
+    review = api.start_review()
+    api.approve(review, "app.py::first")
+    git_repo.commit({"app.py": TWO_FUNCTIONS.replace("return 1", "return 11")})
+    api.refresh(review)
+
+    assert api.diff(review, "app.py::first")["mode"] == "approved"
+
+    api.call("POST", f"/reviews/{review}/sessions", 201)
+
+    assert api.diff(review, "app.py::first")["mode"] == "approved"
+
+    git_repo.commit({"app.py": TWO_FUNCTIONS.replace("return 1", "return 12")})
+    api.refresh(review)
+    diff = api.diff(review, "app.py::first")
+
+    assert (diff["mode"], diff["available_modes"]) == ("reviewed", ["base", "reviewed"])
+    assert changed_lines(diff) == [("removed", "    return 11"), ("added", "    return 12")]
+
+
+def test_a_review_shows_its_changes_when_the_approved_text_was_not_kept(api: ApiClient, git_repo: GitFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("bussola.review.approvals.APPROVED_TEXT_LIMIT_BYTES", 0)
+    feature_with(git_repo, {"app.py": TWO_FUNCTIONS}, {"app.py": TWO_FUNCTIONS.replace("return 1", "return 10")})
+    review = api.start_review()
+    api.approve(review, "app.py::first")
+    api.call("POST", f"/reviews/{review}/sessions", 201)
+
+    git_repo.commit({"app.py": TWO_FUNCTIONS.replace("return 1", "return 11")})
+    api.refresh(review)
+    diff = api.diff(review, "app.py::first")
+
+    assert (diff["mode"], diff["available_modes"]) == ("reviewed", ["base", "reviewed"])
+    assert changed_lines(diff) == [("removed", "    return 10"), ("added", "    return 11")]
+
+
+def test_a_unit_unchanged_since_the_last_review_shows_only_the_base_diff(api: ApiClient, git_repo: GitFixture) -> None:
+    feature_with(git_repo, {"app.py": TWO_FUNCTIONS}, {"app.py": TWO_FUNCTIONS.replace("return 1", "return 10")})
+    review = api.start_review()
+    api.call("POST", f"/reviews/{review}/sessions", 201)
+
+    git_repo.commit({"app.py": TWO_FUNCTIONS.replace("return 1", "return 10").replace("return 2", "return 20")})
+    api.refresh(review)
+    diff = api.diff(review, "app.py::first")
+
+    assert (diff["mode"], diff["available_modes"]) == ("base", ["base"])
 
 
 def test_hidden_child_units_are_shown_as_a_readable_placeholder(api: ApiClient, git_repo: GitFixture) -> None:

@@ -4,9 +4,10 @@ from datetime import datetime
 from enum import StrEnum
 
 from bussola.review.context import ReviewContext
+from bussola.review.diffs import EarlierVersion, approved_version, reviewed_version
 from bussola.review.keys import KeyTuple, key_of
 from bussola.review.states import DONE_STATES, ApprovalSet, UnitState, UnitStatus, compute_statuses
-from bussola.storage.models import Revision, UnitSnapshot
+from bussola.storage.models import Approval, Revision, UnitSnapshot
 
 
 class UnitFilter(StrEnum):
@@ -46,6 +47,18 @@ def seen_at_last_session(context: ReviewContext) -> set[tuple[KeyTuple, str | No
     snapshots = context.store.reviews.snapshots(session.revision_id)
     statuses = compute_statuses(snapshots, approval_set(context, session.completed_at))
     return {(key_of(snapshot), snapshot.head_hash) for snapshot in snapshots if statuses[snapshot.id].is_todo}
+
+
+def earlier_version(context: ReviewContext, snapshot: UnitSnapshot, approval: Approval | None) -> EarlierVersion | None:
+    approved = None if approval is None else approved_version(approval)
+    shown = approval if approved is not None and approved.lines is not None else None
+    session = context.store.reviews.last_session(context.review.id, context.reviewer.id)
+    if session is None or session.revision_id == snapshot.revision_id or (shown is not None and shown.created_at > session.completed_at):
+        return approved
+    reviewed = context.store.reviews.find_snapshot(session.revision_id, *key_of(snapshot))
+    if reviewed is None or reviewed.head_text is None or reviewed.head_hash in {snapshot.head_hash, shown and shown.head_hash}:
+        return approved
+    return reviewed_version(reviewed)
 
 
 def count_states(views: list[UnitView]) -> dict[UnitState, int]:
