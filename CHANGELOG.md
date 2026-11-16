@@ -10,6 +10,10 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 - **AI chat** in the panel on the right of the review page answers questions about the pull request, with its description, the units it changes and the conversation so far, and can follow the code with the same lookups as the AI review. Select lines and choose **Ask AI** to attach them to the next message. Ask it to add a comment and it adds one to the review as yours, on the lines it is about. Answers link to the lines they mention and list the lookups made and the comments added; the conversation is kept per review and **Clear** deletes it ([#77](https://github.com/Spoki-App/bussola/issues/77)).
 - **Describe** can follow the code with the same lookups as the AI review, finding what the unit calls, who calls it and the definitions it relies on before explaining the unit and rating its impact. The description block lists the lookups made, with their results, under **code lookups** ([#103](https://github.com/Spoki-App/bussola/issues/103)).
 
+### Changed
+
+- The selected lines offer only **Compare with...** to start a comparison. The bar it opens shows the first range as a chip with its unit and number of lines and a short hint for the next step, instead of one long sentence, and holds the actions: **Compare with selection** (which replaces **Compare with first range** above the selected lines), a clipboard button for **Compare with clipboard** (moved from the selected lines) and **Cancel** ([#83](https://github.com/Spoki-App/bussola/issues/83)).
+
 ### Fixed
 
 - Cmd+click on a method call, such as `order.requeue()`, no longer lists module-level functions with the same name when the language server cannot tell the type of the object: a call on an object lists methods, a plain call lists functions, and a call on an imported module still lists both ([#80](https://github.com/Spoki-App/bussola/issues/80)).

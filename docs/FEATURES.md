@@ -106,8 +106,8 @@ When code is moved or extracted, the diff shows a deletion here and an addition 
 ### How to use it
 
 1. Look for **moved to** and **moved from** next to a unit's title, and click one to see the two blocks side by side with the changed words marked.
-2. To compare two ranges, select lines by their numbers as for a comment and choose **Compare with...**, then select the second range anywhere in the review and choose **Compare with first range**. **Cancel** in the bar at the bottom drops the first range.
-3. To compare with code from elsewhere, copy it, select the lines and choose **Compare with clipboard**. The copied code is lined up with the indentation of your lines; the browser may ask once to let the page read the clipboard.
+2. To compare two ranges, select lines by their numbers as for a comment and choose **Compare with...**. The bar at the bottom shows this first range; select the second range anywhere in the review and choose **Compare with selection**. **Cancel** in the bar drops the first range.
+3. To compare with code from elsewhere, copy it, choose **Compare with...** on your lines and then the clipboard button in the bar (**Compare with clipboard**). The copied code is lined up with the indentation of your lines; the browser may ask once to let the page read the clipboard.
 
 Small blocks and trivial lines such as `}` or `else:` are left out of move detection, so common snippets do not show up as moves.
 
