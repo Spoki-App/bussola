@@ -6,6 +6,10 @@ from bussola.storage.models import Repo
 from bussola.storage.repositories import Store
 
 
+def repo_name(repo: Repo) -> str:
+    return Path(repo.path).name or repo.path
+
+
 def register_repo(store: Store, path: Path) -> Repo:
     try:
         git_repo = GitRepo.discover(path.expanduser())
