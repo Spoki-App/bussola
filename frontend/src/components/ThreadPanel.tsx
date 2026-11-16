@@ -59,12 +59,16 @@ export function ThreadPanel({ reviewId, threads }: Props) {
   const [kind, setKind] = useState(storedKind)
   const [showResolved, setShowResolved] = useState(() => readStored(RESOLVED_KEY) === 'true')
   const linkedId = useLinkedElementId()
+  const [widenedFor, setWidenedFor] = useState<string | null>(null)
   const linked = threads.find((thread) => threadElementId(thread.id) === linkedId && !isInline(thread))
-  if (linked && !showResolved && isResolved(linked)) {
-    setShowResolved(true)
-  }
-  if (linked && kind !== 'all' && (linked.scope === 'review') !== (kind === 'general')) {
-    setKind('all')
+  if (linked && linkedId !== widenedFor) {
+    setWidenedFor(linkedId)
+    if (!showResolved && isResolved(linked)) {
+      setShowResolved(true)
+    }
+    if (kind !== 'all' && (linked.scope === 'review') !== (kind === 'general')) {
+      setKind('all')
+    }
   }
   const showGeneral = kind !== 'code'
   const shown = showResolved ? threads : threads.filter((thread) => !isResolved(thread))

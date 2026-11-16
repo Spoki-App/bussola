@@ -109,6 +109,10 @@ describe('ThreadPanel filters', () => {
     expect(screen.getByText('subtotal')).toBeTruthy()
     expect(screen.getByRole('checkbox', { name: 'Show resolved (1)' })).toBeChecked()
     expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true')
+
+    fireEvent.click(screen.getByRole('tab', { name: 'General' }))
+    expect(screen.getByRole('tab', { name: 'General' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByText('subtotal')).toBeNull()
     Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
   })
 })
