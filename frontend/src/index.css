@@ -1221,6 +1221,28 @@ button.busy {
   scroll-margin-top: calc(var(--file-header-height, 48px) + 8px);
 }
 
+.units.fixed-width .unit-card {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.units.fixed-width .unit-card > * {
+  contain: inline-size;
+}
+
+.units.fixed-width .unit-card::before {
+  content: '';
+  display: block;
+  width: calc(var(--unit-sides, 1) * ((var(--unit-columns) + var(--unit-gutters, 15)) * 1ch + 0.5em));
+  font-family: var(--mono);
+  font-size: var(--code-size);
+}
+
+.unit-card:has(> .unit-body .diff-split) {
+  --unit-sides: 2;
+  --unit-gutters: 8;
+}
+
 .unit-tools {
   position: sticky;
   bottom: 0;

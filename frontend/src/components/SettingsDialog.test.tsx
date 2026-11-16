@@ -61,7 +61,7 @@ describe('SettingsButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Diff' }))
     expect(screen.getByRole('button', { name: 'Diff' })).toHaveAttribute('aria-current', 'true')
-    expect(shownSettings()).toEqual(['Diff layout', 'Line wrap'])
+    expect(shownSettings()).toEqual(['Diff layout', 'Line wrap', 'Unit width'])
 
     fireEvent.click(screen.getByRole('button', { name: 'AI' }))
     expect(shownSettings()).toEqual(['AI provider', 'AI prompts'])
@@ -85,7 +85,7 @@ describe('SettingsButton', () => {
 
     press('ArrowUp')
     expect(screen.getByRole('button', { name: 'Diff' })).toHaveFocus()
-    expect(shownSettings()).toEqual(['Diff layout', 'Line wrap'])
+    expect(shownSettings()).toEqual(['Diff layout', 'Line wrap', 'Unit width'])
 
     press('Home')
     expect(screen.getByRole('button', { name: 'Pull requests' })).toHaveFocus()

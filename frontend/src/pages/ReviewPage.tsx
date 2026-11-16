@@ -1,9 +1,10 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useDescriptions } from '../api/descriptions'
 import { useSync } from '../api/forge'
 import { useApprove, useFinishReview, useReview, useUnits } from '../api/hooks'
+import { useLineLength } from '../api/lineLength'
 import type { DiffRow, ReviewDetail, ReviewSubmitResult, SyncResult, Unit, UnitDescription, UnitDiff, UnitFilter } from '../api/types'
 import { AiChat } from '../components/AiChat'
 import { AiReview } from '../components/AiReview'
@@ -22,6 +23,7 @@ import { SubmitReviewDialog } from '../components/SubmitReviewDialog'
 import { PublishSummary, SyncSummary } from '../components/SyncSummary'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
 import { UnitTree } from '../components/UnitTree'
+import { UnitWidthButton } from '../components/UnitWidthPanel'
 import { useAiReview } from '../hooks/useAiReview'
 import { useCodeNavigation } from '../hooks/useCodeNavigation'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
@@ -47,6 +49,7 @@ import { submittedMessage } from '../review/submitReview'
 import { buildUnitTree, unitsInOrder } from '../review/unitTree'
 import { filterGroups, matchesUnitQuery } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
+import { unitColumns, useUnitWidth } from '../settings/unitWidth'
 import { FILTER_LABELS, STATE_LABELS, STATE_ORDER, clampIndex, focusedPosition, groupByFile, loadUnitFilter, nextTodoIndex, progressPercent, saveUnitFilter, shortSha } from '../review/logic'
 import { plural } from '../review/text'
 import { Segmented } from '../components/Segmented'
@@ -208,6 +211,8 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const [filter, setFilter] = useState<UnitFilter>(loadUnitFilter)
   const revisionId = review.data?.latest_revision?.id
   const units = useUnits(reviewId, revisionId, filter)
+  const lineLength = useLineLength(reviewId, revisionId)
+  const columns = unitColumns(useUnitWidth(), lineLength.data)
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query)
   const [impactFilter, setImpactFilter] = useState<ImpactFilter>('all')
@@ -376,6 +381,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
         </>
       )}
       <DiffLayoutSwitch />
+      <UnitWidthButton lineLength={lineLength.data} />
     </div>
   )
 
@@ -426,7 +432,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                   </>
                 )}
               </aside>
-              <main className="units">
+              <main className={columns === undefined ? 'units' : 'units fixed-width'} style={columns === undefined ? undefined : ({ '--unit-columns': columns } as CSSProperties)}>
                 {units.error && <ErrorNote message={describeError(units.error)} />}
                 {units.data && unitList.length === 0 && <p className="muted">{emptyMessage(filter, deferredQuery, impactFilter, units.data.length)}</p>}
                 {groups.map((group) => (

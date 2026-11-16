@@ -146,7 +146,7 @@ Diffs are highlighted like on GitHub, each changed line is paired with its old v
 ### How to use it
 
 1. Open **Settings** > **Appearance** to choose a **Theme** (System, Light, Dark or one from your editor), adjust single **Theme colors**, and set your **Code font** with ligatures.
-2. Open **Settings** > **Diff** to choose the **Diff layout** (Automatic, Split, Unified) and **Line wrap**.
+2. Open **Settings** > **Diff** to choose the **Diff layout** (Automatic, Split, Unified), **Line wrap** and **Unit width** (Auto from the repository line length, 80 to 160 columns, or Full).
 3. Learn the shortcuts: `j` / `k` next and previous unit, `n` next unit to review, `a` approve, `c` comment, `r` sync, `t` show or hide the conversation.
 
 Every choice is kept in your browser, so a reload or another review opens the same way.
