@@ -1,3 +1,5 @@
+import pytest
+
 from tests.apiclient import ApiClient, Json
 from tests.gitrepo import GitFixture
 
@@ -221,6 +223,21 @@ def test_a_review_after_a_stale_approval_shows_the_changes_since_that_review(api
 
     assert (diff["mode"], diff["available_modes"]) == ("reviewed", ["base", "reviewed"])
     assert changed_lines(diff) == [("removed", "    return 11"), ("added", "    return 12")]
+
+
+def test_a_review_shows_its_changes_when_the_approved_text_was_not_kept(api: ApiClient, git_repo: GitFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("bussola.review.approvals.APPROVED_TEXT_LIMIT_BYTES", 0)
+    feature_with(git_repo, {"app.py": TWO_FUNCTIONS}, {"app.py": TWO_FUNCTIONS.replace("return 1", "return 10")})
+    review = api.start_review()
+    api.approve(review, "app.py::first")
+    api.call("POST", f"/reviews/{review}/sessions", 201)
+
+    git_repo.commit({"app.py": TWO_FUNCTIONS.replace("return 1", "return 11")})
+    api.refresh(review)
+    diff = api.diff(review, "app.py::first")
+
+    assert (diff["mode"], diff["available_modes"]) == ("reviewed", ["base", "reviewed"])
+    assert changed_lines(diff) == [("removed", "    return 10"), ("added", "    return 11")]
 
 
 def test_a_unit_unchanged_since_the_last_review_shows_only_the_base_diff(api: ApiClient, git_repo: GitFixture) -> None:

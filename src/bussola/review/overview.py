@@ -51,11 +51,12 @@ def seen_at_last_session(context: ReviewContext) -> set[tuple[KeyTuple, str | No
 
 def earlier_version(context: ReviewContext, snapshot: UnitSnapshot, approval: Approval | None) -> EarlierVersion | None:
     approved = None if approval is None else approved_version(approval)
+    shown = approval if approved is not None and approved.lines is not None else None
     session = context.store.reviews.last_session(context.review.id, context.reviewer.id)
-    if session is None or session.revision_id == snapshot.revision_id or (approval is not None and approval.created_at > session.completed_at):
+    if session is None or session.revision_id == snapshot.revision_id or (shown is not None and shown.created_at > session.completed_at):
         return approved
     reviewed = context.store.reviews.find_snapshot(session.revision_id, *key_of(snapshot))
-    if reviewed is None or reviewed.head_text is None or reviewed.head_hash in {snapshot.head_hash, approval and approval.head_hash}:
+    if reviewed is None or reviewed.head_text is None or reviewed.head_hash in {snapshot.head_hash, shown and shown.head_hash}:
         return approved
     return reviewed_version(reviewed)
 
