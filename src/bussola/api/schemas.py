@@ -348,6 +348,7 @@ class ForgeOut(BaseModel):
     head_matches: bool | None
     error: str | None
     viewer: str | None
+    viewer_reviewed_at: str | None
 
 
 class ForgeLinkIn(BaseModel):

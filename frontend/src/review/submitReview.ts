@@ -1,4 +1,4 @@
-import type { ForgeOverview, ReviewEvent, ReviewSubmitResult } from '../api/types'
+import type { AiReviewRun, AiReviewRunDetail, ForgeOverview, ReviewEvent, ReviewSubmitResult, Thread } from '../api/types'
 import { sentCount } from './sync'
 import { plural } from './text'
 
@@ -11,6 +11,29 @@ export const REVIEW_EVENTS: Record<ReviewEvent, { label: string; description: st
 export function isOwnPullRequest(forge: ForgeOverview | undefined): boolean {
   const viewer = forge?.viewer
   return Boolean(viewer) && viewer === forge?.pull_request?.author
+}
+
+export interface AiReviewDraft {
+  runId: number
+  text: string
+  event: ReviewEvent
+}
+
+const LINE_LINK = /\[([^\]]*)\]\(<?#(?:after|before)[-:][^)]*\)/g
+
+export function latestNewAiReview(runs: AiReviewRun[] | undefined, reviewedAt: string | null): AiReviewRun | null {
+  const run = runs?.find((candidate) => candidate.finished_at !== null)
+  if (!run?.finished_at) {
+    return null
+  }
+  return reviewedAt === null || Date.parse(run.finished_at) > Date.parse(reviewedAt) ? run : null
+}
+
+export function aiReviewDraft(run: AiReviewRunDetail, threads: Thread[]): AiReviewDraft {
+  const open = new Set(threads.filter((thread) => thread.status === 'open').map((thread) => thread.id))
+  const summaries = run.parts.flatMap((part) => (part.summary?.trim() ? [part.summary.trim().replace(LINE_LINK, '$1')] : []))
+  const leftOpen = run.parts.some((part) => part.findings.some((finding) => open.has(finding.thread_id)))
+  return { runId: run.id, text: summaries.join('\n\n'), event: leftOpen ? 'REQUEST_CHANGES' : 'COMMENT' }
 }
 
 export function needsSummary(event: ReviewEvent, pendingComments: number): boolean {

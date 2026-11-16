@@ -38,7 +38,7 @@ export function useSubmitReview(reviewId: number) {
   return useMutation({
     mutationFn: (request: { event: ReviewEvent; body: string }) => postJson<ReviewSubmitResult>(`/reviews/${String(reviewId)}/forge/review`, request),
     onSuccess: () => {
-      void invalidate(client, [keys.review(reviewId), threadsKey(reviewId), githubSyncKey(reviewId)])
+      void invalidate(client, [keys.review(reviewId), threadsKey(reviewId), githubSyncKey(reviewId), forgeKey(reviewId)])
     },
   })
 }

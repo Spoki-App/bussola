@@ -27,6 +27,12 @@ class ForgeStatus:
 
 
 @dataclass(frozen=True)
+class PullRequestReview:
+    author: str
+    submitted_at: str
+
+
+@dataclass(frozen=True)
 class PullRequest:
     number: int
     title: str
@@ -40,6 +46,10 @@ class PullRequest:
     comment_count: int = 0
     unresolved_threads: int = 0
     body: str = ""
+    reviews: tuple[PullRequestReview, ...] = ()
+
+    def reviewed_at(self, login: str | None) -> str | None:
+        return max((review.submitted_at for review in self.reviews if login and review.author == login), default=None)
 
 
 @dataclass(frozen=True)

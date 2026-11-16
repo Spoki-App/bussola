@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import type { ForgeOverview, ReviewSubmitResult } from '../api/types'
-import { SubmitReviewDialog } from './SubmitReviewDialog'
+import type { AiReviewRun, AiReviewRunDetail, ForgeOverview, ReviewSubmitResult } from '../api/types'
+import { SubmitReview, SubmitReviewDialog } from './SubmitReviewDialog'
 
 const PULL = {
   number: 7,
@@ -31,6 +31,7 @@ function overview(viewer: string): ForgeOverview {
     head_matches: true,
     error: null,
     viewer,
+    viewer_reviewed_at: null,
   }
 }
 
@@ -89,19 +90,20 @@ function posted(fetchMock: ReturnType<typeof renderDialog>['fetchMock']): unknow
   return fetchMock.mock.calls.filter(([url, init]) => url === '/api/reviews/1/forge/review' && init?.method === 'POST').map(([, init]) => JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as unknown)
 }
 
+const SUMMARY = 'Review summary (Markdown)'
+
 const submitButton = () => screen.getByRole('button', { name: 'Submit review' })
 
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+    this.open = true
+  }
+  HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+    this.open = false
+    this.dispatchEvent(new Event('close'))
+  }
+})
 describe('SubmitReviewDialog', () => {
-  beforeAll(() => {
-    HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
-      this.open = true
-    }
-    HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
-      this.open = false
-      this.dispatchEvent(new Event('close'))
-    }
-  })
-
   afterEach(() => {
     vi.unstubAllGlobals()
   })
@@ -109,7 +111,7 @@ describe('SubmitReviewDialog', () => {
   it('offers a summary with Write and Preview and the three review types', () => {
     renderDialog()
 
-    fireEvent.change(screen.getByLabelText('Review summary'), { target: { value: 'Looks **good**' } })
+    fireEvent.change(screen.getByLabelText(SUMMARY), { target: { value: 'Looks **good**' } })
     fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
 
     expect(screen.getByText('good').tagName).toBe('STRONG')
@@ -117,7 +119,7 @@ describe('SubmitReviewDialog', () => {
     expect(screen.getByRole('radio', { name: /^Approve/ })).toBeEnabled()
     expect(screen.getByRole('radio', { name: /^Request changes/ })).toBeEnabled()
     fireEvent.click(screen.getByRole('tab', { name: 'Write' }))
-    expect(screen.getByLabelText('Review summary')).toHaveValue('Looks **good**')
+    expect(screen.getByLabelText(SUMMARY)).toHaveValue('Looks **good**')
   })
 
   it('approves without a summary and closes', async () => {
@@ -138,7 +140,7 @@ describe('SubmitReviewDialog', () => {
     fireEvent.click(screen.getByRole('radio', { name: /^Request changes/ }))
     expect(submitButton()).toBeDisabled()
     expect(screen.getByText('Write a summary to request changes.')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Review summary'), { target: { value: 'Please rename it' } })
+    fireEvent.change(screen.getByLabelText(SUMMARY), { target: { value: 'Please rename it' } })
     expect(submitButton()).toBeEnabled()
   })
 
@@ -189,13 +191,135 @@ describe('SubmitReviewDialog', () => {
     const answer = () => Promise.resolve(Response.json({ detail: 'HTTP 422: Unprocessable Entity' }, { status: 502 }))
     const { onSubmitted, onClose } = renderDialog({ answer })
 
-    fireEvent.change(screen.getByLabelText('Review summary'), { target: { value: 'Please rename it' } })
+    fireEvent.change(screen.getByLabelText(SUMMARY), { target: { value: 'Please rename it' } })
     fireEvent.click(screen.getByRole('radio', { name: /^Request changes/ }))
     fireEvent.click(submitButton())
 
     expect(await screen.findByRole('alert')).toHaveTextContent('HTTP 422: Unprocessable Entity')
-    expect(screen.getByLabelText('Review summary')).toHaveValue('Please rename it')
+    expect(screen.getByLabelText(SUMMARY)).toHaveValue('Please rename it')
     expect(onSubmitted).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+const RUN: AiReviewRun = {
+  id: 5,
+  status: 'completed',
+  again: false,
+  provider: 'claude-code',
+  provider_label: 'Claude Code',
+  model: null,
+  reviewed: 2,
+  findings: 1,
+  failed: 0,
+  error: null,
+  started_at: '2026-11-12T10:00:00Z',
+  finished_at: '2026-11-12T10:05:00Z',
+}
+
+const DETAIL: AiReviewRunDetail = {
+  ...RUN,
+  rating: null,
+  links: [],
+  parts: [{ units: [], summary: 'Needs work before merging.\n\n- [the total](#after:app.py:3) skips refunds', findings: [{ thread_id: 't1', place: 'app.py:3', body: 'Refunds' }], lookups: [], error: null }],
+}
+
+const AI_SUMMARY = 'Needs work before merging.\n\n- the total skips refunds'
+
+function renderSubmitReview({ reviewedAt = null as string | null, runs = [RUN], threadStatus = 'open' } = {}) {
+  const state = { runs }
+  const fetchMock = vi.fn<(url: string) => Promise<Response>>((url) => {
+    const answers: Record<string, unknown> = {
+      '/api/reviews/1/forge': { ...overview('alice'), viewer_reviewed_at: reviewedAt },
+      '/api/reviews/1/ai-review/runs': state.runs,
+      '/api/reviews/1/ai-review/runs/5': DETAIL,
+      '/api/reviews/1/threads?revision_id=3': [{ id: 't1', status: threadStatus }],
+    }
+    return Promise.resolve(Response.json(answers[url] ?? []))
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={client}>
+      <SubmitReview reviewId={1} revisionId={3} pendingComments={0} onSubmitted={vi.fn()} />
+    </QueryClientProvider>,
+  )
+  const loaded = () =>
+    waitFor(() => {
+      expect(fetchMock.mock.calls.some(([url]) => url === '/api/reviews/1/threads?revision_id=3')).toBe(true)
+      expect(client.isFetching()).toBe(0)
+    })
+  const setRuns = async (next: AiReviewRun[]) => {
+    state.runs = next
+    await act(() => client.invalidateQueries())
+    await loaded()
+  }
+  return { loaded, setRuns }
+}
+
+const open = () => { fireEvent.click(screen.getAllByRole('button', { name: 'Submit review' })[0]) }
+const cancel = () => { fireEvent.click(screen.getByRole('button', { name: 'Cancel' })) }
+
+describe('SubmitReview', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('starts from a new AI review that left open comments, with Request changes', async () => {
+    const { loaded } = renderSubmitReview({ reviewedAt: '2026-11-11T09:00:00Z' })
+    await loaded()
+
+    open()
+
+    expect(screen.getByLabelText(SUMMARY)).toHaveValue(AI_SUMMARY)
+    expect(screen.getByRole('radio', { name: /^Request changes/ })).toBeChecked()
+    fireEvent.click(screen.getByRole('radio', { name: /^Comment/ }))
+    expect(screen.getByRole('radio', { name: /^Comment/ })).toBeChecked()
+  })
+
+  it('keeps the summary cleared after the AI review was used once', async () => {
+    const { loaded } = renderSubmitReview()
+    await loaded()
+
+    open()
+    fireEvent.change(screen.getByLabelText(SUMMARY), { target: { value: '' } })
+    cancel()
+    open()
+
+    expect(screen.getByLabelText(SUMMARY)).toHaveValue('')
+  })
+
+  it('keeps Comment when the AI review comments are resolved', async () => {
+    const { loaded } = renderSubmitReview({ threadStatus: 'resolved' })
+    await loaded()
+
+    open()
+
+    expect(screen.getByLabelText(SUMMARY)).toHaveValue(AI_SUMMARY)
+    expect(screen.getByRole('radio', { name: /^Comment/ })).toBeChecked()
+  })
+
+  it('starts empty when the AI review is older than the last submitted review', async () => {
+    const { loaded } = renderSubmitReview({ reviewedAt: '2026-11-12T11:00:00Z' })
+    await loaded()
+
+    open()
+
+    expect(screen.getByLabelText(SUMMARY)).toHaveValue('')
+    expect(screen.getByRole('radio', { name: /^Comment/ })).toBeChecked()
+  })
+
+  it('never replaces a summary already written', async () => {
+    const { loaded, setRuns } = renderSubmitReview({ runs: [] })
+    await loaded()
+    open()
+    fireEvent.change(screen.getByLabelText(SUMMARY), { target: { value: 'My own words' } })
+    cancel()
+
+    await setRuns([RUN])
+    open()
+
+    expect(screen.getByLabelText(SUMMARY)).toHaveValue('My own words')
+    expect(screen.getByRole('radio', { name: /^Request changes/ })).toBeChecked()
   })
 })

@@ -7,6 +7,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Sequence
+from dataclasses import replace
 from typing import Any
 
 from bussola.errors import InvalidRequestError
@@ -26,6 +27,7 @@ from bussola.forge.base import (
     MergeOptions,
     MergeRequest,
     PullRequest,
+    PullRequestReview,
     RemoteComment,
     RemoteNote,
     RemoteThread,
@@ -200,7 +202,8 @@ class GitHubAdapter:
         return [_pull_request(node) for node in nodes]
 
     def pull_request(self, repository: str, number: int) -> PullRequest:
-        return _pull_request(self._json(["pr", "view", str(number), "--repo", _repo(repository), "--json", PR_FIELDS]))
+        item = self._json(["pr", "view", str(number), "--repo", _repo(repository), "--json", f"{PR_FIELDS},reviews"])
+        return replace(_pull_request(item), reviews=_reviews(item.get("reviews") or []))
 
     def diff_ranges(self, repository: str, number: int) -> dict[str, LineRanges]:
         files = self._paginated(f"repos/{_repo(repository)}/pulls/{number}/files")
@@ -517,6 +520,10 @@ def _pull_request(item: JsonObject) -> PullRequest:
         unresolved_threads=sum(1 for thread in _nodes(item.get("reviewThreads")) if not thread.get("isResolved", False)),
         body=str(item.get("body") or ""),
     )
+
+
+def _reviews(items: list[JsonObject]) -> tuple[PullRequestReview, ...]:
+    return tuple(PullRequestReview(_login(item.get("author")), str(item["submittedAt"])) for item in items if item.get("submittedAt"))
 
 
 def _total(connection: JsonObject | None) -> int:

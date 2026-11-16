@@ -24,6 +24,10 @@ interface Props {
   initial?: string
   busy?: boolean
   autoFocus?: boolean
+  allowEmpty?: boolean
+  hint?: string
+  children?: ReactNode
+  onChange?: (body: string) => void
   onSubmit: (body: string, done: () => void) => void
   onCancel?: () => void
 }
@@ -105,7 +109,20 @@ function imageFiles(files: FileList | null | undefined): File[] {
   return Array.from(files ?? []).filter((file) => file.type.startsWith('image/'))
 }
 
-export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)', submitLabel, initial = '', busy = false, autoFocus = false, onSubmit, onCancel }: Props) {
+export function Composer({
+  reviewId,
+  placeholder = 'Leave a comment (Markdown)',
+  submitLabel,
+  initial = '',
+  busy = false,
+  autoFocus = false,
+  allowEmpty = false,
+  hint,
+  children,
+  onChange,
+  onSubmit,
+  onCancel,
+}: Props) {
   const [body, setBody] = useState(initial)
   const [start] = useState(() => initialState(initial))
   const [mode, setMode] = useState(start.mode)
@@ -122,8 +139,11 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
       editor.current?.focus()
     }
   }, [autoFocus])
+  useEffect(() => {
+    onChange?.(body)
+  }, [body, onChange])
   const options = mention ? filterMentions(candidates.data ?? [], mention.query) : []
-  const canSubmit = !busy && uploading === 0 && body.trim() !== ''
+  const canSubmit = !busy && uploading === 0 && (allowEmpty || body.trim() !== '')
 
   const showRich = (html: string) => {
     setRich((current) => ({ html, version: current.version + 1 }))
@@ -364,6 +384,7 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
           value={body}
           placeholder={placeholder}
           autoFocus={autoFocus && mode === 'write'}
+          data-autofocus={autoFocus && mode === 'write' ? true : undefined}
           rows={3}
           onChange={(event) => { setBody(event.target.value) }}
           onSelect={updateWriteMention}
@@ -379,6 +400,7 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
             aria-multiline
             aria-label={placeholder}
             data-placeholder={placeholder}
+            data-autofocus={autoFocus ? true : undefined}
             dangerouslySetInnerHTML={{ __html: rich.html }}
             onFocus={() => { runCommand('defaultParagraphSeparator', 'p') }}
             onInput={() => {
@@ -403,8 +425,9 @@ export function Composer({ reviewId, placeholder = 'Leave a comment (Markdown)',
         )}
       </div>
       {notice && <ErrorNote message={notice} />}
+      {children}
       <div className="composer-actions">
-        <span className="muted">{uploading ? 'Uploading images...' : 'Ctrl/Cmd + Enter to send'}</span>
+        <span className="muted">{uploading ? 'Uploading images...' : (hint ?? 'Ctrl/Cmd + Enter to send')}</span>
         {onCancel && (
           <button type="button" onClick={onCancel}>
             Cancel
