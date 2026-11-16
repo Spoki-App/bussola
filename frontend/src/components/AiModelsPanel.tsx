@@ -44,7 +44,7 @@ export function AiModelsPanel() {
   if (status.data === undefined) {
     return <p className="muted">Loading...</p>
   }
-  return <ModelsForm ai={status.data} models={models.data} />
+  return <ModelsForm key={status.data.operations.map((operation) => operation.key).join()} ai={status.data} models={models.data} />
 }
 
 function ModelsForm({ ai, models }: { ai: AiStatus; models: AiModels | undefined }) {
@@ -107,7 +107,11 @@ function ModelsForm({ ai, models }: { ai: AiStatus; models: AiModels | undefined
                 </option>
               ))}
             </select>
-            {!effort && <p className="muted">This model does not take an effort.</p>}
+            {!effort && (
+              <p className="muted">
+                {row.effort === '' ? 'This model does not take an effort.' : 'This model does not take an effort. Save models to stop sending the effort saved for it.'}
+              </p>
+            )}
           </fieldset>
         )
       })}

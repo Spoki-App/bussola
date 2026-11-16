@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AiModels, AiStatus } from '../api/types'
@@ -24,13 +24,13 @@ const STATUS: AiStatus = {
   ],
 }
 
-function renderPanel(models: AiModels) {
+function renderPanel(models: AiModels, client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>((url) => {
     return Promise.resolve(Response.json(url === '/api/ai/models' ? models : STATUS))
   })
   vi.stubGlobal('fetch', fetchMock)
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <AiModelsPanel />
     </QueryClientProvider>,
   )
@@ -63,6 +63,25 @@ describe('AiModelsPanel', () => {
     expect(screen.getByLabelText('AI chat effort')).toBeDisabled()
     expect(screen.getByText('This model does not take an effort.')).toBeInTheDocument()
     expect(screen.getByLabelText('Describe effort')).toBeEnabled()
+  })
+
+  it('shows the operations once a broken configuration is fixed', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+    client.setQueryData(['ai', null], { ...STATUS, configured: false, provider: null, target: null, problem: 'Invalid configuration', operations: [] })
+    renderPanel({ models: [], problem: null }, client)
+
+    expect(await screen.findByText('Invalid configuration')).toBeInTheDocument()
+    act(() => {
+      client.setQueryData(['ai', null], STATUS)
+    })
+
+    expect(await screen.findByLabelText('Rate impact model')).toHaveValue('claude-haiku-5-5')
+  })
+
+  it('says when a saved effort is still sent to a model that does not take one', async () => {
+    renderPanel({ models: [{ id: 'claude-opus-5-5', effort: false }], problem: null })
+
+    expect(await screen.findByText(/Save models to stop sending the effort saved for it/)).toBeInTheDocument()
   })
 
   it('does not save an effort for a model that does not take one', async () => {
