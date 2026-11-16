@@ -27,6 +27,7 @@ If a change trades one of these for something else, say so in the pull request.
 | `src/bussola/storage/` | SQLAlchemy models, repositories and Alembic migrations |
 | `src/bussola/api/` | HTTP routes and schemas |
 | `frontend/` | React UI, built into `src/bussola/static/` |
+| `redirect/` | The static page on `bussola.spoki.com` that turns `https://bussola.spoki.com/<path>` into `bussola://<path>`, deployed to GitHub Pages |
 | `tests/` | Backend tests; `tests/fakegh` is the fake `gh` used by the GitHub tests, `tests/fakelsp` the fake language server, `tests/fakeclaude` the fake `claude` used by the AI tests |
 | `docs/design.md` | The rules behind units, approvals, threads and GitHub sync |
 
@@ -49,7 +50,7 @@ Run these before opening a pull request; CI runs the same ones.
 
 ```bash
 uv run ruff format --check . && uv run ruff check . && uv run basedpyright && uv run pytest
-npm --prefix frontend run lint && npm --prefix frontend run typecheck && npm --prefix frontend test
+npm --prefix frontend run lint && npm --prefix frontend run typecheck && npm --prefix frontend test && node --test redirect/link.test.js
 npm --prefix frontend run build && npm --prefix frontend run e2e
 ```
 
