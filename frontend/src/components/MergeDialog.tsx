@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useMerge, useMergeOptions } from '../api/forge'
-import type { CommitText, MergeMethod, MergeOptions } from '../api/types'
+import type { CommitText, MergeMethod, MergeOptions, MergeResult } from '../api/types'
+import { useModalDialog } from '../hooks/useModalDialog'
 import { ErrorNote } from './Badges'
 import { Segmented } from './Segmented'
 
@@ -12,57 +13,101 @@ const METHOD_LABELS: Record<MergeMethod, string> = {
   rebase: 'Rebase and merge',
 }
 
-const CONFIRM_LABELS: Record<MergeMethod, string> = {
-  merge: 'Confirm merge',
-  squash: 'Confirm squash and merge',
-  rebase: 'Confirm rebase and merge',
+interface Props {
+  reviewId: number
+  onMerged: (result: MergeResult) => void
+  onClose: () => void
 }
 
-export function MergePullRequest({ reviewId }: { reviewId: number }) {
+export function MergeDialog({ reviewId, onMerged, onClose }: Props) {
+  const { ref, close } = useModalDialog()
   const options = useMergeOptions(reviewId)
   const merge = useMerge(reviewId)
-  const result = merge.data
-  if (result) {
-    return (
-      <div className="notice merge-result">
-        <p>{result.branch_deleted ? 'Pull request merged and its branch deleted.' : 'Pull request merged.'}</p>
-        {result.branch_error && <ErrorNote message={result.branch_error} />}
-      </div>
-    )
-  }
-  if (options.isPending) {
-    return <p className="muted">Checking whether the pull request can be merged...</p>
-  }
-  if (options.error) {
-    return <ErrorNote message={describeError(options.error)} />
-  }
-  return <MergeForm options={options.data} merge={merge} />
+
+  return (
+    <dialog
+      ref={ref}
+      className="picker merge-dialog"
+      aria-labelledby="merge-dialog-title"
+      onClose={onClose}
+      onCancel={(event) => {
+        if (merge.isPending) {
+          event.preventDefault()
+        }
+      }}
+    >
+      <header className="picker-header">
+        <h2 id="merge-dialog-title">Merge pull request</h2>
+      </header>
+      {options.error && <ErrorNote message={describeError(options.error)} />}
+      {options.data ? (
+        <MergeForm options={options.data} merge={merge} onMerged={onMerged} close={close} />
+      ) : (
+        <>
+          {!options.error && <p className="muted">Checking whether the pull request can be merged...</p>}
+          <Actions close={close} />
+        </>
+      )}
+    </dialog>
+  )
 }
 
-function MergeForm({ options, merge }: { options: MergeOptions; merge: ReturnType<typeof useMerge> }) {
+function Actions({ close, busy = false, children }: { close: () => void; busy?: boolean; children?: ReactNode }) {
+  return (
+    <div className="composer-actions">
+      <button type="button" disabled={busy} onClick={close}>
+        Cancel
+      </button>
+      {children}
+    </div>
+  )
+}
+
+interface FormProps {
+  options: MergeOptions
+  merge: ReturnType<typeof useMerge>
+  onMerged: (result: MergeResult) => void
+  close: () => void
+}
+
+function MergeForm({ options, merge, onMerged, close }: FormProps) {
   const [choice, setChoice] = useState<MergeMethod | null>(null)
   const [edits, setEdits] = useState<Partial<Record<MergeMethod, CommitText>>>({})
   const [deleteBranch, setDeleteBranch] = useState(false)
   const method = choice !== null && options.methods.includes(choice) ? choice : options.default_method
   if (method === null) {
-    return <ErrorNote message="This repository allows no merge method. Enable one in its settings on GitHub." />
+    return (
+      <>
+        <ErrorNote message="This repository allows no merge method. Enable one in its settings on GitHub." />
+        <Actions close={close} />
+      </>
+    )
   }
-  const prefilled = options.commit_texts[method]
-  const text = edits[method] ?? prefilled
+  const text = edits[method] ?? options.commit_texts[method]
   const blocked = options.blockers.length > 0
+  const disabled = blocked || merge.isPending || text?.title.trim() === ''
   const edit = (change: Partial<CommitText>) => {
     if (text) {
       setEdits({ ...edits, [method]: { ...text, ...change } })
     }
   }
   const submit = () => {
+    if (disabled) {
+      return
+    }
     const request = { method, head_sha: options.head_sha, title: text?.title ?? '', message: text?.message ?? '', delete_branch: deleteBranch }
-    merge.mutate(request)
+    merge.mutateAsync(request).then(
+      (result) => {
+        onMerged(result)
+        close()
+      },
+      () => undefined,
+    )
   }
 
   return (
     <form
-      className="stack merge-pull-request"
+      className="stack"
       onSubmit={(event) => {
         event.preventDefault()
         submit()
@@ -103,10 +148,12 @@ function MergeForm({ options, merge }: { options: MergeOptions; merge: ReturnTyp
         </label>
       )}
       {options.branch_deletion === 'automatic' && <p className="muted">GitHub deletes the branch after merging, as set in the repository settings.</p>}
-      <button type="submit" className="primary" disabled={blocked || merge.isPending || text?.title.trim() === ''}>
-        {merge.isPending ? 'Merging...' : CONFIRM_LABELS[method]}
-      </button>
       {merge.error && <ErrorNote message={describeError(merge.error)} />}
+      <Actions close={close} busy={merge.isPending}>
+        <button type="submit" className="primary" disabled={disabled}>
+          {merge.isPending ? 'Merging...' : 'Merge'}
+        </button>
+      </Actions>
     </form>
   )
 }

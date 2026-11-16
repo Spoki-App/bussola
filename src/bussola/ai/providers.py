@@ -1,5 +1,5 @@
 from bussola.ai.anthropic_api import AnthropicProvider
-from bussola.ai.base import AiNotConfiguredError, AiProvider
+from bussola.ai.base import AiNotConfiguredError, AiProvider, Tuning
 from bussola.ai.claude_code import ClaudeCodeProvider, find_claude
 from bussola.ai.config import AiSettings, ProviderName
 from bussola.ai.openai_compatible import OpenAiCompatibleProvider
@@ -8,16 +8,20 @@ from bussola.ai.openai_compatible import OpenAiCompatibleProvider
 def build_provider(settings: AiSettings) -> AiProvider:
     match settings.provider:
         case ProviderName.CLAUDE_CODE:
-            return ClaudeCodeProvider(find_claude(), settings.model, settings.timeout)
+            return ClaudeCodeProvider(find_claude(), settings.model, settings.timeout, _tuning(settings))
         case ProviderName.ANTHROPIC:
             endpoint = _required(settings.endpoint, "endpoint")
-            return AnthropicProvider(_required(settings.model, "model"), endpoint, _api_key(settings), settings.timeout, settings.max_tokens)
+            return AnthropicProvider(_required(settings.model, "model"), endpoint, _api_key(settings), settings.timeout, _tuning(settings))
         case ProviderName.OPENAI_COMPATIBLE:
             endpoint = _required(settings.endpoint, "endpoint")
             key = _api_key(settings) if settings.api_key_env else None
-            return OpenAiCompatibleProvider(_required(settings.model, "model"), endpoint, key, settings.timeout, settings.max_tokens)
+            return OpenAiCompatibleProvider(_required(settings.model, "model"), endpoint, key, settings.timeout, _tuning(settings))
         case ProviderName.NONE:
             raise AiNotConfiguredError("No AI provider is configured")
+
+
+def _tuning(settings: AiSettings) -> Tuning:
+    return Tuning(settings.max_tokens, settings.effort)
 
 
 def _required(value: str | None, name: str) -> str:

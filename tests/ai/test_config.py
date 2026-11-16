@@ -3,7 +3,17 @@ from pathlib import Path
 import pytest
 
 from bussola.ai.base import AiNotConfiguredError, AiTargetChangedError
-from bussola.ai.config import CONFIG_DIR_ENV, AiSettings, ProviderName, UserAiConfig, default_config_file, load_user_config, resolve_ai_settings
+from bussola.ai.config import (
+    CONFIG_DIR_ENV,
+    AiOperation,
+    AiSettings,
+    Effort,
+    ProviderName,
+    UserAiConfig,
+    default_config_file,
+    load_user_config,
+    resolve_ai_settings,
+)
 from bussola.ai.providers import build_provider
 from bussola.ai.settings import load_ai_settings, require_target
 
@@ -211,3 +221,31 @@ def test_claude_sees_the_whole_pull_request_unless_a_limit_is_set() -> None:
     assert UserAiConfig().code_limit(ProviderName.OPENAI_COMPATIBLE) == 100_000
     assert UserAiConfig(max_code_characters=50_000).code_limit(ProviderName.ANTHROPIC) == 50_000
     assert UserAiConfig(max_code_characters=50_000).code_limit(ProviderName.OPENAI_COMPATIBLE) == 50_000
+
+
+def test_an_operation_without_an_override_uses_the_global_model(tmp_path: Path) -> None:
+    config = tmp_path / "config.toml"
+    config.write_text(ANTHROPIC + '[ai.operations.impact]\nmodel = "claude-haiku-5-5"\neffort = "low"\n\n[ai.operations.review]\neffort = "high"\n')
+
+    settings = load_ai_settings(config)
+
+    assert (settings.for_operation(AiOperation.IMPACT).model, settings.for_operation(AiOperation.IMPACT).effort) == ("claude-haiku-5-5", Effort.LOW)
+    assert (settings.for_operation(AiOperation.REVIEW).model, settings.for_operation(AiOperation.REVIEW).effort) == ("claude-opus-5-5", Effort.HIGH)
+    assert (settings.for_operation(AiOperation.CHAT).model, settings.for_operation(AiOperation.CHAT).effort) == ("claude-opus-5-5", None)
+
+
+def test_a_model_chosen_for_an_operation_is_part_of_the_confirmed_target() -> None:
+    plain = resolve_ai_settings(UserAiConfig(provider=ProviderName.ANTHROPIC))
+    effort_only = resolve_ai_settings(UserAiConfig.model_validate({"provider": "anthropic", "operations": {"review": {"effort": "high"}}}))
+    other_model = resolve_ai_settings(UserAiConfig.model_validate({"provider": "anthropic", "operations": {"impact": {"model": "claude-haiku-5-5"}}}))
+
+    assert effort_only.target == plain.target
+    assert other_model.target == '["anthropic", "claude-opus-5-5", "https://api.anthropic.com", {"impact": "claude-haiku-5-5"}]'
+
+
+def test_the_effort_reaches_each_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    settings = resolve_ai_settings(UserAiConfig.model_validate({"provider": "anthropic", "operations": {"chat": {"effort": "medium"}}}))
+
+    assert build_provider(settings.for_operation(AiOperation.CHAT)).effort == "medium"
+    assert build_provider(settings.for_operation(AiOperation.DESCRIBE)).effort is None

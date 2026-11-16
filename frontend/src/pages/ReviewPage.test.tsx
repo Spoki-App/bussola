@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ReviewDetail, SyncResult } from '../api/types'
+import type { MergeOptions, ReviewDetail, SyncResult } from '../api/types'
 import { ReviewPage, type ReviewExtensions } from './ReviewPage'
 
 const revision = { id: 2, number: 1, head_sha: 'b', base_sha: 'a', merge_base_sha: 'a', created_at: '2026-11-04T10:00:00Z' }
@@ -165,5 +165,65 @@ describe('ReviewPage conversation panel', () => {
     fireEvent.keyDown(window, { key: 't' })
     expect(screen.getByText('Thread list')).not.toBeVisible()
     expect(window.localStorage.getItem('bussola.sidePanelHidden')).toBe('true')
+  })
+})
+
+describe('ReviewPage merge', () => {
+  beforeAll(() => {
+    HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+      this.open = true
+    }
+    HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+      this.open = false
+      this.dispatchEvent(new Event('close'))
+    }
+  })
+
+  beforeEach(() => {
+    let state = 'OPEN'
+    const options: MergeOptions = {
+      head_sha: 'b',
+      methods: ['squash'],
+      default_method: 'squash',
+      commit_texts: { squash: { title: 'feat: first title (#34)', message: '' } },
+      blockers: [],
+      branch_deletion: 'optional',
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url === '/api/reviews/3/forge/merge') {
+          if (init?.method === 'POST') {
+            state = 'MERGED'
+            return Promise.resolve(Response.json({ state, branch_deleted: false, branch_error: null }))
+          }
+          return Promise.resolve(Response.json(options))
+        }
+        if (url === '/api/reviews/3') {
+          const review = reviewWithTitle('feat: first title')
+          return Promise.resolve(Response.json({ ...review, pull_request: review.pull_request && { ...review.pull_request, state } }))
+        }
+        return Promise.resolve(Response.json([]))
+      }),
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('opens the merge options in a dialog and shows the result in the header after merging', async () => {
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Merge' }))
+    const dialog = screen.getByRole('dialog', { name: 'Merge pull request' })
+    expect(dialog).toHaveAttribute('open')
+    expect(await within(dialog).findByLabelText('Commit title')).toHaveValue('feat: first title (#34)')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Merge' }))
+
+    expect(await screen.findByText('Pull request merged.')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() => { expect(screen.queryByRole('button', { name: 'Merge' })).not.toBeInTheDocument() })
   })
 })
