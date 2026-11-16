@@ -52,6 +52,8 @@
   --sans: 'Instrument Sans Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --code-size: 12px;
+  --diff-gutter-columns: 7;
+  --diff-code-indent: 0.5em;
   --narrow: 82%;
   --radius-box: 10px;
   --radius-control: 6px;
@@ -176,7 +178,12 @@ pre,
   font-feature-settings: var(--code-features, normal);
 }
 
+.diff .diff-gutter-col {
+  width: calc(var(--diff-gutter-columns) * 1ch);
+}
+
 .diff .diff-code {
+  padding-left: var(--diff-code-indent);
   word-break: normal;
   overflow-wrap: anywhere;
 }
@@ -1220,6 +1227,32 @@ button.busy {
   background: var(--bg);
   overflow: clip;
   scroll-margin-top: calc(var(--file-header-height, 48px) + 8px);
+}
+
+.units.fixed-width .unit-card {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.units.fixed-width .unit-card > * {
+  contain: inline-size;
+}
+
+.units.fixed-width .unit-header {
+  flex-wrap: wrap;
+}
+
+.units.fixed-width .unit-card::before {
+  content: '';
+  display: block;
+  width: calc(var(--unit-sides, 1) * ((var(--unit-columns) + var(--unit-gutters, 2) * var(--diff-gutter-columns) + 1) * 1ch + var(--diff-code-indent)));
+  font-family: var(--mono);
+  font-size: var(--code-size);
+}
+
+.units.fixed-width .unit-card:has(> .unit-body .diff-split) {
+  --unit-sides: 2;
+  --unit-gutters: 1;
 }
 
 .unit-tools {

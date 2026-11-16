@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Request, status
 
 from bussola.api.deps import ContextDep, ReviewerDep, repo_of, resolve_revision
-from bussola.api.schemas import RefreshIn, RefreshOut, ReviewDetailOut, ReviewerOut, SessionOut, SyncOut
+from bussola.api.schemas import LineLengthOut, RefreshIn, RefreshOut, ReviewDetailOut, ReviewerOut, SessionOut, SyncOut
 from bussola.api.state import app_state
 from bussola.api.views import publish_out, review_detail_out, revision_out
 from bussola.forge.review_sync import Refreshed, refresh_with_fetch, sync_and_publish
+from bussola.review.line_length import resolve_line_length
 from bussola.review.repos import open_repo
 from bussola.review.revisions import refresh_review
 from bussola.storage.models import ReviewSession
@@ -20,6 +21,14 @@ def get_me(reviewer: ReviewerDep) -> ReviewerOut:
 @router.get("/reviews/{review_id}")
 def get_review(context: ContextDep) -> ReviewDetailOut:
     return review_detail_out(context, repo_of(context))
+
+
+@router.get("/reviews/{review_id}/line-length")
+def line_length(context: ContextDep, revision_id: int | None = None) -> LineLengthOut:
+    revision = resolve_revision(context, revision_id)
+    git_repo = open_repo(repo_of(context))
+    found = resolve_line_length(lambda path: git_repo.file_at(revision.head_sha, path))
+    return LineLengthOut(columns=found.columns, source=found.source)
 
 
 @router.post("/reviews/{review_id}/refresh")

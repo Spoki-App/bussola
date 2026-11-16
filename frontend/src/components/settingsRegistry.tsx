@@ -11,6 +11,7 @@ import { DiffWrapCheckbox } from './DiffWrapToggle'
 import { OpenPullRequestForm } from './OpenPullRequestForm'
 import { ThemeColorsPanel } from './ThemeColorsPanel'
 import { ThemePanel } from './ThemePanel'
+import { UnitWidthPanel } from './UnitWidthPanel'
 
 export const SETTING_CATEGORIES = ['Pull requests', 'Repositories', 'Appearance', 'Diff', 'AI'] as const
 
@@ -72,6 +73,12 @@ export const SETTINGS: Setting[] = [
     name: 'Line wrap',
     description: 'Wrap long lines in the diff, or keep them on one row and scroll sideways.',
     render: () => <DiffWrapCheckbox />,
+  },
+  {
+    category: 'Diff',
+    name: 'Unit width',
+    description: 'The width of the unit box: auto from the line length of the repository, 80, 100, 120 or 160 columns, or full width.',
+    render: () => <UnitWidthPanel />,
   },
   {
     category: 'AI',

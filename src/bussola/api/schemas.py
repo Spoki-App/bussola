@@ -101,6 +101,11 @@ class ReviewDetailOut(ReviewOut):
     unsent_comments: int = 0
 
 
+class LineLengthOut(BaseModel):
+    columns: int
+    source: str | None
+
+
 class RefreshIn(BaseModel):
     fetch: bool = False
 
