@@ -6,8 +6,19 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Added
 
+- `https://bussola.spoki.com/` opens bussola links where `bussola://` is not clickable: `https://bussola.spoki.com/github.com/<owner>/<name>/pull/<number>` opens `bussola://github.com/<owner>/<name>/pull/<number>`, and any other bussola link works with `bussola://` replaced the same way, keeping the query and the anchor. The page rewrites the address in the browser and sends nothing to a server; if bussola does not open, it links to the GitHub page and the install steps ([#104](https://github.com/Spoki-App/bussola/issues/104)).
+- **Sync all** on the home page runs **Sync reviews** for every repository at once, so pull requests merged or closed after starting their review are updated everywhere without syncing each repository. Repositories without pull request reviews are skipped, and one that cannot be synced is listed with its error without stopping the others ([#100](https://github.com/Spoki-App/bussola/issues/100)).
 - **AI chat** in the panel on the right of the review page answers questions about the pull request, with its description, the units it changes and the conversation so far, and can follow the code with the same lookups as the AI review. Select lines and choose **Ask AI** to attach them to the next message. Ask it to add a comment and it adds one to the review as yours, on the lines it is about. Answers link to the lines they mention and list the lookups made and the comments added; the conversation is kept per review and **Clear** deletes it ([#77](https://github.com/Spoki-App/bussola/issues/77)).
 - Replies start from a single-line **Reply...** field with your initial under each thread, in the code and in the conversation panel, which opens the full comment box when clicked, so threads take less space. The conversation panel filters **All**, **General** (comments on the whole review) and **Code** (file comments, outdated threads, and the line threads shown in the code, listed with a link to each), and hides resolved threads unless **Show resolved** is ticked; both choices are kept in the browser ([#82](https://github.com/Spoki-App/bussola/issues/82)).
+- **Describe** can follow the code with the same lookups as the AI review, finding what the unit calls, who calls it and the definitions it relies on before explaining the unit and rating its impact. The description block lists the lookups made, with their results, under **code lookups** ([#103](https://github.com/Spoki-App/bussola/issues/103)).
+
+### Changed
+
+- The selected lines offer only **Compare with...** to start a comparison. The bar it opens shows the first range as a chip with its unit and number of lines and a short hint for the next step, instead of one long sentence, and holds the actions: **Compare with selection** (which replaces **Compare with first range** above the selected lines), a clipboard button for **Compare with clipboard** (moved from the selected lines) and **Cancel** ([#83](https://github.com/Spoki-App/bussola/issues/83)).
+
+### Changed
+
+- **Submit review** writes the summary with the same editor as comments, with **Write**, **Preview**, **Rich text**, the formatting toolbar and its shortcuts. After an AI review newer than your last review on the pull request, the summary starts with the AI review's verdict and summary, never replacing text you wrote, and **Request changes** is selected when the AI review left comments that are still open ([#99](https://github.com/Spoki-App/bussola/issues/99)).
 
 ### Fixed
 

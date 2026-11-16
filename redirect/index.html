@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'; form-action 'none'; base-uri 'none'" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex" />
+    <title>Open in bussola</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="modulepreload" href="/link.js" />
+    <script type="module" src="/page.js"></script>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --text: #16213a;
+        --muted: #5b6478;
+        --background: #ffffff;
+        --surface: #f4f6fa;
+        --border: #dfe3eb;
+        --accent: #2952cc;
+        --on-accent: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --text: #e4e9f2;
+          --muted: #9aa5bc;
+          --background: #0e1424;
+          --surface: #141c2e;
+          --border: #253049;
+          --accent: #8aabff;
+          --on-accent: #0e1424;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--background);
+        color: var(--text);
+        font: 16px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Helvetica, Arial, sans-serif;
+      }
+      main {
+        max-width: 640px;
+        margin: 12vh auto;
+        padding: 0 16px;
+      }
+      h1 {
+        font-size: 24px;
+        margin: 0 0 16px;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 14px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 1px 6px;
+        overflow-wrap: anywhere;
+      }
+      a {
+        color: var(--accent);
+      }
+      .button {
+        display: inline-block;
+        padding: 8px 18px;
+        border-radius: 8px;
+        background: var(--accent);
+        color: var(--on-accent);
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .muted {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>bussola</h1>
+      <section id="opening" hidden>
+        <p>Opening <code id="target"></code> in bussola.</p>
+        <p><a id="open" class="button">Open in bussola</a></p>
+        <div id="fallback" hidden>
+          <p class="muted">Nothing happened? bussola may not be installed, or <code>bussola://</code> links may not be registered on this computer.</p>
+          <ul>
+            <li id="github-item" hidden><a id="github">Open it on GitHub</a></li>
+            <li><a href="https://github.com/Spoki-App/bussola#quick-start">Install bussola</a>, then run <code>bussola install-handler</code> once (<a href="https://github.com/Spoki-App/bussola/blob/main/docs/GUIDE.md#opening-bussola-links">more on bussola:// links</a>).</li>
+          </ul>
+        </div>
+      </section>
+      <section id="usage">
+        <p>This page opens links in <a href="https://github.com/Spoki-App/bussola">bussola</a>, where <code>bussola://</code> links are not clickable. Put <code>https://bussola.spoki.com/</code> in place of <code>https://</code> in a GitHub pull request link, or in place of <code>bussola://</code> in a bussola link:</p>
+        <p><code>https://bussola.spoki.com/github.com/&lt;owner&gt;/&lt;name&gt;/pull/&lt;number&gt;</code></p>
+        <p class="muted">Nothing is sent to a server: the page only rewrites the address in your browser.</p>
+      </section>
+    </main>
+  </body>
+</html>
