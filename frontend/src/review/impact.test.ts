@@ -9,7 +9,7 @@ function unit(id: number, path: string, name: string): Unit {
 }
 
 function rating(unitId: number, impact: Impact): UnitDescription {
-  return { unit_id: unitId, description: null, impact, impact_reason: 'Why.', provider: 'fake', provider_label: 'Fake', model: null, effort: null, created_at: '', outdated: false }
+  return { unit_id: unitId, description: null, impact, impact_reason: 'Why.', provider: 'fake', provider_label: 'Fake', model: null, effort: null, created_at: '', outdated: false, lookups: [] }
 }
 
 function group(path: string, units: Unit[]): FileGroup {

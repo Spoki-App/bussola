@@ -432,6 +432,13 @@ textarea {
   margin-bottom: 8px;
 }
 
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
 .home-header h1 {
   margin: 0;
   font-size: 32px;
@@ -2784,6 +2791,11 @@ button.danger {
 .ai-impact {
   margin: 4px 0 0;
   font-size: 13px;
+}
+
+.ai-description-lookups {
+  margin: 6px 0 0;
+  font-size: 12px;
 }
 
 .code-font-panel input:not([type='checkbox']) {

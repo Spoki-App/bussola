@@ -260,6 +260,7 @@ class UnitDescription(Base):
     provider_label: Mapped[str] = mapped_column()
     model: Mapped[str | None] = mapped_column()
     effort: Mapped[str | None] = mapped_column(default=None)
+    lookups: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON(none_as_null=True), default=None)
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
 

@@ -256,7 +256,8 @@ class SqlDescriptionRepository(_SqlRepository):
         values = {column.name: getattr(description, column.name) for column in UnitDescription.__table__.columns if column.name != "id"}
         inserted = insert(UnitDescription).values(**values)
         replaced = {name: value for name, value in values.items() if name not in CHANGE_KEY}
-        replaced["description"] = func.coalesce(inserted.excluded.description, UnitDescription.description)
+        for kept in ("description", "lookups"):
+            replaced[kept] = func.coalesce(getattr(inserted.excluded, kept), getattr(UnitDescription, kept))
         statement = inserted.on_conflict_do_update(index_elements=list(CHANGE_KEY), set_=replaced)
         with self._session.begin_nested():
             self._session.execute(statement)

@@ -396,6 +396,7 @@ export interface UnitDescription {
   effort: string | null
   created_at: string
   outdated: boolean
+  lookups: AiReviewLookup[]
 }
 
 export type DescribedUnit = UnitDescription & { description: string }

@@ -26,6 +26,7 @@ from bussola.review.diffs import DiffRow
 from bussola.review.images import image_type
 from bussola.review.modules import ModulePaths
 from bussola.review.overview import UnitView
+from bussola.review.repos import repo_name
 from bussola.review.rows import ROW_APPROVABLE_KINDS, is_binary
 from bussola.review.scope import ChangeType
 from bussola.review.states import DONE_STATES, UnitState
@@ -33,10 +34,6 @@ from bussola.review.summaries import ReviewData, load_review_data
 from bussola.review.threads_count import open_thread_counts
 from bussola.storage.models import Approval, ForgeLink, Repo, Revision, RowApproval
 from bussola.units.model import UnitKind
-
-
-def repo_name(repo: Repo) -> str:
-    return Path(repo.path).name or repo.path
 
 
 def repo_out(repo: Repo) -> RepoOut:

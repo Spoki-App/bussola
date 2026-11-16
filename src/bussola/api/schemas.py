@@ -686,6 +686,7 @@ class UnitDescriptionOut(BaseModel):
     effort: str | None = None
     created_at: datetime
     outdated: bool
+    lookups: list["AiReviewLookupOut"]
 
 
 class RateImpactOut(BaseModel):
