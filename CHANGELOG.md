@@ -10,6 +10,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Fixed
 
+- A unit that changes after **Mark as reviewed** now shows the changes since that review, like an approved unit does: it opens on the new **Reviewed → current** diff instead of only base to head ([#98](https://github.com/Spoki-App/bussola/issues/98)).
 - Cmd+click on a method call, such as `order.requeue()`, no longer lists module-level functions with the same name when the language server cannot tell the type of the object: a call on an object lists methods, a plain call lists functions, and a call on an imported module still lists both ([#80](https://github.com/Spoki-App/bussola/issues/80)).
 
 ## [0.2.0] - 2026-11-06

@@ -1,6 +1,6 @@
 export type UnitState = 'approved' | 'approved_moved' | 'changed' | 'partial' | 'removed' | 'new'
 export type UnitFilter = 'all' | 'todo' | 'since_last'
-export type DiffMode = 'base' | 'approved'
+export type DiffMode = 'base' | 'approved' | 'reviewed'
 export type LineChange = 'context' | 'added' | 'removed'
 export type ChangeType = 'added' | 'modified' | 'removed'
 export type LineRange = [number, number]

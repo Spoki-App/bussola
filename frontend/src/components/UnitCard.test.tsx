@@ -210,4 +210,26 @@ describe('UnitCard', () => {
 
     expect(screen.queryByRole('button', { name: /Approve selection/ })).toBeNull()
   })
+
+  it('offers the reviewed version when the unit changed since it was marked as reviewed', async () => {
+    const diff: UnitDiff = {
+      unit_id: 1,
+      mode: 'reviewed',
+      available_modes: ['base', 'reviewed'],
+      approved_text_unavailable: false,
+      binary: false,
+      unified: '',
+      rows: [],
+    }
+    vi.stubGlobal('fetch', vi.fn((url: string) => (url.includes('/diff') ? Promise.resolve(Response.json(diff)) : new Promise(() => undefined))))
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <UnitCard reviewId={1} repoId={1} unit={unit('new')} focused={false} onFocus={() => undefined} register={() => undefined} />
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByRole('button', { name: 'Reviewed → current' })).toHaveClass('active')
+    expect(screen.getByRole('button', { name: 'Base → head' })).not.toHaveClass('active')
+    expect(screen.queryByRole('button', { name: 'Approved → current' })).toBeNull()
+  })
 })

@@ -1,7 +1,11 @@
-from tests.apiclient import ApiClient
+from tests.apiclient import ApiClient, Json
 from tests.gitrepo import GitFixture
 
 TWO_FUNCTIONS = "def first():\n    return 1\n\n\ndef second():\n    return 2\n"
+
+
+def changed_lines(diff: Json) -> list[tuple[str, str]]:
+    return [(row["change"], row["text"]) for row in diff["rows"] if row["change"] != "context"]
 
 
 def feature_with(git_repo: GitFixture, base: dict[str, str], change: dict[str, str]) -> None:
@@ -177,6 +181,36 @@ def test_since_last_review_shows_only_units_touched_afterwards(api: ApiClient, g
 
     assert api.states(review, "todo") == {"app.py::second": "new", "app.py::third": "new"}
     assert api.states(review, "since_last") == {"app.py::third": "new"}
+
+
+def test_approved_and_reviewed_units_show_the_changes_since_that_review(api: ApiClient, git_repo: GitFixture) -> None:
+    feature_with(git_repo, {"app.py": TWO_FUNCTIONS}, {"app.py": TWO_FUNCTIONS.replace("return 1", "return 10").replace("return 2", "return 20")})
+    review = api.start_review()
+    api.approve(review, "app.py::first")
+    api.call("POST", f"/reviews/{review}/sessions", 201)
+
+    git_repo.commit({"app.py": TWO_FUNCTIONS.replace("return 1", "return 11").replace("return 2", "return 22")})
+    api.refresh(review)
+    approved = api.diff(review, "app.py::first")
+    reviewed = api.diff(review, "app.py::second")
+
+    assert (approved["mode"], approved["available_modes"]) == ("approved", ["base", "approved"])
+    assert changed_lines(approved) == [("removed", "    return 10"), ("added", "    return 11")]
+    assert (reviewed["mode"], reviewed["available_modes"]) == ("reviewed", ["base", "reviewed"])
+    assert changed_lines(reviewed) == [("removed", "    return 20"), ("added", "    return 22")]
+    assert changed_lines(api.diff(review, "app.py::second", mode="base")) == [("removed", "    return 2"), ("added", "    return 22")]
+
+
+def test_a_unit_unchanged_since_the_last_review_shows_only_the_base_diff(api: ApiClient, git_repo: GitFixture) -> None:
+    feature_with(git_repo, {"app.py": TWO_FUNCTIONS}, {"app.py": TWO_FUNCTIONS.replace("return 1", "return 10")})
+    review = api.start_review()
+    api.call("POST", f"/reviews/{review}/sessions", 201)
+
+    git_repo.commit({"app.py": TWO_FUNCTIONS.replace("return 1", "return 10").replace("return 2", "return 20")})
+    api.refresh(review)
+    diff = api.diff(review, "app.py::first")
+
+    assert (diff["mode"], diff["available_modes"]) == ("base", ["base"])
 
 
 def test_hidden_child_units_are_shown_as_a_readable_placeholder(api: ApiClient, git_repo: GitFixture) -> None:
