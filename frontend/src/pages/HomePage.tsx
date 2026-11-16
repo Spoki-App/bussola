@@ -2,12 +2,12 @@ import { useState, type SubmitEvent } from 'react'
 
 import { describeError } from '../api/client'
 import { useCreateReview, useRefs, useRepos, useReviews } from '../api/hooks'
-import { isMissingClone } from '../api/pulls'
+import { isMissingClone, useSyncAllPullRequests } from '../api/pulls'
 import type { Repo } from '../api/types'
 import { AddRepoForm } from '../components/AddRepoForm'
 import { CourseStrip, ErrorNote } from '../components/Badges'
 import { CommentCount } from '../components/CommentCount'
-import { PullRequestsPanel } from '../components/PullRequestsPanel'
+import { PullRequestsPanel, PullSyncSummary } from '../components/PullRequestsPanel'
 import { ReviewTitle } from '../components/ReviewTitle'
 import { Link } from '../Link'
 import { navigate, reviewPath, useSearch } from '../navigation'
@@ -24,6 +24,7 @@ export function HomePage() {
   const repos = useRepos()
   const addRequest = addRepositoryRequestFromSearch(useSearch())
   const [filter, setFilter] = useState<ReviewFilter>(loadReviewFilter)
+  const syncAll = useSyncAllPullRequests()
   const choose = (option: ReviewFilter) => {
     setFilter(option)
     saveReviewFilter(option)
@@ -32,8 +33,17 @@ export function HomePage() {
     <div className="page">
       <div className="home-header">
         <h1>Repositories</h1>
-        <Segmented label="Show reviews" labels={REVIEW_FILTER_LABELS} value={filter} onChange={choose} />
+        <div className="home-actions">
+          <Segmented label="Show reviews" labels={REVIEW_FILTER_LABELS} value={filter} onChange={choose} />
+          {Boolean(repos.data?.length) && (
+            <button type="button" disabled={syncAll.isPending} title="Fetch the latest commits of every reviewed pull request in every repository" onClick={() => { syncAll.mutate() }}>
+              {syncAll.isPending ? 'Syncing...' : 'Sync all'}
+            </button>
+          )}
+        </div>
       </div>
+      {syncAll.data && <PullSyncSummary result={syncAll.data} />}
+      {syncAll.error && <ErrorNote message={describeError(syncAll.error)} />}
       {addRequest && <AddRepositoryPrompt request={addRequest} />}
       {repos.error && <ErrorNote message={describeError(repos.error)} />}
       {repos.data?.length === 0 && <p className="muted">No repositories yet. Add one from Settings (top right), or run `bussola serve` inside a repository.</p>}

@@ -17,7 +17,7 @@ from bussola.forge.pulls import (
     list_pull_requests,
     review_pull_request,
 )
-from bussola.forge.review_sync import sync_pull_requests
+from bussola.forge.review_sync import sync_all_pull_requests, sync_pull_requests
 from bussola.review.context import ReviewContext
 from bussola.review.repos import open_repo
 
@@ -42,6 +42,12 @@ def start_pull_request_review(number: int, repo: RepoDep, store: StoreDep, revie
 def sync_pulls(repo: RepoDep, store: StoreDep, reviewer: ReviewerDep, request: Request) -> PullSyncOut:
     result = sync_pull_requests(ForgeSession(store, app_state(request).forge, open_repo(repo), reviewer), repo)
     store.commit()
+    return PullSyncOut(updated=result.updated, closed=result.closed, failed=result.failed)
+
+
+@router.post("/pulls/sync")
+def sync_all_pulls(store: StoreDep, reviewer: ReviewerDep, request: Request) -> PullSyncOut:
+    result = sync_all_pull_requests(store, app_state(request).forge, reviewer)
     return PullSyncOut(updated=result.updated, closed=result.closed, failed=result.failed)
 
 
