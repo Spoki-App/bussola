@@ -1,6 +1,6 @@
-const GITHUB_PREFIX = 'github.com/'
+const GITHUB_PATH = /^(?:www\.)?github\.com\//
 const REVIEW_PATH = 'review'
-const REPOSITORY = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/
+const REPOSITORY = /^(?!\.+\/)[A-Za-z0-9_.-]{1,100}\/(?!\.+$)[A-Za-z0-9_.-]{1,100}$/
 const PULL_NUMBER = /^[1-9][0-9]{0,8}$/
 
 function linkPath(location) {
@@ -14,7 +14,7 @@ export function bussolaLink(location) {
 
 export function githubPage(location) {
   const path = linkPath(location)
-  if (path.startsWith(GITHUB_PREFIX)) {
+  if (GITHUB_PATH.test(path)) {
     return `https://${path}${location.search}${location.hash}`
   }
   if (path !== REVIEW_PATH) {

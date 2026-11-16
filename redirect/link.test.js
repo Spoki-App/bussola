@@ -25,6 +25,7 @@ test('the root has no bussola link', () => {
 
 test('the GitHub page of a GitHub path is the original link', () => {
   assert.equal(githubPage(at('/github.com/acme/shop/pull/482/files#r9')), 'https://github.com/acme/shop/pull/482/files#r9')
+  assert.equal(githubPage(at('/www.github.com/acme/shop/pull/482')), 'https://www.github.com/acme/shop/pull/482')
 })
 
 test('the GitHub page of a review link is its pull request', () => {
@@ -42,6 +43,9 @@ test('there is no GitHub page for other hosts or invalid review links', () => {
     '/review?repo=acme/shop&pr=0',
     '/review?repo=acme/shop&pr=abc',
     '/review?repo=acme/shop/x&pr=1',
+    '/review?repo=../..&pr=1',
+    '/review?repo=acme/..&pr=1',
+    '/review?repo=.../shop&pr=1',
   ]) {
     assert.equal(githubPage(at(address)), null, address)
   }
