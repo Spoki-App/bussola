@@ -103,6 +103,42 @@ test('a pull request link of an unknown repository opens the add repository flow
   await expect(page.getByLabel('Filter repositories')).toHaveValue('no-such-repository')
 })
 
+test('modals fit their content in the middle of the window and scroll inside past 90% of its height', async ({ page }) => {
+  await page.goto(`/?token=${E2E_TOKEN}`)
+
+  const open = (className: string, lines: number) =>
+    page.evaluate(
+      ({ className, lines }) => {
+        document.querySelector('dialog')?.remove()
+        const dialog = document.createElement('dialog')
+        dialog.className = className
+        dialog.append(...Array.from({ length: lines }, () => Object.assign(document.createElement('div'), { textContent: 'Line' })))
+        document.body.append(dialog)
+        dialog.showModal()
+        const box = dialog.getBoundingClientRect()
+        return {
+          shareOfWindow: box.height / window.innerHeight,
+          offCenter: Math.abs(box.top - (window.innerHeight - box.bottom)),
+          scrolls: dialog.scrollHeight > dialog.clientHeight && ['auto', 'scroll'].includes(getComputedStyle(dialog).overflowY),
+        }
+      },
+      { className, lines },
+    )
+
+  for (const className of ['picker', 'picker submit-review-dialog', 'picker ai-notice']) {
+    await test.step(className, async () => {
+      const short = await open(className, 2)
+      expect(short.shareOfWindow).toBeLessThan(0.5)
+      expect(short.offCenter).toBeLessThan(2)
+
+      const tall = await open(className, 200)
+      expect(tall.shareOfWindow).toBeLessThanOrEqual(0.9)
+      expect(tall.offCenter).toBeLessThan(2)
+      expect(tall.scrolls).toBe(true)
+    })
+  }
+})
+
 test('the header of an open unit stays below the file header while its diff scrolls past', async ({ page }) => {
   await page.setViewportSize({ width: 1000, height: 260 })
   await page.goto(`/?token=${E2E_TOKEN}`)
