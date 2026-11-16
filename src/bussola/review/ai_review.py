@@ -30,6 +30,7 @@ from bussola.review.descriptions import (
     marked,
     old_key_of,
     stored_descriptions,
+    unit_definitions,
     unit_prompt,
     unrated,
 )
@@ -46,6 +47,11 @@ UNRATED_ORDER = IMPACT_ORDER[Impact.MEDIUM]
 MAX_FINDING_CHARACTERS = MAX_BODY_LENGTH - 1_000
 CLIPPED_COMMENT = "\n\n[The rest of this comment was too long to keep.]"
 MAX_TITLE_CHARACTERS = 120
+MAX_PROMPT_CODE_CHARACTERS = 1_500_000
+DEFINITIONS_ONLY = (
+    "The pull request is too large to show the code of every unit, so each unit to review shows only its definitions. "
+    "Open each one with unit_diff, by the name on its `Open with unit_diff` line, to see its change with line numbers before you review it."
+)
 
 type RaisedKey = tuple[str, str | None, str | None, str | None, int | None, str]
 
@@ -261,13 +267,14 @@ def _run(job: AiReviewJob, record: "_RunRecord") -> AiReviewOutcome:
     snapshots, pending = reviewable_units(context, job.tools.snapshots)
     pending = snapshots if job.again else pending
     impacts = _impacts(context, snapshots)
-    groups = review_groups(snapshots, pending, impacts, job.limit)
+    definitions_only = job.limit is None and sum(len(unit_prompt(unit, numbered=True, clip=False)) for unit in pending) > MAX_PROMPT_CODE_CHARACTERS
+    groups = review_groups(snapshots, pending, impacts, MAX_PROMPT_CODE_CHARACTERS if definitions_only else job.limit, definitions_only=definitions_only)
     done = [0, *accumulate(len(group) for group in groups)]
     progress = _ReviewProgress(job.report, len(pending))
     progress.reviewed(0)
     if groups:
         job.tools.prepare()
-    reviewer = _GroupReviewer(job, snapshots, ai_reviewer(context, job.runner.provider), progress, record, impacts)
+    reviewer = _GroupReviewer(job, snapshots, ai_reviewer(context, job.runner.provider), progress, record, impacts, definitions_only)
     context.store.commit()
     outcome: BatchResult[int, int] = run_batch(
         range(len(groups)), lambda index: reviewer.review(groups[index]), cancellation, lambda batch: progress.reviewed(done[batch.done])
@@ -297,7 +304,9 @@ def unreviewed(snapshots: list[UnitSnapshot], reviewed: Iterable[AiReviewedUnit]
     return [snapshot for snapshot in snapshots if not {(key_of(snapshot), change_hash(snapshot)), (old_key_of(snapshot), change_hash(snapshot))} & done]
 
 
-def review_groups(snapshots: list[UnitSnapshot], pending: list[UnitSnapshot], impacts: dict[int, Impact], limit: int | None) -> list[list[UnitSnapshot]]:
+def review_groups(
+    snapshots: list[UnitSnapshot], pending: list[UnitSnapshot], impacts: dict[int, Impact], limit: int | None, *, definitions_only: bool = False
+) -> list[list[UnitSnapshot]]:
     order = {snapshot.id: index for index, snapshot in enumerate(snapshots)}
 
     def rank(unit: UnitSnapshot) -> tuple[int, int]:
@@ -309,13 +318,19 @@ def review_groups(snapshots: list[UnitSnapshot], pending: list[UnitSnapshot], im
     groups: list[list[UnitSnapshot]] = []
     size = 0
     for unit in (unit for units in files.values() for unit in units):
-        cost = len(unit_prompt(unit, numbered=True, clip=limit is not None))
+        cost = len(review_unit_text(unit, definitions_only=definitions_only, clip=limit is not None))
         if not groups or (limit is not None and groups[-1] and size + cost > limit):
             groups.append([])
             size = 0
         groups[-1].append(unit)
         size += cost
     return groups
+
+
+def review_unit_text(unit: UnitSnapshot, *, definitions_only: bool, clip: bool) -> str:
+    if definitions_only:
+        return f"Open with unit_diff: {unit_label(unit)}\n{unit_definitions(unit)}"
+    return unit_prompt(unit, numbered=True, clip=clip)
 
 
 def ai_reviewer(context: ReviewContext, provider: AiProvider) -> Reviewer:
@@ -388,10 +403,11 @@ class _GroupReviewer:
     progress: _ReviewProgress
     record: _RunRecord
     impacts: dict[int, Impact]
+    definitions_only: bool
 
     def review(self, group: list[UnitSnapshot]) -> int:
         context, revision = self.job.context, self.job.revision
-        toolbox = self.job.tools.toolbox(self.progress.looked_up)
+        toolbox = self.job.tools.toolbox(self.progress.looked_up, len(group) if self.definitions_only else 0)
         try:
             views = [view for view in thread_views(context, revision) if any(comment.deleted_at is None for comment in view.comments)]
             prompt = self._prompt(group, views)
@@ -422,8 +438,11 @@ class _GroupReviewer:
         others = [unit_label(snapshot) for snapshot in self.snapshots if snapshot.id not in focus]
         if others:
             lines += ["The other units this pull request changes, which you can open with unit_diff:", *marked("units", "\n".join(others), clip=clip), ""]
-        lines += ["The units to review:", ""]
-        lines += [f"Unit: {RATING_ID.format(number)}\n{unit_prompt(snapshot, numbered=True, clip=clip)}" for number, snapshot in enumerate(group, start=1)]
+        lines += ["The units to review:", *([DEFINITIONS_ONLY] if self.definitions_only else []), ""]
+        lines += [
+            f"Unit: {RATING_ID.format(number)}\n{review_unit_text(snapshot, definitions_only=self.definitions_only, clip=clip)}"
+            for number, snapshot in enumerate(group, start=1)
+        ]
         comments = [_thread_summary(view) for view in views]
         if comments:
             lines += ["Comments reviewers already made on this pull request:", *marked("comments", "\n\n".join(comments), clip=clip), ""]

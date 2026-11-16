@@ -71,7 +71,7 @@ class ReviewTools:
     ignore: tuple[str, ...]
     cancellation: Cancellation
 
-    def toolbox(self, on_call: Callable[[], None] | None = None) -> Toolbox:
+    def toolbox(self, on_call: Callable[[], None] | None = None, extra_calls: int = 0) -> Toolbox:
         return Toolbox(
             [
                 AiTool(
@@ -90,7 +90,7 @@ class ReviewTools:
                 AiTool("search", f"Lines of the repository that contain an exact text, at most {MAX_SEARCH_RESULTS}.", TextSearch, self.search),
                 AiTool("unit_diff", "One changed unit of the pull request before and after the change, with line numbers.", UnitName, self.unit_diff),
             ],
-            MAX_TOOL_CALLS,
+            MAX_TOOL_CALLS + extra_calls,
             on_call,
         )
 

@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from bussola.review.descriptions import BINARY_SIDE, MAX_SIDE_CHARACTERS, UnitInsight, unit_prompt
+from bussola.review.descriptions import BINARY_SIDE, MAX_SIDE_CHARACTERS, UnitInsight, unit_definitions, unit_prompt
 from bussola.storage.models import UnitSnapshot
 
 
@@ -86,3 +86,18 @@ def test_code_cannot_close_the_block_it_is_quoted_in() -> None:
     assert marker is not None
     assert prompt.index(head) < prompt.index(f"</{marker.group(1)}>")
     assert f"</{marker.group(1)}>" not in head
+
+
+def test_definitions_keep_the_signature_and_leave_out_the_body() -> None:
+    before = "@cached\ndef total(\n    items,\n):\n    return sum(items)\n"
+    after = "function total(items, rate) {\n  return sum(items) * rate;\n}\n"
+
+    prompt = unit_definitions(snapshot(before, after))
+
+    assert re.search(r"<(before-[0-9a-f]{16})>\n@cached\ndef total\(\n    items,\n\):\n</\1>", prompt)
+    assert re.search(r"<(after-[0-9a-f]{16})>\nfunction total\(items, rate\) \{\n</\1>", prompt)
+    assert "return" not in prompt
+
+
+def test_definitions_of_a_new_unit_say_it_is_new() -> None:
+    assert "<before>The unit did not exist before this change.</before>" in unit_definitions(snapshot(None, "X = 1\n"))

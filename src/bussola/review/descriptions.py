@@ -26,6 +26,8 @@ MAX_SIDE_CHARACTERS = 40_000
 MARKER_HASH_LENGTH = 16
 BINARY_SIDE = "Binary content that cannot be shown."
 UNIT_NAMES = {"module": "module-level code"}
+MAX_DEFINITION_LINES = 8
+DEFINITION_ENDINGS = (":", "{")
 
 
 def _not_blank(text: str) -> str:
@@ -226,15 +228,31 @@ def description_row(
 
 
 def unit_prompt(snapshot: UnitSnapshot, *, numbered: bool = False, clip: bool = True) -> str:
+    base, head = (_numbered(snapshot, Side.BASE), _numbered(snapshot, Side.HEAD)) if numbered else (snapshot.base_text, snapshot.head_text)
+    return _unit_text(snapshot, base, head, clip)
+
+
+def unit_definitions(snapshot: UnitSnapshot) -> str:
+    return _unit_text(snapshot, _definition(snapshot.base_text), _definition(snapshot.head_text), clip=True)
+
+
+def _unit_text(snapshot: UnitSnapshot, base: str | None, head: str | None, clip: bool) -> str:
     name = snapshot.qualified_name or f"(the whole {UNIT_NAMES.get(snapshot.kind, snapshot.kind)})"
     lines = [f"Path: {snapshot.path}"]
     if snapshot.old_path and snapshot.old_path != snapshot.path:
         lines.append(f"Renamed from: {snapshot.old_path}")
     lines += [f"Kind: {snapshot.kind}", f"Name: {name}", ""]
-    base, head = (_numbered(snapshot, Side.BASE), _numbered(snapshot, Side.HEAD)) if numbered else (snapshot.base_text, snapshot.head_text)
     lines += _side("before", snapshot.base_hash, base, "The unit did not exist before this change.", clip)
     lines += _side("after", snapshot.head_hash, head, "This change removes the unit.", clip)
     return "\n".join(lines)
+
+
+def _definition(text: str | None) -> str | None:
+    if text is None:
+        return None
+    lines = text.splitlines()[:MAX_DEFINITION_LINES]
+    end = next((index for index, line in enumerate(lines, start=1) if line.rstrip().endswith(DEFINITION_ENDINGS)), len(lines))
+    return "\n".join(lines[:end])
 
 
 def _numbered(snapshot: UnitSnapshot, side: Side) -> str | None:
