@@ -7,9 +7,15 @@ import { ErrorNote } from './Badges'
 import { ExternalLink } from './ExternalLink'
 import { CommentCount } from './CommentCount'
 
-function syncSummary(result: PullSyncResult): string {
-  const parts = [`${String(result.updated)} updated`, `${String(result.closed)} closed or merged`]
-  return `Pull request reviews synced: ${parts.join(', ')}.`
+export function PullSyncSummary({ result }: { result: PullSyncResult }) {
+  return (
+    <>
+      <p className="notice">
+        Pull request reviews synced: {result.updated} updated, {result.closed} closed or merged.
+      </p>
+      {result.failed.map((failure, index) => <ErrorNote key={index} message={failure} />)}
+    </>
+  )
 }
 
 export function PullRequestsPanel({ repoId }: { repoId: number }) {
@@ -42,8 +48,7 @@ export function PullRequestsPanel({ repoId }: { repoId: number }) {
           {sync.isPending ? 'Syncing...' : 'Sync reviews'}
         </button>
       </div>
-      {sync.data && <p className="notice">{syncSummary(sync.data)}</p>}
-      {sync.data?.failed.map((failure) => <ErrorNote key={failure} message={failure} />)}
+      {sync.data && <PullSyncSummary result={sync.data} />}
       {(sync.error ?? start.error) && <ErrorNote message={describeError(sync.error ?? start.error)} />}
       {data.pulls.length === 0 && <p className="muted">No open pull requests.</p>}
       <ul className="pull-list">

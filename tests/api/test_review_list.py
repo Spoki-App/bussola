@@ -5,7 +5,7 @@ from typing import Any
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-from bussola.api.views import repo_name
+from bussola.review.repos import repo_name
 from bussola.storage.models import Repo
 from tests.apiclient import ApiClient
 from tests.gitrepo import GitFixture
