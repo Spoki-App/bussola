@@ -432,6 +432,13 @@ textarea {
   margin-bottom: 8px;
 }
 
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
 .home-header h1 {
   margin: 0;
   font-size: 32px;
