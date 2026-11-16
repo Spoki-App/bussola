@@ -901,6 +901,7 @@ button.busy {
 
 .picker.ai-review-details {
   width: min(860px, calc(100vw - 32px));
+  height: 760px;
 }
 
 .ai-review-details-body {
@@ -2476,6 +2477,10 @@ button.danger {
 
 .picker-header {
   justify-content: space-between;
+}
+
+.picker.directory-picker {
+  height: 600px;
 }
 
 .picker.submit-review-dialog {

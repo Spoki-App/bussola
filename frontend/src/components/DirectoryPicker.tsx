@@ -24,7 +24,7 @@ export function DirectoryPicker({ filter = '', busy, error, onSelect, onClose }:
   const [tab, setTab] = useState<PickerTab>('found')
 
   return (
-    <dialog ref={dialog} className="picker" aria-labelledby="picker-title" onClose={onClose}>
+    <dialog ref={dialog} className="picker directory-picker" aria-labelledby="picker-title" onClose={onClose}>
       <header className="picker-header">
         <h2 id="picker-title">Add a repository</h2>
         <button type="button" className="link" onClick={close}>

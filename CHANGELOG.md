@@ -11,7 +11,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 ### Fixed
 
 - Cmd+click on a method call, such as `order.requeue()`, no longer lists module-level functions with the same name when the language server cannot tell the type of the object: a call on an object lists methods, a plain call lists functions, and a call on an imported module still lists both ([#80](https://github.com/Spoki-App/bussola/issues/80)).
-- Dialogs such as **Finish your review**, **Add a repository**, the AI notice and the AI review **Details** fit their content in the middle of the window instead of filling its height, and scroll inside only past 90% of the window height ([#86](https://github.com/Spoki-App/bussola/issues/86)).
+- Short dialogs such as **Finish your review** and the AI notice fit their content in the middle of the window instead of filling its height, and scroll inside only past 90% of the window height ([#86](https://github.com/Spoki-App/bussola/issues/86)).
 
 ## [0.2.0] - 2026-11-06
 

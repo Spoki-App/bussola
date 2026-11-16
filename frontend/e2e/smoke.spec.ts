@@ -119,13 +119,13 @@ test('modals fit their content in the middle of the window and scroll inside pas
         return {
           shareOfWindow: box.height / window.innerHeight,
           offCenter: Math.abs(box.top - (window.innerHeight - box.bottom)),
-          scrolls: dialog.scrollHeight > dialog.clientHeight,
+          scrolls: dialog.scrollHeight > dialog.clientHeight && ['auto', 'scroll'].includes(getComputedStyle(dialog).overflowY),
         }
       },
       { className, lines },
     )
 
-  for (const className of ['picker', 'picker submit-review-dialog', 'picker ai-notice', 'picker ai-review-details']) {
+  for (const className of ['picker', 'picker submit-review-dialog', 'picker ai-notice']) {
     await test.step(className, async () => {
       const short = await open(className, 2)
       expect(short.shareOfWindow).toBeLessThan(0.5)
