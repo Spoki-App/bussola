@@ -53,7 +53,7 @@ async function openReview(page: Page, name: string) {
 
 test('the compare bar compares the first range with a second selected range', async ({ page }) => {
   const card = await openReview(page, 'selection')
-  const bar = page.getByRole('region', { name: 'Compare ranges' })
+  const bar = page.getByRole('status', { name: 'Compare ranges' })
 
   await card.locator('td.diff-gutter-insert', { hasText: /^3$/ }).click()
   await card.getByRole('button', { name: 'Compare with...' }).click()
@@ -75,7 +75,7 @@ test('selected lines are compared with the code copied to the clipboard', async 
   await card.locator('td.diff-gutter-insert', { hasText: /^2$/ }).click()
   await card.locator('td.diff-gutter-insert', { hasText: /^3$/ }).click({ modifiers: ['Shift'] })
   await card.getByRole('button', { name: 'Compare with...' }).click()
-  const bar = page.getByRole('region', { name: 'Compare ranges' })
+  const bar = page.getByRole('status', { name: 'Compare ranges' })
   await expect(bar.getByText('2 lines')).toBeVisible()
   await expect(card.getByRole('button', { name: 'Compare with clipboard' })).toHaveCount(0)
   await bar.getByRole('button', { name: 'Compare with clipboard' }).click()

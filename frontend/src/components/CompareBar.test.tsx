@@ -21,6 +21,7 @@ describe('CompareBar', () => {
   it('shows the first range as a chip and asks for a second range', () => {
     renderBar()
 
+    expect(screen.getByRole('status', { name: 'Compare ranges' })).toBeInTheDocument()
     expect(screen.getByText('checkout.validate')).toBeInTheDocument()
     expect(screen.getByText('5 lines')).toBeInTheDocument()
     expect(screen.getByText('Select a second range by its line numbers, or compare with the clipboard.')).toBeInTheDocument()
@@ -29,12 +30,15 @@ describe('CompareBar', () => {
 
   it('compares with the selected lines once a second range is selected', () => {
     const onCompareSelection = vi.fn()
-    renderBar({ onCompareSelection })
+    const handlers = { onCompareClipboard: vi.fn(), onCancel: vi.fn() }
+    const { rerender } = render(<CompareBar title="checkout.validate" lineCount={5} {...handlers} />)
+    expect(screen.getByRole('button', { name: 'Compare with selection' })).toBeDisabled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Compare with selection' }))
+    rerender(<CompareBar title="checkout.validate" lineCount={5} {...handlers} onCompareSelection={onCompareSelection} />)
 
-    expect(onCompareSelection).toHaveBeenCalledOnce()
     expect(screen.getByText('Compare it with the selected lines or the clipboard.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Compare with selection' }))
+    expect(onCompareSelection).toHaveBeenCalledOnce()
   })
 
   it('compares with the text in the clipboard', async () => {

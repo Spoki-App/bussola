@@ -38,7 +38,7 @@ export function CompareBar({ title, lineCount, onCompareSelection, onCompareClip
     )
   }
   return (
-    <section className="compare-bar" aria-label="Compare ranges">
+    <section className="compare-bar" role="status" aria-label="Compare ranges">
       <span className="compare-bar-label">First range</span>
       <span className="move-link compare-chip" title={title}>
         <code>{title}</code>
