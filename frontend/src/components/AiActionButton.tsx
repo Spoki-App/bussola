@@ -98,6 +98,7 @@ function AiNoticeDialog({ ai, onAnswer }: { ai: AiStatus; onAnswer: (accepted: b
   const { ref: dialog, close } = useModalDialog()
   const accepted = useRef(false)
   const answered = useRef(false)
+  const overrides = ai.operations.filter((operation) => operation.model !== null)
   const finish = () => {
     if (!answered.current) {
       answered.current = true
@@ -123,6 +124,15 @@ function AiNoticeDialog({ ai, onAnswer }: { ai: AiStatus; onAnswer: (accepted: b
         )}
         .
       </p>
+      {overrides.length > 0 && (
+        <ul>
+          {overrides.map((operation) => (
+            <li key={operation.key}>
+              {operation.title} uses the model <code>{operation.model}</code>.
+            </li>
+          ))}
+        </ul>
+      )}
       <p className="muted">bussola asks once for each provider, model and endpoint. Nothing is sent until you choose Send code.</p>
       <div className="ai-notice-actions">
         <button type="button" onClick={close}>

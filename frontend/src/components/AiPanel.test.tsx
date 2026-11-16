@@ -18,6 +18,7 @@ const OFF: AiStatus = {
   problem: null,
   config_file: CONFIG_FILE,
   target: null,
+  operations: [],
 }
 
 const ANTHROPIC: AiStatus = {
@@ -30,6 +31,7 @@ const ANTHROPIC: AiStatus = {
   api_key_env: 'ANTHROPIC_API_KEY',
   api_key_set: true,
   target: 'anthropic|claude-opus-5-5|https://api.anthropic.com',
+  operations: [],
 }
 
 const EMPTY_CONFIG: AiConfig = {

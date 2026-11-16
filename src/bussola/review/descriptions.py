@@ -240,6 +240,7 @@ def description_row(
         provider=provider.name,
         provider_label=provider.label,
         model=provider.model,
+        effort=provider.effort,
     )
 
 

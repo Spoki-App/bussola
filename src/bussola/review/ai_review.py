@@ -383,7 +383,8 @@ class _RunRecord:
     @classmethod
     def start(cls, job: AiReviewJob) -> "_RunRecord":
         provider = job.runner.provider
-        run = AiReviewRun(job.context.review.id, job.revision.id, provider.name, provider.label, provider.model, job.again, RunStatus.RUNNING)
+        review_id, revision_id = job.context.review.id, job.revision.id
+        run = AiReviewRun(review_id, revision_id, provider.name, provider.label, provider.model, job.again, RunStatus.RUNNING, effort=provider.effort)
         record = cls(job.context, job.context.store.ai_reviews.add_run(run))
         record._save()
         job.context.store.commit()

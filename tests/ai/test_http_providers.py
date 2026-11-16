@@ -28,8 +28,10 @@ from bussola.ai.base import (
     AiTimeoutError,
     AiUnreachableError,
     Cancellation,
+    ModelInfo,
     ToolDefinition,
     ToolOutcome,
+    Tuning,
 )
 from bussola.ai.config import AiSettings, ProviderName
 from bussola.ai.http import MAX_ATTEMPTS, MAX_RESPONSE_BYTES, bypasses_proxy
@@ -62,10 +64,14 @@ class StubServer:
         stub = self
 
         class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                self.do_POST()
+
             def do_POST(self) -> None:
-                length = int(self.headers["Content-Length"])
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length)) if length else None
                 stub.requests.append(
-                    {"path": self.path, "headers": {name.lower(): value for name, value in self.headers.items()}, "json": json.loads(self.rfile.read(length))}
+                    {"method": self.command, "path": self.path, "headers": {name.lower(): value for name, value in self.headers.items()}, "json": body}
                 )
                 if stub.before_reply is not None:
                     stub.before_reply()
@@ -120,6 +126,54 @@ def test_the_anthropic_api_gets_the_key_the_model_and_the_schema(stub: StubServe
         "messages": [{"role": "user", "content": "def pay(): ..."}],
         "output_config": {"format": {"type": "json_schema", "schema": {"type": "object"}}},
     }
+
+
+def test_the_anthropic_api_gets_the_effort_in_the_output_config(stub: StubServer) -> None:
+    stub.reply({"stop_reason": "end_turn", "content": [{"type": "text", "text": "{}"}]})
+
+    AnthropicProvider("claude-opus-5-5", stub.url, "sk-test", 5.0, Tuning(effort="high")).complete(REQUEST, Cancellation())
+
+    assert stub.requests[0]["json"]["output_config"]["effort"] == "high"
+
+
+def test_the_anthropic_api_lists_its_models_and_whether_they_take_an_effort(stub: StubServer) -> None:
+    stub.reply(
+        {
+            "data": [
+                {"id": "claude-opus-5-5", "capabilities": {"effort": {"supported": True}}},
+                {"id": "claude-haiku-4-5", "capabilities": {"effort": {"supported": False}}},
+                {"id": "claude-mystery"},
+            ]
+        }
+    )
+
+    models = AnthropicProvider("claude-opus-5-5", stub.url, "sk-test", 5.0).models(Cancellation())
+
+    assert models == [ModelInfo("claude-opus-5-5", True), ModelInfo("claude-haiku-4-5", False), ModelInfo("claude-mystery")]
+    assert (stub.requests[0]["method"], stub.requests[0]["path"]) == ("GET", "/v1/models?limit=1000")
+    assert stub.requests[0]["headers"]["x-api-key"] == "sk-test"
+
+
+def test_an_openai_compatible_endpoint_gets_the_reasoning_effort_and_lists_its_models(stub: StubServer) -> None:
+    stub.reply({"choices": [{"finish_reason": "stop", "message": {"content": "{}"}}]})
+    provider = OpenAiCompatibleProvider("gpt", f"{stub.url}/v1", "local-key", 5.0, Tuning(effort="low"))
+
+    provider.complete(REQUEST, Cancellation())
+    stub.reply({"object": "list", "data": [{"id": "gpt"}, {"id": "qwen2.5-coder"}]})
+    models = provider.models(Cancellation())
+
+    assert stub.requests[0]["json"]["reasoning_effort"] == "low"
+    assert models == [ModelInfo("gpt"), ModelInfo("qwen2.5-coder")]
+    assert (stub.requests[1]["method"], stub.requests[1]["path"]) == ("GET", "/v1/models")
+    assert stub.requests[1]["headers"]["authorization"] == "Bearer local-key"
+
+
+def test_without_an_effort_none_is_sent(stub: StubServer) -> None:
+    stub.reply({"choices": [{"finish_reason": "stop", "message": {"content": "{}"}}]})
+
+    OpenAiCompatibleProvider("gpt", stub.url, None, 5.0).complete(REQUEST, Cancellation())
+
+    assert "reasoning_effort" not in stub.requests[0]["json"]
 
 
 @pytest.mark.parametrize(("stop_reason", "message"), [("max_tokens", "cut off"), ("model_context_window_exceeded", "context window"), ("refusal", "declined")])
