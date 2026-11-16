@@ -3,7 +3,8 @@ import os
 import tempfile
 import tomllib
 import urllib.parse
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 
@@ -42,6 +43,49 @@ DEFAULT_CODE_LIMITS = {ProviderName.OPENAI_COMPATIBLE.value: 100_000}
 MIN_CODE_CHARACTERS = 10
 
 
+class Effort(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class AiOperation(StrEnum):
+    DESCRIBE = "describe"
+    IMPACT = "impact"
+    REVIEW = "review"
+    CHAT = "chat"
+
+
+class AiOperationConfig(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    model: str | None = None
+    effort: Effort | None = None
+
+    @field_validator("model")
+    @classmethod
+    def _blank_is_global(cls, model: str | None) -> str | None:
+        return None if model is None else model.strip() or None
+
+
+class AiOperations(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    describe: AiOperationConfig = AiOperationConfig()
+    impact: AiOperationConfig = AiOperationConfig()
+    review: AiOperationConfig = AiOperationConfig()
+    chat: AiOperationConfig = AiOperationConfig()
+
+    def of(self, operation: AiOperation) -> AiOperationConfig:
+        return getattr(self, operation.value)
+
+    def custom(self) -> dict[str, dict[str, str]]:
+        return {name: values for name, values in self.model_dump(mode="json", exclude_none=True).items() if values}
+
+    def models(self) -> dict[str, str]:
+        return {operation: chosen.model for operation in AiOperation if (chosen := self.of(operation)).model is not None}
+
+
 class AiPrompts(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -69,6 +113,7 @@ class UserAiConfig(BaseModel):
     max_tokens: int | None = Field(default=None, gt=0)
     max_code_characters: int | None = Field(default=None, ge=MIN_CODE_CHARACTERS)
     prompts: AiPrompts = AiPrompts()
+    operations: AiOperations = AiOperations()
 
     def code_limit(self, provider: str) -> int | None:
         return self.max_code_characters or DEFAULT_CODE_LIMITS.get(provider)
@@ -101,6 +146,8 @@ class AiSettings:
     timeout: float = DEFAULT_TIMEOUT_SECONDS
     api_key_env: str | None = None
     max_tokens: int | None = None
+    effort: Effort | None = None
+    operations: AiOperations = field(default_factory=AiOperations)
 
     @property
     def configured(self) -> bool:
@@ -112,7 +159,14 @@ class AiSettings:
 
     @property
     def target(self) -> str | None:
-        return json.dumps([self.provider, self.model, self.endpoint]) if self.configured else None
+        if not self.configured:
+            return None
+        models = self.operations.models()
+        return json.dumps([self.provider, self.model, self.endpoint, models] if models else [self.provider, self.model, self.endpoint])
+
+    def for_operation(self, operation: AiOperation) -> "AiSettings":
+        chosen = self.operations.of(operation)
+        return replace(self, model=chosen.model or self.model, effort=chosen.effort)
 
     def api_key(self) -> str | None:
         return (os.environ.get(self.api_key_env) or None) if self.api_key_env else None
@@ -133,8 +187,10 @@ def load_user_config(path: Path | None) -> UserConfig:
 
 
 def save_user_ai_config(path: Path, ai: UserAiConfig) -> None:
-    values = ai.model_dump(mode="json", exclude_none=True, exclude_defaults=True, exclude={"prompts"})
-    lines = ["[ai]", *(f"{name} = {json.dumps(value, ensure_ascii=False)}" for name, value in values.items())]
+    values = ai.model_dump(mode="json", exclude_none=True, exclude_defaults=True, exclude={"prompts", "operations"})
+    lines = ["[ai]", *_toml_values(values)]
+    for name, chosen in ai.operations.custom().items():
+        lines += ["", f"[ai.operations.{name}]", *_toml_values(chosen)]
     prompts = ai.prompts.custom()
     if prompts:
         lines += ["", "[ai.prompts]", *(f"{name} = {_toml_text(text)}" for name, text in prompts.items())]
@@ -146,6 +202,10 @@ def save_user_ai_config(path: Path, ai: UserAiConfig) -> None:
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=target.parent, prefix=f".{target.name}.", delete=False) as handle:
         handle.write(text)
     Path(handle.name).replace(target)
+
+
+def _toml_values(values: Mapping[str, object]) -> list[str]:
+    return [f"{name} = {json.dumps(value, ensure_ascii=False)}" for name, value in values.items()]
 
 
 def _toml_text(text: str) -> str:
@@ -161,9 +221,9 @@ def describe_config_error(error: Exception) -> str:
 def resolve_ai_settings(user: UserAiConfig) -> AiSettings:
     provider = user.provider or ProviderName.NONE
     if provider == ProviderName.NONE:
-        return AiSettings(ProviderName.NONE)
+        return AiSettings(ProviderName.NONE, operations=user.operations)
     if provider == ProviderName.CLAUDE_CODE:
-        return AiSettings(provider, model=user.model, timeout=user.timeout, max_tokens=user.max_tokens)
+        return AiSettings(provider, model=user.model, timeout=user.timeout, max_tokens=user.max_tokens, operations=user.operations)
     return AiSettings(
         provider=provider,
         model=user.model or DEFAULT_MODELS.get(provider),
@@ -171,4 +231,5 @@ def resolve_ai_settings(user: UserAiConfig) -> AiSettings:
         timeout=user.timeout,
         api_key_env=user.api_key_env or DEFAULT_KEY_ENV.get(provider),
         max_tokens=user.max_tokens,
+        operations=user.operations,
     )

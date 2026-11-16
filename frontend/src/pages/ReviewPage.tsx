@@ -5,7 +5,7 @@ import { useDescriptions } from '../api/descriptions'
 import { useSync } from '../api/forge'
 import { useApprove, useFinishReview, useReview, useUnits } from '../api/hooks'
 import { useLineLength } from '../api/lineLength'
-import type { DiffRow, ReviewDetail, ReviewSubmitResult, SyncResult, Unit, UnitDescription, UnitDiff, UnitFilter } from '../api/types'
+import type { DiffRow, MergeResult, ReviewDetail, ReviewSubmitResult, SyncResult, Unit, UnitDescription, UnitDiff, UnitFilter } from '../api/types'
 import { AiChat } from '../components/AiChat'
 import { AiReview } from '../components/AiReview'
 import { CourseStrip, ErrorNote } from '../components/Badges'
@@ -15,7 +15,7 @@ import { ExternalLink } from '../components/ExternalLink'
 import { FileTree } from '../components/FileTree'
 import { GitHubSyncStatus } from '../components/GitHubSyncStatus'
 import { LinkPullRequest } from '../components/LinkPullRequest'
-import { MergePullRequest } from '../components/MergePullRequest'
+import { MergeDialog } from '../components/MergeDialog'
 import { PullRequestDescription } from '../components/PullRequestDescription'
 import { RateImpact } from '../components/RateImpact'
 import { ReviewTitle } from '../components/ReviewTitle'
@@ -103,6 +103,7 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
   const [message, setMessage] = useState<string | null>(null)
   const [synced, setSynced] = useState<SyncResult | null>(null)
   const [merging, setMerging] = useState(false)
+  const [merged, setMerged] = useState<MergeResult | null>(null)
   const sync = useSync(review.id)
   const finish = useFinishReview(review.id)
   const revision = review.latest_revision
@@ -173,7 +174,7 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
           Mark as reviewed
         </button>
         {review.pull_request?.state === 'OPEN' && (
-          <button type="button" aria-expanded={merging} onClick={() => { setMerging(!merging) }}>
+          <button type="button" aria-haspopup="dialog" onClick={() => { setMerging(true) }}>
             Merge
           </button>
         )}
@@ -181,7 +182,14 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
       {message && <p className="notice">{message}</p>}
       {synced && <SyncSummary result={synced} />}
       {submitted && <PublishSummary message={submittedMessage(submitted)} published={submitted.published} />}
-      {merging && <MergePullRequest reviewId={review.id} />}
+      {merging && <MergeDialog reviewId={review.id} onMerged={setMerged} onClose={() => { setMerging(false) }} />}
+      {merged && (
+        <PublishSummary
+          message={merged.branch_deleted ? 'Pull request merged and its branch deleted.' : 'Pull request merged.'}
+          published={null}
+          problems={merged.branch_error ? [merged.branch_error] : []}
+        />
+      )}
       {needsLink && <LinkPullRequest reviewId={review.id} unsent={synced.unsent_comments} onLinked={runSync} />}
       {(sync.error ?? finish.error) && <ErrorNote message={describeError(sync.error ?? finish.error)} />}
     </header>

@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 
 from bussola.ai.base import AiCancelledError
+from bussola.ai.config import AiOperation
 from bussola.api.deps import ContextDep, repo_of, resolve_revision
 from bussola.api.descriptions import ai_provider, ai_runner, code_limit
 from bussola.api.navigation import unit_at, units_by_path
@@ -26,7 +27,7 @@ router = APIRouter(tags=["ai-review"])
 @router.post("/reviews/{review_id}/ai-review")
 def start_ai_review(context: ContextDep, body: AiReviewIn, request: Request) -> AiReviewOut:
     state = app_state(request)
-    provider = ai_provider(state, context, body.target)
+    provider = ai_provider(state, context, body.target, AiOperation.REVIEW)
     revision = resolve_revision(context, None)
     git_repo = open_repo(repo_of(context))
     ignore = load_repo_config(git_repo.root).ignore
@@ -98,6 +99,7 @@ def _run_out(run: AiReviewRun, running: bool) -> AiReviewRunOut:
         provider=run.provider,
         provider_label=run.provider_label,
         model=run.model,
+        effort=run.effort,
         reviewed=run.reviewed,
         findings=run.findings,
         failed=run.failed,

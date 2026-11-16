@@ -1,12 +1,13 @@
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from bussola.ai.base import Cancellation
-from bussola.ai.tools import AiTool, Toolbox, ToolError
+from bussola.ai.tools import MAX_TOOL_OUTPUT_CHARACTERS, AiTool, Toolbox, ToolError
 from bussola.git import GitError, GitRepo
 from bussola.globs import matches_any
 from bussola.navigation.navigator import Click, Navigation, Navigator, Origin, Target
@@ -20,6 +21,7 @@ MAX_READ_LINES = 300
 MAX_TARGETS = 50
 MAX_SEARCH_RESULTS = 50
 INDEX_WAIT_SECONDS = 120.0
+UNIT_DIFF_SIDE_CHARACTERS = (MAX_TOOL_OUTPUT_CHARACTERS - 1_000) // 2
 INDEX_POLL_SECONDS = 0.5
 FIND_USAGES = (
     "Every place that uses a name, across the whole repository, like Cmd+click on a definition in an editor. "
@@ -71,7 +73,7 @@ class ReviewTools:
     ignore: tuple[str, ...]
     cancellation: Cancellation
 
-    def toolbox(self, on_call: Callable[[], None] | None = None) -> Toolbox:
+    def toolbox(self, on_call: Callable[[], None] | None = None, extra_calls: int = 0) -> Toolbox:
         return Toolbox(
             [
                 AiTool(
@@ -90,9 +92,13 @@ class ReviewTools:
                 AiTool("search", f"Lines of the repository that contain an exact text, at most {MAX_SEARCH_RESULTS}.", TextSearch, self.search),
                 AiTool("unit_diff", "One changed unit of the pull request before and after the change, with line numbers.", UnitName, self.unit_diff),
             ],
-            MAX_TOOL_CALLS,
+            MAX_TOOL_CALLS + extra_calls,
             on_call,
         )
+
+    @cached_property
+    def _units(self) -> dict[str, UnitSnapshot]:
+        return {unit_label(snapshot): snapshot for snapshot in reversed(self.snapshots)}
 
     def prepare(self) -> None:
         for side in Side:
@@ -139,10 +145,10 @@ class ReviewTools:
         return "\n".join(shown + ([f"Only the first {MAX_SEARCH_RESULTS} are shown; search for something more specific."] if found.more else []))
 
     def unit_diff(self, request: UnitName) -> str:
-        snapshot = next((snapshot for snapshot in self.snapshots if unit_label(snapshot) == request.unit), None)
+        snapshot = self._units.get(request.unit)
         if snapshot is None:
             raise ToolError(f"No changed unit is named {request.unit}. Use a name from the list of changed units.")
-        return unit_prompt(snapshot, numbered=True)
+        return unit_prompt(snapshot, numbered=True, side_characters=UNIT_DIFF_SIDE_CHARACTERS)
 
     def _navigate(self, location: Location) -> Navigation:
         side = SIDES[location.side]

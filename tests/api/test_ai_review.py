@@ -142,6 +142,74 @@ def test_with_a_limit_a_large_pull_request_is_reviewed_in_groups_with_the_highes
     assert "Name: total" in second.prompt
 
 
+def test_a_pull_request_too_large_for_the_prompt_sends_only_definitions_and_the_model_opens_the_code(
+    billing: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("bussola.review.ai_review.MAX_PROMPT_CODE_CHARACTERS", 1)
+    monkeypatch.setattr("bussola.review.review_tools.MAX_TOOL_CALLS", 0)
+    opened: list[str] = []
+
+    def review(request: AiRequest) -> Json:
+        assert request.tools is not None
+        unit = request.prompt.split("Open with unit_diff: ")[1].split("\n")[0]
+        opened.append(request.tools.call("unit_diff", {"unit": unit}).text)
+        return {"findings": [finding(6, "The shop name changed.")]} if unit == "app.py::name" else NOTHING
+
+    provider = FakeProvider(review)
+    api = client(billing, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    assert run(api, review_id) == {"reviewed": 2, "findings": 1, "failed": 0, "cancelled": False, "error": None}
+
+    first, second = reviews(provider)
+    assert "each unit to review shows only its definitions" in first.prompt
+    assert "Open with unit_diff: app.py::total" in first.prompt
+    assert "def total(items):" in first.prompt
+    assert "return sum(items)" not in first.prompt
+    assert "Open with unit_diff: app.py::name" in second.prompt
+    assert "6:     return 'store'" in opened[1]
+    [thread] = ai_threads(api, review_id)
+    assert (thread["qualified_name"], thread["anchor"]["file_line"]) == ("name", 6)
+
+
+def test_a_unit_the_model_did_not_open_is_reviewed_again_next_time(
+    billing: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("bussola.review.ai_review.MAX_PROMPT_CODE_CHARACTERS", 1)
+
+    def review(request: AiRequest) -> Json:
+        assert request.tools is not None
+        if "Open with unit_diff: app.py::name" in request.prompt:
+            request.tools.call("unit_diff", {"unit": "app.py::name"})
+        return NOTHING
+
+    provider = FakeProvider(review)
+    api = client(billing, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    assert run(api, review_id)["reviewed"] == 1
+    assert run(api, review_id)["reviewed"] == 0
+
+    last = max(api.call("GET", f"/reviews/{review_id}/ai-review/runs"), key=lambda run_out: run_out["id"])
+    [part] = api.call("GET", f"/reviews/{review_id}/ai-review/runs/{last['id']}")["parts"]
+    assert [unit["label"] for unit in part["units"]] == ["app.py::total"]
+
+
+def test_with_a_limit_a_large_pull_request_still_sends_its_code(
+    billing: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("bussola.review.ai_review.MAX_PROMPT_CODE_CHARACTERS", 1)
+    limit(config_file, 10)
+    provider = FakeProvider(NOTHING, NOTHING)
+    api = client(billing, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    run(api, review_id)
+
+    assert all("Open with unit_diff" not in request.prompt for request in reviews(provider))
+    assert any("2:     return sum(items) * 1.2" in request.prompt for request in reviews(provider))
+
+
 def test_findings_are_placed_on_the_unit_and_lines_they_name(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
     findings = {
         "findings": [

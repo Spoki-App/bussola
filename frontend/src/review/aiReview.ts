@@ -1,5 +1,5 @@
 import type { AiReviewLookup, AiReviewResult, AiReviewRun, AiReviewRunStatus, AiReviewStatus } from '../api/types'
-import { plural } from './text'
+import { aiSource, plural } from './text'
 
 export function aiReviewProgress(status: AiReviewStatus | null): string {
   if (!status?.running || status.phase === null) {
@@ -40,7 +40,7 @@ export function runLabel(run: AiReviewRun): string {
 }
 
 export function runHeadline(run: AiReviewRun): string {
-  const provider = run.model ? `${run.provider_label} (${run.model})` : run.provider_label
+  const provider = aiSource(run.provider_label, run.model, run.effort)
   const kind = run.again ? 'Review again' : 'AI review'
   const counts = `${plural(run.reviewed, 'unit')} reviewed, ${plural(run.findings, 'finding')}${run.failed > 0 ? `, ${plural(run.failed, 'unit')} not reviewed` : ''}.`
   return `${RUN_STATUS_LABELS[run.status]}: ${kind} with ${provider}, started ${new Date(run.started_at).toLocaleString()}. ${counts}`

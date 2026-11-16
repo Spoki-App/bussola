@@ -579,6 +579,24 @@ class AiStatusOut(BaseModel):
     problem: str | None = None
     config_file: str | None = None
     target: str | None = None
+    operations: list["AiOperationOut"] = []
+
+
+class AiOperationOut(BaseModel):
+    key: str
+    title: str
+    model: str | None = None
+    effort: str | None = None
+
+
+class AiModelOut(BaseModel):
+    id: str
+    effort: bool | None = None
+
+
+class AiModelsOut(BaseModel):
+    models: list[AiModelOut] = []
+    problem: str | None = None
 
 
 class AiConfigIn(BaseModel):
@@ -671,6 +689,7 @@ class UnitDescriptionOut(BaseModel):
     provider: str
     provider_label: str
     model: str | None
+    effort: str | None = None
     created_at: datetime
     outdated: bool
     lookups: list["AiReviewLookupOut"]
@@ -713,6 +732,7 @@ class AiReviewRunOut(BaseModel):
     provider: str
     provider_label: str
     model: str | None
+    effort: str | None = None
     reviewed: int
     findings: int
     failed: int
@@ -785,4 +805,5 @@ class AiChatMessageOut(BaseModel):
     links: list[AiReviewLinkOut]
     provider_label: str | None
     model: str | None
+    effort: str | None = None
     created_at: datetime

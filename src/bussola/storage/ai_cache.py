@@ -21,6 +21,7 @@ class SqlAiCache:
             AiResult.provider == key.provider,
             AiResult.model == key.model,
             AiResult.endpoint == key.endpoint,
+            AiResult.effort == key.effort,
             AiResult.content_hash == key.content_hash,
         )
         return self._session.execute(statement).scalar_one_or_none()
@@ -33,6 +34,7 @@ class SqlAiCache:
             "provider": key.provider,
             "model": key.model,
             "endpoint": key.endpoint,
+            "effort": key.effort,
         }
         statement = insert(AiResult).values(**values, content_hash=key.content_hash, result=result, created_at=utcnow())
         with self._session.begin_nested():
