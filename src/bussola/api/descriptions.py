@@ -42,11 +42,10 @@ def describe(context: ContextDep, unit_id: int, body: DescribeUnitIn, request: R
     others = [unit_label(other) for other in snapshots if other.id != snapshot.id]
     with state.ai_calls.start(body.call_id) as cancellation:
         tools = ReviewTools(git_repo, revision, snapshots, state.navigator, ignore, cancellation)
-        tools.prepare()
         toolbox = tools.toolbox()
-        insight = describe_unit(snapshot, ai_runner(state, provider).with_tools(toolbox), cancellation, others, regenerate=body.regenerate)
+        insight, fresh = describe_unit(snapshot, ai_runner(state, provider).with_tools(toolbox), cancellation, others, regenerate=body.regenerate)
     row = description_row(context, snapshot, provider, insight, insight.description)
-    row.lookups = tool_lookups(toolbox) if toolbox.log or body.regenerate else None
+    row.lookups = tool_lookups(toolbox) if fresh else None
     saved = context.store.descriptions.save(row)
     context.store.commit()
     return _description_out(unit_id, saved, outdated=False)

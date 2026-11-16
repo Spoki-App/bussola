@@ -92,6 +92,9 @@ class AiRunner:
                 self._cache.put(key, result.model_dump(mode="json"))
         return result
 
+    def has_cached(self, task: AiTask[Any], content_hash: str) -> bool:
+        return self._cached(task, self._key(task, content_hash)) is not None
+
     def _key(self, task: AiTask[Any], content_hash: str | None) -> AiCacheKey | None:
         if content_hash is None or self._cache is None or self.provider.model is None:
             return None

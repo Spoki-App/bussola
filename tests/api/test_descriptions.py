@@ -6,9 +6,11 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from sqlalchemy import delete
 
 from bussola.ai.base import AiProviderError, AiRequest, AiUnreachableError
 from bussola.storage.database import Database
+from bussola.storage.models import AiResult
 from bussola.storage.repositories import Store
 from tests.ai.fakes import ANTHROPIC_CONFIG, FakeProvider, fake_factory
 from tests.apiclient import ApiClient, Json
@@ -95,6 +97,26 @@ def test_the_model_can_look_up_code_and_the_lookups_are_kept_with_the_descriptio
     lookup = {"tool": "read_file", "arguments": arguments, "result": "2:     return sum(items)", "error": False}
     assert described["lookups"] == [lookup]
     assert descriptions(api, review_id)[unit_id]["lookups"] == [lookup]
+
+
+def test_a_new_answer_without_lookups_does_not_keep_the_lookups_of_the_old_one(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    def looked_up(request: AiRequest) -> Json:
+        assert request.tools is not None
+        request.tools.call("search", {"text": "total", "side": "after"})
+        return INSIGHT
+
+    provider = FakeProvider(looked_up, {"description": "Adds a tax.", "impact": "high", "impact_reason": "Prices change."})
+    api = ai_client(billing, data_dir, config_file, provider)
+    review_id = api.start_review()
+    describe(api, review_id, "app.py::total")
+    with Database.open(data_dir).session() as session:
+        session.execute(delete(AiResult))
+        session.commit()
+
+    again = describe(api, review_id, "app.py::total")
+
+    assert len(provider.requests) == 2
+    assert (again["description"], again["lookups"]) == ("Adds a tax.", [])
 
 
 def test_a_description_is_kept_when_the_review_is_opened_again(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
