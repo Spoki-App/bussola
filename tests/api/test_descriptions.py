@@ -392,6 +392,22 @@ def test_one_call_rates_every_unit_and_stores_the_rating_without_a_description(b
     assert stored[api.unit(review_id, "app.py::name")["id"]]["impact"] == "high"
 
 
+def test_rate_impact_and_describe_use_the_model_and_effort_chosen_for_them(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    config_file.write_text(
+        ANTHROPIC_CONFIG + '\n[ai.operations.impact]\nmodel = "claude-haiku-5-5"\neffort = "low"\n\n[ai.operations.describe]\neffort = "high"\n'
+    )
+    provider = FakeProvider(lambda request: INSIGHT if request.name == "describe_unit" else ratings(RATING, RATING))
+    api = ai_client(billing, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    rate(api, review_id)
+    rated = descriptions(api, review_id)[api.unit(review_id, "app.py::total")["id"]]
+    described = describe(api, review_id, "app.py::total")
+
+    assert (rated["model"], rated["effort"]) == ("claude-haiku-5-5", "low")
+    assert (described["model"], described["effort"]) == ("claude-opus-5-5", "high")
+
+
 def test_with_a_limit_a_large_pull_request_is_rated_in_a_few_calls(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
     config_file.write_text(ANTHROPIC_CONFIG + "max_code_characters = 10\n")
     provider = FakeProvider(ratings(RATING))

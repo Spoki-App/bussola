@@ -2,6 +2,7 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Request
 
+from bussola.ai.config import AiOperation
 from bussola.api.ai_review import line_links, link_targets
 from bussola.api.compare import code_range
 from bussola.api.deps import ContextDep, repo_of, resolve_revision
@@ -26,7 +27,7 @@ def list_chat(context: ContextDep) -> list[AiChatMessageOut]:
 @router.post("/reviews/{review_id}/ai-chat")
 def send_chat(context: ContextDep, body: AiChatIn, request: Request) -> list[AiChatMessageOut]:
     state = app_state(request)
-    provider = ai_provider(state, context, body.target)
+    provider = ai_provider(state, context, body.target, AiOperation.CHAT)
     revision = resolve_revision(context, None)
     snippets = [chat_snippet(code_range(context, item)) for item in body.snippets]
     git_repo = open_repo(repo_of(context))
@@ -40,7 +41,16 @@ def send_chat(context: ContextDep, body: AiChatIn, request: Request) -> list[AiC
     review_id = context.review.id
     question = context.store.ai_chat.add(AiChatMessage(review_id, USER, body.message, [asdict(snippet) for snippet in snippets]))
     comments = add_chat_comments(context, revision, snapshots, reply.comments)
-    answer = AiChatMessage(review_id, ASSISTANT, reply.answer, lookups=reply.lookups, comments=comments, provider_label=provider.label, model=provider.model)
+    answer = AiChatMessage(
+        review_id,
+        ASSISTANT,
+        reply.answer,
+        lookups=reply.lookups,
+        comments=comments,
+        provider_label=provider.label,
+        model=provider.model,
+        effort=provider.effort,
+    )
     answer = context.store.ai_chat.add(answer)
     context.store.commit()
     return _messages_out(context, [question, answer])
@@ -76,5 +86,6 @@ def _message_out(message: AiChatMessage, links: list[AiReviewLinkOut]) -> AiChat
         links=links,
         provider_label=message.provider_label,
         model=message.model,
+        effort=message.effort,
         created_at=message.created_at,
     )

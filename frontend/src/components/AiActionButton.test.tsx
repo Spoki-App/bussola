@@ -16,6 +16,7 @@ const LOCAL: AiStatus = {
   problem: null,
   config_file: null,
   target: 'openai-compatible|qwen2.5-coder|http://localhost:11434/v1',
+  operations: [],
 }
 
 function renderButton(status: AiStatus, onRun = vi.fn(), later: AiStatus | null = status) {
@@ -120,6 +121,20 @@ describe('AiActionButton', () => {
       expect(onRun).toHaveBeenCalledTimes(2)
     })
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('names the models chosen for single AI actions in the notice', async () => {
+    const operations = [
+      { key: 'impact' as const, title: 'Rate impact', model: 'qwen2.5-coder:1.5b', effort: 'low' as const },
+      { key: 'review' as const, title: 'AI review', model: null, effort: 'high' as const },
+    ]
+    renderButton({ ...LOCAL, operations })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Describe' }))
+
+    const notice = await screen.findByRole('dialog', { name: 'Send code to OpenAI-compatible endpoint?' })
+    expect(notice).toHaveTextContent('Rate impact uses the model qwen2.5-coder:1.5b.')
+    expect(notice).not.toHaveTextContent('AI review uses')
   })
 
   it('sends nothing when the notice is cancelled and asks again next time', async () => {

@@ -3,7 +3,7 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
-from bussola.ai.base import AiRequest, Cancellation, run_cancellable
+from bussola.ai.base import AiRequest, Cancellation, ModelInfo, run_cancellable
 from bussola.ai.config import AiSettings
 
 type Answer = str | dict[str, Any] | Exception | Callable[[AiRequest], str | dict[str, Any]]
@@ -19,6 +19,8 @@ class FakeProvider:
 
     def __init__(self, *answers: Answer, model: str | None = "fake-model", delay: float = 0.0, timeout: float = 5.0) -> None:
         self.model = model
+        self.effort: str | None = None
+        self.listed: list[ModelInfo] | Exception = []
         self.requests: list[AiRequest] = []
         self.settings: AiSettings | None = None
         self._answers = list(answers)
@@ -36,10 +38,17 @@ class FakeProvider:
             answer = answer(request)
         return answer if isinstance(answer, str) else json.dumps(answer)
 
+    def models(self, cancellation: Cancellation) -> list[ModelInfo]:
+        cancellation.check()
+        if isinstance(self.listed, Exception):
+            raise self.listed
+        return self.listed
+
 
 def fake_factory(provider: FakeProvider) -> Callable[[AiSettings], FakeProvider]:
     def build(settings: AiSettings) -> FakeProvider:
         provider.model = settings.model
+        provider.effort = settings.effort
         provider.settings = settings
         return provider
 

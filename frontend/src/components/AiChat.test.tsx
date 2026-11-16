@@ -20,6 +20,7 @@ const AI: AiStatus = {
   problem: null,
   config_file: null,
   target: '["anthropic", "claude-opus-5-5", "https://api.anthropic.com"]',
+  operations: [],
 }
 
 const OFF: AiStatus = { ...AI, configured: false, provider: null, target: null }
@@ -36,6 +37,7 @@ const QUESTION: AiChatMessage = {
   links: [],
   provider_label: null,
   model: null,
+  effort: null,
   created_at: '2026-11-09T10:00:00Z',
 }
 
@@ -49,6 +51,7 @@ const ANSWER: AiChatMessage = {
   links: [{ path: 'app.py', side: 'head', line: 2, unit_id: 7 }],
   provider_label: 'Anthropic API',
   model: 'claude-opus-5-5',
+  effort: null,
   created_at: '2026-11-09T10:00:05Z',
 }
 
