@@ -3145,3 +3145,65 @@ button.danger {
   --state: var(--amber);
   --state-bg: var(--amber-bg);
 }
+
+.thread-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 4px;
+}
+
+.thread-filters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.thread-jumps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.thread-jumps li {
+  display: grid;
+  min-width: 0;
+}
+
+.thread-jumps li > * {
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reply-collapsed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.reply-collapsed input {
+  flex: 1;
+  min-width: 0;
+  cursor: text;
+}
+
+.avatar {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg-sunken);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}

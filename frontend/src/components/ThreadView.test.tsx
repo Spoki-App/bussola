@@ -49,7 +49,7 @@ describe('ThreadView deletion', () => {
     renderThread(true)
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/threads/t1', expect.objectContaining({ method: 'DELETE' }))
     fireEvent.click(screen.getByRole('button', { name: 'Delete thread' }))
 
     await waitFor(() => {
@@ -111,5 +111,31 @@ describe('ThreadView authors', () => {
 
     expect(screen.getAllByText('Anthropic API (claude-opus-5-5)')).toHaveLength(2)
     expect(screen.getAllByTitle('Added by the AI review')).toHaveLength(2)
+  })
+})
+
+describe('ThreadView reply', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('shows a collapsed reply field with the avatar that expands on focus', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(Response.json({ id: 1, email: 'a@b.c', name: 'alice', ai: false }))))
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ThreadView reviewId={1} thread={thread(false, true)} />
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('.reply-collapsed .avatar')).toHaveTextContent('A')
+    })
+    expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull()
+
+    fireEvent.focus(screen.getByRole('textbox', { name: 'Reply' }))
+
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.getByRole('textbox', { name: 'Reply' })).toHaveAttribute('placeholder', 'Reply...')
   })
 })

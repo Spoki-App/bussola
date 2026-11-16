@@ -240,3 +240,26 @@ test('settings open with the search focused, move between categories with the ar
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
 })
+
+test('a thread replies from a collapsed field, and the conversation lists line comments to jump to', async ({ page }) => {
+  await page.goto(`/?token=${E2E_TOKEN}`)
+  await demoReviewLink(page).first().click()
+  const card = page.locator('article.unit-card', { hasText: 'total' })
+  await card.getByRole('button', { name: 'Expand unit' }).click()
+  await card.locator('td.diff-gutter', { hasText: /^3$/ }).first().click()
+  await card.getByPlaceholder('Leave a comment (Markdown)').fill('Collapsed reply check')
+  await card.getByRole('button', { name: 'Start thread' }).click()
+
+  const thread = card.getByTestId('thread').filter({ hasText: 'Collapsed reply check' })
+  await expect(thread.getByRole('button', { name: 'Reply' })).toHaveCount(0)
+  await thread.getByRole('textbox', { name: 'Reply' }).click()
+  await thread.getByRole('textbox', { name: 'Reply (Markdown)' }).fill('Done')
+  await thread.getByRole('button', { name: 'Reply' }).click()
+  await expect(thread).toContainText('2 comments')
+  await expect(thread.getByRole('textbox', { name: 'Reply' })).toHaveAttribute('placeholder', 'Reply...')
+
+  const panel = page.locator('.thread-panel')
+  await panel.getByRole('tab', { name: 'Code' }).click()
+  await expect(panel.getByText(/Collapsed reply check/)).toBeVisible()
+  await expect(panel.getByRole('heading', { name: 'Review' })).toHaveCount(0)
+})

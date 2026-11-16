@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import type { Thread } from '../api/types'
 import { ThreadPanel } from './ThreadPanel'
@@ -25,6 +25,71 @@ const outdated: Thread = {
   comments: [],
   can_delete: false,
 }
+
+const general: Thread = {
+  ...outdated,
+  id: 't2',
+  scope: 'review',
+  path: null,
+  module: null,
+  kind: null,
+  qualified_name: null,
+  side: null,
+  resolvable: false,
+  line_text: null,
+  anchor: null,
+}
+
+const inline: Thread = {
+  ...outdated,
+  id: 't3',
+  anchor: { revision_id: 1, line_offset: 1, outdated: false, unit_id: 7, file_line: 12, end_file_line: 12 },
+  comments: [{ id: 'c1', thread_id: 't3', author: outdated.created_by, body: 'Why zero?\nMore text', created_at: '2026-10-28T10:00:00Z', edited_at: null, deleted: false, mine: false, remote_url: null }],
+}
+
+const resolved: Thread = { ...outdated, id: 't4', status: 'resolved', qualified_name: 'subtotal' }
+
+function renderPanel(threads: Thread[]) {
+  return render(
+    <QueryClientProvider client={new QueryClient()}>
+      <ThreadPanel reviewId={1} threads={threads} />
+    </QueryClientProvider>,
+  )
+}
+
+describe('ThreadPanel filters', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('shows general and code comments by default and filters each kind', () => {
+    renderPanel([general, outdated, inline])
+
+    expect(screen.getByRole('heading', { name: 'Review' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'total (src/shop/cart.py:12)' })).toBeTruthy()
+    expect(screen.getByText('Alice: Why zero?')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'General' }))
+    expect(screen.queryByRole('heading', { name: 'In the code' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Outdated or not shown' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Code' }))
+    expect(screen.queryByRole('heading', { name: 'Review' })).toBeNull()
+    expect(screen.getByRole('heading', { name: 'In the code' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Outdated or not shown' })).toBeTruthy()
+    expect(window.localStorage.getItem('bussola.conversationFilter')).toBe('code')
+  })
+
+  it('hides resolved threads until asked', () => {
+    renderPanel([resolved])
+
+    expect(screen.queryByText('subtotal')).toBeNull()
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Show resolved (1)' }))
+
+    expect(screen.getByText('subtotal')).toBeTruthy()
+  })
+})
 
 describe('ThreadPanel', () => {
   it('names the unit of a thread shown outside its card with its module', () => {

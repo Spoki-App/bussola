@@ -8,6 +8,7 @@ import { CopyLinkButton } from './CopyLinkButton'
 import { ExternalLink } from './ExternalLink'
 import { Composer } from './Composer'
 import { Markdown } from './Markdown'
+import { ReplyBox } from './ReplyBox'
 import { threadElementId, useLinkedScroll } from '../review/linkFocus'
 import { ReviewLinkContext } from '../review/reviewLink'
 import { plural } from '../review/text'
@@ -76,13 +77,7 @@ export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
           {thread.comments.map((comment) => (
             <CommentItem key={comment.id} reviewId={reviewId} comment={comment} />
           ))}
-          <Composer
-            reviewId={reviewId}
-            submitLabel="Reply"
-            placeholder="Reply (Markdown)"
-            busy={reply.isPending}
-            onSubmit={(body, done) => { reply.mutate({ threadId: thread.id, body }, { onSuccess: done }) }}
-          />
+          <ReplyBox reviewId={reviewId} busy={reply.isPending} onSubmit={(body, done) => { reply.mutate({ threadId: thread.id, body }, { onSuccess: done }) }} />
         </>
       )}
       {failure && <ErrorNote message={describeError(failure)} />}
