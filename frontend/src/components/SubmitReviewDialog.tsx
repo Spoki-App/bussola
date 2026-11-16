@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { useAiReviewRun, useAiReviewRuns } from '../api/aiReview'
 import { describeError } from '../api/client'
@@ -31,7 +31,8 @@ export function SubmitReviewDialog({ reviewId, pendingComments, summary, default
   const [chosen, setEvent] = useState<ReviewEvent | null>(null)
   const own = isOwnPullRequest(forge.data)
   const event = own ? 'COMMENT' : (chosen ?? defaultEvent)
-  const missingSummary = needsSummary(event, pendingComments) && !summary.trim()
+  const required = needsSummary(event, pendingComments)
+  const missingSummary = required && !summary.trim()
 
   const send = (body: string) => {
     submit.mutateAsync({ event, body }).then(
@@ -55,7 +56,7 @@ export function SubmitReviewDialog({ reviewId, pendingComments, summary, default
         initial={summary}
         busy={submit.isPending}
         autoFocus
-        allowEmpty={!needsSummary(event, pendingComments)}
+        allowEmpty={!required}
         hint={missingSummary ? (event === 'REQUEST_CHANGES' ? 'Write a summary to request changes.' : 'Write a summary or a comment first.') : undefined}
         onChange={onSummaryChange}
         onSubmit={send}
@@ -89,7 +90,7 @@ function useAiReviewDraft(reviewId: number, revisionId: number | undefined): AiR
   const run = forge.data ? latestNewAiReview(runs.data, forge.data.viewer_reviewed_at) : null
   const detail = useAiReviewRun(reviewId, run?.id ?? null)
   const threads = useThreads(reviewId, revisionId)
-  return detail.data && threads.data ? aiReviewDraft(detail.data, threads.data) : null
+  return useMemo(() => (detail.data && threads.data ? aiReviewDraft(detail.data, threads.data) : null), [detail.data, threads.data])
 }
 
 interface SubmitReviewProps {

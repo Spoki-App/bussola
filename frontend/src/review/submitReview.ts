@@ -1,5 +1,7 @@
 import type { AiReviewRun, AiReviewRunDetail, ForgeOverview, ReviewEvent, ReviewSubmitResult, Thread } from '../api/types'
+import { lineLinksAsText } from '../markdown/lineLinks'
 import { sentCount } from './sync'
+import { isOpen } from './threadPlacement'
 import { plural } from './text'
 
 export const REVIEW_EVENTS: Record<ReviewEvent, { label: string; description: string; submitted: string }> = {
@@ -19,10 +21,8 @@ export interface AiReviewDraft {
   event: ReviewEvent
 }
 
-const LINE_LINK = /\[([^\]]*)\]\(<?#(?:after|before)[-:][^)]*\)/g
-
 export function latestNewAiReview(runs: AiReviewRun[] | undefined, reviewedAt: string | null): AiReviewRun | null {
-  const run = runs?.find((candidate) => candidate.finished_at !== null)
+  const run = runs?.find((candidate) => candidate.finished_at)
   if (!run?.finished_at) {
     return null
   }
@@ -30,8 +30,8 @@ export function latestNewAiReview(runs: AiReviewRun[] | undefined, reviewedAt: s
 }
 
 export function aiReviewDraft(run: AiReviewRunDetail, threads: Thread[]): AiReviewDraft {
-  const open = new Set(threads.filter((thread) => thread.status === 'open').map((thread) => thread.id))
-  const summaries = run.parts.flatMap((part) => (part.summary?.trim() ? [part.summary.trim().replace(LINE_LINK, '$1')] : []))
+  const open = new Set(threads.filter(isOpen).map((thread) => thread.id))
+  const summaries = run.parts.map((part) => lineLinksAsText((part.summary ?? '').trim())).filter(Boolean)
   const leftOpen = run.parts.some((part) => part.findings.some((finding) => open.has(finding.thread_id)))
   return { runId: run.id, text: summaries.join('\n\n'), event: leftOpen ? 'REQUEST_CHANGES' : 'COMMENT' }
 }

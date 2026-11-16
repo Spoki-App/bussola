@@ -29,7 +29,7 @@ const part = (summary: string | null, threadIds: string[]): AiReviewRunDetail['p
   error: null,
 })
 
-const thread = (id: string, status: Thread['status']) => ({ id, status }) as Thread
+const thread = (id: string, status: Thread['status']) => ({ id, status, resolvable: true }) as Thread
 
 describe('submit review', () => {
   it('picks the latest finished AI review when it is newer than the last submitted review', () => {

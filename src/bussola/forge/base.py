@@ -49,7 +49,9 @@ class PullRequest:
     reviews: tuple[PullRequestReview, ...] = ()
 
     def reviewed_at(self, login: str | None) -> str | None:
-        return max((review.submitted_at for review in self.reviews if login and review.author == login), default=None)
+        if not login:
+            return None
+        return max((review.submitted_at for review in self.reviews if review.author == login), default=None)
 
 
 @dataclass(frozen=True)

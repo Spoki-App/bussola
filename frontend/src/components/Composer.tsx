@@ -384,7 +384,7 @@ export function Composer({
           value={body}
           placeholder={placeholder}
           autoFocus={autoFocus && mode === 'write'}
-          data-autofocus={autoFocus && mode === 'write' ? true : undefined}
+          data-autofocus={(autoFocus && mode === 'write') || undefined}
           rows={3}
           onChange={(event) => { setBody(event.target.value) }}
           onSelect={updateWriteMention}
@@ -400,7 +400,7 @@ export function Composer({
             aria-multiline
             aria-label={placeholder}
             data-placeholder={placeholder}
-            data-autofocus={autoFocus ? true : undefined}
+            data-autofocus={autoFocus || undefined}
             dangerouslySetInnerHTML={{ __html: rich.html }}
             onFocus={() => { runCommand('defaultParagraphSeparator', 'p') }}
             onInput={() => {

@@ -233,7 +233,7 @@ function renderSubmitReview({ reviewedAt = null as string | null, runs = [RUN], 
       '/api/reviews/1/forge': { ...overview('alice'), viewer_reviewed_at: reviewedAt },
       '/api/reviews/1/ai-review/runs': state.runs,
       '/api/reviews/1/ai-review/runs/5': DETAIL,
-      '/api/reviews/1/threads?revision_id=3': [{ id: 't1', status: threadStatus }],
+      '/api/reviews/1/threads?revision_id=3': [{ id: 't1', status: threadStatus, resolvable: true }],
     }
     return Promise.resolve(Response.json(answers[url] ?? []))
   })
