@@ -50,6 +50,21 @@ describe('CompareBar', () => {
     await vi.waitFor(() => { expect(onCompareClipboard).toHaveBeenCalledWith('return total\n') })
   })
 
+  it('does not compare when the clipboard is read after the bar closed', async () => {
+    let resolve: (text: string) => void = () => undefined
+    const read = new Promise<string>((done) => { resolve = done })
+    stubClipboard(() => read)
+    const handlers = { onCompareClipboard: vi.fn(), onCancel: vi.fn() }
+    const { unmount } = render(<CompareBar title="checkout.validate" lineCount={5} {...handlers} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Compare with clipboard' }))
+    unmount()
+    resolve('return total\n')
+    await read
+
+    expect(handlers.onCompareClipboard).not.toHaveBeenCalled()
+  })
+
   it('says when the clipboard is empty', async () => {
     stubClipboard(() => Promise.resolve('  \n'))
     const { onCompareClipboard } = renderBar()

@@ -2207,6 +2207,7 @@ button.link:hover:not(:disabled) {
 }
 
 .compare-chip code {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }

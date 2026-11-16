@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { plural } from '../review/text'
 import { ErrorNote } from './Badges'
@@ -22,10 +22,20 @@ function readClipboard(): Promise<string> {
 export function CompareBar({ title, lineCount, onCompareSelection, onCompareClipboard, onCancel }: Props) {
   const hasSelection = onCompareSelection !== undefined
   const [error, setError] = useState<string | null>(null)
+  const open = useRef(true)
+  useEffect(() => {
+    open.current = true
+    return () => {
+      open.current = false
+    }
+  }, [])
   const compareClipboard = () => {
     setError(null)
     readClipboard().then(
       (pasted) => {
+        if (!open.current) {
+          return
+        }
         if (pasted.trim()) {
           onCompareClipboard(pasted)
         } else {
