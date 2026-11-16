@@ -19,6 +19,10 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 - **Submit review** writes the summary with the same editor as comments, with **Write**, **Preview**, **Rich text**, the formatting toolbar and its shortcuts. After an AI review newer than your last review on the pull request, the summary starts with the AI review's verdict and summary, never replacing text you wrote, and **Request changes** is selected when the AI review left comments that are still open ([#99](https://github.com/Spoki-App/bussola/issues/99)).
 
+### Changed
+
+- **Merge** opens the merge options in a dialog, like **Submit review**, instead of a panel next to the button: the merge method, the prefilled commit title and message, **Delete the branch after merging**, the reasons merging is blocked, and **Cancel** and **Merge**. If GitHub refuses the merge the dialog stays open with the reason; after a merge it closes and the header shows the result ([#101](https://github.com/Spoki-App/bussola/issues/101)).
+
 ### Fixed
 
 - **AI review** of a pull request too large for one prompt no longer fails every unit with "Prompt is too long": without **Code per call** set, it sends only the definitions of each unit and the model opens the code of each one through its code lookups ([#102](https://github.com/Spoki-App/bussola/issues/102)).
