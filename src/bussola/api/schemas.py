@@ -353,6 +353,7 @@ class ForgeOut(BaseModel):
     head_matches: bool | None
     error: str | None
     viewer: str | None
+    viewer_reviewed_at: str | None
 
 
 class ForgeLinkIn(BaseModel):
@@ -672,6 +673,7 @@ class UnitDescriptionOut(BaseModel):
     model: str | None
     created_at: datetime
     outdated: bool
+    lookups: list["AiReviewLookupOut"]
 
 
 class RateImpactOut(BaseModel):

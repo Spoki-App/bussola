@@ -4,7 +4,9 @@ import { describeError } from '../api/client'
 import type { AiDescriptionState } from '../hooks/useAiDescription'
 import type { LineLink } from '../markdown/lineLinks'
 import { IMPACT_LABELS } from '../review/impact'
+import { plural } from '../review/text'
 import { AiActionButton } from './AiActionButton'
+import { Lookups } from './AiReviewDetails'
 import { ErrorNote } from './Badges'
 import { Markdown } from './Markdown'
 
@@ -62,6 +64,12 @@ export function AiDescription({ repoId, ai, onLineLink }: Props) {
             <strong>{`${IMPACT_LABELS[description.impact]} impact`}</strong>
             {`: ${description.impact_reason}`}
           </p>
+          {description.lookups.length > 0 && (
+            <details className="ai-description-lookups">
+              <summary>{plural(description.lookups.length, 'code lookup')}</summary>
+              <Lookups lookups={description.lookups} />
+            </details>
+          )}
         </div>
       )}
     </section>

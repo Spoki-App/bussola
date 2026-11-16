@@ -2225,9 +2225,49 @@ button.link:hover:not(:disabled) {
 .compare-bar {
   right: auto;
   left: 50%;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 8px 12px;
   max-width: calc(100vw - 32px);
   transform: translateX(-50%);
+}
+
+.compare-bar-label,
+.compare-bar-hint {
+  font-size: 12px;
+}
+
+.compare-bar-label {
+  font-weight: 650;
+}
+
+.compare-chip {
+  max-width: 320px;
+  white-space: nowrap;
+}
+
+.compare-chip code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compare-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+button.compare-clipboard {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+}
+
+.compare-bar .error-note {
+  margin: 0;
 }
 
 .confirm {
@@ -2520,7 +2560,7 @@ button.danger {
 
 .picker.submit-review-dialog {
   width: min(640px, calc(100vw - 32px));
-  height: auto;
+  height: fit-content;
   max-height: calc(100vh - 64px);
   overflow-y: auto;
 }
@@ -2530,23 +2570,15 @@ button.danger {
   font-size: 15px;
 }
 
-.submit-review-dialog textarea,
-.submit-review-preview {
-  width: 100%;
+.submit-review-dialog .composer {
+  gap: 10px;
+  margin-top: 0;
+}
+
+.submit-review-dialog .composer textarea,
+.submit-review-dialog .composer-preview,
+.submit-review-dialog .rich-text {
   min-height: 140px;
-  font-family: var(--sans);
-  line-height: 1.5;
-}
-
-.submit-review-dialog textarea {
-  resize: vertical;
-}
-
-.submit-review-preview {
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-box);
-  overflow-y: auto;
 }
 
 .submit-review-events {
@@ -2824,6 +2856,11 @@ button.danger {
 .ai-impact {
   margin: 4px 0 0;
   font-size: 13px;
+}
+
+.ai-description-lookups {
+  margin: 6px 0 0;
+  font-size: 12px;
 }
 
 .code-font-panel input:not([type='checkbox']) {

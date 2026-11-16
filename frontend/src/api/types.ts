@@ -223,6 +223,7 @@ export interface ForgeOverview {
   head_matches: boolean | null
   error: string | null
   viewer: string | null
+  viewer_reviewed_at: string | null
 }
 
 export type ReviewEvent = 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES'
@@ -370,6 +371,7 @@ export interface UnitDescription {
   model: string | null
   created_at: string
   outdated: boolean
+  lookups: AiReviewLookup[]
 }
 
 export type DescribedUnit = UnitDescription & { description: string }

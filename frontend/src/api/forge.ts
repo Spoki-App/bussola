@@ -13,7 +13,7 @@ export const GITHUB_SYNC_INTERVAL_MS = 3 * 60 * 1000
 const GITHUB_SYNC_STALE_MS = 60 * 1000
 
 export function useForge(reviewId: number) {
-  return useQuery({ queryKey: forgeKey(reviewId), queryFn: () => getJson<ForgeOverview>(`/reviews/${String(reviewId)}/forge`), retry: false })
+  return useQuery({ queryKey: forgeKey(reviewId), queryFn: () => getJson<ForgeOverview>(`/reviews/${String(reviewId)}/forge`), retry: false, staleTime: GITHUB_SYNC_STALE_MS })
 }
 
 export function useLinkPullRequest(reviewId: number) {
@@ -37,7 +37,10 @@ export function useSubmitReview(reviewId: number) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (request: { event: ReviewEvent; body: string }) => postJson<ReviewSubmitResult>(`/reviews/${String(reviewId)}/forge/review`, request),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (result.published.review_url) {
+        client.setQueryData<ForgeOverview>(forgeKey(reviewId), (overview) => overview && { ...overview, viewer_reviewed_at: new Date().toISOString() })
+      }
       void invalidate(client, [keys.review(reviewId), threadsKey(reviewId), githubSyncKey(reviewId)])
     },
   })

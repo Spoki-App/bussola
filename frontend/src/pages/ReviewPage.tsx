@@ -19,7 +19,7 @@ import { MergePullRequest } from '../components/MergePullRequest'
 import { PullRequestDescription } from '../components/PullRequestDescription'
 import { RateImpact } from '../components/RateImpact'
 import { ReviewTitle } from '../components/ReviewTitle'
-import { SubmitReviewDialog } from '../components/SubmitReviewDialog'
+import { SubmitReview } from '../components/SubmitReviewDialog'
 import { PublishSummary, SyncSummary } from '../components/SyncSummary'
 import { UnitCard, type CommentTarget, type UnitActions } from '../components/UnitCard'
 import { UnitTree } from '../components/UnitTree'
@@ -88,7 +88,6 @@ function loadPanelHidden(): boolean {
 const SYNC_TITLE =
   'Fetch the branch from its remote and record any new commits as a new revision. If the review is linked to a GitHub pull request, also bring in its comments and send your unsent comments as one review.'
 const PULL_SYNC_TITLE = 'Download the latest commits and comments of the pull request from GitHub, record any new commits as a new revision, then send your unsent comments as one review.'
-const SUBMIT_TITLE = 'Send your unsent comments to GitHub as one review with a summary, and comment, approve or request changes.'
 const MARK_TITLE = 'Remember this point. The "Since my last review" filter will then show only what changes after now. Nothing is approved or closed.'
 
 function syncLabel(review: ReviewDetail, pending: boolean): string {
@@ -107,8 +106,6 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
   const sync = useSync(review.id)
   const finish = useFinishReview(review.id)
   const revision = review.latest_revision
-  const [submitting, setSubmitting] = useState(false)
-  const [summary, setSummary] = useState('')
   const [submitted, setSubmitted] = useState<ReviewSubmitResult | null>(null)
 
   const runSync = () => {
@@ -117,7 +114,6 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
     sync.mutate(undefined, { onSuccess: setSynced })
   }
   const onSubmitted = (result: ReviewSubmitResult) => {
-    setSummary('')
     setSynced(null)
     setMessage(null)
     setSubmitted(result)
@@ -158,11 +154,7 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
         <button type="button" onClick={runSync} disabled={sync.isPending} title={`${review.pull_request_review ? PULL_SYNC_TITLE : SYNC_TITLE} Shortcut: r`}>
           {syncLabel(review, sync.isPending)}
         </button>
-        {isPullRequest && (
-          <button type="button" title={SUBMIT_TITLE} onClick={() => { setSubmitting(true) }}>
-            Submit review
-          </button>
-        )}
+        {isPullRequest && <SubmitReview reviewId={review.id} revisionId={revision?.id} pendingComments={review.unsent_comments} onSubmitted={onSubmitted} />}
         <button
           type="button"
           className="primary"
@@ -187,16 +179,6 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
         )}
       </div>
       {message && <p className="notice">{message}</p>}
-      {submitting && (
-        <SubmitReviewDialog
-          reviewId={review.id}
-          pendingComments={review.unsent_comments}
-          summary={summary}
-          onSummaryChange={setSummary}
-          onSubmitted={onSubmitted}
-          onClose={() => { setSubmitting(false) }}
-        />
-      )}
       {synced && <SyncSummary result={synced} />}
       {submitted && <PublishSummary message={submittedMessage(submitted)} published={submitted.published} />}
       {merging && <MergePullRequest reviewId={review.id} />}
