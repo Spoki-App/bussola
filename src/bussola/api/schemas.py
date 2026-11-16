@@ -573,6 +573,51 @@ class AiStatusOut(BaseModel):
     problem: str | None = None
     config_file: str | None = None
     target: str | None = None
+    operations: list["AiOperationOut"] = []
+
+
+class AiOperationOut(BaseModel):
+    key: str
+    title: str
+    model: str | None = None
+    effort: str | None = None
+
+
+class AiOperationIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model: str | None = None
+    effort: str | None = None
+
+    @field_validator("model", "effort")
+    @classmethod
+    def blank_is_unset(cls, value: str | None) -> str | None:
+        return None if value is None else value.strip() or None
+
+
+class AiOperationsIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    describe: AiOperationIn = AiOperationIn()
+    impact: AiOperationIn = AiOperationIn()
+    review: AiOperationIn = AiOperationIn()
+    chat: AiOperationIn = AiOperationIn()
+
+
+class AiOperationsOut(BaseModel):
+    operations: list[AiOperationOut]
+    config_file: str | None = None
+    problem: str | None = None
+
+
+class AiModelOut(BaseModel):
+    id: str
+    effort: bool | None = None
+
+
+class AiModelsOut(BaseModel):
+    models: list[AiModelOut] = []
+    problem: str | None = None
 
 
 class AiConfigIn(BaseModel):
@@ -665,6 +710,7 @@ class UnitDescriptionOut(BaseModel):
     provider: str
     provider_label: str
     model: str | None
+    effort: str | None = None
     created_at: datetime
     outdated: bool
 
@@ -706,6 +752,7 @@ class AiReviewRunOut(BaseModel):
     provider: str
     provider_label: str
     model: str | None
+    effort: str | None = None
     reviewed: int
     findings: int
     failed: int
@@ -778,4 +825,5 @@ class AiChatMessageOut(BaseModel):
     links: list[AiReviewLinkOut]
     provider_label: str | None
     model: str | None
+    effort: str | None = None
     created_at: datetime

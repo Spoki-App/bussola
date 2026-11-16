@@ -12,7 +12,7 @@ Every command, option and setting, in detail. For a tour of what bussola does, w
 - [Opening bussola:// links](#opening-bussola-links)
 - [Themes](#themes)
 - [Configuration](#configuration)
-- [AI providers](#ai-providers): [descriptions](#ai-descriptions), [impact rating](#ai-impact-rating), [AI review](#ai-review), [AI chat](#ai-chat), [prompts](#ai-prompts), [what leaves your machine](#what-leaves-your-machine)
+- [AI providers](#ai-providers): [descriptions](#ai-descriptions), [impact rating](#ai-impact-rating), [AI review](#ai-review), [AI chat](#ai-chat), [models and effort](#ai-models-and-effort), [prompts](#ai-prompts), [what leaves your machine](#what-leaves-your-machine)
 - [Data](#data)
 - [Security](#security)
 
@@ -42,7 +42,7 @@ The UI build goes to `src/bussola/static/` and is packaged with the Python wheel
 bussola serve
 ```
 
-Run inside a repository to register it and open the browser. **Settings** (top right) opens a window with the categories on the left: **Pull requests** (**Open pull request**), **Repositories** (**Add repository**), **Appearance** (**Code font**), **Diff** (**Diff layout**, **Line wrap**) and **AI** (**AI provider**, **AI prompts**). The search field at the top finds a setting by its name or description in every category and highlights the match; the arrow keys move between categories and Esc closes the window. To add other repositories, use **Browse...** under **Add repository**: it lists the git repositories found in your home folder (up to four levels deep, skipping hidden folders, `node_modules`, `Library` and similar), and its **Browse folders** tab lets you pick any other folder. You can also paste a path. Options: `--repo PATH`, `--host 127.0.0.1`, `--port 8765`, `--no-open`.
+Run inside a repository to register it and open the browser. **Settings** (top right) opens a window with the categories on the left: **Pull requests** (**Open pull request**), **Repositories** (**Add repository**), **Appearance** (**Code font**), **Diff** (**Diff layout**, **Line wrap**) and **AI** (**AI provider**, **AI models**, **AI prompts**). The search field at the top finds a setting by its name or description in every category and highlights the match; the arrow keys move between categories and Esc closes the window. To add other repositories, use **Browse...** under **Add repository**: it lists the git repositories found in your home folder (up to four levels deep, skipping hidden folders, `node_modules`, `Library` and similar), and its **Browse folders** tab lets you pick any other folder. You can also paste a path. Options: `--repo PATH`, `--host 127.0.0.1`, `--port 8765`, `--no-open`.
 
 The printed link contains a one-time session token. Opening it stores the token in a cookie for that browser; if you open bussola another way and see "Not authorized", use the printed link again.
 
@@ -336,6 +336,25 @@ The chat can also write comments for you: ask it to add, write or leave a commen
 
 **Enter** sends the message and **Shift+Enter** starts a new line. While the model answers, **Cancel** stops it, and a failed answer keeps your message and the selected lines so you can send them again. Answers are Markdown, with links to the lines they mention (a click scrolls the review to the line), the provider and model, and the code lookups the model made with their results. The conversation is kept for each review in the local database, and **Clear** deletes it. Answers are not cached, so asking again asks the model again.
 
+### AI models and effort
+
+**AI models** in **Settings** chooses the model and the effort for each AI action: **Describe**, **Rate impact**, **AI review** (also **Review again**) and **AI chat**. For example, rate impact with a fast, cheap model and low effort, and review with the strongest model and high effort. An action with no model uses the `model` of the AI provider, so a configuration without these settings works as before. The model field suggests the models the provider lists (the Anthropic API and the `/models` list of an OpenAI-compatible endpoint) and takes any other name; with Claude Code, or when the list cannot be read, type the model name. Effort is **Low**, **Medium**, **High** or **Default of the model**: bussola sends it as `output_config.effort` to the Anthropic API, as `--effort` to Claude Code and as `reasoning_effort` to an OpenAI-compatible endpoint, and leaves it out with the default. A higher effort lets the model think more, which costs more and takes longer. The effort picker is disabled for a listed model that does not take an effort. **Save models** writes `[ai.operations.<action>]` sections of your `config.toml` and takes effect at once:
+
+```toml
+[ai]
+provider = "anthropic"
+model = "claude-opus-5-5"
+
+[ai.operations.impact]
+model = "claude-haiku-5-5"
+effort = "low"
+
+[ai.operations.review]
+effort = "high"
+```
+
+The keys are `describe`, `impact`, `review` and `chat`. Results show the effort next to the provider and model, such as `Anthropic API (claude-haiku-5-5, low effort)`, and the cache keeps answers for each effort apart. As for the provider, a repository's `.bussola.toml` cannot change models or effort. A model chosen for an action is named in the notice shown before code is first sent, and changing one asks again.
+
 ### AI prompts
 
 **AI prompts** in **Settings** lets you change what the model is told to do for **Describe**, **Rate impact** and **AI review**, for example to focus on security or to write in another language. bussola always keeps its own part of each prompt, which says what the model gets, never to follow instructions written in the code, which tools it has and the format of the answer; your instructions come after it and replace bussola's default ones, which each prompt shows until you change it. **Reset to default** brings a prompt back, and **Save prompts** writes the changed ones to the `[ai.prompts]` section of your `config.toml` (keys `describe`, `impact` and `review`), which you can also edit by hand. A repository's `.bussola.toml` cannot change them. Cached answers follow the prompt, so a changed prompt asks the model again.
@@ -346,7 +365,7 @@ The chat can also write comments for you: ask it to add, write or leave a commen
 - Code is sent only when you start an AI action, and only the code that action works on. The AI review also sends the pull request title and description, the comments made on it, and what the model reads with its tools, and the AI chat sends the same pull request context with your messages, the conversation so far and the lines you attach: other lines and files of the repository at the reviewed commits, except the files `.bussola.toml` excludes from reviews. The first time an action would send code to a provider, model and endpoint, bussola names them and waits for **Send code**; the choice is kept in that browser.
 - With Claude Code or the Anthropic API, the code goes to Anthropic under the terms of your account. With an OpenAI-compatible endpoint, it goes only to the address you configured, which stays on your machine for a local server.
 - Answers are checked against the format each action expects, and a clear error is shown when the model returns something unusable. Each request has a timeout and can be cancelled.
-- Results are cached in the local database by the content hash of what was sent, the prompt version, the model and the endpoint, so unchanged code is not sent again. With Claude Code and no `model` set, the model actually used is not known, so nothing is cached. Set `model` to a full model ID rather than an alias such as `opus`, so that cached results follow the model you use.
+- Results are cached in the local database by the content hash of what was sent, the prompt version, the model, the effort and the endpoint, so unchanged code is not sent again. With Claude Code and no `model` set, the model actually used is not known, so nothing is cached. Set `model` to a full model ID rather than an alias such as `opus`, so that cached results follow the model you use.
 
 ## Data
 

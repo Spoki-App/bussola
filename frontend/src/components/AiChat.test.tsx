@@ -20,6 +20,7 @@ const AI: AiStatus = {
   problem: null,
   config_file: null,
   target: '["anthropic", "claude-opus-5-5", "https://api.anthropic.com"]',
+  operations: [],
 }
 
 const OFF: AiStatus = { ...AI, configured: false, provider: null, target: null }

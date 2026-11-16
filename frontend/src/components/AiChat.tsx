@@ -8,7 +8,7 @@ import type { CodeTarget } from '../hooks/useCodeNavigation'
 import type { LineLink } from '../markdown/lineLinks'
 import { snippetPlace, type ChatSnippetDraft } from '../review/askAi'
 import { showThread } from '../review/linkFocus'
-import { plural } from '../review/text'
+import { aiSource, plural } from '../review/text'
 import { AiActionButton } from './AiActionButton'
 import { Findings, Lookups } from './AiReviewDetails'
 import { ErrorNote } from './Badges'
@@ -208,7 +208,7 @@ interface AnswerProps {
 }
 
 function Answer({ message, onLineLink, onOpenThread }: AnswerProps) {
-  const author = message.model ? `${message.provider_label ?? 'AI'} (${message.model})` : message.provider_label
+  const author = message.model || message.effort ? aiSource(message.provider_label ?? 'AI', message.model, message.effort) : message.provider_label
   return (
     <>
       <Markdown text={message.body} media={false} onLineLink={onLineLink} />

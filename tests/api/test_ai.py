@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from bussola.ai.base import AiProviderError
+from bussola.ai.base import AiProviderError, ModelInfo
 from bussola.ai.connection import CONNECTION_TIMEOUT_SECONDS
 from bussola.ai.runner import DEFAULT_MAX_TOKENS
 from bussola.app import create_app
@@ -53,6 +53,12 @@ def test_the_status_names_the_provider_model_and_key_variable(data_dir: Path, co
         "problem": None,
         "config_file": str(config_file),
         "target": '["anthropic", "claude-opus-5-5", "https://api.anthropic.com"]',
+        "operations": [
+            {"key": "describe", "title": "Describe", "model": None, "effort": None},
+            {"key": "impact", "title": "Rate impact", "model": None, "effort": None},
+            {"key": "review", "title": "AI review", "model": None, "effort": None},
+            {"key": "chat", "title": "AI chat", "model": None, "effort": None},
+        ],
     }
 
 
@@ -318,3 +324,60 @@ def test_prompts_cannot_be_saved_over_a_broken_configuration(data_dir: Path, con
 
     assert response.status_code == 409
     assert response.json()["detail"].startswith("Fix the configuration file before changing the prompts")
+
+
+def test_each_operation_can_choose_its_model_and_effort(data_dir: Path, config_file: Path) -> None:
+    write(config_file, ANTHROPIC_CONFIG)
+    api = client(data_dir, config_file)
+
+    saved = api.put("/api/ai/operations", json={"impact": {"model": "claude-haiku-5-5", "effort": "low"}, "review": {"model": " ", "effort": "high"}}).json()
+
+    assert config_file.read_text() == (
+        '[ai]\nprovider = "anthropic"\n\n[ai.operations.impact]\nmodel = "claude-haiku-5-5"\neffort = "low"\n\n[ai.operations.review]\neffort = "high"\n'
+    )
+    assert saved["operations"][1] == {"key": "impact", "title": "Rate impact", "model": "claude-haiku-5-5", "effort": "low"}
+    assert saved["operations"][2] == {"key": "review", "title": "AI review", "model": None, "effort": "high"}
+    assert api.get("/api/ai").json()["operations"] == saved["operations"]
+
+
+def test_an_unknown_effort_is_refused(data_dir: Path, config_file: Path) -> None:
+    write(config_file, ANTHROPIC_CONFIG)
+
+    response = client(data_dir, config_file).put("/api/ai/operations", json={"chat": {"effort": "extreme"}})
+
+    assert response.status_code == 400
+    assert config_file.read_text() == ANTHROPIC_CONFIG
+
+
+def test_saving_the_provider_keeps_the_operations(data_dir: Path, config_file: Path) -> None:
+    write(config_file, ANTHROPIC_CONFIG)
+    api = client(data_dir, config_file)
+    api.put("/api/ai/operations", json={"chat": {"effort": "medium"}})
+
+    api.put("/api/ai/config", json={"provider": "claude-code"})
+
+    assert api.get("/api/ai/operations").json()["operations"][3]["effort"] == "medium"
+
+
+def test_the_models_come_from_the_provider(data_dir: Path, config_file: Path) -> None:
+    write(config_file, ANTHROPIC_CONFIG)
+    provider = FakeProvider({"ok": True})
+    provider.listed = [ModelInfo("claude-opus-5-5", effort=True), ModelInfo("claude-haiku-4-5", effort=False)]
+
+    models = client(data_dir, config_file, provider).get("/api/ai/models").json()
+
+    assert models == {"models": [{"id": "claude-opus-5-5", "effort": True}, {"id": "claude-haiku-4-5", "effort": False}], "problem": None}
+
+
+def test_models_that_cannot_be_listed_leave_the_model_as_free_text(data_dir: Path, config_file: Path) -> None:
+    write(config_file, ANTHROPIC_CONFIG)
+    provider = FakeProvider({"ok": True})
+    provider.listed = AiProviderError("models answered HTTP 404")
+
+    models = client(data_dir, config_file, provider).get("/api/ai/models").json()
+
+    assert models == {"models": [], "problem": "models answered HTTP 404"}
+
+
+def test_without_a_provider_there_are_no_models(data_dir: Path, config_file: Path) -> None:
+    assert client(data_dir, config_file).get("/api/ai/models").json() == {"models": [], "problem": None}

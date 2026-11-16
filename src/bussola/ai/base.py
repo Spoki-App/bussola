@@ -79,14 +79,32 @@ class AiRequest:
     tools: ToolRunner | None = None
 
 
+@dataclass(frozen=True)
+class Tuning:
+    max_tokens: int | None = None
+    effort: str | None = None
+
+
+DEFAULT_TUNING = Tuning()
+
+
+@dataclass(frozen=True)
+class ModelInfo:
+    id: str
+    effort: bool | None = None
+
+
 class AiProvider(Protocol):
     name: str
     label: str
     model: str | None
     endpoint: str | None
     max_tokens: int | None
+    effort: str | None
 
     def complete(self, request: AiRequest, cancellation: "Cancellation") -> str: ...
+
+    def models(self, cancellation: "Cancellation") -> list[ModelInfo]: ...
 
 
 class Cancellation:

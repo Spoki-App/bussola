@@ -60,6 +60,7 @@ class AiCacheKey:
     model: str
     endpoint: str
     content_hash: str
+    effort: str = ""
 
 
 class AiCache(Protocol):
@@ -103,6 +104,7 @@ class AiRunner:
             self.provider.model,
             self.provider.endpoint or "",
             content_hash,
+            self.provider.effort or "",
         )
 
     def _cached[T: BaseModel](self, task: AiTask[T], key: AiCacheKey | None) -> T | None:

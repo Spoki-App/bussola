@@ -19,6 +19,7 @@ const AI: AiStatus = {
   problem: null,
   config_file: null,
   target: '["anthropic", "claude-opus-5-5", "https://api.anthropic.com"]',
+  operations: [],
 }
 
 const IDLE: AiReviewStatus = { running: false, phase: null, done: 0, total: 0, lookups: 0, units: 5, reviewed_units: 0, runs: 0 }

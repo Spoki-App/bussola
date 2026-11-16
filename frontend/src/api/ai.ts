@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { getJson, postJson, putJson } from './client'
-import type { AiConfig, AiConfigFields, AiPromptKey, AiPrompts, AiStatus, AiTestResult } from './types'
+import type { AiConfig, AiConfigFields, AiModels, AiOperationChoice, AiOperationKey, AiOperations, AiPromptKey, AiPrompts, AiStatus, AiTestResult } from './types'
 
 export const aiKey = (repoId?: number) => ['ai', repoId ?? null] as const
 
@@ -55,4 +55,25 @@ export function useSaveAiPrompts() {
     mutationFn: (prompts: Record<AiPromptKey, string>) => putJson<AiPrompts>('/ai/prompts', prompts),
     onSuccess: (saved) => { client.setQueryData(aiPromptsKey, saved) },
   })
+}
+
+const aiOperationsKey = ['ai-operations'] as const
+
+export function useAiOperations() {
+  return useQuery({ queryKey: aiOperationsKey, queryFn: () => getJson<AiOperations>('/ai/operations'), retry: false })
+}
+
+export function useSaveAiOperations() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (choices: Record<AiOperationKey, AiOperationChoice>) => putJson<AiOperations>('/ai/operations', choices),
+    onSuccess: (saved) => {
+      client.setQueryData(aiOperationsKey, saved)
+      return client.invalidateQueries({ queryKey: ['ai'] })
+    },
+  })
+}
+
+export function useAiModels() {
+  return useQuery({ queryKey: ['ai-models'], queryFn: () => getJson<AiModels>('/ai/models'), retry: false, staleTime: Infinity })
 }

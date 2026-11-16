@@ -335,6 +335,37 @@ export interface AiStatus {
   problem: string | null
   config_file: string | null
   target: string | null
+  operations: AiOperation[]
+}
+
+export type AiOperationKey = 'describe' | 'impact' | 'review' | 'chat'
+
+export type AiEffort = 'low' | 'medium' | 'high'
+
+export interface AiOperationChoice {
+  model: string | null
+  effort: AiEffort | null
+}
+
+export interface AiOperation extends AiOperationChoice {
+  key: AiOperationKey
+  title: string
+}
+
+export interface AiOperations {
+  operations: AiOperation[]
+  config_file: string | null
+  problem: string | null
+}
+
+export interface AiModel {
+  id: string
+  effort: boolean | null
+}
+
+export interface AiModels {
+  models: AiModel[]
+  problem: string | null
 }
 
 export interface AiConfigFields {
@@ -368,6 +399,7 @@ export interface UnitDescription {
   provider: string
   provider_label: string
   model: string | null
+  effort?: string | null
   created_at: string
   outdated: boolean
 }
@@ -411,6 +443,7 @@ export interface AiReviewRun {
   provider: string
   provider_label: string
   model: string | null
+  effort?: string | null
   reviewed: number
   findings: number
   failed: number
@@ -472,6 +505,7 @@ export interface AiChatMessage {
   links: AiReviewLink[]
   provider_label: string | null
   model: string | null
+  effort?: string | null
   created_at: string
 }
 

@@ -77,6 +77,18 @@ def test_the_cli_runs_without_tools_with_the_schema_and_the_prompt_on_stdin(fake
     assert Path(call["cwd"]).name.startswith("bussola-ai-")
 
 
+def test_the_effort_is_passed_to_the_cli(fake_claude: FakeClaude) -> None:
+    fake_claude.answer({"type": "result", "is_error": False, "result": "{}"})
+
+    ClaudeCodeProvider(find_claude(), "claude-haiku-5-5", 10.0, "low").complete(REQUEST, Cancellation())
+
+    assert fake_claude.call()["args"][-4:] == ["--model", "claude-haiku-5-5", "--effort", "low"]
+
+
+def test_claude_code_lists_no_models_so_the_model_is_free_text() -> None:
+    assert ClaudeCodeProvider("claude", None, 10.0).models(Cancellation()) == []
+
+
 def test_bussola_settings_such_as_the_session_token_are_not_passed_to_the_cli(fake_claude: FakeClaude, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BUSSOLA_TOKEN", "session-secret")
     monkeypatch.setenv("CLAUDECODE", "1")
@@ -103,6 +115,7 @@ def test_without_a_model_the_cli_default_is_used_and_the_text_result_is_read(fak
 
     assert answer == '{"impact": "high"}'
     assert "--model" not in fake_claude.call()["args"]
+    assert "--effort" not in fake_claude.call()["args"]
 
 
 def test_an_error_reported_by_the_cli_is_raised(fake_claude: FakeClaude) -> None:
