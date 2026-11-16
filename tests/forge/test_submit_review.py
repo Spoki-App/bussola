@@ -114,3 +114,26 @@ def test_overview_names_the_github_user(api: ApiClient, git_repo: GitFixture, fa
     link(api, review)
 
     assert api.call("GET", f"/reviews/{review}/forge")["viewer"] == "carol"
+
+
+def test_overview_gives_the_time_of_the_latest_review_by_the_github_user(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
+    review = setup_review(api, git_repo, fake_gh)
+    reviews = [
+        {"author": {"login": "carol"}, "submittedAt": "2026-11-10T09:00:00Z"},
+        {"author": {"login": "dave"}, "submittedAt": "2026-11-12T09:00:00Z"},
+        {"author": {"login": "carol"}, "submittedAt": "2026-11-11T09:00:00Z"},
+        {"author": {"login": "carol"}, "submittedAt": None},
+    ]
+    fake_gh.configure(viewer="carol", prs=[{**fake_gh.state()["prs"][0], "reviews": reviews}])
+    link(api, review)
+
+    assert api.call("GET", f"/reviews/{review}/forge")["viewer_reviewed_at"] == "2026-11-11T09:00:00Z"
+
+
+def test_summary_keeps_local_images_in_bussola(api: ApiClient, git_repo: GitFixture, fake_gh: FakeGh) -> None:
+    review = setup_review(api, git_repo, fake_gh)
+    link(api, review)
+
+    submit(api, review, "COMMENT", f"See ![chart](/api/attachments/{'a' * 64}.png)")
+
+    assert fake_gh.api_posts("/reviews")[0]["input"]["body"] == "See *(image kept in bussola: chart)*"

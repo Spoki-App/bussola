@@ -26,6 +26,7 @@ from bussola.forge.base import (
     MergeOptions,
     MergeRequest,
     PullRequest,
+    PullRequestReview,
     RemoteComment,
     RemoteNote,
     RemoteThread,
@@ -200,7 +201,7 @@ class GitHubAdapter:
         return [_pull_request(node) for node in nodes]
 
     def pull_request(self, repository: str, number: int) -> PullRequest:
-        return _pull_request(self._json(["pr", "view", str(number), "--repo", _repo(repository), "--json", PR_FIELDS]))
+        return _pull_request(self._json(["pr", "view", str(number), "--repo", _repo(repository), "--json", f"{PR_FIELDS},reviews"]))
 
     def diff_ranges(self, repository: str, number: int) -> dict[str, LineRanges]:
         files = self._paginated(f"repos/{_repo(repository)}/pulls/{number}/files")
@@ -516,7 +517,13 @@ def _pull_request(item: JsonObject) -> PullRequest:
         comment_count=_comment_count(item),
         unresolved_threads=sum(1 for thread in _nodes(item.get("reviewThreads")) if not thread.get("isResolved", False)),
         body=str(item.get("body") or ""),
+        reviews=_reviews(item.get("reviews")),
     )
+
+
+def _reviews(reviews: list[JsonObject] | JsonObject | None) -> tuple[PullRequestReview, ...]:
+    items = reviews if isinstance(reviews, list) else _nodes(reviews)
+    return tuple(PullRequestReview(_login(item.get("author")), str(item["submittedAt"])) for item in items if item.get("submittedAt"))
 
 
 def _total(connection: JsonObject | None) -> int:
