@@ -23,7 +23,8 @@ async function serveRedirectPage(page: Page) {
 
 test('the redirect page opens the bussola link of its path and offers GitHub and the install steps', async ({ page }) => {
   const requested = await serveRedirectPage(page)
-  await page.clock.install()
+  await page.clock.install({ time: 0 })
+  await page.clock.pauseAt(1000)
   await page.goto(`${SITE}/github.com/acme/shop/pull/482/files#discussion_r123`, { waitUntil: 'commit' })
 
   await expect(page.getByText('Opening bussola://github.com/acme/shop/pull/482/files#discussion_r123 in bussola.')).toBeVisible()
