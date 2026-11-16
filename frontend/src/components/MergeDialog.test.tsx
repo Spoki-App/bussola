@@ -21,10 +21,8 @@ const OPTIONS: MergeOptions = {
 
 const MERGED: MergeResult = { state: 'MERGED', branch_deleted: true, branch_error: null }
 
-function renderMerge(options: Partial<MergeOptions> = {}, merged: Response | (() => Response) = () => Response.json(MERGED)) {
-  const fetchMock = vi.fn((_url: string, init?: RequestInit) =>
-    Promise.resolve(init?.method === 'POST' ? (typeof merged === 'function' ? merged() : merged) : Response.json({ ...OPTIONS, ...options })),
-  )
+function renderMerge(options: Partial<MergeOptions> = {}, merged = Response.json(MERGED)) {
+  const fetchMock = vi.fn((_url: string, init?: RequestInit) => Promise.resolve(init?.method === 'POST' ? merged : Response.json({ ...OPTIONS, ...options })))
   vi.stubGlobal('fetch', fetchMock)
   const onMerged = vi.fn()
   const onClose = vi.fn()
@@ -112,9 +110,10 @@ describe('MergeDialog', () => {
   })
 
   it('keeps the dialog open with the reason when GitHub refuses the merge', async () => {
-    const { onMerged, onClose } = renderMerge({}, () => Response.json({ detail: 'Head branch was modified.' }, { status: 409 }))
+    const { onMerged, onClose } = renderMerge({}, Response.json({ detail: 'Head branch was modified.' }, { status: 409 }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Merge' }))
+    await screen.findByLabelText('Commit title')
+    fireEvent.click(mergeButton())
 
     expect(await screen.findByText(/Head branch was modified/)).toBeInTheDocument()
     expect(onMerged).not.toHaveBeenCalled()

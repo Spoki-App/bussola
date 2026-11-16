@@ -14,7 +14,7 @@ import { ExternalLink } from '../components/ExternalLink'
 import { FileTree } from '../components/FileTree'
 import { GitHubSyncStatus } from '../components/GitHubSyncStatus'
 import { LinkPullRequest } from '../components/LinkPullRequest'
-import { MergeDialog, MergeResultNotice } from '../components/MergeDialog'
+import { MergeDialog } from '../components/MergeDialog'
 import { PullRequestDescription } from '../components/PullRequestDescription'
 import { RateImpact } from '../components/RateImpact'
 import { ReviewTitle } from '../components/ReviewTitle'
@@ -198,7 +198,13 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
       {synced && <SyncSummary result={synced} />}
       {submitted && <PublishSummary message={submittedMessage(submitted)} published={submitted.published} />}
       {merging && <MergeDialog reviewId={review.id} onMerged={setMerged} onClose={() => { setMerging(false) }} />}
-      {merged && <MergeResultNotice result={merged} />}
+      {merged && (
+        <PublishSummary
+          message={merged.branch_deleted ? 'Pull request merged and its branch deleted.' : 'Pull request merged.'}
+          published={null}
+          problems={merged.branch_error ? [merged.branch_error] : []}
+        />
+      )}
       {needsLink && <LinkPullRequest reviewId={review.id} unsent={synced.unsent_comments} onLinked={runSync} />}
       {(sync.error ?? finish.error) && <ErrorNote message={describeError(sync.error ?? finish.error)} />}
     </header>

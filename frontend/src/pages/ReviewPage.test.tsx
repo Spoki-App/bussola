@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { MergeOptions, ReviewDetail, SyncResult } from '../api/types'
 import { ReviewPage, type ReviewExtensions } from './ReviewPage'
@@ -169,7 +169,7 @@ describe('ReviewPage conversation panel', () => {
 })
 
 describe('ReviewPage merge', () => {
-  beforeEach(() => {
+  beforeAll(() => {
     HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
       this.open = true
     }
@@ -177,6 +177,9 @@ describe('ReviewPage merge', () => {
       this.open = false
       this.dispatchEvent(new Event('close'))
     }
+  })
+
+  beforeEach(() => {
     let state = 'OPEN'
     const options: MergeOptions = {
       head_sha: 'b',

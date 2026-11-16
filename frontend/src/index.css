@@ -710,8 +710,7 @@ textarea {
   gap: 4px;
 }
 
-.merge-dialog .notice p,
-.merge-result p {
+.merge-dialog .notice p {
   margin: 0;
 }
 

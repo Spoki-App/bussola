@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useMerge, useMergeOptions } from '../api/forge'
@@ -22,13 +22,6 @@ interface Props {
 export function MergeDialog({ reviewId, onMerged, onClose }: Props) {
   const { ref, close } = useModalDialog()
   const options = useMergeOptions(reviewId)
-  const cancel = (
-    <div className="composer-actions">
-      <button type="button" onClick={close}>
-        Cancel
-      </button>
-    </div>
-  )
 
   return (
     <dialog ref={ref} className="picker merge-dialog" aria-labelledby="merge-dialog-title" onClose={onClose}>
@@ -40,18 +33,20 @@ export function MergeDialog({ reviewId, onMerged, onClose }: Props) {
       ) : (
         <>
           {options.error ? <ErrorNote message={describeError(options.error)} /> : <p className="muted">Checking whether the pull request can be merged...</p>}
-          {cancel}
+          <Actions close={close} />
         </>
       )}
     </dialog>
   )
 }
 
-export function MergeResultNotice({ result }: { result: MergeResult }) {
+function Actions({ close, children }: { close: () => void; children?: ReactNode }) {
   return (
-    <div className="notice merge-result">
-      <p>{result.branch_deleted ? 'Pull request merged and its branch deleted.' : 'Pull request merged.'}</p>
-      {result.branch_error && <ErrorNote message={result.branch_error} />}
+    <div className="composer-actions">
+      <button type="button" onClick={close}>
+        Cancel
+      </button>
+      {children}
     </div>
   )
 }
@@ -69,17 +64,24 @@ function MergeForm({ reviewId, options, onMerged, close }: FormProps) {
   const [edits, setEdits] = useState<Partial<Record<MergeMethod, CommitText>>>({})
   const [deleteBranch, setDeleteBranch] = useState(false)
   const method = choice !== null && options.methods.includes(choice) ? choice : options.default_method
-  const prefilled = method && options.commit_texts[method]
-  const text = (method && edits[method]) ?? prefilled
+  if (method === null) {
+    return (
+      <>
+        <ErrorNote message="This repository allows no merge method. Enable one in its settings on GitHub." />
+        <Actions close={close} />
+      </>
+    )
+  }
+  const text = edits[method] ?? options.commit_texts[method]
   const blocked = options.blockers.length > 0
-  const disabled = method === null || blocked || merge.isPending || text?.title.trim() === ''
+  const disabled = blocked || merge.isPending || text?.title.trim() === ''
   const edit = (change: Partial<CommitText>) => {
-    if (method && text) {
+    if (text) {
       setEdits({ ...edits, [method]: { ...text, ...change } })
     }
   }
   const submit = () => {
-    if (method === null || disabled) {
+    if (disabled) {
       return
     }
     const request = { method, head_sha: options.head_sha, title: text?.title ?? '', message: text?.message ?? '', delete_branch: deleteBranch }
@@ -110,16 +112,12 @@ function MergeForm({ reviewId, options, onMerged, close }: FormProps) {
           </ul>
         </div>
       )}
-      {method === null ? (
-        <ErrorNote message="This repository allows no merge method. Enable one in its settings on GitHub." />
-      ) : (
-        <Segmented
-          label="Merge method"
-          labels={Object.fromEntries(options.methods.map((item) => [item, METHOD_LABELS[item]])) as Record<MergeMethod, string>}
-          value={method}
-          onChange={setChoice}
-        />
-      )}
+      <Segmented
+        label="Merge method"
+        labels={Object.fromEntries(options.methods.map((item) => [item, METHOD_LABELS[item]])) as Record<MergeMethod, string>}
+        value={method}
+        onChange={setChoice}
+      />
       {text && (
         <>
           <label>
@@ -140,14 +138,11 @@ function MergeForm({ reviewId, options, onMerged, close }: FormProps) {
       )}
       {options.branch_deletion === 'automatic' && <p className="muted">GitHub deletes the branch after merging, as set in the repository settings.</p>}
       {merge.error && <ErrorNote message={describeError(merge.error)} />}
-      <div className="composer-actions">
-        <button type="button" onClick={close}>
-          Cancel
-        </button>
+      <Actions close={close}>
         <button type="submit" className="primary" disabled={disabled}>
           {merge.isPending ? 'Merging...' : 'Merge'}
         </button>
-      </div>
+      </Actions>
     </form>
   )
 }
