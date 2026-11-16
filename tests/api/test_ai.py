@@ -337,6 +337,7 @@ def test_each_operation_can_choose_its_model_and_effort(data_dir: Path, config_f
     )
     assert saved["operations"][1] == {"key": "impact", "title": "Rate impact", "model": "claude-haiku-5-5", "effort": "low"}
     assert saved["operations"][2] == {"key": "review", "title": "AI review", "model": None, "effort": "high"}
+    assert saved["target"] == '["anthropic", "claude-opus-5-5", "https://api.anthropic.com", {"impact": "claude-haiku-5-5"}]'
     assert api.get("/api/ai").json()["operations"] == saved["operations"]
 
 
@@ -345,7 +346,7 @@ def test_an_unknown_effort_is_refused(data_dir: Path, config_file: Path) -> None
 
     response = client(data_dir, config_file).put("/api/ai/operations", json={"chat": {"effort": "extreme"}})
 
-    assert response.status_code == 400
+    assert response.status_code == 422
     assert config_file.read_text() == ANTHROPIC_CONFIG
 
 
@@ -356,7 +357,7 @@ def test_saving_the_provider_keeps_the_operations(data_dir: Path, config_file: P
 
     api.put("/api/ai/config", json={"provider": "claude-code"})
 
-    assert api.get("/api/ai/operations").json()["operations"][3]["effort"] == "medium"
+    assert api.get("/api/ai").json()["operations"][3]["effort"] == "medium"
 
 
 def test_the_models_come_from_the_provider(data_dir: Path, config_file: Path) -> None:

@@ -14,7 +14,17 @@ from typing import Any
 
 import pytest
 
-from bussola.ai.base import AiCancelledError, AiNotConfiguredError, AiProviderError, AiRequest, AiTimeoutError, Cancellation, ToolDefinition, ToolOutcome
+from bussola.ai.base import (
+    AiCancelledError,
+    AiNotConfiguredError,
+    AiProviderError,
+    AiRequest,
+    AiTimeoutError,
+    Cancellation,
+    ToolDefinition,
+    ToolOutcome,
+    Tuning,
+)
 from bussola.ai.claude_code import HELP_TIMEOUT_SECONDS, READER_NAME, ClaudeCodeProvider, find_claude
 from bussola.ai.config import AiSettings, ProviderName
 from bussola.ai.providers import build_provider
@@ -80,7 +90,7 @@ def test_the_cli_runs_without_tools_with_the_schema_and_the_prompt_on_stdin(fake
 def test_the_effort_is_passed_to_the_cli(fake_claude: FakeClaude) -> None:
     fake_claude.answer({"type": "result", "is_error": False, "result": "{}"})
 
-    ClaudeCodeProvider(find_claude(), "claude-haiku-5-5", 10.0, "low").complete(REQUEST, Cancellation())
+    ClaudeCodeProvider(find_claude(), "claude-haiku-5-5", 10.0, Tuning(effort="low")).complete(REQUEST, Cancellation())
 
     assert fake_claude.call()["args"][-4:] == ["--model", "claude-haiku-5-5", "--effort", "low"]
 

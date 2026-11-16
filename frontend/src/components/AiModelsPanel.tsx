@@ -1,8 +1,8 @@
 import { useId, useState } from 'react'
 
-import { useAiModels, useAiOperations, useAiStatus, useSaveAiOperations } from '../api/ai'
+import { useAiModels, useAiStatus, useSaveAiOperations } from '../api/ai'
 import { describeError } from '../api/client'
-import type { AiEffort, AiModel, AiOperation, AiOperationChoice, AiOperationKey, AiOperations, AiStatus } from '../api/types'
+import type { AiEffort, AiModel, AiModels, AiOperation, AiOperationChoice, AiOperationKey, AiStatus } from '../api/types'
 import { ErrorNote } from './Badges'
 
 const EFFORTS: Record<AiEffort, string> = { low: 'Low', medium: 'Medium', high: 'High' }
@@ -37,24 +37,22 @@ function takesEffort(models: AiModel[], model: string | null): boolean {
 
 export function AiModelsPanel() {
   const status = useAiStatus()
-  const operations = useAiOperations()
-  const error = status.error ?? operations.error
-  if (error) {
-    return <ErrorNote message={describeError(error)} />
+  const models = useAiModels(status.data?.configured ?? false)
+  if (status.error) {
+    return <ErrorNote message={describeError(status.error)} />
   }
-  if (status.data === undefined || operations.data === undefined) {
+  if (status.data === undefined) {
     return <p className="muted">Loading...</p>
   }
-  return <ModelsForm ai={status.data} operations={operations.data} />
+  return <ModelsForm ai={status.data} models={models.data} />
 }
 
-function ModelsForm({ ai, operations }: { ai: AiStatus; operations: AiOperations }) {
+function ModelsForm({ ai, models }: { ai: AiStatus; models: AiModels | undefined }) {
   const id = useId()
-  const [rows, setRows] = useState(() => rowsOf(operations.operations))
+  const [rows, setRows] = useState(() => rowsOf(ai.operations))
   const [saved, setSaved] = useState(false)
   const save = useSaveAiOperations()
-  const models = useAiModels()
-  const listed = models.data?.models ?? []
+  const listed = models?.models ?? []
   const update = (key: AiOperationKey, change: Partial<Row>) => {
     setRows({ ...rows, [key]: { ...rows[key], ...change } })
     setSaved(false)
@@ -72,14 +70,13 @@ function ModelsForm({ ai, operations }: { ai: AiStatus; operations: AiOperations
         Choose a model and an effort for each AI action. Leave the model empty to use the model of the AI provider. A higher effort lets the model think
         more, which costs more and takes longer.
       </p>
-      {!ai.configured && <p className="muted">Choose an AI provider first to see the models it offers.</p>}
-      {operations.problem && <ErrorNote message={operations.problem} />}
+      {!ai.configured && (ai.problem ? <ErrorNote message={ai.problem} /> : <p className="muted">Choose an AI provider first to see the models it offers.</p>)}
       <datalist id={`${id}-models`}>
         {listed.map((model) => (
           <option key={model.id} value={model.id} />
         ))}
       </datalist>
-      {operations.operations.map((operation) => {
+      {ai.operations.map((operation) => {
         const row = rows[operation.key]
         const effort = takesEffort(listed, row.model.trim() || ai.model)
         return (
@@ -113,7 +110,7 @@ function ModelsForm({ ai, operations }: { ai: AiStatus; operations: AiOperations
           </fieldset>
         )
       })}
-      {models.data?.problem && <p className="muted">{`The provider did not list its models, so type the model name: ${models.data.problem}`}</p>}
+      {models?.problem && <p className="muted">{`The provider did not list its models, so type the model name: ${models.problem}`}</p>}
       <div className="ai-form-actions">
         <button type="submit" className="primary" disabled={save.isPending}>
           {save.isPending ? 'Saving...' : 'Save models'}
@@ -122,7 +119,7 @@ function ModelsForm({ ai, operations }: { ai: AiStatus; operations: AiOperations
       </div>
       {save.error && <ErrorNote message={describeError(save.error)} />}
       <p className="muted">
-        Saved in the <code>[ai.operations]</code> sections of <code>{operations.config_file ?? 'config.toml'}</code>. A repository cannot change them.
+        Saved in the <code>[ai.operations]</code> sections of <code>{ai.config_file ?? 'config.toml'}</code>. A repository cannot change them.
       </p>
     </form>
   )

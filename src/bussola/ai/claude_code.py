@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import IO, Any
 
 from bussola.ai.base import (
+    DEFAULT_TUNING,
     MAX_ERROR_LENGTH,
     AiCancelledError,
     AiNotConfiguredError,
@@ -24,6 +25,7 @@ from bussola.ai.base import (
     Cancellation,
     ModelInfo,
     ToolRunner,
+    Tuning,
     json_object,
     run_cancellable,
 )
@@ -129,9 +131,9 @@ class ClaudeCodeProvider:
     endpoint: str | None = None
     max_tokens: int | None = None
 
-    def __init__(self, executable: str, model: str | None, timeout: float, effort: str | None = None) -> None:
+    def __init__(self, executable: str, model: str | None, timeout: float, tuning: Tuning = DEFAULT_TUNING) -> None:
         self.model = model
-        self.effort = effort
+        self.effort = tuning.effort
         self._executable = executable
         self._timeout = timeout
 

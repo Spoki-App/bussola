@@ -8,7 +8,7 @@ from bussola.ai.openai_compatible import OpenAiCompatibleProvider
 def build_provider(settings: AiSettings) -> AiProvider:
     match settings.provider:
         case ProviderName.CLAUDE_CODE:
-            return ClaudeCodeProvider(find_claude(), settings.model, settings.timeout, settings.effort)
+            return ClaudeCodeProvider(find_claude(), settings.model, settings.timeout, _tuning(settings))
         case ProviderName.ANTHROPIC:
             endpoint = _required(settings.endpoint, "endpoint")
             return AnthropicProvider(_required(settings.model, "model"), endpoint, _api_key(settings), settings.timeout, _tuning(settings))

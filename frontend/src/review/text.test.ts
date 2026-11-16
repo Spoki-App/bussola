@@ -7,6 +7,6 @@ describe('aiSource', () => {
     expect(aiSource('Anthropic API', 'claude-haiku-5-5', 'low')).toBe('Anthropic API (claude-haiku-5-5, low effort)')
     expect(aiSource('Anthropic API', 'claude-opus-5-5', null)).toBe('Anthropic API (claude-opus-5-5)')
     expect(aiSource('Claude Code CLI', null, 'high')).toBe('Claude Code CLI (high effort)')
-    expect(aiSource('Claude Code CLI', null)).toBe('Claude Code CLI')
+    expect(aiSource('Claude Code CLI', null, null)).toBe('Claude Code CLI')
   })
 })

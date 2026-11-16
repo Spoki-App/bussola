@@ -184,6 +184,7 @@ const RUN: AiReviewRunDetail = {
   provider: 'anthropic',
   provider_label: 'Anthropic API',
   model: 'claude-opus-5-5',
+  effort: null,
   reviewed: 2,
   findings: 1,
   failed: 0,

@@ -52,6 +52,7 @@ const DESCRIBED: UnitDescription = {
   provider: 'anthropic',
   provider_label: 'Anthropic API',
   model: 'claude-opus-5-5',
+  effort: null,
   created_at: '2026-11-01T10:00:00Z',
   outdated: false,
 }

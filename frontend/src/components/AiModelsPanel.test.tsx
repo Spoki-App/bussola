@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { AiModels, AiOperations, AiStatus } from '../api/types'
+import type { AiModels, AiStatus } from '../api/types'
 import { AiModelsPanel } from './AiModelsPanel'
 
 const STATUS: AiStatus = {
@@ -16,29 +16,17 @@ const STATUS: AiStatus = {
   problem: null,
   config_file: '/home/me/.config/bussola/config.toml',
   target: '["anthropic", "claude-opus-5-5", "https://api.anthropic.com"]',
-  operations: [],
-}
-
-const OPERATIONS: AiOperations = {
   operations: [
     { key: 'describe', title: 'Describe', model: null, effort: null },
     { key: 'impact', title: 'Rate impact', model: 'claude-haiku-5-5', effort: 'low' },
     { key: 'review', title: 'AI review', model: null, effort: 'high' },
     { key: 'chat', title: 'AI chat', model: null, effort: null },
   ],
-  config_file: '/home/me/.config/bussola/config.toml',
-  problem: null,
 }
 
 function renderPanel(models: AiModels) {
-  const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>((url, init) => {
-    if (init?.method === 'PUT') {
-      return Promise.resolve(Response.json(OPERATIONS))
-    }
-    if (url === '/api/ai/models') {
-      return Promise.resolve(Response.json(models))
-    }
-    return Promise.resolve(Response.json(url === '/api/ai' ? STATUS : OPERATIONS))
+  const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>((url) => {
+    return Promise.resolve(Response.json(url === '/api/ai/models' ? models : STATUS))
   })
   vi.stubGlobal('fetch', fetchMock)
   render(

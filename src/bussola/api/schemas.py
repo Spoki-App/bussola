@@ -583,33 +583,6 @@ class AiOperationOut(BaseModel):
     effort: str | None = None
 
 
-class AiOperationIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    model: str | None = None
-    effort: str | None = None
-
-    @field_validator("model", "effort")
-    @classmethod
-    def blank_is_unset(cls, value: str | None) -> str | None:
-        return None if value is None else value.strip() or None
-
-
-class AiOperationsIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    describe: AiOperationIn = AiOperationIn()
-    impact: AiOperationIn = AiOperationIn()
-    review: AiOperationIn = AiOperationIn()
-    chat: AiOperationIn = AiOperationIn()
-
-
-class AiOperationsOut(BaseModel):
-    operations: list[AiOperationOut]
-    config_file: str | None = None
-    problem: str | None = None
-
-
 class AiModelOut(BaseModel):
     id: str
     effort: bool | None = None

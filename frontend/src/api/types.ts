@@ -352,12 +352,6 @@ export interface AiOperation extends AiOperationChoice {
   title: string
 }
 
-export interface AiOperations {
-  operations: AiOperation[]
-  config_file: string | null
-  problem: string | null
-}
-
 export interface AiModel {
   id: string
   effort: boolean | null
@@ -399,7 +393,7 @@ export interface UnitDescription {
   provider: string
   provider_label: string
   model: string | null
-  effort?: string | null
+  effort: string | null
   created_at: string
   outdated: boolean
 }
@@ -443,7 +437,7 @@ export interface AiReviewRun {
   provider: string
   provider_label: string
   model: string | null
-  effort?: string | null
+  effort: string | null
   reviewed: number
   findings: number
   failed: number
@@ -505,7 +499,7 @@ export interface AiChatMessage {
   links: AiReviewLink[]
   provider_label: string | null
   model: string | null
-  effort?: string | null
+  effort: string | null
   created_at: string
 }
 

@@ -221,7 +221,7 @@ def describe_config_error(error: Exception) -> str:
 def resolve_ai_settings(user: UserAiConfig) -> AiSettings:
     provider = user.provider or ProviderName.NONE
     if provider == ProviderName.NONE:
-        return AiSettings(ProviderName.NONE)
+        return AiSettings(ProviderName.NONE, operations=user.operations)
     if provider == ProviderName.CLAUDE_CODE:
         return AiSettings(provider, model=user.model, timeout=user.timeout, max_tokens=user.max_tokens, operations=user.operations)
     return AiSettings(
