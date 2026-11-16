@@ -53,6 +53,21 @@ def test_new_edit_next_to_an_approved_row_needs_review_again(api: ApiClient, git
     assert (unit["state"], unit["rows_approved"], unit["rows_total"]) == ("partial", 2, 4)
 
 
+def test_a_partly_approved_unit_changed_after_a_review_opens_on_the_base_diff(api: ApiClient, git_repo: GitFixture) -> None:
+    review = start(git_repo, api)
+    api.approve_rows(review, "settings.ini", head_range=(2, 2), base_range=(2, 2))
+    api.call("POST", f"/reviews/{review}/sessions", 201)
+
+    git_repo.commit({"settings.ini": HEAD_CONFIG.replace("debug = true", "debug = false")})
+    api.refresh(review)
+    diff = api.diff(review, "settings.ini")
+
+    assert api.unit(review, "settings.ini")["state"] == "partial"
+    assert (diff["mode"], diff["available_modes"]) == ("base", ["base", "reviewed"])
+    assert sorted(row["text"] for row in diff["rows"] if row["approved"]) == ["port = 80", "port = 8080"]
+    assert api.diff(review, "settings.ini", mode="reviewed")["mode"] == "reviewed"
+
+
 def test_module_code_can_be_approved_by_selection(api: ApiClient, git_repo: GitFixture) -> None:
     git_repo.commit({"app.py": "import os\n\n\ndef f():\n    return 1\n"})
     git_repo.branch("feature")

@@ -61,11 +61,14 @@ def reviewed_version(reviewed: UnitSnapshot) -> EarlierVersion:
     return EarlierVersion(DiffMode.REVIEWED, reviewed.head_hash, side_lines(reviewed, Side.HEAD))
 
 
-def choose_diff_mode(snapshot: UnitSnapshot, earlier: EarlierVersion | None, requested: DiffMode | None) -> DiffChoice:
+def choose_diff_mode(snapshot: UnitSnapshot, earlier: EarlierVersion | None, requested: DiffMode | None, *, prefer_base: bool = False) -> DiffChoice:
     if earlier is None or earlier.head_hash == snapshot.head_hash:
         return DiffChoice(DiffMode.BASE, [DiffMode.BASE], approved_text_unavailable=False)
     has_lines = earlier.lines is not None
-    wanted = requested or (earlier.mode if has_lines else DiffMode.BASE)
+    if requested is None:
+        wanted = earlier.mode if has_lines and not prefer_base else DiffMode.BASE
+    else:
+        wanted = DiffMode.BASE if requested == DiffMode.BASE else earlier.mode
     available = [DiffMode.BASE, earlier.mode]
     if wanted == earlier.mode and has_lines:
         return DiffChoice(earlier.mode, available, approved_text_unavailable=False, earlier_lines=earlier.lines)

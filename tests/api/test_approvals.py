@@ -202,6 +202,7 @@ def test_approved_and_reviewed_units_show_the_changes_since_that_review(api: Api
     assert changed_lines(reviewed) == [("removed", "    return 20"), ("added", "    return 22")]
     assert [row["old_line"] for row in reviewed["rows"] if row["change"] == "removed"] == [6]
     assert changed_lines(api.diff(review, "app.py::second", mode="base")) == [("removed", "    return 2"), ("added", "    return 22")]
+    assert api.diff(review, "app.py::second", mode="approved")["mode"] == "reviewed"
 
 
 def test_a_review_after_a_stale_approval_shows_the_changes_since_that_review(api: ApiClient, git_repo: GitFixture) -> None:

@@ -96,7 +96,7 @@ Units that still need review start open and the others closed. Approving a unit 
 | New | Not approved yet |
 | Approved | You approved this exact content |
 | Approved (moved) | You approved the same content under another name or path, which no longer exists |
-| Changed since approval | You approved an earlier version; the diff shows approved to current by default |
+| Changed since approval | You approved an earlier version; the diff shows approved to current by default, or reviewed to current when you pressed **Mark as reviewed** after approving |
 | Partly approved | Some of the changed lines of a module or file are approved |
 | Removed | The unit was deleted; approving it confirms the deletion |
 
