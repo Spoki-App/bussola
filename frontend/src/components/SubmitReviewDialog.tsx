@@ -87,10 +87,11 @@ export function SubmitReviewDialog({ reviewId, pendingComments, summary, default
 function useAiReviewDraft(reviewId: number, revisionId: number | undefined): AiReviewDraft | null {
   const forge = useForge(reviewId)
   const runs = useAiReviewRuns(reviewId)
-  const run = forge.data ? latestNewAiReview(runs.data, forge.data.viewer_reviewed_at) : null
+  const reviewedAt = forge.data?.viewer_reviewed_at ?? null
+  const run = forge.data ? latestNewAiReview(runs.data, reviewedAt) : null
   const detail = useAiReviewRun(reviewId, run?.id ?? null)
   const threads = useThreads(reviewId, revisionId)
-  return useMemo(() => (detail.data && threads.data ? aiReviewDraft(detail.data, threads.data) : null), [detail.data, threads.data])
+  return useMemo(() => (detail.data && threads.data ? aiReviewDraft(detail.data, threads.data, reviewedAt) : null), [detail.data, threads.data, reviewedAt])
 }
 
 interface SubmitReviewProps {
@@ -104,9 +105,11 @@ export function SubmitReview({ reviewId, revisionId, pendingComments, onSubmitte
   const [open, setOpen] = useState(false)
   const [summary, setSummary] = useState('')
   const [draftedRun, setDraftedRun] = useState<number | null>(null)
+  const [defaultEvent, setDefaultEvent] = useState<ReviewEvent>('COMMENT')
   const draft = useAiReviewDraft(reviewId, revisionId)
 
   const start = () => {
+    setDefaultEvent(draft?.event ?? 'COMMENT')
     if (draft && draft.runId !== draftedRun) {
       setDraftedRun(draft.runId)
       if (!summary.trim()) {
@@ -126,7 +129,7 @@ export function SubmitReview({ reviewId, revisionId, pendingComments, onSubmitte
           reviewId={reviewId}
           pendingComments={pendingComments}
           summary={summary}
-          defaultEvent={draft?.event}
+          defaultEvent={defaultEvent}
           onSummaryChange={setSummary}
           onSubmitted={(result) => {
             setSummary('')

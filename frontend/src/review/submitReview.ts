@@ -21,18 +21,16 @@ export interface AiReviewDraft {
   event: ReviewEvent
 }
 
+const isAfter = (time: string, reviewedAt: string | null) => reviewedAt === null || Date.parse(time) > Date.parse(reviewedAt)
+
 export function latestNewAiReview(runs: AiReviewRun[] | undefined, reviewedAt: string | null): AiReviewRun | null {
-  const run = runs?.find((candidate) => candidate.finished_at)
-  if (!run?.finished_at) {
-    return null
-  }
-  return reviewedAt === null || Date.parse(run.finished_at) > Date.parse(reviewedAt) ? run : null
+  const run = runs?.find((candidate) => candidate.finished_at && candidate.reviewed > 0)
+  return run?.finished_at && isAfter(run.finished_at, reviewedAt) ? run : null
 }
 
-export function aiReviewDraft(run: AiReviewRunDetail, threads: Thread[]): AiReviewDraft {
-  const open = new Set(threads.filter(isOpen).map((thread) => thread.id))
+export function aiReviewDraft(run: AiReviewRunDetail, threads: Thread[], reviewedAt: string | null): AiReviewDraft {
   const summaries = run.parts.map((part) => lineLinksAsText((part.summary ?? '').trim())).filter(Boolean)
-  const leftOpen = run.parts.some((part) => part.findings.some((finding) => open.has(finding.thread_id)))
+  const leftOpen = threads.some((thread) => thread.created_by.ai && isOpen(thread) && isAfter(thread.created_at, reviewedAt))
   return { runId: run.id, text: summaries.join('\n\n'), event: leftOpen ? 'REQUEST_CHANGES' : 'COMMENT' }
 }
 

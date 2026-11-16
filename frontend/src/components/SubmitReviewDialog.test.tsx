@@ -233,7 +233,7 @@ function renderSubmitReview({ reviewedAt = null as string | null, runs = [RUN], 
       '/api/reviews/1/forge': { ...overview('alice'), viewer_reviewed_at: reviewedAt },
       '/api/reviews/1/ai-review/runs': state.runs,
       '/api/reviews/1/ai-review/runs/5': DETAIL,
-      '/api/reviews/1/threads?revision_id=3': [{ id: 't1', status: threadStatus, resolvable: true }],
+      '/api/reviews/1/threads?revision_id=3': [{ id: 't1', status: threadStatus, resolvable: true, created_at: '2026-11-12T10:04:00Z', created_by: { id: 2, email: '', name: 'Claude Code', ai: true } }],
     }
     return Promise.resolve(Response.json(answers[url] ?? []))
   })
@@ -252,6 +252,7 @@ function renderSubmitReview({ reviewedAt = null as string | null, runs = [RUN], 
   const setRuns = async (next: AiReviewRun[]) => {
     state.runs = next
     await act(() => client.invalidateQueries())
+    await waitFor(() => { expect(fetchMock.mock.calls.some(([url]) => url === '/api/reviews/1/ai-review/runs/5')).toBe(true) })
     await loaded()
   }
   return { loaded, setRuns }
@@ -306,6 +307,26 @@ describe('SubmitReview', () => {
     open()
 
     expect(screen.getByLabelText(SUMMARY)).toHaveValue('')
+    expect(screen.getByRole('radio', { name: /^Comment/ })).toBeChecked()
+  })
+
+  it('is not hidden by a later AI review that had nothing to review', async () => {
+    const { loaded } = renderSubmitReview({ runs: [{ ...RUN, id: 6, reviewed: 0, findings: 0, finished_at: '2026-11-12T11:00:00Z' }, RUN] })
+    await loaded()
+
+    open()
+
+    expect(screen.getByLabelText(SUMMARY)).toHaveValue(AI_SUMMARY)
+    expect(screen.getByRole('radio', { name: /^Request changes/ })).toBeChecked()
+  })
+
+  it('keeps the review type while the dialog is open', async () => {
+    const { loaded, setRuns } = renderSubmitReview({ runs: [] })
+    await loaded()
+    open()
+
+    await setRuns([RUN])
+
     expect(screen.getByRole('radio', { name: /^Comment/ })).toBeChecked()
   })
 
