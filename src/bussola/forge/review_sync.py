@@ -11,7 +11,7 @@ from bussola.git import GitError, GitRepo, InvalidRefError
 from bussola.review.context import ReviewContext
 from bussola.review.repos import open_repo, repo_name
 from bussola.review.revisions import RefreshResult, fetch_review_remotes, refresh_review
-from bussola.storage.models import Repo, Reviewer
+from bussola.storage.models import ForgeLink, Repo, Reviewer
 from bussola.storage.repositories import Store
 
 FETCH_ERRORS = (ForgeError, GitError, InvalidRefError, InvalidRequestError, ConflictError)
@@ -73,10 +73,14 @@ def sync_and_publish(context: ReviewContext, adapter: ForgeAdapter, git_repo: Gi
 
 
 def sync_pull_requests(session: ForgeSession, repo: Repo) -> SyncResult:
+    return sync_links(session, session.store.forge.links_for_repo(repo.id))
+
+
+def sync_links(session: ForgeSession, links: list[ForgeLink]) -> SyncResult:
     remote = require_remote(session.adapter, session.git_repo)
     updated, closed = 0, 0
     failed: list[str] = []
-    for link in session.store.forge.links_for_repo(repo.id):
+    for link in links:
         review = session.store.reviews.get_review(link.review_id)
         if review is None or not same_repository(link.repository, remote.repository):
             continue
@@ -94,11 +98,12 @@ def sync_all_pull_requests(store: Store, adapter: ForgeAdapter, reviewer: Review
     updated, closed = 0, 0
     failed: list[str] = []
     for repo in store.reviews.list_repos():
-        if not store.forge.links_for_repo(repo.id):
+        links = store.forge.links_for_repo(repo.id)
+        if not links:
             continue
         name = repo_name(repo)
         try:
-            result = sync_pull_requests(ForgeSession(store, adapter, open_repo(repo), reviewer), repo)
+            result = sync_links(ForgeSession(store, adapter, open_repo(repo), reviewer), links)
         except FETCH_ERRORS as error:
             store.session.rollback()
             failed.append(f"{name}: {error}")

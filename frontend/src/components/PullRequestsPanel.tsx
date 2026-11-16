@@ -13,7 +13,7 @@ export function PullSyncSummary({ result }: { result: PullSyncResult }) {
       <p className="notice">
         Pull request reviews synced: {result.updated} updated, {result.closed} closed or merged.
       </p>
-      {result.failed.map((failure) => <ErrorNote key={failure} message={failure} />)}
+      {result.failed.map((failure, index) => <ErrorNote key={index} message={failure} />)}
     </>
   )
 }
