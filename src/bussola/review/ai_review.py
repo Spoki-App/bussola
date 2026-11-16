@@ -30,6 +30,7 @@ from bussola.review.descriptions import (
     marked,
     old_key_of,
     stored_descriptions,
+    unit_definitions,
     unit_prompt,
     unrated,
 )
@@ -46,6 +47,12 @@ UNRATED_ORDER = IMPACT_ORDER[Impact.MEDIUM]
 MAX_FINDING_CHARACTERS = MAX_BODY_LENGTH - 1_000
 CLIPPED_COMMENT = "\n\n[The rest of this comment was too long to keep.]"
 MAX_TITLE_CHARACTERS = 120
+MAX_PROMPT_CODE_CHARACTERS = 1_500_000
+MAX_DEFINITION_UNITS = 15
+DEFINITIONS_ONLY = (
+    "The pull request is too large to show the code of every unit, so each unit to review shows only its definitions. "
+    "Open each one with unit_diff, by the name on its `Open with unit_diff` line, to see its change with line numbers before you review it."
+)
 
 type RaisedKey = tuple[str, str | None, str | None, str | None, int | None, str]
 
@@ -261,20 +268,23 @@ def _run(job: AiReviewJob, record: "_RunRecord") -> AiReviewOutcome:
     snapshots, pending = reviewable_units(context, job.tools.snapshots)
     pending = snapshots if job.again else pending
     impacts = _impacts(context, snapshots)
-    groups = review_groups(snapshots, pending, impacts, job.limit)
+    costs = {unit.id: len(unit_prompt(unit, numbered=True, clip=job.limit is not None)) for unit in pending}
+    definitions_only = job.limit is None and sum(costs.values()) > MAX_PROMPT_CODE_CHARACTERS
+    limit = GroupLimit(MAX_PROMPT_CODE_CHARACTERS, MAX_DEFINITION_UNITS) if definitions_only else GroupLimit(job.limit)
+    groups = review_groups(snapshots, pending, impacts, costs, limit)
     done = [0, *accumulate(len(group) for group in groups)]
     progress = _ReviewProgress(job.report, len(pending))
     progress.reviewed(0)
     if groups:
         job.tools.prepare()
-    reviewer = _GroupReviewer(job, snapshots, ai_reviewer(context, job.runner.provider), progress, record, impacts)
+    reviewer = _GroupReviewer(job, snapshots, ai_reviewer(context, job.runner.provider), progress, record, impacts, definitions_only)
     context.store.commit()
-    outcome: BatchResult[int, int] = run_batch(
+    outcome: BatchResult[int, tuple[int, int]] = run_batch(
         range(len(groups)), lambda index: reviewer.review(groups[index]), cancellation, lambda batch: progress.reviewed(done[batch.done])
     )
     return AiReviewOutcome(
-        reviewed=sum(len(groups[index]) for index in outcome.results),
-        findings=sum(outcome.results.values()),
+        reviewed=sum(reviewed for _, reviewed in outcome.results.values()),
+        findings=sum(findings for findings, _ in outcome.results.values()),
         failed=sum(len(groups[index]) for index in outcome.errors),
         cancelled=outcome.cancelled,
         error=outcome.stopped_by or next(iter(outcome.errors.values()), None),
@@ -297,7 +307,22 @@ def unreviewed(snapshots: list[UnitSnapshot], reviewed: Iterable[AiReviewedUnit]
     return [snapshot for snapshot in snapshots if not {(key_of(snapshot), change_hash(snapshot)), (old_key_of(snapshot), change_hash(snapshot))} & done]
 
 
-def review_groups(snapshots: list[UnitSnapshot], pending: list[UnitSnapshot], impacts: dict[int, Impact], limit: int | None) -> list[list[UnitSnapshot]]:
+@dataclass(frozen=True)
+class GroupLimit:
+    characters: int | None
+    units: int | None = None
+
+    def exceeded(self, group: list[UnitSnapshot], size: int) -> bool:
+        return (self.characters is not None and size > self.characters) or (self.units is not None and len(group) >= self.units)
+
+
+def review_groups(
+    snapshots: list[UnitSnapshot],
+    pending: list[UnitSnapshot],
+    impacts: dict[int, Impact],
+    costs: dict[int, int],
+    limit: GroupLimit,
+) -> list[list[UnitSnapshot]]:
     order = {snapshot.id: index for index, snapshot in enumerate(snapshots)}
 
     def rank(unit: UnitSnapshot) -> tuple[int, int]:
@@ -309,12 +334,11 @@ def review_groups(snapshots: list[UnitSnapshot], pending: list[UnitSnapshot], im
     groups: list[list[UnitSnapshot]] = []
     size = 0
     for unit in (unit for units in files.values() for unit in units):
-        cost = len(unit_prompt(unit, numbered=True, clip=limit is not None))
-        if not groups or (limit is not None and groups[-1] and size + cost > limit):
+        if not groups or (groups[-1] and limit.exceeded(groups[-1], size + costs[unit.id])):
             groups.append([])
             size = 0
         groups[-1].append(unit)
-        size += cost
+        size += costs[unit.id]
     return groups
 
 
@@ -388,17 +412,18 @@ class _GroupReviewer:
     progress: _ReviewProgress
     record: _RunRecord
     impacts: dict[int, Impact]
+    definitions_only: bool
 
-    def review(self, group: list[UnitSnapshot]) -> int:
+    def review(self, group: list[UnitSnapshot]) -> tuple[int, int]:
         context, revision = self.job.context, self.job.revision
-        toolbox = self.job.tools.toolbox(self.progress.looked_up)
+        toolbox = self.job.tools.toolbox(self.progress.looked_up, len(group) if self.definitions_only else 0)
         try:
             views = [view for view in thread_views(context, revision) if any(comment.deleted_at is None for comment in view.comments)]
             prompt = self._prompt(group, views)
             content_hash = hashlib.sha256(f"{prompt}\0{toolbox.fingerprint()}".encode()).hexdigest()
             answer = self.job.runner.with_tools(toolbox).run(REVIEW_PULL_REQUEST, prompt, self.job.cancellation, content_hash)
             with context.store.session.begin_nested():
-                created = self._save(group, answer.findings, views)
+                created, reviewed = self._save(group, answer.findings, views, self._opened(toolbox))
                 rated = self._rate(group, answer.ratings)
         except AiCancelledError:
             raise
@@ -410,7 +435,12 @@ class _GroupReviewer:
         part = self._units(group, rated) | {"summary": answer.summary.strip(), "findings": findings, "lookups": tool_lookups(toolbox), "error": None}
         self.record.part(part)
         context.store.commit()
-        return len(created)
+        return len(created), reviewed
+
+    def _opened(self, toolbox: Toolbox) -> set[str] | None:
+        if not self.definitions_only:
+            return None
+        return {str(call.arguments.get("unit")) for call in toolbox.log if call.name == "unit_diff" and not call.error}
 
     def _prompt(self, group: list[UnitSnapshot], views: list[ThreadView]) -> str:
         revision, clip = self.job.revision, self.job.limit is not None
@@ -422,12 +452,17 @@ class _GroupReviewer:
         others = [unit_label(snapshot) for snapshot in self.snapshots if snapshot.id not in focus]
         if others:
             lines += ["The other units this pull request changes, which you can open with unit_diff:", *marked("units", "\n".join(others), clip=clip), ""]
-        lines += ["The units to review:", ""]
-        lines += [f"Unit: {RATING_ID.format(number)}\n{unit_prompt(snapshot, numbered=True, clip=clip)}" for number, snapshot in enumerate(group, start=1)]
+        lines += ["The units to review:", *([DEFINITIONS_ONLY] if self.definitions_only else []), ""]
+        lines += [f"Unit: {RATING_ID.format(number)}\n{self._unit_text(snapshot, clip)}" for number, snapshot in enumerate(group, start=1)]
         comments = [_thread_summary(view) for view in views]
         if comments:
             lines += ["Comments reviewers already made on this pull request:", *marked("comments", "\n\n".join(comments), clip=clip), ""]
         return "\n".join(lines)
+
+    def _unit_text(self, snapshot: UnitSnapshot, clip: bool) -> str:
+        if self.definitions_only:
+            return f"Open with unit_diff: {unit_label(snapshot)}\n{unit_definitions(snapshot)}"
+        return unit_prompt(snapshot, numbered=True, clip=clip)
 
     def _units(self, group: list[UnitSnapshot], rated: dict[int, Impact]) -> dict[str, Any]:
         return {"units": [{"label": unit_label(unit), "impact": rated.get(unit.id, self.impacts.get(unit.id))} for unit in group]}
@@ -446,7 +481,9 @@ class _GroupReviewer:
                 context.store.descriptions.save(description_row(context, snapshot, self.job.runner.provider, rating, None))
         return rated
 
-    def _save(self, group: list[UnitSnapshot], findings: list[Finding], views: list[ThreadView]) -> list[tuple[Thread, str, str]]:
+    def _save(
+        self, group: list[UnitSnapshot], findings: list[Finding], views: list[ThreadView], opened: set[str] | None
+    ) -> tuple[list[tuple[Thread, str, str]], int]:
         context, provider = self.job.context, self.job.runner.provider
         raised = {_raised_key(view) for view in views}
         ai_context = replace(context, reviewer=self.author)
@@ -461,19 +498,21 @@ class _GroupReviewer:
             raised.add(key)
             if request.snapshot is not None:
                 per_unit[request.snapshot.id] += 1
-        for snapshot in group:
-            reviewed = AiReviewedUnit(
-                context.review.id,
-                snapshot.path,
-                snapshot.kind,
-                snapshot.qualified_name,
-                change_hash(snapshot),
-                per_unit[snapshot.id],
-                provider.name,
-                provider.model,
+        reviewed = [snapshot for snapshot in group if opened is None or unit_label(snapshot) in opened or per_unit[snapshot.id]]
+        for snapshot in reviewed:
+            context.store.ai_reviews.save_reviewed_unit(
+                AiReviewedUnit(
+                    context.review.id,
+                    snapshot.path,
+                    snapshot.kind,
+                    snapshot.qualified_name,
+                    change_hash(snapshot),
+                    per_unit[snapshot.id],
+                    provider.name,
+                    provider.model,
+                )
             )
-            context.store.ai_reviews.save_reviewed_unit(reviewed)
-        return created
+        return created, len(reviewed)
 
 
 def place_finding(finding: Finding, group: list[UnitSnapshot], snapshots: list[UnitSnapshot]) -> NewThread:

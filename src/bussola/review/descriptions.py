@@ -2,6 +2,7 @@ import hashlib
 import json
 from collections.abc import Iterable, Sequence
 from enum import StrEnum
+from itertools import dropwhile, islice
 from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, Field, field_validator
@@ -26,6 +27,9 @@ MAX_SIDE_CHARACTERS = 40_000
 MARKER_HASH_LENGTH = 16
 BINARY_SIDE = "Binary content that cannot be shown."
 UNIT_NAMES = {"module": "module-level code"}
+MAX_DEFINITION_LINES = 8
+DEFINITION_ENDINGS = (":", "{")
+COMMENT_STARTS = ("#", "//", "/*", "*")
 
 
 def _not_blank(text: str) -> str:
@@ -239,16 +243,38 @@ def description_row(
     )
 
 
-def unit_prompt(snapshot: UnitSnapshot, *, numbered: bool = False, clip: bool = True) -> str:
+def unit_prompt(snapshot: UnitSnapshot, *, numbered: bool = False, clip: bool = True, side_characters: int = MAX_SIDE_CHARACTERS) -> str:
+    base, head = (_numbered(snapshot, Side.BASE), _numbered(snapshot, Side.HEAD)) if numbered else (snapshot.base_text, snapshot.head_text)
+    return _unit_text(snapshot, base, head, clip, side_characters)
+
+
+def unit_definitions(snapshot: UnitSnapshot) -> str:
+    return _unit_text(snapshot, _definition(snapshot.base_text), _definition(snapshot.head_text), True, MAX_SIDE_CHARACTERS)
+
+
+def _unit_text(snapshot: UnitSnapshot, base: str | None, head: str | None, clip: bool, side_characters: int) -> str:
     name = snapshot.qualified_name or f"(the whole {UNIT_NAMES.get(snapshot.kind, snapshot.kind)})"
     lines = [f"Path: {snapshot.path}"]
     if snapshot.old_path and snapshot.old_path != snapshot.path:
         lines.append(f"Renamed from: {snapshot.old_path}")
     lines += [f"Kind: {snapshot.kind}", f"Name: {name}", ""]
-    base, head = (_numbered(snapshot, Side.BASE), _numbered(snapshot, Side.HEAD)) if numbered else (snapshot.base_text, snapshot.head_text)
-    lines += _side("before", snapshot.base_hash, base, "The unit did not exist before this change.", clip)
-    lines += _side("after", snapshot.head_hash, head, "This change removes the unit.", clip)
+    limit = side_characters if clip else None
+    lines += _side("before", snapshot.base_hash, base, "The unit did not exist before this change.", limit)
+    lines += _side("after", snapshot.head_hash, head, "This change removes the unit.", limit)
     return "\n".join(lines)
+
+
+def _definition(text: str | None) -> str | None:
+    if text is None:
+        return None
+    lines = list(islice(dropwhile(_is_comment, text.splitlines()), MAX_DEFINITION_LINES))
+    end = next((index for index, line in enumerate(lines, start=1) if line.rstrip().endswith(DEFINITION_ENDINGS)), len(lines))
+    return "\n".join(lines[:end])
+
+
+def _is_comment(line: str) -> bool:
+    text = line.strip()
+    return not text or text.startswith(COMMENT_STARTS)
 
 
 def _numbered(snapshot: UnitSnapshot, side: Side) -> str | None:
@@ -258,19 +284,19 @@ def _numbered(snapshot: UnitSnapshot, side: Side) -> str | None:
     return "\n".join(f"{'' if line.file_line is None else line.file_line}: {line.text}" for line in lines)
 
 
-def _side(tag: str, content_hash: str | None, text: str | None, missing: str, clip: bool) -> list[str]:
+def _side(tag: str, content_hash: str | None, text: str | None, missing: str, limit: int | None) -> list[str]:
     if text is None:
         return [f"<{tag}>{missing if content_hash is None else BINARY_SIDE}</{tag}>", ""]
-    return [*marked(tag, text, clip=clip), ""]
+    return [*(marked(tag, text, clip=False) if limit is None else marked(tag, text, limit=limit)), ""]
 
 
-def marked(tag: str, text: str, *, clip: bool = True) -> list[str]:
-    clipped = _clipped(text) if clip else text
+def marked(tag: str, text: str, *, clip: bool = True, limit: int = MAX_SIDE_CHARACTERS) -> list[str]:
+    clipped = _clipped(text, limit) if clip else text
     marker = f"{tag}-{hashlib.sha256(clipped.encode()).hexdigest()[:MARKER_HASH_LENGTH]}"
     return [f"<{marker}>", clipped, f"</{marker}>"]
 
 
-def _clipped(text: str) -> str:
-    if len(text) <= MAX_SIDE_CHARACTERS:
+def _clipped(text: str, limit: int) -> str:
+    if len(text) <= limit:
         return text
-    return f"{text[:MAX_SIDE_CHARACTERS]}\n[... {len(text) - MAX_SIDE_CHARACTERS} more characters not shown]"
+    return f"{text[:limit]}\n[... {len(text) - limit} more characters not shown]"
