@@ -4,7 +4,8 @@ import { ApiError, getJson, postJson } from './client'
 import { invalidate, keys, useInvalidatingMutation } from './hooks'
 import type { PullRequestList, PullSyncResult, ReviewDetail } from './types'
 
-const pullsKey = (repoId: number) => ['pulls', repoId] as const
+const allPullsKey = ['pulls'] as const
+const pullsKey = (repoId: number) => [...allPullsKey, repoId] as const
 
 export function usePullRequests(repoId: number) {
   return useQuery({ queryKey: pullsKey(repoId), queryFn: () => getJson<PullRequestList>(`/repos/${String(repoId)}/pulls`), retry: false })
@@ -18,6 +19,10 @@ export function useReviewPullRequest(repoId: number) {
 
 export function useSyncPullRequests(repoId: number) {
   return useInvalidatingMutation([keys.reviews(repoId), pullsKey(repoId)], () => postJson<PullSyncResult>(`/repos/${String(repoId)}/pulls/sync`))
+}
+
+export function useSyncAllPullRequests() {
+  return useInvalidatingMutation([keys.allReviews, allPullsKey], () => postJson<PullSyncResult>('/pulls/sync'))
 }
 
 export function useOpenPullRequestLink() {

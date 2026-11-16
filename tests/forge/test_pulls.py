@@ -7,7 +7,7 @@ from bussola.forge.base import Conversation, ForgeError
 from bussola.forge.github import GitHubAdapter
 from bussola.git import GitError, GitRepo
 from tests.apiclient import ApiClient
-from tests.forge.conftest import FIRST, SECOND, GitHubSandbox
+from tests.forge.conftest import FIRST, GITHUB_URL, SECOND, GitHubSandbox
 from tests.gitrepo import GitFixture
 
 
@@ -237,3 +237,38 @@ def test_syncing_pull_requests_keeps_a_linked_branch_review_on_its_branch(api: A
     detail = api.call("GET", f"/reviews/{review}")
     assert (result["updated"], result["failed"]) == (1, [])
     assert (detail["head_ref"], detail["pull_request_review"], detail["pull_request"]["number"]) == ("feature", False, 7)
+
+
+def test_sync_all_syncs_pull_request_reviews_and_skips_repositories_without_any(api: ApiClient, github: GitHubSandbox, tmp_path: Path) -> None:
+    github.open_pull_request({"app.py": FIRST})
+    repo = register(api)
+    review = api.call("POST", f"/repos/{repo}/pulls/7/review", 201)["id"]
+    plain = GitFixture.create(tmp_path / "plain")
+    plain.commit({"notes.txt": "hello\n"}, "base")
+    api.call("POST", "/repos", 201, {"path": str(plain.root)})
+
+    github.open_pull_request({"app.py": SECOND})
+    result = api.call("POST", "/pulls/sync")
+
+    assert result == {"updated": 1, "closed": 0, "failed": []}
+    assert unit_texts(api, review) == ["    return sum(items, 0)"]
+
+
+def test_sync_all_reports_a_moved_repository_and_syncs_the_others(api: ApiClient, github: GitHubSandbox, tmp_path: Path) -> None:
+    github.open_pull_request({"app.py": FIRST})
+    moved = register(api)
+    api.call("POST", f"/repos/{moved}/pulls/7/review", 201)
+    bare = tmp_path / "widgets.git"
+    clone = GitFixture(tmp_path / "clone")
+    GitFixture(tmp_path).git("clone", "-q", str(bare), str(clone.root))
+    clone.git("remote", "set-url", "origin", GITHUB_URL)
+    clone.git("config", f"url.{bare}.insteadOf", GITHUB_URL)
+    other = api.call("POST", "/repos", 201, {"path": str(clone.root)})["id"]
+    api.call("POST", f"/repos/{other}/pulls/7/review", 201)
+    github.local.root.rename(tmp_path / "elsewhere")
+
+    github.open_pull_request({"app.py": SECOND}, state="MERGED")
+    result = api.call("POST", "/pulls/sync")
+
+    assert (result["updated"], result["closed"]) == (0, 1)
+    assert result["failed"] == [f"repo: Repository not found at {github.local.root}. Register it again from its new location."]
