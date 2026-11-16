@@ -113,6 +113,10 @@ describe('ThreadPanel filters', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'General' }))
     expect(screen.getByRole('tab', { name: 'General' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByText('subtotal')).toBeNull()
+
+    act(() => { link.done() })
+    act(() => { link.start({ unitId: null, elementId: 'thread-t4' }) })
+    expect(screen.getByText('subtotal')).toBeTruthy()
     Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
   })
 })

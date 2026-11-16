@@ -60,6 +60,9 @@ export function ThreadPanel({ reviewId, threads }: Props) {
   const [showResolved, setShowResolved] = useState(() => readStored(RESOLVED_KEY) === 'true')
   const linkedId = useLinkedElementId()
   const [widenedFor, setWidenedFor] = useState<string | null>(null)
+  if (linkedId === null && widenedFor !== null) {
+    setWidenedFor(null)
+  }
   const linked = threads.find((thread) => threadElementId(thread.id) === linkedId && !isInline(thread))
   if (linked && linkedId !== widenedFor) {
     setWidenedFor(linkedId)

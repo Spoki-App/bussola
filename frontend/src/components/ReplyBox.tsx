@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { useMe } from '../api/hooks'
 import { Composer } from './Composer'
@@ -9,32 +9,54 @@ interface Props {
   onSubmit: (body: string, done: () => void) => void
 }
 
+const EDITOR = 'textarea:not([hidden]), [contenteditable="true"]'
+
 export function ReplyBox({ reviewId, busy, onSubmit }: Props) {
   const [open, setOpen] = useState(false)
+  const [started, setStarted] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
   const me = useMe()
-  if (open) {
-    return (
-      <Composer
-        reviewId={reviewId}
-        submitLabel="Reply"
-        placeholder="Reply (Markdown)"
-        busy={busy}
-        autoFocus
-        onCancel={() => { setOpen(false) }}
-        onSubmit={(body, done) => {
-          onSubmit(body, () => {
-            done()
-            setOpen(false)
-          })
-        }}
-      />
-    )
-  }
+  useEffect(() => {
+    if (open) {
+      box.current?.querySelector<HTMLElement>(EDITOR)?.focus()
+    }
+  }, [open])
   return (
-    <div className="reply-collapsed">
-      <Avatar name={me.data?.name ?? ''} />
-      <input type="text" readOnly aria-label="Reply" placeholder="Reply..." onFocus={() => { setOpen(true) }} />
-    </div>
+    <>
+      {!open && (
+        <div className="reply-collapsed">
+          <Avatar name={me.data?.name ?? ''} />
+          <input
+            type="text"
+            readOnly
+            aria-label="Reply"
+            placeholder="Reply..."
+            onFocus={() => {
+              setStarted(true)
+              setOpen(true)
+            }}
+          />
+        </div>
+      )}
+      {started && (
+        <div ref={box} hidden={!open}>
+          <Composer
+            reviewId={reviewId}
+            submitLabel="Reply"
+            placeholder="Reply (Markdown)"
+            busy={busy}
+            onCancel={() => { setOpen(false) }}
+            onSubmit={(body, done) => {
+              onSubmit(body, () => {
+                done()
+                setOpen(false)
+                setStarted(false)
+              })
+            }}
+          />
+        </div>
+      )}
+    </>
   )
 }
 

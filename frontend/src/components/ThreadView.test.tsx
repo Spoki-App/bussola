@@ -135,7 +135,11 @@ describe('ThreadView reply', () => {
     fireEvent.focus(screen.getByRole('textbox', { name: 'Reply' }))
 
     expect(screen.getByRole('button', { name: 'Reply' })).toBeDisabled()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Reply (Markdown)' }), { target: { value: 'Half written' } })
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(screen.getByRole('textbox', { name: 'Reply' })).toHaveAttribute('placeholder', 'Reply...')
+
+    fireEvent.focus(screen.getByRole('textbox', { name: 'Reply' }))
+    expect(screen.getByRole('textbox', { name: 'Reply (Markdown)' })).toHaveValue('Half written')
   })
 })
