@@ -13,6 +13,7 @@ const run = (id: number, finishedAt: string | null, reviewed = 1): AiReviewRun =
   provider: 'anthropic',
   provider_label: 'Anthropic API',
   model: null,
+  effort: null,
   reviewed,
   findings: 0,
   failed: 0,
