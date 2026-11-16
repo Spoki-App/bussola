@@ -4,14 +4,18 @@ from fastapi import APIRouter, Request
 
 from bussola.ai.base import AiCancelledError, AiProvider
 from bussola.ai.batch import BatchResult
-from bussola.ai.config import load_user_config
+from bussola.ai.config import AiOperation, load_user_config
 from bussola.ai.runner import AiRunner
 from bussola.ai.settings import load_ai_settings, require_target
 from bussola.api.deps import ContextDep, repo_of, resolve_revision, snapshot_of
-from bussola.api.schemas import AiCallIn, DescribeUnitIn, RateImpactOut, UnitDescriptionOut
+from bussola.api.schemas import AiCallIn, AiReviewLookupOut, DescribeUnitIn, RateImpactOut, UnitDescriptionOut
 from bussola.api.state import AppState, app_state
+from bussola.config import load_repo_config
+from bussola.review.ai_review import tool_lookups
 from bussola.review.context import ReviewContext
 from bussola.review.descriptions import Impact, describe_unit, description_row, is_outdated, rate_units, stored_descriptions
+from bussola.review.repos import open_repo
+from bussola.review.review_tools import ReviewTools, unit_label
 from bussola.storage.models import UnitDescription
 
 router = APIRouter(tags=["descriptions"])
@@ -29,11 +33,20 @@ def list_descriptions(context: ContextDep, revision_id: int | None = None) -> li
 def describe(context: ContextDep, unit_id: int, body: DescribeUnitIn, request: Request) -> UnitDescriptionOut:
     state = app_state(request)
     snapshot = snapshot_of(context, unit_id)
-    provider = ai_provider(state, context, body.target)
+    provider = ai_provider(state, context, body.target, AiOperation.DESCRIBE)
+    revision = resolve_revision(context, snapshot.revision_id)
+    snapshots = context.store.reviews.snapshots(revision.id)
+    git_repo = open_repo(repo_of(context))
+    ignore = load_repo_config(git_repo.root).ignore
     context.store.commit()
+    others = [unit_label(other) for other in snapshots if other.id != snapshot.id]
     with state.ai_calls.start(body.call_id) as cancellation:
-        insight = describe_unit(snapshot, ai_runner(state, provider), cancellation, regenerate=body.regenerate)
-    saved = context.store.descriptions.save(description_row(context, snapshot, provider, insight, insight.description))
+        tools = ReviewTools(git_repo, revision, snapshots, state.navigator, ignore, cancellation)
+        toolbox = tools.toolbox()
+        insight, fresh = describe_unit(snapshot, ai_runner(state, provider).with_tools(toolbox), cancellation, others, regenerate=body.regenerate)
+    row = description_row(context, snapshot, provider, insight, insight.description)
+    row.lookups = tool_lookups(toolbox) if fresh else None
+    saved = context.store.descriptions.save(row)
     context.store.commit()
     return _description_out(unit_id, saved, outdated=False)
 
@@ -41,7 +54,7 @@ def describe(context: ContextDep, unit_id: int, body: DescribeUnitIn, request: R
 @router.post("/reviews/{review_id}/impact")
 def rate_all(context: ContextDep, body: AiCallIn, request: Request) -> RateImpactOut:
     state = app_state(request)
-    provider = ai_provider(state, context, body.target)
+    provider = ai_provider(state, context, body.target, AiOperation.IMPACT)
     snapshots = context.store.reviews.snapshots(resolve_revision(context, None).id)
     try:
         with state.ai_calls.start(body.call_id) as cancellation:
@@ -64,8 +77,9 @@ def code_limit(state: AppState, provider: AiProvider) -> int | None:
     return load_user_config(state.settings.config_file).ai.code_limit(provider.name)
 
 
-def ai_provider(state: AppState, context: ReviewContext, target: str) -> AiProvider:
-    return state.ai_factory(require_target(load_ai_settings(state.settings.config_file, Path(repo_of(context).path)), target))
+def ai_provider(state: AppState, context: ReviewContext, target: str, operation: AiOperation) -> AiProvider:
+    settings = require_target(load_ai_settings(state.settings.config_file, Path(repo_of(context).path)), target)
+    return state.ai_factory(settings.for_operation(operation))
 
 
 def _description_out(unit_id: int, description: UnitDescription, outdated: bool) -> UnitDescriptionOut:
@@ -77,6 +91,8 @@ def _description_out(unit_id: int, description: UnitDescription, outdated: bool)
         provider=description.provider,
         provider_label=description.provider_label,
         model=description.model,
+        effort=description.effort,
         created_at=description.created_at,
         outdated=outdated,
+        lookups=[AiReviewLookupOut.model_validate(lookup) for lookup in description.lookups or []],
     )

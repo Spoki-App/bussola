@@ -106,4 +106,5 @@ def _overview(context: ReviewContext, request: Request) -> ForgeOut:
         head_matches=pull.head_sha == revision.head_sha if pull else None,
         error=overview.error,
         viewer=overview.viewer,
+        viewer_reviewed_at=pull.reviewed_at(overview.viewer) if pull else None,
     )

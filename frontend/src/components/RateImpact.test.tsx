@@ -18,6 +18,7 @@ const AI: AiStatus = {
   problem: null,
   config_file: null,
   target: '["anthropic", "claude-opus-5-5", "https://api.anthropic.com"]',
+  operations: [],
 }
 
 function Harness() {

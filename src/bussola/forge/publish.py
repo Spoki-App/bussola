@@ -189,7 +189,7 @@ class _Publisher:
             return None
 
     def submit(self, plan: PublishPlan, verdict: ReviewVerdict) -> str | None:
-        summary = verdict.summary.strip()
+        summary = local_images_as_text(verdict.summary).strip()
         body = GROUP_SEPARATOR.join([*([summary] if summary else []), *(text for _, text in plan.body_parts)])
         _require_summary(verdict.event, body, plan)
         submission = ReviewSubmission(self.commit_id, body, [item for _, item in plan.inline], verdict.event)

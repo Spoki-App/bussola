@@ -17,6 +17,7 @@ const AI: AiStatus = {
   problem: null,
   config_file: null,
   target: '["anthropic", "claude-opus-5-5", "https://api.anthropic.com"]',
+  operations: [],
 }
 
 const UNIT: Unit = {
@@ -51,8 +52,10 @@ const DESCRIBED: UnitDescription = {
   provider: 'anthropic',
   provider_label: 'Anthropic API',
   model: 'claude-opus-5-5',
+  effort: null,
   created_at: '2026-11-01T10:00:00Z',
   outdated: false,
+  lookups: [],
 }
 
 interface Routes {
@@ -130,6 +133,23 @@ describe('AI description on a unit card', () => {
     expect(screen.getByText(': Changes what customers pay.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Describe' })).toBeNull()
     expect(posted(fetchMock, '/api/reviews/1/units/7/description')).toEqual([{ target: AI.target, regenerate: false, call_id: expect.stringMatching(/^[0-9a-f]{32}$/) as unknown }])
+  })
+
+  it('lists the code lookups the model made, folded', async () => {
+    const lookup = { tool: 'find_usages', arguments: { path: 'app.py', side: 'after', line: 1, name: 'total' }, result: 'shop.py:9:     total(cart)', error: false }
+    renderCard({ stored: [{ ...DESCRIBED, lookups: [lookup] }] })
+
+    const summary = await screen.findByText('1 code lookup')
+    expect(summary.closest('details')).not.toHaveAttribute('open')
+    expect(screen.getByText('find_usages(path: app.py, side: after, line: 1, name: total)')).toBeInTheDocument()
+    expect(screen.getByText('shop.py:9: total(cart)', { normalizer: (text) => text.replace(/\s+/g, ' ') })).toBeInTheDocument()
+  })
+
+  it('shows no lookups when the model made none', async () => {
+    renderCard({ stored: [DESCRIBED] })
+
+    expect(await screen.findByText('tax')).toBeInTheDocument()
+    expect(screen.queryByText(/code lookup/)).toBeNull()
   })
 
   it('turns links to lines into buttons that show the line in the diff', async () => {

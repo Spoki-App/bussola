@@ -432,6 +432,13 @@ textarea {
   margin-bottom: 8px;
 }
 
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
 .home-header h1 {
   margin: 0;
   font-size: 32px;
@@ -705,22 +712,16 @@ textarea {
   color: var(--muted);
 }
 
-.merge-pull-request {
-  width: 100%;
-  max-width: 720px;
-}
-
-.merge-pull-request > label:not(.checkbox) {
+.merge-dialog form > label:not(.checkbox) {
   display: grid;
   gap: 4px;
 }
 
-.merge-pull-request .notice p,
-.merge-result p {
+.merge-dialog .notice p {
   margin: 0;
 }
 
-.merge-pull-request .notice ul {
+.merge-dialog .notice ul {
   margin: 4px 0 0;
   padding-left: 20px;
 }
@@ -2185,9 +2186,49 @@ button.link:hover:not(:disabled) {
 .compare-bar {
   right: auto;
   left: 50%;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 8px 12px;
   max-width: calc(100vw - 32px);
   transform: translateX(-50%);
+}
+
+.compare-bar-label,
+.compare-bar-hint {
+  font-size: 12px;
+}
+
+.compare-bar-label {
+  font-weight: 650;
+}
+
+.compare-chip {
+  max-width: 320px;
+  white-space: nowrap;
+}
+
+.compare-chip code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compare-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+button.compare-clipboard {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+}
+
+.compare-bar .error-note {
+  margin: 0;
 }
 
 .confirm {
@@ -2478,35 +2519,29 @@ button.danger {
   justify-content: space-between;
 }
 
-.picker.submit-review-dialog {
+.picker.submit-review-dialog,
+.picker.merge-dialog {
   width: min(640px, calc(100vw - 32px));
-  height: auto;
+  height: fit-content;
   max-height: calc(100vh - 64px);
   overflow-y: auto;
 }
 
-.submit-review-dialog h2 {
+.submit-review-dialog h2,
+.merge-dialog h2 {
   margin: 0;
   font-size: 15px;
 }
 
-.submit-review-dialog textarea,
-.submit-review-preview {
-  width: 100%;
+.submit-review-dialog .composer {
+  gap: 10px;
+  margin-top: 0;
+}
+
+.submit-review-dialog .composer textarea,
+.submit-review-dialog .composer-preview,
+.submit-review-dialog .rich-text {
   min-height: 140px;
-  font-family: var(--sans);
-  line-height: 1.5;
-}
-
-.submit-review-dialog textarea {
-  resize: vertical;
-}
-
-.submit-review-preview {
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-box);
-  overflow-y: auto;
 }
 
 .submit-review-events {
@@ -2786,6 +2821,11 @@ button.danger {
   font-size: 13px;
 }
 
+.ai-description-lookups {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
 .code-font-panel input:not([type='checkbox']) {
   width: 100%;
 }
@@ -2990,6 +3030,18 @@ button.danger {
   font-size: 12px;
   line-height: 1.5;
   resize: vertical;
+}
+
+.ai-operation {
+  margin: 0;
+  padding: 8px 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.ai-operation legend {
+  padding: 0 4px;
+  font-weight: 550;
 }
 
 .ai-form-actions {

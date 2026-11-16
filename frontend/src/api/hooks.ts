@@ -22,6 +22,7 @@ const REVIEW_POLL_MS = 5000
 export const keys = {
   repos: ['repos'] as const,
   refs: (repoId: number) => ['refs', repoId] as const,
+  allReviews: ['reviews'] as const,
   reviews: (repoId: number) => ['reviews', repoId] as const,
   review: (reviewId: number) => ['review', reviewId] as const,
   units: (reviewId: number) => ['units', reviewId] as const,

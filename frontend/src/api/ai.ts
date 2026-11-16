@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { getJson, postJson, putJson } from './client'
-import type { AiConfig, AiConfigFields, AiPromptKey, AiPrompts, AiStatus, AiTestResult } from './types'
+import type { AiConfig, AiConfigFields, AiModels, AiOperationChoice, AiOperationKey, AiPromptKey, AiPrompts, AiStatus, AiTestResult } from './types'
 
 export const aiKey = (repoId?: number) => ['ai', repoId ?? null] as const
 
@@ -14,6 +14,7 @@ export function useAiStatus(repoId?: number) {
 }
 
 const aiConfigKey = ['ai-config'] as const
+const aiModelsKey = ['ai-models'] as const
 
 export function useAiConfig() {
   return useQuery({ queryKey: aiConfigKey, queryFn: () => getJson<AiConfig>('/ai/config'), retry: false })
@@ -23,7 +24,12 @@ export function useSaveAiConfig() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (fields: AiConfigFields) => putJson<AiStatus>('/ai/config', fields),
-    onSuccess: () => Promise.all([client.invalidateQueries({ queryKey: ['ai'] }), client.invalidateQueries({ queryKey: aiConfigKey })]),
+    onSuccess: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['ai'] }),
+        client.invalidateQueries({ queryKey: aiConfigKey }),
+        client.invalidateQueries({ queryKey: aiModelsKey }),
+      ]),
   })
 }
 
@@ -55,4 +61,16 @@ export function useSaveAiPrompts() {
     mutationFn: (prompts: Record<AiPromptKey, string>) => putJson<AiPrompts>('/ai/prompts', prompts),
     onSuccess: (saved) => { client.setQueryData(aiPromptsKey, saved) },
   })
+}
+
+export function useSaveAiOperations() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (choices: Record<AiOperationKey, AiOperationChoice>) => putJson<AiStatus>('/ai/operations', choices),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['ai'] }),
+  })
+}
+
+export function useAiModels(enabled: boolean) {
+  return useQuery({ queryKey: aiModelsKey, queryFn: () => getJson<AiModels>('/ai/models'), retry: false, staleTime: Infinity, enabled })
 }

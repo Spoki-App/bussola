@@ -6,11 +6,28 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Added
 
+- `https://bussola.spoki.com/` opens bussola links where `bussola://` is not clickable: `https://bussola.spoki.com/github.com/<owner>/<name>/pull/<number>` opens `bussola://github.com/<owner>/<name>/pull/<number>`, and any other bussola link works with `bussola://` replaced the same way, keeping the query and the anchor. The page rewrites the address in the browser and sends nothing to a server; if bussola does not open, it links to the GitHub page and the install steps ([#104](https://github.com/Spoki-App/bussola/issues/104)).
+- **Sync all** on the home page runs **Sync reviews** for every repository at once, so pull requests merged or closed after starting their review are updated everywhere without syncing each repository. Repositories without pull request reviews are skipped, and one that cannot be synced is listed with its error without stopping the others ([#100](https://github.com/Spoki-App/bussola/issues/100)).
 - **AI chat** in the panel on the right of the review page answers questions about the pull request, with its description, the units it changes and the conversation so far, and can follow the code with the same lookups as the AI review. Select lines and choose **Ask AI** to attach them to the next message. Ask it to add a comment and it adds one to the review as yours, on the lines it is about. Answers link to the lines they mention and list the lookups made and the comments added; the conversation is kept per review and **Clear** deletes it ([#77](https://github.com/Spoki-App/bussola/issues/77)).
+- **AI models** in **Settings** chooses the model and the effort (Low, Medium, High or the model's default) for **Describe**, **Rate impact**, **AI review** and **AI chat**, so a frequent cheap action can use a fast model and the AI review the strongest one. Actions without a choice use the provider's `model`. The model field suggests the models the Anthropic API or an OpenAI-compatible endpoint lists, the effort reaches all three providers, results name the effort with the model, and the choices are saved in `[ai.operations]` sections of `config.toml` ([#97](https://github.com/Spoki-App/bussola/issues/97)).
+- **Describe** can follow the code with the same lookups as the AI review, finding what the unit calls, who calls it and the definitions it relies on before explaining the unit and rating its impact. The description block lists the lookups made, with their results, under **code lookups** ([#103](https://github.com/Spoki-App/bussola/issues/103)).
+
+### Changed
+
+- The selected lines offer only **Compare with...** to start a comparison. The bar it opens shows the first range as a chip with its unit and number of lines and a short hint for the next step, instead of one long sentence, and holds the actions: **Compare with selection** (which replaces **Compare with first range** above the selected lines), a clipboard button for **Compare with clipboard** (moved from the selected lines) and **Cancel** ([#83](https://github.com/Spoki-App/bussola/issues/83)).
+
+### Changed
+
+- **Submit review** writes the summary with the same editor as comments, with **Write**, **Preview**, **Rich text**, the formatting toolbar and its shortcuts. After an AI review newer than your last review on the pull request, the summary starts with the AI review's verdict and summary, never replacing text you wrote, and **Request changes** is selected when the AI review left comments that are still open ([#99](https://github.com/Spoki-App/bussola/issues/99)).
+
+### Changed
+
+- **Merge** opens the merge options in a dialog, like **Submit review**, instead of a panel next to the button: the merge method, the prefilled commit title and message, **Delete the branch after merging**, the reasons merging is blocked, and **Cancel** and **Merge**. If GitHub refuses the merge the dialog stays open with the reason; after a merge it closes and the header shows the result ([#101](https://github.com/Spoki-App/bussola/issues/101)).
 
 ### Fixed
 
 - A unit that changes after **Mark as reviewed** now shows the changes since that review, like an approved unit does: it opens on the new **Reviewed → current** diff instead of only base to head ([#98](https://github.com/Spoki-App/bussola/issues/98)).
+- **AI review** of a pull request too large for one prompt no longer fails every unit with "Prompt is too long": without **Code per call** set, it sends only the definitions of each unit and the model opens the code of each one through its code lookups ([#102](https://github.com/Spoki-App/bussola/issues/102)).
 - Cmd+click on a method call, such as `order.requeue()`, no longer lists module-level functions with the same name when the language server cannot tell the type of the object: a call on an object lists methods, a plain call lists functions, and a call on an imported module still lists both ([#80](https://github.com/Spoki-App/bussola/issues/80)).
 
 ## [0.2.0] - 2026-11-06

@@ -240,6 +240,7 @@ class AiResult(Base):
     endpoint: Mapped[str] = mapped_column(primary_key=True)
     content_hash: Mapped[str] = mapped_column(primary_key=True)
     result: Mapped[dict[str, Any]] = mapped_column(JSON)
+    effort: Mapped[str] = mapped_column(primary_key=True, default="")
     created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
 
 
@@ -258,6 +259,8 @@ class UnitDescription(Base):
     provider: Mapped[str] = mapped_column()
     provider_label: Mapped[str] = mapped_column()
     model: Mapped[str | None] = mapped_column()
+    effort: Mapped[str | None] = mapped_column(default=None)
+    lookups: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON(none_as_null=True), default=None)
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
 
@@ -293,6 +296,7 @@ class AiReviewRun(Base):
     failed: Mapped[int] = mapped_column(default=0)
     error: Mapped[str | None] = mapped_column(default=None)
     details: Mapped[dict[str, Any]] = mapped_column(JSON, default_factory=dict)
+    effort: Mapped[str | None] = mapped_column(default=None)
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     started_at: Mapped[datetime] = mapped_column(default_factory=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(default=None)
@@ -309,5 +313,6 @@ class AiChatMessage(Base):
     comments: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default_factory=list)
     provider_label: Mapped[str | None] = mapped_column(default=None)
     model: Mapped[str | None] = mapped_column(default=None)
+    effort: Mapped[str | None] = mapped_column(default=None)
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     created_at: Mapped[datetime] = mapped_column(default_factory=utcnow)

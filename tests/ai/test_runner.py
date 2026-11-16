@@ -161,6 +161,17 @@ def test_a_changed_system_prompt_or_schema_is_asked_again_without_a_new_version(
     assert len(provider.requests) == 2
 
 
+def test_has_cached_tells_whether_a_run_would_reuse_a_cached_result(tmp_path: Path) -> None:
+    with Database.open(tmp_path).session() as session:
+        runner = AiRunner(FakeProvider(GOOD, model="model-a"), SqlAiCache(session))
+
+        assert runner.has_cached(RATE, "hash-1") is False
+        runner.run(RATE, "code", Cancellation(), content_hash="hash-1")
+
+        assert runner.has_cached(RATE, "hash-1") is True
+        assert runner.has_cached(RATE, "hash-2") is False
+
+
 def test_an_unusable_cached_result_is_asked_again(tmp_path: Path) -> None:
     provider = FakeProvider(GOOD)
     with Database.open(tmp_path).session() as session:
@@ -218,6 +229,19 @@ def test_the_same_model_on_another_endpoint_is_asked_again(tmp_path: Path) -> No
         provider.endpoint = "https://models.example.com/v1"
         runner.run(RATE, "code", Cancellation(), content_hash="hash")
         provider.endpoint = "http://localhost:11434/v1"
+        runner.run(RATE, "code", Cancellation(), content_hash="hash")
+        runner.run(RATE, "code", Cancellation(), content_hash="hash")
+
+    assert len(provider.requests) == 2
+
+
+def test_the_same_model_with_another_effort_is_asked_again(tmp_path: Path) -> None:
+    provider = FakeProvider(GOOD)
+    with Database.open(tmp_path).session() as session:
+        runner = AiRunner(provider, SqlAiCache(session))
+
+        runner.run(RATE, "code", Cancellation(), content_hash="hash")
+        provider.effort = "low"
         runner.run(RATE, "code", Cancellation(), content_hash="hash")
         runner.run(RATE, "code", Cancellation(), content_hash="hash")
 
