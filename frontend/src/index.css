@@ -705,22 +705,17 @@ textarea {
   color: var(--muted);
 }
 
-.merge-pull-request {
-  width: 100%;
-  max-width: 720px;
-}
-
-.merge-pull-request > label:not(.checkbox) {
+.merge-dialog form > label:not(.checkbox) {
   display: grid;
   gap: 4px;
 }
 
-.merge-pull-request .notice p,
+.merge-dialog .notice p,
 .merge-result p {
   margin: 0;
 }
 
-.merge-pull-request .notice ul {
+.merge-dialog .notice ul {
   margin: 4px 0 0;
   padding-left: 20px;
 }
@@ -2478,14 +2473,16 @@ button.danger {
   justify-content: space-between;
 }
 
-.picker.submit-review-dialog {
+.picker.submit-review-dialog,
+.picker.merge-dialog {
   width: min(640px, calc(100vw - 32px));
   height: auto;
   max-height: calc(100vh - 64px);
   overflow-y: auto;
 }
 
-.submit-review-dialog h2 {
+.submit-review-dialog h2,
+.merge-dialog h2 {
   margin: 0;
   font-size: 15px;
 }
