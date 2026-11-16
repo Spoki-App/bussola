@@ -1,6 +1,7 @@
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -94,6 +95,10 @@ class ReviewTools:
             on_call,
         )
 
+    @cached_property
+    def _units(self) -> dict[str, UnitSnapshot]:
+        return {unit_label(snapshot): snapshot for snapshot in reversed(self.snapshots)}
+
     def prepare(self) -> None:
         for side in Side:
             self.navigator.prepare(self.repo, side_commit(self.revision, side), self.ignore)
@@ -139,7 +144,7 @@ class ReviewTools:
         return "\n".join(shown + ([f"Only the first {MAX_SEARCH_RESULTS} are shown; search for something more specific."] if found.more else []))
 
     def unit_diff(self, request: UnitName) -> str:
-        snapshot = next((snapshot for snapshot in self.snapshots if unit_label(snapshot) == request.unit), None)
+        snapshot = self._units.get(request.unit)
         if snapshot is None:
             raise ToolError(f"No changed unit is named {request.unit}. Use a name from the list of changed units.")
         return unit_prompt(snapshot, numbered=True)

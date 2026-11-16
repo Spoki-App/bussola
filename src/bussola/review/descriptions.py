@@ -250,7 +250,7 @@ def _unit_text(snapshot: UnitSnapshot, base: str | None, head: str | None, clip:
 def _definition(text: str | None) -> str | None:
     if text is None:
         return None
-    lines = text.splitlines()[:MAX_DEFINITION_LINES]
+    lines = text.split("\n", MAX_DEFINITION_LINES)[:MAX_DEFINITION_LINES]
     end = next((index for index, line in enumerate(lines, start=1) if line.rstrip().endswith(DEFINITION_ENDINGS)), len(lines))
     return "\n".join(lines[:end])
 

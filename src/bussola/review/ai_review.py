@@ -267,8 +267,9 @@ def _run(job: AiReviewJob, record: "_RunRecord") -> AiReviewOutcome:
     snapshots, pending = reviewable_units(context, job.tools.snapshots)
     pending = snapshots if job.again else pending
     impacts = _impacts(context, snapshots)
-    definitions_only = job.limit is None and sum(len(unit_prompt(unit, numbered=True, clip=False)) for unit in pending) > MAX_PROMPT_CODE_CHARACTERS
-    groups = review_groups(snapshots, pending, impacts, MAX_PROMPT_CODE_CHARACTERS if definitions_only else job.limit, definitions_only=definitions_only)
+    costs = {unit.id: len(unit_prompt(unit, numbered=True, clip=job.limit is not None)) for unit in pending}
+    definitions_only = job.limit is None and sum(costs.values()) > MAX_PROMPT_CODE_CHARACTERS
+    groups = review_groups(snapshots, pending, impacts, costs, MAX_PROMPT_CODE_CHARACTERS if definitions_only else job.limit)
     done = [0, *accumulate(len(group) for group in groups)]
     progress = _ReviewProgress(job.report, len(pending))
     progress.reviewed(0)
@@ -305,7 +306,7 @@ def unreviewed(snapshots: list[UnitSnapshot], reviewed: Iterable[AiReviewedUnit]
 
 
 def review_groups(
-    snapshots: list[UnitSnapshot], pending: list[UnitSnapshot], impacts: dict[int, Impact], limit: int | None, *, definitions_only: bool = False
+    snapshots: list[UnitSnapshot], pending: list[UnitSnapshot], impacts: dict[int, Impact], costs: dict[int, int], limit: int | None
 ) -> list[list[UnitSnapshot]]:
     order = {snapshot.id: index for index, snapshot in enumerate(snapshots)}
 
@@ -318,19 +319,12 @@ def review_groups(
     groups: list[list[UnitSnapshot]] = []
     size = 0
     for unit in (unit for units in files.values() for unit in units):
-        cost = len(review_unit_text(unit, definitions_only=definitions_only, clip=limit is not None))
-        if not groups or (limit is not None and groups[-1] and size + cost > limit):
+        if not groups or (limit is not None and groups[-1] and size + costs[unit.id] > limit):
             groups.append([])
             size = 0
         groups[-1].append(unit)
-        size += cost
+        size += costs[unit.id]
     return groups
-
-
-def review_unit_text(unit: UnitSnapshot, *, definitions_only: bool, clip: bool) -> str:
-    if definitions_only:
-        return f"Open with unit_diff: {unit_label(unit)}\n{unit_definitions(unit)}"
-    return unit_prompt(unit, numbered=True, clip=clip)
 
 
 def ai_reviewer(context: ReviewContext, provider: AiProvider) -> Reviewer:
@@ -439,14 +433,16 @@ class _GroupReviewer:
         if others:
             lines += ["The other units this pull request changes, which you can open with unit_diff:", *marked("units", "\n".join(others), clip=clip), ""]
         lines += ["The units to review:", *([DEFINITIONS_ONLY] if self.definitions_only else []), ""]
-        lines += [
-            f"Unit: {RATING_ID.format(number)}\n{review_unit_text(snapshot, definitions_only=self.definitions_only, clip=clip)}"
-            for number, snapshot in enumerate(group, start=1)
-        ]
+        lines += [f"Unit: {RATING_ID.format(number)}\n{self._unit_text(snapshot, clip)}" for number, snapshot in enumerate(group, start=1)]
         comments = [_thread_summary(view) for view in views]
         if comments:
             lines += ["Comments reviewers already made on this pull request:", *marked("comments", "\n\n".join(comments), clip=clip), ""]
         return "\n".join(lines)
+
+    def _unit_text(self, snapshot: UnitSnapshot, clip: bool) -> str:
+        if self.definitions_only:
+            return f"Open with unit_diff: {unit_label(snapshot)}\n{unit_definitions(snapshot)}"
+        return unit_prompt(snapshot, numbered=True, clip=clip)
 
     def _units(self, group: list[UnitSnapshot], rated: dict[int, Impact]) -> dict[str, Any]:
         return {"units": [{"label": unit_label(unit), "impact": rated.get(unit.id, self.impacts.get(unit.id))} for unit in group]}
