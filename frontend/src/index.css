@@ -901,7 +901,6 @@ button.busy {
 
 .picker.ai-review-details {
   width: min(860px, calc(100vw - 32px));
-  height: min(760px, calc(100vh - 48px));
 }
 
 .ai-review-details-body {
@@ -2447,7 +2446,8 @@ button.danger {
 
 .picker {
   width: min(560px, calc(100vw - 32px));
-  height: min(600px, calc(100vh - 64px));
+  height: fit-content;
+  max-height: 90vh;
   padding: 20px;
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -2480,9 +2480,6 @@ button.danger {
 
 .picker.submit-review-dialog {
   width: min(640px, calc(100vw - 32px));
-  height: auto;
-  max-height: calc(100vh - 64px);
-  overflow-y: auto;
 }
 
 .submit-review-dialog h2 {
@@ -3012,10 +3009,6 @@ button.danger {
 .ai-details dd {
   margin: 0;
   overflow-wrap: anywhere;
-}
-
-.ai-notice {
-  height: auto;
 }
 
 .ai-notice h2,

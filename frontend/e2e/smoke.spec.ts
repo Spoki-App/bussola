@@ -103,6 +103,45 @@ test('a pull request link of an unknown repository opens the add repository flow
   await expect(page.getByLabel('Filter repositories')).toHaveValue('no-such-repository')
 })
 
+for (const className of ['picker', 'picker submit-review-dialog', 'picker ai-notice', 'picker ai-review-details']) {
+  test(`a "${className}" modal fits its content in the middle of the window and scrolls inside past 90% of its height`, async ({ page }) => {
+    await page.goto(`/?token=${E2E_TOKEN}`)
+    await expect(page.getByRole('heading', { name: 'demo' })).toBeVisible()
+
+    const open = (lines: number) =>
+      page.evaluate(
+        ({ className, lines }) => {
+          document.querySelector('dialog')?.remove()
+          const dialog = document.createElement('dialog')
+          dialog.className = className
+          dialog.append(...Array.from({ length: lines }, () => Object.assign(document.createElement('div'), { textContent: 'Line' })))
+          document.body.append(dialog)
+          dialog.showModal()
+          const box = dialog.getBoundingClientRect()
+          const style = getComputedStyle(dialog)
+          const content = dialog.lastElementChild?.getBoundingClientRect().bottom ?? box.top
+          return {
+            spaceAbove: box.top,
+            spaceBelow: window.innerHeight - box.bottom,
+            shareOfWindow: box.height / window.innerHeight,
+            emptyBelowContent: box.bottom - content - parseFloat(style.paddingBottom) - parseFloat(style.borderBottomWidth),
+            scrolls: dialog.scrollHeight > dialog.clientHeight,
+          }
+        },
+        { className, lines },
+      )
+
+    const short = await open(2)
+    expect(short.emptyBelowContent).toBeLessThan(2)
+    expect(Math.abs(short.spaceAbove - short.spaceBelow)).toBeLessThan(2)
+
+    const tall = await open(200)
+    expect(tall.shareOfWindow).toBeLessThanOrEqual(0.9)
+    expect(Math.abs(tall.spaceAbove - tall.spaceBelow)).toBeLessThan(2)
+    expect(tall.scrolls).toBe(true)
+  })
+}
+
 test('the header of an open unit stays below the file header while its diff scrolls past', async ({ page }) => {
   await page.setViewportSize({ width: 1000, height: 260 })
   await page.goto(`/?token=${E2E_TOKEN}`)
