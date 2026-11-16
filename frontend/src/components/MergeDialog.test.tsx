@@ -121,6 +121,41 @@ describe('MergeDialog', () => {
     expect(screen.getByLabelText('Commit title')).toHaveValue('Sum the items (#7)')
   })
 
+  it('cannot be cancelled while the merge is running', async () => {
+    let finish: (response: Response) => void = () => undefined
+    const pending = new Promise<Response>((done) => {
+      finish = done
+    })
+    const { fetchMock, onMerged, onClose } = renderMerge()
+    const loadOptions = fetchMock.getMockImplementation()
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => (init?.method === 'POST' ? pending : loadOptions?.(url, init) ?? pending))
+
+    await screen.findByLabelText('Commit title')
+    fireEvent.click(mergeButton())
+
+    expect(await screen.findByRole('button', { name: 'Merging...' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+    const cancel = new Event('cancel', { cancelable: true })
+    screen.getByRole('dialog').dispatchEvent(cancel)
+    expect(cancel.defaultPrevented).toBe(true)
+
+    finish(Response.json(MERGED))
+    await waitFor(() => { expect(onMerged).toHaveBeenCalledWith(MERGED) })
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('keeps the form and shows the error when refreshing the options fails', async () => {
+    const { fetchMock } = renderMerge()
+
+    await screen.findByLabelText('Commit title')
+    fetchMock.mockImplementation(() => Promise.resolve(Response.json({ detail: 'gh is not logged in.' }, { status: 502 })))
+    fireEvent.focus(window)
+    window.dispatchEvent(new Event('visibilitychange'))
+
+    expect(await screen.findByText(/gh is not logged in/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Commit title')).toHaveValue('Sum the items (#7)')
+  })
+
   it('falls back to the default method when the chosen one is no longer allowed', async () => {
     const { fetchMock } = renderMerge()
 

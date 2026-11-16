@@ -22,17 +22,29 @@ interface Props {
 export function MergeDialog({ reviewId, onMerged, onClose }: Props) {
   const { ref, close } = useModalDialog()
   const options = useMergeOptions(reviewId)
+  const merge = useMerge(reviewId)
 
   return (
-    <dialog ref={ref} className="picker merge-dialog" aria-labelledby="merge-dialog-title" onClose={onClose}>
+    <dialog
+      ref={ref}
+      className="picker merge-dialog"
+      aria-labelledby="merge-dialog-title"
+      onClose={onClose}
+      onCancel={(event) => {
+        if (merge.isPending) {
+          event.preventDefault()
+        }
+      }}
+    >
       <header className="picker-header">
         <h2 id="merge-dialog-title">Merge pull request</h2>
       </header>
+      {options.error && <ErrorNote message={describeError(options.error)} />}
       {options.data ? (
-        <MergeForm reviewId={reviewId} options={options.data} onMerged={onMerged} close={close} />
+        <MergeForm options={options.data} merge={merge} onMerged={onMerged} close={close} />
       ) : (
         <>
-          {options.error ? <ErrorNote message={describeError(options.error)} /> : <p className="muted">Checking whether the pull request can be merged...</p>}
+          {!options.error && <p className="muted">Checking whether the pull request can be merged...</p>}
           <Actions close={close} />
         </>
       )}
@@ -40,10 +52,10 @@ export function MergeDialog({ reviewId, onMerged, onClose }: Props) {
   )
 }
 
-function Actions({ close, children }: { close: () => void; children?: ReactNode }) {
+function Actions({ close, busy = false, children }: { close: () => void; busy?: boolean; children?: ReactNode }) {
   return (
     <div className="composer-actions">
-      <button type="button" onClick={close}>
+      <button type="button" disabled={busy} onClick={close}>
         Cancel
       </button>
       {children}
@@ -52,14 +64,13 @@ function Actions({ close, children }: { close: () => void; children?: ReactNode 
 }
 
 interface FormProps {
-  reviewId: number
   options: MergeOptions
+  merge: ReturnType<typeof useMerge>
   onMerged: (result: MergeResult) => void
   close: () => void
 }
 
-function MergeForm({ reviewId, options, onMerged, close }: FormProps) {
-  const merge = useMerge(reviewId)
+function MergeForm({ options, merge, onMerged, close }: FormProps) {
   const [choice, setChoice] = useState<MergeMethod | null>(null)
   const [edits, setEdits] = useState<Partial<Record<MergeMethod, CommitText>>>({})
   const [deleteBranch, setDeleteBranch] = useState(false)
@@ -138,7 +149,7 @@ function MergeForm({ reviewId, options, onMerged, close }: FormProps) {
       )}
       {options.branch_deletion === 'automatic' && <p className="muted">GitHub deletes the branch after merging, as set in the repository settings.</p>}
       {merge.error && <ErrorNote message={describeError(merge.error)} />}
-      <Actions close={close}>
+      <Actions close={close} busy={merge.isPending}>
         <button type="submit" className="primary" disabled={disabled}>
           {merge.isPending ? 'Merging...' : 'Merge'}
         </button>
