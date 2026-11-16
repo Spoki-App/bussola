@@ -6,8 +6,8 @@ import { readStored, writeStored } from './storage'
 export type UnitWidth = 'auto' | '80ch' | '100ch' | '120ch' | '160ch' | 'full'
 
 export const UNIT_WIDTH_LABELS: Record<UnitWidth, string> = { auto: 'Auto', '80ch': '80', '100ch': '100', '120ch': '120', '160ch': '160', full: 'Full' }
-export const DEFAULT_UNIT_WIDTH: UnitWidth = 'auto'
-export const DEFAULT_LINE_LENGTH = 120
+const DEFAULT_UNIT_WIDTH: UnitWidth = 'auto'
+const DEFAULT_LINE_LENGTH = 120
 
 const STORAGE_KEY = 'bussola.unitWidth'
 const WIDTHS = Object.keys(UNIT_WIDTH_LABELS) as UnitWidth[]
@@ -73,9 +73,16 @@ export function unitColumns(width: UnitWidth, lineLength: LineLength | undefined
   return width === 'auto' ? (lineLength?.columns ?? DEFAULT_LINE_LENGTH) : Number.parseInt(width)
 }
 
-export function lineLengthOrigin(lineLength: LineLength | undefined): string {
+function lineLengthOrigin(lineLength: LineLength | undefined): string {
   if (!lineLength) {
     return `${String(DEFAULT_LINE_LENGTH)}, until the repository line length is read`
   }
   return lineLength.source ? `${String(lineLength.columns)}, from ${lineLength.source}` : `${String(lineLength.columns)}, the default: the repository sets no line length`
+}
+
+export function unitWidthTitle(width: UnitWidth, lineLength: LineLength | undefined): string {
+  if (width === 'auto') {
+    return `Unit width: Auto, ${lineLengthOrigin(lineLength)}`
+  }
+  return width === 'full' ? 'Unit width: Full, all the available space' : `Unit width: ${UNIT_WIDTH_LABELS[width]} columns`
 }

@@ -42,22 +42,25 @@ async function openReview(page: Page) {
   await page.goto(`/reviews/${String(reviewId)}`)
 }
 
-async function height(cell: Locator): Promise<number> {
-  return (await cell.boundingBox())?.height ?? 0
+async function box(locator: Locator) {
+  return (await locator.boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 }
+}
+
+async function stepTo(button: Locator, label: string) {
+  for (let step = 0; step < 6 && (await button.textContent()) !== label; step++) {
+    await button.click()
+  }
+  await expect(button).toHaveText(label)
 }
 
 async function fitsOnOneRow(card: Locator, text: string): Promise<boolean> {
   const long = card.locator('td.diff-code', { hasText: text })
   const short = card.locator('td.diff-code', { hasText: 'return value' })
-  return (await height(long)) <= (await height(short)) + 1
+  return (await box(long)).height <= (await box(short)).height + 1
 }
 
 async function fitsTheLimit(card: Locator): Promise<boolean> {
   return (await fitsOnOneRow(card, 'value = "')) && !(await fitsOnOneRow(card, 'other = "'))
-}
-
-async function width(locator: Locator): Promise<number> {
-  return (await locator.boundingBox())?.width ?? 0
 }
 
 test.beforeAll(() => {
@@ -80,39 +83,28 @@ test('the unit box follows the repository line length, preset steps and full wid
   await expect(button).toHaveAttribute('title', /60, from pyproject\.toml ruff/)
   await expect(card.locator('table.diff-split')).toBeVisible()
   expect(await fitsTheLimit(card)).toBe(true)
-  expect(await width(card)).toBeLessThan((await width(units)) - 100)
+  expect((await box(card)).width).toBeLessThan((await box(units)).width - 100)
 
   await page.getByRole('tab', { name: 'Unified' }).click()
   await expect(card.locator('table.diff-unified')).toBeVisible()
   expect(await fitsTheLimit(card)).toBe(true)
-  const autoWidth = await width(card)
+  const autoWidth = (await box(card)).width
 
-  await button.click()
-  await expect(button).toHaveText('Width 80')
+  await stepTo(button, 'Width 80')
   expect(await fitsOnOneRow(card, 'other = "')).toBe(true)
-  expect(await width(card)).toBeGreaterThan(autoWidth)
+  expect((await box(card)).width).toBeGreaterThan(autoWidth)
 
-  await button.click()
-  await button.click()
-  await button.click()
-  await button.click()
-  await expect(button).toHaveText('Width Full')
+  await stepTo(button, 'Width Full')
   const padding = await units.evaluate((element) => parseFloat(getComputedStyle(element).paddingLeft) + parseFloat(getComputedStyle(element).paddingRight))
-  expect(Math.abs((await width(card)) - ((await width(units)) - padding))).toBeLessThan(2)
+  expect(Math.abs((await box(card)).width - ((await box(units)).width - padding))).toBeLessThan(2)
 
   await page.reload()
   await expect(button).toHaveText('Width Full')
 
-  await button.click()
-  await expect(button).toHaveText('Width Auto 60')
-  await button.click()
-  await button.click()
-  await button.click()
-  await button.click()
-  await expect(button).toHaveText('Width 160')
+  await stepTo(button, 'Width 160')
   await page.setViewportSize({ width: 700, height: 900 })
-  const cardBox = await card.boundingBox()
-  const unitsBox = await units.boundingBox()
-  expect((cardBox?.x ?? 0) + (cardBox?.width ?? 0)).toBeLessThanOrEqual((unitsBox?.x ?? 0) + (unitsBox?.width ?? 0))
+  const cardBox = await box(card)
+  const unitsBox = await box(units)
+  expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(unitsBox.x + unitsBox.width)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
 })

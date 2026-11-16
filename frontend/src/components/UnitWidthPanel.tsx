@@ -1,13 +1,6 @@
 import type { LineLength } from '../api/lineLength'
-import { UNIT_WIDTH_LABELS, lineLengthOrigin, nextUnitWidth, setUnitWidth, unitColumns, useUnitWidth, type UnitWidth } from '../settings/unitWidth'
+import { UNIT_WIDTH_LABELS, nextUnitWidth, setUnitWidth, unitColumns, unitWidthTitle, useUnitWidth } from '../settings/unitWidth'
 import { Segmented } from './Segmented'
-
-function widthTitle(width: UnitWidth, lineLength: LineLength | undefined): string {
-  if (width === 'auto') {
-    return `Unit width: Auto, ${lineLengthOrigin(lineLength)}`
-  }
-  return width === 'full' ? 'Unit width: Full, all the available space' : `Unit width: ${UNIT_WIDTH_LABELS[width]} columns`
-}
 
 export function UnitWidthPanel() {
   const width = useUnitWidth()
@@ -23,7 +16,7 @@ export function UnitWidthButton({ lineLength }: { lineLength: LineLength | undef
   const width = useUnitWidth()
   const label = width === 'auto' ? `Auto ${String(unitColumns(width, lineLength))}` : UNIT_WIDTH_LABELS[width]
   return (
-    <button type="button" className="unit-width-button" title={`${widthTitle(width, lineLength)}. Click for the next width.`} onClick={() => { setUnitWidth(nextUnitWidth(width)) }}>
+    <button type="button" className="unit-width-button" title={`${unitWidthTitle(width, lineLength)}. Click for the next width.`} onClick={() => { setUnitWidth(nextUnitWidth(width)) }}>
       {`Width ${label}`}
     </button>
   )

@@ -47,12 +47,8 @@ def _toml(text: str) -> object:
         return None
 
 
-def _pyproject_tool(tool: str) -> Callable[[str], object]:
-    return lambda text: _field(_toml(text), "tool", tool, "line-length")
-
-
-def _ruff_toml(text: str) -> object:
-    return _field(_toml(text), "line-length")
+def _toml_field(*keys: str) -> Callable[[str], object]:
+    return lambda text: _field(_toml(text), *keys)
 
 
 def _prettier_file(text: str) -> object:
@@ -69,10 +65,10 @@ def _package_json(text: str) -> object:
 
 _SOURCES: tuple[tuple[str, str, Callable[[str], object]], ...] = (
     (".editorconfig", ".editorconfig", _editorconfig),
-    (".ruff.toml", ".ruff.toml", _ruff_toml),
-    ("ruff.toml", "ruff.toml", _ruff_toml),
-    ("pyproject.toml", "pyproject.toml ruff", _pyproject_tool("ruff")),
-    ("pyproject.toml", "pyproject.toml black", _pyproject_tool("black")),
+    (".ruff.toml", ".ruff.toml", _toml_field("line-length")),
+    ("ruff.toml", "ruff.toml", _toml_field("line-length")),
+    ("pyproject.toml", "pyproject.toml ruff", _toml_field("tool", "ruff", "line-length")),
+    ("pyproject.toml", "pyproject.toml black", _toml_field("tool", "black", "line-length")),
     *(
         (name, name, _prettier_file)
         for name in (".prettierrc", ".prettierrc.json", ".prettierrc.json5", ".prettierrc.yaml", ".prettierrc.yml", ".prettierrc.toml")

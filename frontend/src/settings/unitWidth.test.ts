@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { lineLengthOrigin, nextUnitWidth, unitColumns, type UnitWidth } from './unitWidth'
+import { nextUnitWidth, unitColumns, unitWidthTitle } from './unitWidth'
 
 describe('unitColumns', () => {
   it('uses the repository line length for auto, the preset columns, and none for full width', () => {
@@ -14,20 +14,15 @@ describe('unitColumns', () => {
 
 describe('nextUnitWidth', () => {
   it('steps through the sizes and starts again from auto', () => {
-    let width: UnitWidth = 'auto'
-    const seen: UnitWidth[] = [width]
-    for (let step = 0; step < 6; step++) {
-      width = nextUnitWidth(width)
-      seen.push(width)
-    }
-    expect(seen).toEqual(['auto', '80ch', '100ch', '120ch', '160ch', 'full', 'auto'])
+    expect((['auto', '80ch', '100ch', '120ch', '160ch', 'full'] as const).map(nextUnitWidth)).toEqual(['80ch', '100ch', '120ch', '160ch', 'full', 'auto'])
   })
 })
 
-describe('lineLengthOrigin', () => {
-  it('names where the line length comes from', () => {
-    expect(lineLengthOrigin({ columns: 120, source: 'pyproject.toml ruff' })).toBe('120, from pyproject.toml ruff')
-    expect(lineLengthOrigin({ columns: 120, source: null })).toBe('120, the default: the repository sets no line length')
-    expect(lineLengthOrigin(undefined)).toBe('120, until the repository line length is read')
+describe('unitWidthTitle', () => {
+  it('names where the auto line length comes from', () => {
+    expect(unitWidthTitle('auto', { columns: 120, source: 'pyproject.toml ruff' })).toBe('Unit width: Auto, 120, from pyproject.toml ruff')
+    expect(unitWidthTitle('auto', { columns: 120, source: null })).toBe('Unit width: Auto, 120, the default: the repository sets no line length')
+    expect(unitWidthTitle('auto', undefined)).toBe('Unit width: Auto, 120, until the repository line length is read')
+    expect(unitWidthTitle('100ch', undefined)).toBe('Unit width: 100 columns')
   })
 })

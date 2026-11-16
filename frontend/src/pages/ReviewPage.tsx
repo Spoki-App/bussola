@@ -432,7 +432,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                   </>
                 )}
               </aside>
-              <main className={columns === undefined ? 'units' : 'units fixed-width'} style={columns === undefined ? undefined : ({ '--unit-columns': columns } as CSSProperties)}>
+              <main className={columns === undefined ? 'units' : 'units fixed-width'} style={{ '--unit-columns': columns } as CSSProperties}>
                 {units.error && <ErrorNote message={describeError(units.error)} />}
                 {units.data && unitList.length === 0 && <p className="muted">{emptyMessage(filter, deferredQuery, impactFilter, units.data.length)}</p>}
                 {groups.map((group) => (
