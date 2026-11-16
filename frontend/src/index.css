@@ -2786,6 +2786,11 @@ button.danger {
   font-size: 13px;
 }
 
+.ai-description-lookups {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
 .code-font-panel input:not([type='checkbox']) {
   width: 100%;
 }

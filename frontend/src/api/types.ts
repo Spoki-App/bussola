@@ -370,6 +370,7 @@ export interface UnitDescription {
   model: string | null
   created_at: string
   outdated: boolean
+  lookups: AiReviewLookup[]
 }
 
 export type DescribedUnit = UnitDescription & { description: string }

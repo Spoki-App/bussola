@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from bussola.ai.base import AiProviderError, AiUnreachableError
+from bussola.ai.base import AiProviderError, AiRequest, AiUnreachableError
 from bussola.storage.database import Database
 from bussola.storage.repositories import Store
 from tests.ai.fakes import ANTHROPIC_CONFIG, FakeProvider, fake_factory
@@ -70,6 +70,31 @@ def test_one_call_describes_and_rates_a_unit_and_names_the_provider(billing: Git
     assert "2:     return sum(items) * 1.2" in request.prompt
     assert "[the new check](#after-80)" in request.system
     assert request.schema["required"] == ["description", "impact", "impact_reason"]
+    assert described["lookups"] == []
+
+
+def test_the_model_can_look_up_code_and_the_lookups_are_kept_with_the_description(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    arguments = {"path": "app.py", "side": "before", "start_line": 2, "end_line": 2}
+
+    def answer(request: AiRequest) -> Json:
+        assert request.tools is not None
+        assert [tool.name for tool in request.tools.definitions] == ["find_definition", "find_usages", "read_file", "search", "unit_diff"]
+        request.tools.call("read_file", arguments)
+        return INSIGHT
+
+    provider = FakeProvider(answer)
+    api = ai_client(billing, data_dir, config_file, provider)
+    review_id = api.start_review()
+    unit_id = api.unit(review_id, "app.py::total")["id"]
+
+    described = describe(api, review_id, "app.py::total")
+
+    [request] = provider.requests
+    assert "find_definition and find_usages work like Cmd+click" in request.system
+    assert re.search(r"which you can open with unit_diff:\n<(units-[0-9a-f]{16})>\napp.py::name\n</\1>", request.prompt)
+    lookup = {"tool": "read_file", "arguments": arguments, "result": "2:     return sum(items)", "error": False}
+    assert described["lookups"] == [lookup]
+    assert descriptions(api, review_id)[unit_id]["lookups"] == [lookup]
 
 
 def test_a_description_is_kept_when_the_review_is_opened_again(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
@@ -466,8 +491,13 @@ def test_a_batch_cancelled_before_it_starts_reports_a_cancelled_result(billing: 
     assert provider.requests == []
 
 
-def test_a_rating_saved_over_a_description_keeps_the_description(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
-    api = ai_client(billing, data_dir, config_file, FakeProvider(INSIGHT))
+def test_a_rating_saved_over_a_description_keeps_the_description_and_its_lookups(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    def answer(request: AiRequest) -> Json:
+        assert request.tools is not None
+        request.tools.call("search", {"text": "total", "side": "after"})
+        return INSIGHT
+
+    api = ai_client(billing, data_dir, config_file, FakeProvider(answer))
     review_id = api.start_review()
     unit_id = api.unit(review_id, "app.py::total")["id"]
     describe(api, review_id, "app.py::total")
@@ -475,8 +505,9 @@ def test_a_rating_saved_over_a_description_keeps_the_description(billing: GitFix
     with Database.open(data_dir).session() as session:
         store = Store(session)
         described = store.descriptions.descriptions(review_id)[0]
-        store.descriptions.save(replace(described, description=None, impact="low", impact_reason="Only a rename."))
+        store.descriptions.save(replace(described, description=None, lookups=None, impact="low", impact_reason="Only a rename."))
         store.commit()
 
     stored = descriptions(api, review_id)[unit_id]
     assert (stored["description"], stored["impact"], stored["impact_reason"]) == (INSIGHT["description"], "low", "Only a rename.")
+    assert [lookup["tool"] for lookup in stored["lookups"]] == ["search"]

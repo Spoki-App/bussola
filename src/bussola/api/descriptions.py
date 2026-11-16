@@ -8,10 +8,14 @@ from bussola.ai.config import load_user_config
 from bussola.ai.runner import AiRunner
 from bussola.ai.settings import load_ai_settings, require_target
 from bussola.api.deps import ContextDep, repo_of, resolve_revision, snapshot_of
-from bussola.api.schemas import AiCallIn, DescribeUnitIn, RateImpactOut, UnitDescriptionOut
+from bussola.api.schemas import AiCallIn, AiReviewLookupOut, DescribeUnitIn, RateImpactOut, UnitDescriptionOut
 from bussola.api.state import AppState, app_state
+from bussola.config import load_repo_config
+from bussola.review.ai_review import tool_lookups
 from bussola.review.context import ReviewContext
 from bussola.review.descriptions import Impact, describe_unit, description_row, is_outdated, rate_units, stored_descriptions
+from bussola.review.repos import open_repo
+from bussola.review.review_tools import ReviewTools, unit_label
 from bussola.storage.models import UnitDescription
 
 router = APIRouter(tags=["descriptions"])
@@ -30,10 +34,20 @@ def describe(context: ContextDep, unit_id: int, body: DescribeUnitIn, request: R
     state = app_state(request)
     snapshot = snapshot_of(context, unit_id)
     provider = ai_provider(state, context, body.target)
+    revision = resolve_revision(context, snapshot.revision_id)
+    snapshots = context.store.reviews.snapshots(revision.id)
+    git_repo = open_repo(repo_of(context))
+    ignore = load_repo_config(git_repo.root).ignore
     context.store.commit()
+    others = [unit_label(other) for other in snapshots if other.id != snapshot.id]
     with state.ai_calls.start(body.call_id) as cancellation:
-        insight = describe_unit(snapshot, ai_runner(state, provider), cancellation, regenerate=body.regenerate)
-    saved = context.store.descriptions.save(description_row(context, snapshot, provider, insight, insight.description))
+        tools = ReviewTools(git_repo, revision, snapshots, state.navigator, ignore, cancellation)
+        tools.prepare()
+        toolbox = tools.toolbox()
+        insight = describe_unit(snapshot, ai_runner(state, provider).with_tools(toolbox), cancellation, others, regenerate=body.regenerate)
+    row = description_row(context, snapshot, provider, insight, insight.description)
+    row.lookups = tool_lookups(toolbox)
+    saved = context.store.descriptions.save(row)
     context.store.commit()
     return _description_out(unit_id, saved, outdated=False)
 
@@ -79,4 +93,5 @@ def _description_out(unit_id: int, description: UnitDescription, outdated: bool)
         model=description.model,
         created_at=description.created_at,
         outdated=outdated,
+        lookups=[AiReviewLookupOut.model_validate(lookup) for lookup in description.lookups or []],
     )

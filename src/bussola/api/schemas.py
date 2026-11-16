@@ -667,6 +667,7 @@ class UnitDescriptionOut(BaseModel):
     model: str | None
     created_at: datetime
     outdated: bool
+    lookups: list["AiReviewLookupOut"]
 
 
 class RateImpactOut(BaseModel):
