@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 import { E2E_TOKEN } from './constants.ts'
 
@@ -17,8 +17,8 @@ function git(repo: string, ...args: string[]) {
   execFileSync('git', args, { cwd: repo, stdio: 'ignore' })
 }
 
-function createRepository(): string {
-  const repo = join(root, 'clipboard')
+function createRepository(name: string): string {
+  const repo = join(root, name)
   mkdirSync(repo)
   git(repo, 'init', '-q', '-b', 'main')
   git(repo, 'config', 'user.email', 'e2e@example.com')
@@ -41,20 +41,44 @@ test.afterAll(() => {
   rmSync(root, { recursive: true, force: true })
 })
 
-test('selected lines are compared with the code copied to the clipboard', async ({ page, context }) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+async function openReview(page: Page, name: string) {
   await page.goto(`/?token=${E2E_TOKEN}`)
-  const repo = await page.request.post('/api/repos', { data: { path: createRepository() } })
+  const repo = await page.request.post('/api/repos', { data: { path: createRepository(name) } })
   const { id: repoId } = (await repo.json()) as { id: number }
   const review = await page.request.post(`/api/repos/${String(repoId)}/reviews`, { data: { head_ref: 'feature', base_ref: 'main' } })
   const { id: reviewId } = (await review.json()) as { id: number }
   await page.goto(`/reviews/${String(reviewId)}`)
-  const card = page.locator('article.unit-card', { hasText: 'total' })
+  return page.locator('article.unit-card', { hasText: 'total' })
+}
+
+test('the compare bar compares the first range with a second selected range', async ({ page }) => {
+  const card = await openReview(page, 'selection')
+  const bar = page.getByRole('region', { name: 'Compare ranges' })
+
+  await card.locator('td.diff-gutter-insert', { hasText: /^3$/ }).click()
+  await card.getByRole('button', { name: 'Compare with...' }).click()
+  await expect(bar.getByRole('button', { name: 'Compare with selection' })).toBeDisabled()
+  await card.locator('td.diff-gutter-insert', { hasText: /^2$/ }).click()
+  await bar.getByRole('button', { name: 'Compare with selection' }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Compare' })
+  await expect(dialog.locator('td.diff-code-delete', { hasText: 'return subtotal * 2' })).toBeVisible()
+  await expect(dialog.locator('td.diff-code-insert', { hasText: 'subtotal = sum(items)' })).toBeVisible()
+  await expect(bar).toHaveCount(0)
+})
+
+test('selected lines are compared with the code copied to the clipboard', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  const card = await openReview(page, 'clipboard')
   await page.evaluate(() => navigator.clipboard.writeText('subtotal = sum(items)\nreturn subtotal * 3\n'))
 
   await card.locator('td.diff-gutter-insert', { hasText: /^2$/ }).click()
   await card.locator('td.diff-gutter-insert', { hasText: /^3$/ }).click({ modifiers: ['Shift'] })
-  await card.getByRole('button', { name: 'Compare with clipboard' }).click()
+  await card.getByRole('button', { name: 'Compare with...' }).click()
+  const bar = page.getByRole('region', { name: 'Compare ranges' })
+  await expect(bar.getByText('2 lines')).toBeVisible()
+  await expect(card.getByRole('button', { name: 'Compare with clipboard' })).toHaveCount(0)
+  await bar.getByRole('button', { name: 'Compare with clipboard' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Compare' })
   await expect(dialog.getByText('Clipboard')).toBeVisible()

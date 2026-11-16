@@ -6,6 +6,7 @@ import { useReview } from './api/hooks'
 import { useCreateThread, useThreads } from './api/threads'
 import type { CodeRangeRequest, ComparisonRequest, DiffRow, Thread, Unit, UnitDiff } from './api/types'
 import { ErrorNote } from './components/Badges'
+import { CompareBar } from './components/CompareBar'
 import { CompareDialog } from './components/CompareDialog'
 import type { CommentTarget } from './components/UnitCard'
 import { Composer } from './components/Composer'
@@ -24,15 +25,7 @@ import { draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, isO
 
 interface CompareStart {
   range: CodeRangeRequest
-  label: string
-}
-
-function readClipboard(): Promise<string> {
-  try {
-    return navigator.clipboard.readText()
-  } catch (error) {
-    return Promise.reject(error instanceof Error ? error : new Error(String(error)))
-  }
+  title: string
 }
 
 function AskAiButton({ snippet, onAsked }: { snippet: ChatSnippetDraft; onAsked: () => void }) {
@@ -63,7 +56,6 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [compareStart, setCompareStart] = useState<CompareStart | null>(null)
   const [comparison, setComparison] = useState<ComparisonRequest | null>(null)
-  const [clipboardError, setClipboardError] = useState<string | null>(null)
   const moveLinks = useMemo(() => moveLinksByUnit(moves.data ?? []), [moves.data])
   const { mutate: createThread, isPending: creating, error: createError } = useCreateThread(reviewId)
   const threadsByUnit = useMemo(() => {
@@ -108,27 +100,12 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
         const request = draftRequest(draft)
         const range = { unit_id: unit.id, ...request }
         const isFirstRange = compareStart !== null && sameRange(compareStart.range, range)
-        const compareWithClipboard = () => {
-          setClipboardError(null)
-          readClipboard().then(
-            (pasted) => {
-              if (pasted.trim()) {
-                setComparison({ pasted, right: range })
-              } else {
-                setClipboardError('The clipboard has no text to compare.')
-              }
-            },
-            () => {
-              setClipboardError('The clipboard could not be read. Allow this page to see the clipboard and try again.')
-            },
-          )
-        }
         const compare = () => {
           if (compareStart) {
             setComparison({ left: compareStart.range, right: range })
             setCompareStart(null)
           } else {
-            setCompareStart({ range, label: `${plural(request.line_count, 'line')} of ${unitTitle(unit)}` })
+            setCompareStart({ range, title: unitTitle(unit) })
           }
         }
         place(
@@ -137,18 +114,12 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
             <div className="draft-header">
               <p className="muted draft-range">{request.line_count > 1 ? `Commenting on ${String(request.line_count)} lines` : ''}</p>
               {!isFirstRange && (
-                <button type="button" className="link" title={compareStart ? `Compare with ${compareStart.label}` : 'Keep these lines as the first range, then select a second range to compare with'} onClick={compare}>
+                <button type="button" className="link" title={compareStart ? `Compare with ${plural(compareStart.range.line_count, 'line')} of ${compareStart.title}` : 'Keep these lines as the first range, then select a second range to compare with'} onClick={compare}>
                   {compareStart ? 'Compare with first range' : 'Compare with...'}
-                </button>
-              )}
-              {!compareStart && (
-                <button type="button" className="link" title="Compare these lines with the code copied to the clipboard" onClick={compareWithClipboard}>
-                  Compare with clipboard
                 </button>
               )}
               <AskAiButton snippet={{ range, label: snippetLabel(unit, request.line_count, request.side) }} onAsked={() => { setDraft(null) }} />
             </div>
-            {clipboardError && <ErrorNote message={clipboardError} />}
             <Composer
               reviewId={reviewId}
               submitLabel="Start thread"
@@ -163,7 +134,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
       }
       return Object.fromEntries(Object.entries(widgets).map(([key, nodes]) => [key, <div key={key} className="widgets">{nodes}</div>]))
     },
-    [threadsByUnit, draft, createThread, creating, createError, reviewId, compareStart, clipboardError],
+    [threadsByUnit, draft, createThread, creating, createError, reviewId, compareStart],
   )
 
   const onComment = useCallback((target: CommentTarget) => {
@@ -184,6 +155,17 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
     [moveLinks],
   )
   const fileActions = useCallback((path: string) => <FileCommentButton reviewId={reviewId} path={path} />, [reviewId])
+  const secondRange = useMemo(() => {
+    if (!compareStart || !draft || draft.selecting) {
+      return null
+    }
+    const range = { unit_id: draft.unitId, ...draftRequest(draft) }
+    return sameRange(compareStart.range, range) ? null : range
+  }, [compareStart, draft])
+  const compareWith = (request: ComparisonRequest) => {
+    setComparison(request)
+    setCompareStart(null)
+  }
   const sidePanelContent = threads.error ? <ErrorNote message={describeError(threads.error)} /> : <ThreadPanel reviewId={reviewId} threads={threads.data ?? []} />
 
   return (
@@ -202,12 +184,13 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
         }}
       />
       {compareStart && (
-        <div className="compare-bar" role="status">
-          <span>{`First range: ${compareStart.label}. Select the second range by its line numbers and choose Compare with first range.`}</span>
-          <button type="button" className="link" onClick={() => { setCompareStart(null) }}>
-            Cancel
-          </button>
-        </div>
+        <CompareBar
+          title={compareStart.title}
+          lineCount={compareStart.range.line_count}
+          onCompareSelection={secondRange ? () => { compareWith({ left: compareStart.range, right: secondRange }) } : undefined}
+          onCompareClipboard={(pasted) => { compareWith({ pasted, right: compareStart.range }) }}
+          onCancel={() => { setCompareStart(null) }}
+        />
       )}
       {comparison && <CompareDialog reviewId={reviewId} request={comparison} onClose={() => { setComparison(null) }} />}
     </>
