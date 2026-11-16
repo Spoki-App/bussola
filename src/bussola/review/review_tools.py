@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from bussola.ai.base import Cancellation
-from bussola.ai.tools import AiTool, Toolbox, ToolError
+from bussola.ai.tools import MAX_TOOL_OUTPUT_CHARACTERS, AiTool, Toolbox, ToolError
 from bussola.git import GitError, GitRepo
 from bussola.globs import matches_any
 from bussola.navigation.navigator import Click, Navigation, Navigator, Origin, Target
@@ -21,6 +21,7 @@ MAX_READ_LINES = 300
 MAX_TARGETS = 50
 MAX_SEARCH_RESULTS = 50
 INDEX_WAIT_SECONDS = 120.0
+UNIT_DIFF_SIDE_CHARACTERS = (MAX_TOOL_OUTPUT_CHARACTERS - 1_000) // 2
 INDEX_POLL_SECONDS = 0.5
 FIND_USAGES = (
     "Every place that uses a name, across the whole repository, like Cmd+click on a definition in an editor. "
@@ -147,7 +148,7 @@ class ReviewTools:
         snapshot = self._units.get(request.unit)
         if snapshot is None:
             raise ToolError(f"No changed unit is named {request.unit}. Use a name from the list of changed units.")
-        return unit_prompt(snapshot, numbered=True)
+        return unit_prompt(snapshot, numbered=True, side_characters=UNIT_DIFF_SIDE_CHARACTERS)
 
     def _navigate(self, location: Location) -> Navigation:
         side = SIDES[location.side]

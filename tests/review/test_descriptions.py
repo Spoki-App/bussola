@@ -109,3 +109,10 @@ def test_definitions_skip_the_comments_above_the_declaration() -> None:
     prompt = unit_definitions(snapshot(None, text))
 
     assert re.search(r"<(after-[0-9a-f]{16})>\nfunction total\(items\) \{\n</\1>", prompt)
+
+
+def test_both_sides_can_be_clipped_to_a_smaller_size() -> None:
+    prompt = unit_prompt(snapshot("x" * 30, "y" * 30), side_characters=10)
+
+    assert prompt.count("[... 20 more characters not shown]") == 2
+    assert "y" * 10 in prompt

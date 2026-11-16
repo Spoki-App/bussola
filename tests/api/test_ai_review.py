@@ -172,6 +172,29 @@ def test_a_pull_request_too_large_for_the_prompt_sends_only_definitions_and_the_
     assert (thread["qualified_name"], thread["anchor"]["file_line"]) == ("name", 6)
 
 
+def test_a_unit_the_model_did_not_open_is_reviewed_again_next_time(
+    billing: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("bussola.review.ai_review.MAX_PROMPT_CODE_CHARACTERS", 1)
+
+    def review(request: AiRequest) -> Json:
+        assert request.tools is not None
+        if "Open with unit_diff: app.py::name" in request.prompt:
+            request.tools.call("unit_diff", {"unit": "app.py::name"})
+        return NOTHING
+
+    provider = FakeProvider(review)
+    api = client(billing, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    assert run(api, review_id)["reviewed"] == 1
+    assert run(api, review_id)["reviewed"] == 0
+
+    last = max(api.call("GET", f"/reviews/{review_id}/ai-review/runs"), key=lambda run_out: run_out["id"])
+    [part] = api.call("GET", f"/reviews/{review_id}/ai-review/runs/{last['id']}")["parts"]
+    assert [unit["label"] for unit in part["units"]] == ["app.py::total"]
+
+
 def test_with_a_limit_a_large_pull_request_still_sends_its_code(
     billing: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
