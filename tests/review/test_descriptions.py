@@ -101,3 +101,11 @@ def test_definitions_keep_the_signature_and_leave_out_the_body() -> None:
 
 def test_definitions_of_a_new_unit_say_it_is_new() -> None:
     assert "<before>The unit did not exist before this change.</before>" in unit_definitions(snapshot(None, "X = 1\n"))
+
+
+def test_definitions_skip_the_comments_above_the_declaration() -> None:
+    text = "// Note: totals are cached {\n/**\n * Sums the items.\n */\nfunction total(items) {\n  return sum(items);\n}\n"
+
+    prompt = unit_definitions(snapshot(None, text))
+
+    assert re.search(r"<(after-[0-9a-f]{16})>\nfunction total\(items\) \{\n</\1>", prompt)

@@ -2,6 +2,7 @@ import hashlib
 import json
 from collections.abc import Iterable
 from enum import StrEnum
+from itertools import dropwhile, islice
 from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, Field, field_validator
@@ -28,6 +29,7 @@ BINARY_SIDE = "Binary content that cannot be shown."
 UNIT_NAMES = {"module": "module-level code"}
 MAX_DEFINITION_LINES = 8
 DEFINITION_ENDINGS = (":", "{")
+COMMENT_STARTS = ("#", "//", "/*", "*")
 
 
 def _not_blank(text: str) -> str:
@@ -250,9 +252,14 @@ def _unit_text(snapshot: UnitSnapshot, base: str | None, head: str | None, clip:
 def _definition(text: str | None) -> str | None:
     if text is None:
         return None
-    lines = text.split("\n", MAX_DEFINITION_LINES)[:MAX_DEFINITION_LINES]
+    lines = list(islice(dropwhile(_is_comment, text.splitlines()), MAX_DEFINITION_LINES))
     end = next((index for index, line in enumerate(lines, start=1) if line.rstrip().endswith(DEFINITION_ENDINGS)), len(lines))
     return "\n".join(lines[:end])
+
+
+def _is_comment(line: str) -> bool:
+    text = line.strip()
+    return not text or text.startswith(COMMENT_STARTS)
 
 
 def _numbered(snapshot: UnitSnapshot, side: Side) -> str | None:
