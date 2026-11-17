@@ -376,7 +376,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   )
 
   return (
-    <div className="review-page">
+    <div className={columns === undefined ? 'review-page full-width' : 'review-page fixed-width'}>
       <ReviewHeader review={data} />
       <div className={`review-overview${data.pull_request ? ' with-description' : ''}`}>
         {data.pull_request && <PullRequestDescription pull={data.pull_request} />}

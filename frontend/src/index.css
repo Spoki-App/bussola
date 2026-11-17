@@ -614,6 +614,20 @@ textarea {
   margin: 0 auto;
 }
 
+.review-page.full-width {
+  max-width: none;
+}
+
+.review-page.fixed-width {
+  width: max-content;
+  min-width: min(100%, var(--page-max));
+  max-width: 100%;
+}
+
+.review-page.fixed-width > :not(.review-layout) {
+  contain: inline-size;
+}
+
 @media (min-width: 1761px) {
   .review-page {
     border-inline: 1px solid var(--border);

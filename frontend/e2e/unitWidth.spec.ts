@@ -109,6 +109,14 @@ test('the column of units follows the repository line length, preset steps and f
   await expect(button).toHaveText('Width Full')
 
   await stepTo(button, 'Width 160')
+  await page.setViewportSize({ width: 3000, height: 1000 })
+  await page.getByRole('tab', { name: 'Split' }).click()
+  await expect(card.locator('table.diff-split')).toBeVisible()
+  expect(await fitsOnOneRow(card, 'other = "')).toBe(true)
+  expect(await fillsTheColumn(card, units)).toBe(true)
+  expect((await box(page.locator('.review-page'))).width).toBeGreaterThan(1800)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+
   await page.setViewportSize({ width: 700, height: 900 })
   const cardBox = await box(card)
   const unitsBox = await box(units)
