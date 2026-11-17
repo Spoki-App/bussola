@@ -77,7 +77,7 @@ export const SETTINGS: Setting[] = [
   {
     category: 'Diff',
     name: 'Unit width',
-    description: 'The width of the unit box: auto from the line length of the repository, 80, 100, 120 or 160 columns, or full width.',
+    description: 'The width of the column of units: auto from the line length of the repository, 80, 100, 120 or 160 columns, or full width.',
     render: () => <UnitWidthPanel />,
   },
   {

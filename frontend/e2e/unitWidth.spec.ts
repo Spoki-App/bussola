@@ -73,7 +73,12 @@ test.afterAll(() => {
 
 test.use({ viewport: { width: 1800, height: 1000 } })
 
-test('the unit box follows the repository line length, preset steps and full width', async ({ page }) => {
+async function fillsTheColumn(card: Locator, units: Locator): Promise<boolean> {
+  const padding = await units.evaluate((element) => parseFloat(getComputedStyle(element).paddingLeft) + parseFloat(getComputedStyle(element).paddingRight))
+  return Math.abs((await box(card)).width - ((await box(units)).width - padding)) < 2
+}
+
+test('the column of units follows the repository line length, preset steps and full width', async ({ page }) => {
   await openReview(page)
   const units = page.locator('main.units')
   const card = page.locator('article.unit-card', { hasText: 'wide' })
@@ -83,25 +88,35 @@ test('the unit box follows the repository line length, preset steps and full wid
   await expect(button).toHaveAttribute('title', /60, from pyproject\.toml ruff/)
   await expect(card.locator('table.diff-split')).toBeVisible()
   expect(await fitsTheLimit(card)).toBe(true)
-  expect((await box(card)).width).toBeLessThan((await box(units)).width - 100)
+  expect(await fillsTheColumn(card, units)).toBe(true)
+  const splitAutoWidth = (await box(card)).width
 
   await page.getByRole('tab', { name: 'Unified' }).click()
   await expect(card.locator('table.diff-unified')).toBeVisible()
   expect(await fitsTheLimit(card)).toBe(true)
-  const autoWidth = (await box(card)).width
+  expect(await fillsTheColumn(card, units)).toBe(true)
+  const autoWidth = (await box(units)).width
 
   await stepTo(button, 'Width 80')
   expect(await fitsOnOneRow(card, 'other = "')).toBe(true)
-  expect((await box(card)).width).toBeGreaterThan(autoWidth)
+  expect((await box(units)).width).toBeGreaterThan(autoWidth)
 
   await stepTo(button, 'Width Full')
-  const padding = await units.evaluate((element) => parseFloat(getComputedStyle(element).paddingLeft) + parseFloat(getComputedStyle(element).paddingRight))
-  expect(Math.abs((await box(card)).width - ((await box(units)).width - padding))).toBeLessThan(2)
+  expect(await fillsTheColumn(card, units)).toBe(true)
+  expect(splitAutoWidth).toBeLessThan((await box(units)).width - 100)
 
   await page.reload()
   await expect(button).toHaveText('Width Full')
 
   await stepTo(button, 'Width 160')
+  await page.setViewportSize({ width: 3000, height: 1000 })
+  await page.getByRole('tab', { name: 'Split' }).click()
+  await expect(card.locator('table.diff-split')).toBeVisible()
+  expect(await fitsOnOneRow(card, 'other = "')).toBe(true)
+  expect(await fillsTheColumn(card, units)).toBe(true)
+  expect((await box(page.locator('.review-page'))).width).toBeGreaterThan(1800)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+
   await page.setViewportSize({ width: 700, height: 900 })
   const cardBox = await box(card)
   const unitsBox = await box(units)
