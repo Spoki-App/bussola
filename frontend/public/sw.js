@@ -8,15 +8,15 @@ const OFFLINE_PAGE = `<!doctype html>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>bussola is not running</title>
     <style>
-      :root { color-scheme: light dark; --bg: #ffffff; --text: #1f2328; --muted: #59636e; --code: #f4f6fa; --accent: #2952cc; }
+      :root { color-scheme: light dark; --text: #16213a; --muted: #5b6478; --background: #ffffff; --surface: #f4f6fa; --accent: #2952cc; }
       @media (prefers-color-scheme: dark) {
-        :root { --bg: #0e1424; --text: #e6edf3; --muted: #9198a1; --code: #141c2e; --accent: #8aabff; }
+        :root { --text: #e4e9f2; --muted: #9aa5bc; --background: #0e1424; --surface: #141c2e; --accent: #8aabff; }
       }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--background); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
       main { max-width: 32rem; padding: 2rem; }
       h1 { font-size: 1.4rem; margin: 0 0 0.75rem; }
       p { margin: 0.75rem 0; }
-      code { background: var(--code); border-radius: 4px; padding: 0.1rem 0.35rem; }
+      code { background: var(--surface); border-radius: 4px; padding: 0.1rem 0.35rem; }
       a { color: var(--accent); }
       .muted { color: var(--muted); }
     </style>
