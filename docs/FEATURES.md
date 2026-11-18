@@ -63,14 +63,14 @@ Optional, and off until you choose a provider. **AI review** sends the pull requ
 
 ### How to use it
 
-1. Open **Settings** > **AI** and choose a provider: **Claude Code CLI** (uses the `claude` command you are already signed in to, no key), **Anthropic API** (reads `ANTHROPIC_API_KEY`) or an **OpenAI-compatible endpoint**.
+1. Open **Settings** > **AI** and choose a provider in **General**: **Claude Code CLI** (uses the `claude` command you are already signed in to, no key), **Anthropic API** (reads `ANTHROPIC_API_KEY`) or an **OpenAI-compatible endpoint**.
 2. On the review page, press **AI review**. The page shows how many units are done; **Cancel** stops it and keeps the findings already added.
 3. Read the findings as threads with an **AI** badge: reply, resolve or delete them like any other thread. **Details** shows the summary, every code lookup and the units reviewed.
 4. Use the impact filter in the **Files** bar (**High**, **Medium**, **Low**) to start from the units that matter, or press **Rate impact** to rate them without a review.
 5. Press **Describe** on a unit card for an explanation of the unit and its change, with links to the lines it talks about.
 6. To ask your own questions, open **AI chat** in the panel on the right. Select lines by their numbers and choose **Ask AI** to attach them to the next message; the model can look up definitions, usages and files to answer. Ask it to add a comment and it leaves one on the lines, as yours, ready to edit or publish.
 
-**AI prompts** in **Settings** changes what the model is told for **Describe**, **Rate impact** and **AI review**, for example to focus on security. Running **AI review** again only reviews the units that changed since; **Review all** (or **Review again** once every unit has an AI review) reviews everything once more.
+In **Settings** > **AI**, each feature (**Describe**, **Rate impact**, **AI review**, **AI chat**) has a tab to choose its own provider, a model from the list the provider offers, the effort and the prompt, for example a fast model to rate impact and a prompt that focuses the review on security. Running **AI review** again only reviews the units that changed since; **Review all** (or **Review again** once every unit has an AI review) reviews everything once more.
 
 More in the guide: [AI providers](GUIDE.md#ai-providers), [AI review](GUIDE.md#ai-review), [AI chat](GUIDE.md#ai-chat), [What leaves your machine](GUIDE.md#what-leaves-your-machine).
 

@@ -12,7 +12,7 @@ Every command, option and setting, in detail. For a tour of what bussola does, w
 - [Opening bussola:// links](#opening-bussola-links)
 - [Themes](#themes)
 - [Configuration](#configuration)
-- [AI providers](#ai-providers): [descriptions](#ai-descriptions), [impact rating](#ai-impact-rating), [AI review](#ai-review), [AI chat](#ai-chat), [models and effort](#ai-models-and-effort), [prompts](#ai-prompts), [what leaves your machine](#what-leaves-your-machine)
+- [AI providers](#ai-providers): [descriptions](#ai-descriptions), [impact rating](#ai-impact-rating), [AI review](#ai-review), [AI chat](#ai-chat), [provider, model and effort per feature](#ai-provider-model-and-effort-per-feature), [prompts](#ai-prompts), [what leaves your machine](#what-leaves-your-machine)
 - [Data](#data)
 - [Security](#security)
 
@@ -42,7 +42,7 @@ The UI build goes to `src/bussola/static/` and is packaged with the Python wheel
 bussola serve
 ```
 
-Run inside a repository to register it and open the browser. **Settings** (top right) opens a window with the categories on the left: **Pull requests** (**Open pull request**), **Repositories** (**Add repository**), **Appearance** (**Code font**), **Diff** (**Diff layout**, **Line wrap**, **Unit width**) and **AI** (**AI provider**, **AI models**, **AI prompts**). The search field at the top finds a setting by its name or description in every category and highlights the match; the arrow keys move between categories and Esc closes the window. To add other repositories, use **Browse...** under **Add repository**: it lists the git repositories found in your home folder (up to four levels deep, skipping hidden folders, `node_modules`, `Library` and similar), and its **Browse folders** tab lets you pick any other folder. You can also paste a path. Options: `--repo PATH`, `--host 127.0.0.1`, `--port 8765`, `--no-open`.
+Run inside a repository to register it and open the browser. **Settings** (top right) opens a window with the categories on the left: **Pull requests** (**Open pull request**), **Repositories** (**Add repository**), **Appearance** (**Code font**), **Diff** (**Diff layout**, **Line wrap**, **Unit width**) and **AI** (**AI provider and features**, with the tabs **General**, **Describe**, **Rate impact**, **AI review** and **AI chat**). The search field at the top finds a setting by its name or description in every category and highlights the match; the arrow keys move between categories and Esc closes the window. To add other repositories, use **Browse...** under **Add repository**: it lists the git repositories found in your home folder (up to four levels deep, skipping hidden folders, `node_modules`, `Library` and similar), and its **Browse folders** tab lets you pick any other folder. You can also paste a path. Options: `--repo PATH`, `--host 127.0.0.1`, `--port 8765`, `--no-open`.
 
 The printed link contains a one-time session token. Opening it stores the token in a cookie for that browser; if you open bussola another way and see "Not authorized", use the printed link again.
 
@@ -289,7 +289,7 @@ ignore = ["vendor/**", "docs/**"]
 
 ## AI providers
 
-AI features are optional and off until you choose a provider. With a provider you get [AI descriptions](#ai-descriptions), the [AI impact rating](#ai-impact-rating), the [AI review](#ai-review) of a pull request and the [AI chat](#ai-chat), and every AI action follows the rules below. bussola talks to one of three providers, set in the `[ai]` section of your user configuration, `config.toml` in `platformdirs.user_config_dir("bussola")` (on macOS `~/Library/Application Support/bussola/config.toml`, on Linux `~/.config/bussola/config.toml`; set `BUSSOLA_CONFIG_DIR` to use another directory). Choose the provider in **AI provider** under **AI** in **Settings**: pick Claude Code, the Anthropic API or an OpenAI-compatible endpoint, fill in the model, endpoint and key variable it asks for, and **Save** writes the `[ai]` section of `config.toml` for you, taking effect at once. You can also edit the file by hand; saving from **Settings** rewrites it, so comments in it are not kept. The panel then shows the active provider and model and a **Test connection** button that sends a short fixed prompt and no code.
+AI features are optional and off until you choose a provider. With a provider you get [AI descriptions](#ai-descriptions), the [AI impact rating](#ai-impact-rating), the [AI review](#ai-review) of a pull request and the [AI chat](#ai-chat), and every AI action follows the rules below. bussola talks to one of three providers, set in the `[ai]` section of your user configuration, `config.toml` in `platformdirs.user_config_dir("bussola")` (on macOS `~/Library/Application Support/bussola/config.toml`, on Linux `~/.config/bussola/config.toml`; set `BUSSOLA_CONFIG_DIR` to use another directory). Choose the provider in the **General** tab of **AI provider and features** under **AI** in **Settings**: pick Claude Code, the Anthropic API or an OpenAI-compatible endpoint, fill in the endpoint and key variable it asks for, pick the model from the list the provider offers, and **Save** writes the `[ai]` section of `config.toml` for you, taking effect at once. You can also edit the file by hand; saving from **Settings** rewrites it, so comments in it are not kept. The panel then shows the active provider and model and a **Test connection** button that sends a short fixed prompt and no code.
 
 **Claude Code CLI** runs the `claude` command already installed and signed in on your machine, so bussola needs no key:
 
@@ -352,9 +352,15 @@ The chat can also write comments for you: ask it to add, write or leave a commen
 
 **Enter** sends the message and **Shift+Enter** starts a new line. While the model answers, **Cancel** stops it, and a failed answer keeps your message and the selected lines so you can send them again. Answers are Markdown, with links to the lines they mention (a click scrolls the review to the line), the provider and model, and the code lookups the model made with their results. The conversation is kept for each review in the local database, and **Clear** deletes it. Answers are not cached, so asking again asks the model again.
 
-### AI models and effort
+### AI provider, model and effort per feature
 
-**AI models** in **Settings** chooses the model and the effort for each AI action: **Describe**, **Rate impact**, **AI review** (also **Review again**) and **AI chat**. For example, rate impact with a fast, cheap model and low effort, and review with the strongest model and high effort. An action with no model uses the `model` of the AI provider, so a configuration without these settings works as before. The model field suggests the models the provider lists (the Anthropic API and the `/models` list of an OpenAI-compatible endpoint) and takes any other name; with Claude Code, or when the list cannot be read, type the model name. Effort is **Low**, **Medium**, **High** or **Default of the model**: bussola sends it as `output_config.effort` to the Anthropic API, as `--effort` to Claude Code and as `reasoning_effort` to an OpenAI-compatible endpoint, and leaves it out with the default. A higher effort lets the model think more, which costs more and takes longer. The effort picker is disabled for a listed model that does not take an effort. **Save models** writes `[ai.operations.<action>]` sections of your `config.toml` and takes effect at once:
+**AI provider and features** in **Settings** has a tab for each AI feature next to **General**: **Describe**, **Rate impact**, **AI review** (also **Review again**) and **AI chat**. Each tab sets, for that feature only, the provider, the model, the effort and the [prompt](#ai-prompts), and **Save** writes them at once. For example, rate impact with a fast, cheap model and low effort, review with the strongest model and high effort, and chat through Claude Code while the rest uses the Anthropic API.
+
+- **Provider**: **Same as General** (the default) uses the provider of the **General** tab, with its endpoint and key. A specific provider uses its own defaults; for the Anthropic API or an OpenAI-compatible endpoint the tab also asks for the endpoint and the key variable, as **General** does. Choosing the provider of **General** again keeps its endpoint and key, unless the tab sets its own. The timeout, the answer budget and the code per call come from **General**.
+- **Model**: picked from the models the provider lists: the Anthropic API, the `/models` list of an OpenAI-compatible endpoint, and `opus`, `sonnet` and `haiku` for Claude Code. The first entry keeps the default: the model of **General**, or the default of the provider chosen for the feature. When the list cannot be read, the field takes a typed name and says why. A provider chosen for a feature lists its models with the endpoint and key saved for it, so save the endpoint first.
+- **Effort**: **Low**, **Medium**, **High** or **Default of the model**. bussola sends it as `output_config.effort` to the Anthropic API, as `--effort` to Claude Code and as `reasoning_effort` to an OpenAI-compatible endpoint, and leaves it out with the default. A higher effort lets the model think more, which costs more and takes longer. The effort picker is disabled for a listed model that does not take an effort.
+
+The choices are saved in `[ai.operations.<feature>]` sections of your `config.toml`, with the keys `describe`, `impact`, `review` and `chat`:
 
 ```toml
 [ai]
@@ -367,13 +373,18 @@ effort = "low"
 
 [ai.operations.review]
 effort = "high"
+
+[ai.operations.chat]
+provider = "openai-compatible"
+endpoint = "http://localhost:11434/v1"
+model = "qwen2.5-coder"
 ```
 
-The keys are `describe`, `impact`, `review` and `chat`. Results show the effort next to the provider and model, such as `Anthropic API (claude-haiku-5-5, low effort)`, and the cache keeps answers for each effort apart. As for the provider, a repository's `.bussola.toml` cannot change models or effort. A model chosen for an action is named in the notice shown before code is first sent, and changing one asks again.
+A feature without a section uses the provider and model of `[ai]`, so a configuration without these settings works as before. Results show the effort next to the provider and model, such as `Anthropic API (claude-haiku-5-5, low effort)`, and the cache keeps answers for each provider, model and effort apart. As for the provider, a repository's `.bussola.toml` cannot change these settings. A provider or model chosen for a feature is named in the notice shown before code is first sent, and changing one asks again.
 
 ### AI prompts
 
-**AI prompts** in **Settings** lets you change what the model is told to do for **Describe**, **Rate impact** and **AI review**, for example to focus on security or to write in another language. bussola always keeps its own part of each prompt, which says what the model gets, never to follow instructions written in the code, which tools it has and the format of the answer; your instructions come after it and replace bussola's default ones, which each prompt shows until you change it. **Reset to default** brings a prompt back, and **Save prompts** writes the changed ones to the `[ai.prompts]` section of your `config.toml` (keys `describe`, `impact` and `review`), which you can also edit by hand. A repository's `.bussola.toml` cannot change them. Cached answers follow the prompt, so a changed prompt asks the model again.
+The tab of each feature also holds its prompt, for example to focus on security or to write in another language. bussola always keeps its own part of each prompt, which says what the model gets, never to follow instructions written in the code, which tools it has and the format of the answer; your instructions come after it and replace bussola's default ones, which the prompt shows until you change it. The impact scale in **Rate impact** is also the one the AI review uses to rate units, and the prompt of **AI chat** says how to write the answer. **Reset prompt to default** brings a prompt back, and **Save** writes a changed one to the `[ai.prompts]` section of your `config.toml` (keys `describe`, `impact`, `review` and `chat`), which you can also edit by hand. A repository's `.bussola.toml` cannot change them. Cached answers follow the prompt, so a changed prompt asks the model again.
 
 ### What leaves your machine
 

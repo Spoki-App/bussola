@@ -1,45 +1,17 @@
 import { useId, useState } from 'react'
 
-import { useAiConfig, useAiStatus, useSaveAiConfig, useTestAiConnection } from '../api/ai'
+import { useAiConfig, useAiModels, useAiStatus, useSaveAiConfig, useTestAiConnection } from '../api/ai'
 import { describeError } from '../api/client'
 import type { AiConfig, AiConfigFields, AiStatus } from '../api/types'
+import { AiModelPicker } from './AiModelPicker'
+import { ENDPOINT_PLACEHOLDERS, isRemote, KEY_PLACEHOLDERS, MODEL_DEFAULTS, PROVIDERS, type ProviderChoice } from './aiProviders'
 import { ErrorNote } from './Badges'
-
-type ProviderChoice = 'none' | 'claude-code' | 'anthropic' | 'openai-compatible'
-
-const PROVIDERS: Record<ProviderChoice, string> = {
-  none: 'Off',
-  'claude-code': 'Claude Code CLI',
-  anthropic: 'Anthropic API',
-  'openai-compatible': 'OpenAI-compatible endpoint',
-}
-
-const MODEL_PLACEHOLDERS: Record<ProviderChoice, string> = {
-  none: '',
-  'claude-code': 'Default of the claude command',
-  anthropic: 'claude-opus-5-5',
-  'openai-compatible': 'Required, for example qwen2.5-coder',
-}
-
-const ENDPOINT_PLACEHOLDERS: Record<ProviderChoice, string> = {
-  none: '',
-  'claude-code': '',
-  anthropic: 'https://api.anthropic.com',
-  'openai-compatible': 'Required, for example http://localhost:11434/v1',
-}
 
 const CODE_LIMIT_PLACEHOLDERS: Record<ProviderChoice, string> = {
   none: '',
   'claude-code': 'No limit',
   anthropic: 'No limit',
   'openai-compatible': '100000',
-}
-
-const KEY_PLACEHOLDERS: Record<ProviderChoice, string> = {
-  none: '',
-  'claude-code': '',
-  anthropic: 'ANTHROPIC_API_KEY',
-  'openai-compatible': 'Optional, for a server that needs a key',
 }
 
 interface Form {
@@ -86,7 +58,7 @@ function fieldsOf(form: Form): AiConfigFields {
   }
 }
 
-export function AiPanel() {
+export function AiPanel({ active = true }: { active?: boolean }) {
   const status = useAiStatus()
   const config = useAiConfig()
   const error = status.error ?? config.error
@@ -98,22 +70,23 @@ export function AiPanel() {
   }
   return (
     <div className="stack">
-      <ProviderForm config={config.data} />
+      <ProviderForm config={config.data} active={active} />
       {status.data.configured && <ActiveProvider ai={status.data} />}
     </div>
   )
 }
 
-function ProviderForm({ config }: { config: AiConfig }) {
+function ProviderForm({ config, active }: { config: AiConfig; active: boolean }) {
   const id = useId()
   const [form, setForm] = useState(() => formOf(config))
   const [saved, setSaved] = useState(false)
   const save = useSaveAiConfig()
+  const models = useAiModels(form.provider === 'none' ? null : form.provider, undefined, active)
   const update = (change: Partial<Form>) => {
     setForm({ ...form, ...change })
     setSaved(false)
   }
-  const remote = form.provider === 'anthropic' || form.provider === 'openai-compatible'
+  const remote = isRemote(form.provider)
   const file = config.config_file ?? 'config.toml'
   return (
     <form
@@ -124,7 +97,7 @@ function ProviderForm({ config }: { config: AiConfig }) {
       }}
     >
       <label htmlFor={`${id}-provider`}>Provider</label>
-      <select id={`${id}-provider`} value={form.provider} onChange={(event) => { update({ provider: event.target.value as ProviderChoice }) }}>
+      <select id={`${id}-provider`} value={form.provider} onChange={(event) => { update({ provider: event.target.value as ProviderChoice, model: '' }) }}>
         {Object.entries(PROVIDERS).map(([value, label]) => (
           <option key={value} value={value}>
             {label}
@@ -135,7 +108,7 @@ function ProviderForm({ config }: { config: AiConfig }) {
       {form.provider !== 'none' && (
         <>
           <label htmlFor={`${id}-model`}>Model</label>
-          <input id={`${id}-model`} value={form.model} placeholder={MODEL_PLACEHOLDERS[form.provider]} onChange={(event) => { update({ model: event.target.value }) }} />
+          <AiModelPicker id={`${id}-model`} models={models.data} value={form.model} fallback={MODEL_DEFAULTS[form.provider]} onChange={(model) => { update({ model }) }} />
         </>
       )}
       {remote && (

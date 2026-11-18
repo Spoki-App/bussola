@@ -64,7 +64,7 @@ describe('SettingsButton', () => {
     expect(shownSettings()).toEqual(['Diff layout', 'Line wrap', 'Unit width'])
 
     fireEvent.click(screen.getByRole('button', { name: 'AI' }))
-    expect(shownSettings()).toEqual(['AI provider', 'AI models', 'AI prompts'])
+    expect(shownSettings()).toEqual(['AI provider and features'])
   })
 
   it('moves between categories with the arrow keys, Home and End', () => {
@@ -78,7 +78,7 @@ describe('SettingsButton', () => {
 
     press('End')
     expect(screen.getByRole('button', { name: 'AI' })).toHaveFocus()
-    expect(shownSettings()).toEqual(['AI provider', 'AI models', 'AI prompts'])
+    expect(shownSettings()).toEqual(['AI provider and features'])
 
     press('ArrowDown')
     expect(screen.getByRole('button', { name: 'AI' })).toHaveFocus()
@@ -100,10 +100,10 @@ describe('SettingsButton', () => {
     expect(Array.from(dialog.querySelectorAll('.setting:not([hidden]) mark'), (mark) => mark.textContent)).toEqual(['wrap', 'Wrap'])
 
     search('model')
-    expect(shownSettings()).toEqual(['AI provider', 'AI models', 'AI prompts'])
+    expect(shownSettings()).toEqual(['AI provider and features'])
 
     search('effort')
-    expect(shownSettings()).toEqual(['AI models'])
+    expect(shownSettings()).toEqual(['AI provider and features'])
 
     search('font')
     expect(shownSettings()).toEqual(['Code font'])
