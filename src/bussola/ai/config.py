@@ -56,16 +56,43 @@ class AiOperation(StrEnum):
     CHAT = "chat"
 
 
+def http_endpoint(endpoint: str | None) -> str | None:
+    if endpoint is None:
+        return None
+    if not endpoint.lower().startswith(HTTP_SCHEMES):
+        raise ValueError("endpoint must start with http:// or https://")
+    parts = urllib.parse.urlsplit(endpoint.rstrip("/"))
+    if any(character.isspace() for character in endpoint) or parts.query or parts.fragment or parts.username is not None or not parts.hostname:
+        raise ValueError("endpoint must be a plain http:// or https:// address with a host, without login, query or fragment")
+    _ = parts.port
+    return urllib.parse.urlunsplit(parts._replace(scheme=parts.scheme.lower(), netloc=parts.netloc.lower()))
+
+
 class AiOperationConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
+    provider: ProviderName | None = None
     model: str | None = None
     effort: Effort | None = None
+    endpoint: str | None = None
+    api_key_env: str | None = None
 
-    @field_validator("model")
+    @field_validator("provider")
     @classmethod
-    def _blank_is_global(cls, model: str | None) -> str | None:
-        return None if model is None else model.strip() or None
+    def _a_provider_or_global(cls, provider: ProviderName | None) -> ProviderName | None:
+        if provider == ProviderName.NONE:
+            raise ValueError("leave the provider out to use the one in [ai]")
+        return provider
+
+    @field_validator("model", "endpoint", "api_key_env", mode="before")
+    @classmethod
+    def _blank_is_global(cls, value: str | None) -> str | None:
+        return value.strip() or None if isinstance(value, str) else value
+
+    @field_validator("endpoint")
+    @classmethod
+    def _http_endpoint(cls, endpoint: str | None) -> str | None:
+        return http_endpoint(endpoint)
 
 
 class AiOperations(BaseModel):
@@ -82,9 +109,6 @@ class AiOperations(BaseModel):
     def custom(self) -> dict[str, dict[str, str]]:
         return {name: values for name, values in self.model_dump(mode="json", exclude_none=True).items() if values}
 
-    def models(self) -> dict[str, str]:
-        return {operation: chosen.model for operation in AiOperation if (chosen := self.of(operation)).model is not None}
-
 
 class AiPrompts(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -92,8 +116,9 @@ class AiPrompts(BaseModel):
     describe: str | None = Field(default=None, max_length=MAX_PROMPT_CHARACTERS)
     impact: str | None = Field(default=None, max_length=MAX_PROMPT_CHARACTERS)
     review: str | None = Field(default=None, max_length=MAX_PROMPT_CHARACTERS)
+    chat: str | None = Field(default=None, max_length=MAX_PROMPT_CHARACTERS)
 
-    @field_validator("describe", "impact", "review")
+    @field_validator("describe", "impact", "review", "chat")
     @classmethod
     def _blank_is_default(cls, text: str | None) -> str | None:
         return text if text is None or text.strip() else None
@@ -121,15 +146,7 @@ class UserAiConfig(BaseModel):
     @field_validator("endpoint")
     @classmethod
     def _http_endpoint(cls, endpoint: str | None) -> str | None:
-        if endpoint is None:
-            return None
-        if not endpoint.lower().startswith(HTTP_SCHEMES):
-            raise ValueError("endpoint must start with http:// or https://")
-        parts = urllib.parse.urlsplit(endpoint.rstrip("/"))
-        if any(character.isspace() for character in endpoint) or parts.query or parts.fragment or parts.username is not None or not parts.hostname:
-            raise ValueError("endpoint must be a plain http:// or https:// address with a host, without login, query or fragment")
-        _ = parts.port
-        return urllib.parse.urlunsplit(parts._replace(scheme=parts.scheme.lower(), netloc=parts.netloc.lower()))
+        return http_endpoint(endpoint)
 
 
 class UserConfig(BaseModel):
@@ -161,12 +178,26 @@ class AiSettings:
     def target(self) -> str | None:
         if not self.configured:
             return None
-        models = self.operations.models()
-        return json.dumps([self.provider, self.model, self.endpoint, models] if models else [self.provider, self.model, self.endpoint])
+        route = self._route()
+        routes = {operation.value: own for operation in AiOperation if (own := self.for_operation(operation)._route()) != route}
+        return json.dumps([*route, routes] if routes else route)
+
+    def _route(self) -> list[str | None]:
+        return [self.provider, self.model, self.endpoint]
 
     def for_operation(self, operation: AiOperation) -> "AiSettings":
         chosen = self.operations.of(operation)
-        return replace(self, model=chosen.model or self.model, effort=chosen.effort)
+        if chosen.provider in (None, self.provider):
+            return replace(self, model=chosen.model or self.model, effort=chosen.effort)
+        own = UserAiConfig(
+            provider=chosen.provider,
+            model=chosen.model,
+            endpoint=chosen.endpoint,
+            api_key_env=chosen.api_key_env,
+            timeout=self.timeout,
+            max_tokens=self.max_tokens,
+        )
+        return replace(resolve_ai_settings(own), effort=chosen.effort, operations=self.operations)
 
     def api_key(self) -> str | None:
         return (os.environ.get(self.api_key_env) or None) if self.api_key_env else None

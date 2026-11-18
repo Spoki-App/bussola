@@ -234,13 +234,54 @@ def test_an_operation_without_an_override_uses_the_global_model(tmp_path: Path) 
     assert (settings.for_operation(AiOperation.CHAT).model, settings.for_operation(AiOperation.CHAT).effort) == ("claude-opus-5-5", None)
 
 
-def test_a_model_chosen_for_an_operation_is_part_of_the_confirmed_target() -> None:
+def test_a_model_or_provider_chosen_for_an_operation_is_part_of_the_confirmed_target() -> None:
     plain = resolve_ai_settings(UserAiConfig(provider=ProviderName.ANTHROPIC))
     effort_only = resolve_ai_settings(UserAiConfig.model_validate({"provider": "anthropic", "operations": {"review": {"effort": "high"}}}))
     other_model = resolve_ai_settings(UserAiConfig.model_validate({"provider": "anthropic", "operations": {"impact": {"model": "claude-haiku-5-5"}}}))
+    other_provider = resolve_ai_settings(UserAiConfig.model_validate({"provider": "anthropic", "operations": {"chat": {"provider": "claude-code"}}}))
 
     assert effort_only.target == plain.target
-    assert other_model.target == '["anthropic", "claude-opus-5-5", "https://api.anthropic.com", {"impact": "claude-haiku-5-5"}]'
+    assert (
+        other_model.target
+        == '["anthropic", "claude-opus-5-5", "https://api.anthropic.com", {"impact": ["anthropic", "claude-haiku-5-5", "https://api.anthropic.com"]}]'
+    )
+    assert other_provider.target == '["anthropic", "claude-opus-5-5", "https://api.anthropic.com", {"chat": ["claude-code", null, null]}]'
+
+
+def test_an_operation_with_its_own_provider_uses_that_provider_and_its_defaults() -> None:
+    operations = {"review": {"provider": "anthropic", "effort": "high"}, "chat": {"provider": "claude-code", "endpoint": "http://ignored"}}
+    settings = resolve_ai_settings(UserAiConfig.model_validate({"provider": "claude-code", "timeout": 30, "operations": operations}))
+
+    review = settings.for_operation(AiOperation.REVIEW)
+
+    assert (review.provider, review.model, review.endpoint, review.api_key_env) == (
+        ProviderName.ANTHROPIC,
+        "claude-opus-5-5",
+        "https://api.anthropic.com",
+        "ANTHROPIC_API_KEY",
+    )
+    assert (review.effort, review.timeout) == (Effort.HIGH, 30)
+    assert settings.for_operation(AiOperation.CHAT) == settings
+    assert settings.for_operation(AiOperation.DESCRIBE) == settings
+
+
+def test_an_operation_on_another_endpoint_keeps_its_own_endpoint_and_key() -> None:
+    operations = {"describe": {"provider": "openai-compatible", "model": "qwen", "endpoint": "HTTP://Localhost:11434/v1/", "api_key_env": " "}}
+    settings = resolve_ai_settings(UserAiConfig.model_validate({"provider": "anthropic", "operations": operations}))
+
+    describe = settings.for_operation(AiOperation.DESCRIBE)
+
+    assert (describe.provider, describe.model, describe.endpoint, describe.api_key_env) == (
+        ProviderName.OPENAI_COMPATIBLE,
+        "qwen",
+        "http://localhost:11434/v1",
+        None,
+    )
+
+
+def test_an_operation_cannot_turn_its_provider_off() -> None:
+    with pytest.raises(ValueError, match="leave the provider out"):
+        UserAiConfig.model_validate({"provider": "anthropic", "operations": {"chat": {"provider": "none"}}})
 
 
 def test_the_effort_reaches_each_provider(monkeypatch: pytest.MonkeyPatch) -> None:

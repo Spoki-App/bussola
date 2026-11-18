@@ -98,7 +98,7 @@ function AiNoticeDialog({ ai, onAnswer }: { ai: AiStatus; onAnswer: (accepted: b
   const { ref: dialog, close } = useModalDialog()
   const accepted = useRef(false)
   const answered = useRef(false)
-  const overrides = ai.operations.filter((operation) => operation.model !== null)
+  const overrides = ai.operations.filter((operation) => operation.label !== null || operation.model !== null)
   const finish = () => {
     if (!answered.current) {
       answered.current = true
@@ -128,7 +128,20 @@ function AiNoticeDialog({ ai, onAnswer }: { ai: AiStatus; onAnswer: (accepted: b
         <ul>
           {overrides.map((operation) => (
             <li key={operation.key}>
-              {operation.title} uses the model <code>{operation.model}</code>.
+              {operation.title} uses {operation.label && <strong>{operation.label}</strong>}
+              {operation.label && operation.model && ' with '}
+              {operation.model && (
+                <>
+                  the model <code>{operation.model}</code>
+                </>
+              )}
+              {operation.label && operation.endpoint && (
+                <>
+                  {' '}
+                  at <code>{operation.endpoint}</code>
+                </>
+              )}
+              .
             </li>
           ))}
         </ul>

@@ -123,10 +123,13 @@ describe('AiActionButton', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('names the models chosen for single AI actions in the notice', async () => {
+  it('names the providers and models chosen for single AI actions in the notice', async () => {
+    const unset = { provider: null, label: null, model: null, effort: null, endpoint: null, api_key_env: null, problem: null }
     const operations = [
-      { key: 'impact' as const, title: 'Rate impact', model: 'qwen2.5-coder:1.5b', effort: 'low' as const },
-      { key: 'review' as const, title: 'AI review', model: null, effort: 'high' as const },
+      { ...unset, key: 'impact' as const, title: 'Rate impact', model: 'qwen2.5-coder:1.5b', effort: 'low' as const },
+      { ...unset, key: 'review' as const, title: 'AI review', effort: 'high' as const },
+      { ...unset, key: 'chat' as const, title: 'AI chat', provider: 'anthropic' as const, label: 'Anthropic API', model: 'claude-haiku-5-5' },
+      { ...unset, key: 'describe' as const, title: 'Describe', provider: 'claude-code' as const, label: 'Claude Code CLI' },
     ]
     renderButton({ ...LOCAL, operations })
 
@@ -134,6 +137,8 @@ describe('AiActionButton', () => {
 
     const notice = await screen.findByRole('dialog', { name: 'Send code to OpenAI-compatible endpoint?' })
     expect(notice).toHaveTextContent('Rate impact uses the model qwen2.5-coder:1.5b.')
+    expect(notice).toHaveTextContent('AI chat uses Anthropic API with the model claude-haiku-5-5.')
+    expect(notice).toHaveTextContent('Describe uses Claude Code CLI.')
     expect(notice).not.toHaveTextContent('AI review uses')
   })
 

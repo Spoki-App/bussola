@@ -3,6 +3,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from bussola.ai.config import AiOperationConfig
 from bussola.forge.base import BranchDeletion, MergeMethod, ReviewEvent
 from bussola.navigation.navigator import Origin, Resolver, TargetRole
 from bussola.review.ai_review import AiReviewPhase, RunStatus
@@ -585,8 +586,17 @@ class AiStatusOut(BaseModel):
 class AiOperationOut(BaseModel):
     key: str
     title: str
+    provider: str | None = None
+    label: str | None = None
     model: str | None = None
     effort: str | None = None
+    endpoint: str | None = None
+    api_key_env: str | None = None
+    problem: str | None = None
+
+
+class AiOperationIn(AiOperationConfig):
+    prompt: str | None = None
 
 
 class AiModelOut(BaseModel):
@@ -639,14 +649,6 @@ class AiPromptsOut(BaseModel):
     prompts: list[AiPromptOut]
     config_file: str | None = None
     problem: str | None = None
-
-
-class AiPromptsIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    describe: str | None = None
-    impact: str | None = None
-    review: str | None = None
 
 
 class AiTestOut(BaseModel):

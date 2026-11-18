@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { getJson, postJson, putJson } from './client'
-import type { AiConfig, AiConfigFields, AiModels, AiOperationChoice, AiOperationKey, AiPromptKey, AiPrompts, AiStatus, AiTestResult } from './types'
+import type { AiConfig, AiConfigFields, AiModels, AiOperationChoice, AiOperationKey, AiPrompts, AiProviderName, AiStatus, AiTestResult } from './types'
 
 export const aiKey = (repoId?: number) => ['ai', repoId ?? null] as const
 
@@ -55,22 +55,26 @@ export function useAiPrompts() {
   return useQuery({ queryKey: aiPromptsKey, queryFn: () => getJson<AiPrompts>('/ai/prompts'), retry: false })
 }
 
-export function useSaveAiPrompts() {
+export function useSaveAiOperation(key: AiOperationKey) {
   const client = useQueryClient()
   return useMutation({
-    mutationFn: (prompts: Record<AiPromptKey, string>) => putJson<AiPrompts>('/ai/prompts', prompts),
-    onSuccess: (saved) => { client.setQueryData(aiPromptsKey, saved) },
+    mutationFn: (choice: AiOperationChoice & { prompt: string }) => putJson<AiStatus>(`/ai/operations/${key}`, choice),
+    onSuccess: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['ai'] }),
+        client.invalidateQueries({ queryKey: aiPromptsKey }),
+        client.invalidateQueries({ queryKey: aiModelsKey }),
+      ]),
   })
 }
 
-export function useSaveAiOperations() {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (choices: Record<AiOperationKey, AiOperationChoice>) => putJson<AiStatus>('/ai/operations', choices),
-    onSuccess: () => client.invalidateQueries({ queryKey: ['ai'] }),
+export function useAiModels(provider: AiProviderName | null, operation?: AiOperationKey) {
+  const query = new URLSearchParams({ provider: provider ?? '', ...(operation && { operation }) })
+  return useQuery({
+    queryKey: [...aiModelsKey, provider, operation ?? null],
+    queryFn: () => getJson<AiModels>(`/ai/models?${query.toString()}`),
+    retry: false,
+    staleTime: Infinity,
+    enabled: provider !== null,
   })
-}
-
-export function useAiModels(enabled: boolean) {
-  return useQuery({ queryKey: aiModelsKey, queryFn: () => getJson<AiModels>('/ai/models'), retry: false, staleTime: Infinity, enabled })
 }

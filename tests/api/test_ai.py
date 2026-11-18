@@ -22,6 +22,9 @@ def client(data_dir: Path, config_file: Path, provider: FakeProvider | None = No
     return TestClient(create_app(settings, ai_factory=fake_factory(provider) if provider else None))
 
 
+UNSET_OPERATION = {"provider": None, "label": None, "model": None, "effort": None, "endpoint": None, "api_key_env": None, "problem": None}
+
+
 def write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
@@ -54,10 +57,8 @@ def test_the_status_names_the_provider_model_and_key_variable(data_dir: Path, co
         "config_file": str(config_file),
         "target": '["anthropic", "claude-opus-5-5", "https://api.anthropic.com"]',
         "operations": [
-            {"key": "describe", "title": "Describe", "model": None, "effort": None},
-            {"key": "impact", "title": "Rate impact", "model": None, "effort": None},
-            {"key": "review", "title": "AI review", "model": None, "effort": None},
-            {"key": "chat", "title": "AI chat", "model": None, "effort": None},
+            {"key": key, "title": title, **UNSET_OPERATION}
+            for key, title in [("describe", "Describe"), ("impact", "Rate impact"), ("review", "AI review"), ("chat", "AI chat")]
         ],
     }
 
@@ -290,74 +291,115 @@ def test_the_prompts_start_from_the_defaults(data_dir: Path, config_file: Path) 
         ("describe", "Describe", None),
         ("impact", "Rate impact", None),
         ("review", "AI review", None),
+        ("chat", "AI chat", None),
     ]
     assert prompts["prompts"][2]["default"].startswith("Report only problems that deserve the author's attention")
+    assert prompts["prompts"][3]["default"].startswith("answer: GitHub-flavored Markdown")
     assert prompts["config_file"] == str(config_file)
 
 
-def test_custom_prompts_are_saved_under_ai_prompts_and_the_default_text_is_not(data_dir: Path, config_file: Path) -> None:
-    write(config_file, ANTHROPIC_CONFIG)
-    api = client(data_dir, config_file)
-    default = api.get("/api/ai/prompts").json()["prompts"][1]["default"]
-
-    saved = api.put("/api/ai/prompts", json={"review": "Focus on security.\nWrite in Italian.", "impact": default, "describe": "  "}).json()
-
-    assert [prompt["custom"] for prompt in saved["prompts"]] == [None, None, "Focus on security.\nWrite in Italian."]
-    assert config_file.read_text() == "[ai]\nprovider = \"anthropic\"\n\n[ai.prompts]\nreview = '''\nFocus on security.\nWrite in Italian.'''\n"
-
-
-def test_saving_the_provider_keeps_the_prompts(data_dir: Path, config_file: Path) -> None:
-    write(config_file, ANTHROPIC_CONFIG)
-    api = client(data_dir, config_file)
-    api.put("/api/ai/prompts", json={"review": "Focus on security."})
-
-    api.put("/api/ai/config", json={"provider": "claude-code"})
-
-    assert api.get("/api/ai/prompts").json()["prompts"][2]["custom"] == "Focus on security."
-    assert api.get("/api/ai").json()["provider"] == "claude-code"
-
-
-def test_prompts_cannot_be_saved_over_a_broken_configuration(data_dir: Path, config_file: Path) -> None:
-    write(config_file, "[ai]\nprovider = 'unknown'\n")
-
-    response = client(data_dir, config_file).put("/api/ai/prompts", json={"review": "Focus on security."})
-
-    assert response.status_code == 409
-    assert response.json()["detail"].startswith("Fix the configuration file before changing the prompts")
-
-
-def test_each_operation_can_choose_its_model_and_effort(data_dir: Path, config_file: Path) -> None:
+def test_each_feature_saves_its_model_effort_and_prompt(data_dir: Path, config_file: Path) -> None:
     write(config_file, ANTHROPIC_CONFIG)
     api = client(data_dir, config_file)
 
-    saved = api.put("/api/ai/operations", json={"impact": {"model": "claude-haiku-5-5", "effort": "low"}, "review": {"model": " ", "effort": "high"}}).json()
+    api.put("/api/ai/operations/impact", json={"model": "claude-haiku-5-5", "effort": "low"})
+    saved = api.put("/api/ai/operations/review", json={"model": " ", "effort": "high", "prompt": "Focus on security.\nWrite in Italian."}).json()
 
     assert config_file.read_text() == (
-        '[ai]\nprovider = "anthropic"\n\n[ai.operations.impact]\nmodel = "claude-haiku-5-5"\neffort = "low"\n\n[ai.operations.review]\neffort = "high"\n'
+        '[ai]\nprovider = "anthropic"\n\n[ai.operations.impact]\nmodel = "claude-haiku-5-5"\neffort = "low"\n\n[ai.operations.review]\neffort = "high"\n\n'
+        "[ai.prompts]\nreview = '''\nFocus on security.\nWrite in Italian.'''\n"
     )
-    assert saved["operations"][1] == {"key": "impact", "title": "Rate impact", "model": "claude-haiku-5-5", "effort": "low"}
-    assert saved["operations"][2] == {"key": "review", "title": "AI review", "model": None, "effort": "high"}
-    assert saved["target"] == '["anthropic", "claude-opus-5-5", "https://api.anthropic.com", {"impact": "claude-haiku-5-5"}]'
+    assert saved["operations"][1] == {**UNSET_OPERATION, "key": "impact", "title": "Rate impact", "model": "claude-haiku-5-5", "effort": "low"}
+    assert saved["operations"][2] == {**UNSET_OPERATION, "key": "review", "title": "AI review", "effort": "high"}
+    assert (
+        saved["target"]
+        == '["anthropic", "claude-opus-5-5", "https://api.anthropic.com", {"impact": ["anthropic", "claude-haiku-5-5", "https://api.anthropic.com"]}]'
+    )
     assert api.get("/api/ai").json()["operations"] == saved["operations"]
+    assert [prompt["custom"] for prompt in api.get("/api/ai/prompts").json()["prompts"]] == [None, None, "Focus on security.\nWrite in Italian.", None]
 
 
-def test_an_unknown_effort_is_refused(data_dir: Path, config_file: Path) -> None:
+def test_saving_a_feature_replaces_only_that_feature(data_dir: Path, config_file: Path) -> None:
+    write(config_file, ANTHROPIC_CONFIG)
+    api = client(data_dir, config_file)
+    default = api.get("/api/ai/prompts").json()["prompts"][3]["default"]
+    api.put("/api/ai/operations/describe", json={"effort": "high", "prompt": "Be brief."})
+    api.put("/api/ai/operations/chat", json={"model": "claude-haiku-5-5", "prompt": "Answer in Italian."})
+
+    api.put("/api/ai/operations/chat", json={"effort": "low", "prompt": default})
+
+    assert config_file.read_text() == (
+        '[ai]\nprovider = "anthropic"\n\n[ai.operations.describe]\neffort = "high"\n\n[ai.operations.chat]\neffort = "low"\n\n'
+        "[ai.prompts]\ndescribe = '''\nBe brief.'''\n"
+    )
+
+
+def test_a_feature_can_use_its_own_provider(data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    write(config_file, '[ai]\nprovider = "claude-code"\n')
+    monkeypatch.delenv("MY_KEY", raising=False)
+    api = TestClient(create_app(AppSettings(data_dir=data_dir, static_dir=data_dir / "static", config_file=config_file)))
+
+    saved = api.put("/api/ai/operations/review", json={"provider": "anthropic", "model": "claude-haiku-5-5", "api_key_env": "MY_KEY"}).json()
+
+    assert config_file.read_text() == (
+        '[ai]\nprovider = "claude-code"\n\n[ai.operations.review]\nprovider = "anthropic"\nmodel = "claude-haiku-5-5"\napi_key_env = "MY_KEY"\n'
+    )
+    assert saved["operations"][2] == {
+        **UNSET_OPERATION,
+        "key": "review",
+        "title": "AI review",
+        "provider": "anthropic",
+        "label": "Anthropic API",
+        "model": "claude-haiku-5-5",
+        "api_key_env": "MY_KEY",
+        "problem": "Set the MY_KEY environment variable",
+    }
+    assert saved["target"] == '["claude-code", null, null, {"review": ["anthropic", "claude-haiku-5-5", "https://api.anthropic.com"]}]'
+
+
+@pytest.mark.parametrize(
+    ("body", "reason"),
+    [
+        ({"effort": "extreme"}, "effort"),
+        ({"provider": "none"}, "leave the provider out"),
+        ({"provider": "openai-compatible", "endpoint": "ftp://models"}, "endpoint must start with http"),
+    ],
+)
+def test_invalid_feature_settings_are_refused(data_dir: Path, config_file: Path, body: dict[str, str], reason: str) -> None:
     write(config_file, ANTHROPIC_CONFIG)
 
-    response = client(data_dir, config_file).put("/api/ai/operations", json={"chat": {"effort": "extreme"}})
+    response = client(data_dir, config_file).put("/api/ai/operations/chat", json=body)
 
     assert response.status_code == 422
+    assert reason in response.text
     assert config_file.read_text() == ANTHROPIC_CONFIG
 
 
-def test_saving_the_provider_keeps_the_operations(data_dir: Path, config_file: Path) -> None:
+def test_an_unknown_feature_is_refused(data_dir: Path, config_file: Path) -> None:
+    write(config_file, ANTHROPIC_CONFIG)
+
+    assert client(data_dir, config_file).put("/api/ai/operations/translate", json={}).status_code == 422
+
+
+def test_feature_settings_cannot_be_saved_over_a_broken_configuration(data_dir: Path, config_file: Path) -> None:
+    write(config_file, "[ai]\nprovider = 'unknown'\n")
+
+    response = client(data_dir, config_file).put("/api/ai/operations/review", json={"prompt": "Focus on security."})
+
+    assert response.status_code == 409
+    assert response.json()["detail"].startswith("Fix the configuration file before changing the AI settings")
+
+
+def test_saving_the_provider_keeps_the_features(data_dir: Path, config_file: Path) -> None:
     write(config_file, ANTHROPIC_CONFIG)
     api = client(data_dir, config_file)
-    api.put("/api/ai/operations", json={"chat": {"effort": "medium"}})
+    api.put("/api/ai/operations/chat", json={"effort": "medium", "prompt": "Answer in Italian."})
 
     api.put("/api/ai/config", json={"provider": "claude-code"})
 
     assert api.get("/api/ai").json()["operations"][3]["effort"] == "medium"
+    assert api.get("/api/ai/prompts").json()["prompts"][3]["custom"] == "Answer in Italian."
+    assert api.get("/api/ai").json()["provider"] == "claude-code"
 
 
 def test_the_models_come_from_the_provider(data_dir: Path, config_file: Path) -> None:
@@ -382,3 +424,20 @@ def test_models_that_cannot_be_listed_leave_the_model_as_free_text(data_dir: Pat
 
 def test_without_a_provider_there_are_no_models(data_dir: Path, config_file: Path) -> None:
     assert client(data_dir, config_file).get("/api/ai/models").json() == {"models": [], "problem": None}
+
+
+def test_the_models_of_a_feature_come_from_its_provider(data_dir: Path, config_file: Path) -> None:
+    write(config_file, '[ai]\nprovider = "claude-code"\n\n[ai.operations.review]\nprovider = "openai-compatible"\nendpoint = "http://localhost:1/v1"\n')
+    provider = FakeProvider({"ok": True})
+    api = client(data_dir, config_file, provider)
+
+    api.get("/api/ai/models", params={"operation": "review", "provider": "openai-compatible"})
+    review = provider.settings
+    api.get("/api/ai/models", params={"operation": "describe", "provider": "anthropic"})
+    other = provider.settings
+    api.get("/api/ai/models", params={"provider": "claude-code"})
+    general = provider.settings
+
+    assert review is not None and (review.provider, review.endpoint) == ("openai-compatible", "http://localhost:1/v1")
+    assert other is not None and (other.provider, other.endpoint, other.api_key_env) == ("anthropic", "https://api.anthropic.com", "ANTHROPIC_API_KEY")
+    assert general is not None and general.provider == "claude-code"

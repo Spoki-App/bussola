@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { AiConfig, AiStatus, AiTestResult } from '../api/types'
+import type { AiConfig, AiModels, AiStatus, AiTestResult } from '../api/types'
 import { AiPanel } from './AiPanel'
 
 const CONFIG_FILE = '/home/me/.config/bussola/config.toml'
@@ -51,12 +51,16 @@ interface Api {
   config?: AiConfig
   test?: AiTestResult
   save?: Response
+  models?: AiModels
 }
 
-function stubApi({ status, config = { ...EMPTY_CONFIG, provider: status.provider }, test, save }: Api) {
+function stubApi({ status, config = { ...EMPTY_CONFIG, provider: status.provider }, test, save, models = { models: [], problem: null } }: Api) {
   const fetchMock = vi.fn((input: string, init?: RequestInit) => {
     if (input.endsWith('/ai/test')) {
       return Promise.resolve(Response.json(test))
+    }
+    if (input.startsWith('/api/ai/models')) {
+      return Promise.resolve(Response.json(models))
     }
     if (input.endsWith('/ai/config')) {
       return Promise.resolve(init?.method === 'PUT' ? (save ?? Response.json(status)) : Response.json(config))
@@ -111,6 +115,22 @@ describe('AiPanel', () => {
 
     expect(await screen.findByText('Saved')).toBeInTheDocument()
     expect(savedBody(fetchMock)).toEqual({ provider: 'claude-code', model: 'claude-opus-5-5', endpoint: null, api_key_env: null, timeout: 600, max_tokens: null, max_code_characters: null })
+  })
+
+  it('picks the model from the models the chosen provider lists', async () => {
+    const fetchMock = stubApi({ status: OFF, models: { models: [{ id: 'opus', effort: null }, { id: 'haiku', effort: null }], problem: null } })
+    renderPanel()
+
+    fireEvent.change(await screen.findByLabelText('Provider'), { target: { value: 'claude-code' } })
+    const model = await screen.findByRole('combobox', { name: 'Model' })
+    expect(Array.from(model.querySelectorAll('option'), (option) => option.textContent)).toEqual(['Default of the claude command', 'opus', 'haiku'])
+    fireEvent.change(model, { target: { value: 'haiku' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(savedBody(fetchMock)).toMatchObject({ provider: 'claude-code', model: 'haiku' })
+    })
+    expect(fetchMock).toHaveBeenCalledWith('/api/ai/models?provider=claude-code', expect.anything())
   })
 
   it('asks for the endpoint, the key variable and the answer budget of an API provider', async () => {
