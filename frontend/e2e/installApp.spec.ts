@@ -25,6 +25,16 @@ test('the app explains how to start bussola while the server is down, then reloa
   await expect(page.getByText(`bussola serve --port ${String(E2E_PORT)}`)).toBeVisible()
   await expect(page.getByRole('link', { name: 'bussola:// link' })).toHaveCount(0)
 
+  let otherServerAnswers = 0
+  await page.evaluate(() => Object.assign(window, { notReloaded: true }))
+  await page.route('**/api/health', (route) => {
+    otherServerAnswers += 1
+    return route.fulfill({ json: { status: 'ok' } })
+  })
+  await expect.poll(() => otherServerAnswers, { timeout: 5000 }).toBeGreaterThan(1)
+  expect(await page.evaluate(() => 'notReloaded' in window)).toBe(true)
+  await page.unroute('**/api/health')
+
   await context.setOffline(false)
 
   await expect(page.getByRole('heading', { name: 'demo' })).toBeVisible()

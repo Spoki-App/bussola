@@ -32,7 +32,8 @@ const OFFLINE_PAGE = `<!doctype html>
         document.getElementById('command').textContent = 'bussola serve --port ' + location.port
         document.getElementById('link').remove()
       }
-      setInterval(() => fetch('/api/health', { cache: 'no-store' }).then(() => location.reload(), () => undefined), 2000)
+      const isBussola = (body) => body.app === 'bussola' || body.code === 'invalid_token'
+      setInterval(() => fetch('/api/health', { cache: 'no-store' }).then((response) => response.json()).then((body) => isBussola(body) && location.reload(), () => undefined), 2000)
     </script>
   </body>
 </html>`
