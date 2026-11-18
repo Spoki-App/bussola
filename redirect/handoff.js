@@ -1,28 +1,20 @@
 function lostFocus(window, timeoutMs) {
   const { document } = window
   return new Promise((resolve) => {
-    const finish = (lost) => {
-      window.clearTimeout(timer)
-      window.removeEventListener('blur', onBlur)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      resolve(lost)
-    }
-    const onBlur = () => finish(true)
-    const onVisibilityChange = () => {
+    window.setTimeout(() => resolve(false), timeoutMs)
+    window.addEventListener('blur', () => resolve(true))
+    document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
-        finish(true)
+        resolve(true)
       }
-    }
-    const timer = window.setTimeout(() => finish(false), timeoutMs)
-    window.addEventListener('blur', onBlur)
-    document.addEventListener('visibilitychange', onVisibilityChange)
+    })
   })
 }
 
 export async function handOff(window, timeoutMs) {
-  if (!(await lostFocus(window, timeoutMs))) {
-    return 'unconfirmed'
+  const opened = await lostFocus(window, timeoutMs)
+  if (opened) {
+    window.close()
   }
-  window.close()
-  return window.closed ? 'closed' : 'open'
+  return opened
 }

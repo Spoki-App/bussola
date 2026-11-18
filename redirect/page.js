@@ -21,12 +21,12 @@ function openLink(link) {
     show('github-item')
   }
   show('opening')
-  handOff(window, FALLBACK_DELAY_MS).then((outcome) => {
-    if (outcome === 'unconfirmed') {
-      show('fallback')
-    } else if (outcome === 'open') {
+  handOff(window, FALLBACK_DELAY_MS).then((opened) => {
+    if (opened) {
       hide('opening')
       show('opened')
+    } else {
+      show('fallback')
     }
   })
   window.location.href = link
