@@ -353,10 +353,16 @@ export interface AiOperationChoice {
   api_key_env: string | null
 }
 
+export interface AiRoute {
+  label: string | null
+  model: string | null
+  endpoint: string | null
+}
+
 export interface AiOperation extends AiOperationChoice {
   key: AiOperationKey
   title: string
-  label: string | null
+  uses: AiRoute | null
   problem: string | null
 }
 

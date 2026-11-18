@@ -165,6 +165,7 @@ class AiSettings:
     max_tokens: int | None = None
     effort: Effort | None = None
     operations: AiOperations = field(default_factory=AiOperations)
+    section: str = "[ai]"
 
     @property
     def configured(self) -> bool:
@@ -178,18 +179,18 @@ class AiSettings:
     def target(self) -> str | None:
         if not self.configured:
             return None
-        route = self._route()
-        routes = {operation.value: own for operation in AiOperation if (own := self.for_operation(operation)._route()) != route}
+        route = self.route()
+        routes = {operation.value: own for operation in AiOperation if (own := self.for_operation(operation).route()) != route}
         return json.dumps([*route, routes] if routes else route)
 
-    def _route(self) -> list[str | None]:
+    def route(self) -> list[str | None]:
         return [self.provider, self.model, self.endpoint]
 
     def for_operation(self, operation: AiOperation) -> "AiSettings":
         chosen = self.operations.of(operation)
-        if chosen.provider in (None, self.provider):
+        if chosen.provider is None or (chosen.provider == self.provider and chosen.endpoint is None and chosen.api_key_env is None):
             return replace(self, model=chosen.model or self.model, effort=chosen.effort)
-        return replace(self.on_provider(chosen.provider, chosen), effort=chosen.effort)
+        return replace(self.on_provider(chosen.provider, chosen), effort=chosen.effort, section=f"[ai.operations.{operation.value}]")
 
     def on_provider(self, provider: ProviderName, route: AiOperationConfig | None = None) -> "AiSettings":
         chosen = route or AiOperationConfig()

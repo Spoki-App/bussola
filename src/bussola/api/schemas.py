@@ -583,10 +583,16 @@ class AiStatusOut(BaseModel):
     operations: list["AiOperationOut"] = []
 
 
+class AiRouteOut(BaseModel):
+    label: str | None
+    model: str | None
+    endpoint: str | None
+
+
 class AiOperationOut(AiOperationConfig):
     key: str
     title: str
-    label: str | None = None
+    uses: AiRouteOut | None = None
     problem: str | None = None
 
 

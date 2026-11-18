@@ -260,9 +260,21 @@ def test_an_operation_with_its_own_provider_uses_that_provider_and_its_defaults(
         "https://api.anthropic.com",
         "ANTHROPIC_API_KEY",
     )
-    assert (review.effort, review.timeout) == (Effort.HIGH, 30)
-    assert settings.for_operation(AiOperation.CHAT) == settings
+    assert (review.effort, review.timeout, review.section) == (Effort.HIGH, 30, "[ai.operations.review]")
+    assert settings.for_operation(AiOperation.CHAT).route() == settings.route()
     assert settings.for_operation(AiOperation.DESCRIBE) == settings
+
+
+def test_an_operation_on_the_general_provider_with_its_own_endpoint_keeps_it() -> None:
+    general = {"provider": "openai-compatible", "endpoint": "https://corp.example/v1", "model": "big"}
+    operations = {
+        "chat": {"provider": "openai-compatible", "endpoint": "http://localhost:11434/v1", "model": "small"},
+        "review": {"provider": "openai-compatible"},
+    }
+    settings = resolve_ai_settings(UserAiConfig.model_validate({**general, "operations": operations}))
+
+    assert settings.for_operation(AiOperation.CHAT).route() == ["openai-compatible", "small", "http://localhost:11434/v1"]
+    assert settings.for_operation(AiOperation.REVIEW) == settings
 
 
 def test_an_operation_on_another_endpoint_keeps_its_own_endpoint_and_key() -> None:

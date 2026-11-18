@@ -97,7 +97,7 @@ function ProviderForm({ config, active }: { config: AiConfig; active: boolean })
       }}
     >
       <label htmlFor={`${id}-provider`}>Provider</label>
-      <select id={`${id}-provider`} value={form.provider} onChange={(event) => { update({ provider: event.target.value as ProviderChoice }) }}>
+      <select id={`${id}-provider`} value={form.provider} onChange={(event) => { update({ provider: event.target.value as ProviderChoice, model: '' }) }}>
         {Object.entries(PROVIDERS).map(([value, label]) => (
           <option key={value} value={value}>
             {label}

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AiConfig, AiModels, AiOperation, AiPrompts, AiStatus } from '../api/types'
 import { AiSettingsPanel } from './AiSettingsPanel'
 
-const UNSET = { provider: null, label: null, model: null, effort: null, endpoint: null, api_key_env: null, problem: null }
+const UNSET = { provider: null, model: null, effort: null, endpoint: null, api_key_env: null, uses: null, problem: null }
 
 const OPERATIONS: AiOperation[] = [
   { ...UNSET, key: 'describe', title: 'Describe' },
@@ -158,7 +158,7 @@ describe('AiSettingsPanel', () => {
   })
 
   it('lists the models of a feature only once its tab is open', async () => {
-    const operations = OPERATIONS.map((operation) => (operation.key === 'chat' ? { ...operation, provider: 'claude-code' as const, label: 'Claude Code CLI' } : operation))
+    const operations = OPERATIONS.map((operation) => (operation.key === 'chat' ? { ...operation, provider: 'claude-code' as const, uses: { label: 'Claude Code CLI', model: null, endpoint: null } } : operation))
     const fetchMock = renderPanel({ ...STATUS, operations })
     await screen.findByRole('tab', { name: 'AI chat' })
     await waitFor(() => {
@@ -184,12 +184,32 @@ describe('AiSettingsPanel', () => {
 
   it('shows the problem of a feature provider and of a broken configuration', async () => {
     const operations = OPERATIONS.map((operation) =>
-      operation.key === 'chat' ? { ...operation, provider: 'anthropic' as const, label: 'Anthropic API', problem: 'Set the MY_KEY environment variable' } : operation,
+      operation.key === 'chat' ? { ...operation, provider: 'anthropic' as const, problem: 'Set the MY_KEY environment variable' } : operation,
     )
     renderPanel({ ...STATUS, provider: 'claude-code', label: 'Claude Code CLI', model: null, operations })
     await screen.findByRole('tab', { name: 'AI chat' })
 
-    expect(await within(await waitFor(() => openTab('AI chat'))).findByRole('alert')).toHaveTextContent('Set the MY_KEY environment variable')
+    const chat = within(await waitFor(() => openTab('AI chat')))
+    expect(await chat.findByRole('alert')).toHaveTextContent('Set the MY_KEY environment variable')
+
+    fireEvent.change(chat.getByLabelText('AI chat provider'), { target: { value: 'claude-code' } })
+
+    expect(chat.queryByRole('alert')).toBeNull()
+  })
+
+  it('keeps an endpoint for a feature on the same provider as General', async () => {
+    const fetchMock = renderPanel()
+    await screen.findByRole('tab', { name: 'AI chat' })
+    const chat = within(await waitFor(() => openTab('AI chat')))
+
+    fireEvent.change(chat.getByLabelText('AI chat provider'), { target: { value: 'anthropic' } })
+    expect(chat.getByLabelText('AI chat endpoint')).toHaveAttribute('placeholder', 'Same as General: https://api.anthropic.com')
+    fireEvent.change(chat.getByLabelText('AI chat endpoint'), { target: { value: 'https://proxy.example' } })
+    fireEvent.click(chat.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(savedRequest(fetchMock)?.[1]).toMatchObject({ provider: 'anthropic', endpoint: 'https://proxy.example', api_key_env: '' })
+    })
   })
 
   it('shows why the features cannot be set when the configuration is broken', async () => {

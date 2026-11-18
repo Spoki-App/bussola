@@ -133,6 +133,18 @@ describe('AiPanel', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/ai/models?provider=claude-code', expect.anything())
   })
 
+  it('clears the model when the provider changes', async () => {
+    const fetchMock = stubApi({ status: ANTHROPIC, config: { ...EMPTY_CONFIG, provider: 'anthropic', model: 'claude-opus-5-5' } })
+    renderPanel()
+
+    fireEvent.change(await screen.findByLabelText('Provider'), { target: { value: 'claude-code' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(savedBody(fetchMock)).toMatchObject({ provider: 'claude-code', model: '' })
+    })
+  })
+
   it('asks for the endpoint, the key variable and the answer budget of an API provider', async () => {
     const fetchMock = stubApi({ status: OFF, config: { ...EMPTY_CONFIG, timeout: null } })
     renderPanel()

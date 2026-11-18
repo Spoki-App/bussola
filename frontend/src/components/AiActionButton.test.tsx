@@ -124,20 +124,20 @@ describe('AiActionButton', () => {
   })
 
   it('names the providers and models chosen for single AI actions in the notice', async () => {
-    const unset = { provider: null, label: null, model: null, effort: null, endpoint: null, api_key_env: null, problem: null }
+    const unset = { provider: null, model: null, effort: null, endpoint: null, api_key_env: null, problem: null, uses: null }
     const operations = [
-      { ...unset, key: 'impact' as const, title: 'Rate impact', model: 'qwen2.5-coder:1.5b', effort: 'low' as const },
+      { ...unset, key: 'impact' as const, title: 'Rate impact', model: 'qwen2.5-coder:1.5b', effort: 'low' as const, uses: { label: 'OpenAI-compatible endpoint', model: 'qwen2.5-coder:1.5b', endpoint: null } },
       { ...unset, key: 'review' as const, title: 'AI review', effort: 'high' as const },
-      { ...unset, key: 'chat' as const, title: 'AI chat', provider: 'anthropic' as const, label: 'Anthropic API', model: 'claude-haiku-5-5' },
-      { ...unset, key: 'describe' as const, title: 'Describe', provider: 'claude-code' as const, label: 'Claude Code CLI' },
+      { ...unset, key: 'chat' as const, title: 'AI chat', provider: 'anthropic' as const, uses: { label: 'Anthropic API', model: 'claude-opus-5-5', endpoint: 'https://api.anthropic.com' } },
+      { ...unset, key: 'describe' as const, title: 'Describe', provider: 'claude-code' as const, uses: { label: 'Claude Code CLI', model: null, endpoint: null } },
     ]
     renderButton({ ...LOCAL, operations })
 
     fireEvent.click(await screen.findByRole('button', { name: 'Describe' }))
 
     const notice = await screen.findByRole('dialog', { name: 'Send code to OpenAI-compatible endpoint?' })
-    expect(notice).toHaveTextContent('Rate impact uses the model qwen2.5-coder:1.5b.')
-    expect(notice).toHaveTextContent('AI chat uses Anthropic API with the model claude-haiku-5-5.')
+    expect(notice).toHaveTextContent('Rate impact uses OpenAI-compatible endpoint with the model qwen2.5-coder:1.5b.')
+    expect(notice).toHaveTextContent('AI chat uses Anthropic API with the model claude-opus-5-5 at https://api.anthropic.com.')
     expect(notice).toHaveTextContent('Describe uses Claude Code CLI.')
     expect(notice).not.toHaveTextContent('AI review uses')
   })

@@ -30,6 +30,7 @@ from bussola.api.schemas import (
     AiOperationOut,
     AiPromptOut,
     AiPromptsOut,
+    AiRouteOut,
     AiStatusOut,
     AiTestOut,
     CancelOut,
@@ -179,13 +180,14 @@ def _operations_out(state: AppState, settings: AiSettings) -> list[AiOperationOu
 
 def _operation_out(state: AppState, settings: AiSettings, key: AiOperation, title: str) -> AiOperationOut:
     routed = settings.for_operation(key)
-    own = settings.configured and routed.provider != settings.provider
+    moved = settings.configured and (routed.provider, routed.endpoint, routed.api_key_env) != (settings.provider, settings.endpoint, settings.api_key_env)
+    rerouted = settings.configured and routed.route() != settings.route()
     return AiOperationOut(
         key=key,
         title=title,
         **settings.operations.of(key).model_dump(),
-        label=routed.label if own else None,
-        problem=_problem(state, routed) if own else None,
+        uses=AiRouteOut(label=routed.label, model=routed.model, endpoint=routed.endpoint) if rerouted else None,
+        problem=_problem(state, routed) if moved else None,
     )
 
 

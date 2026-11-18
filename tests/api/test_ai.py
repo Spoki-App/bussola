@@ -22,7 +22,7 @@ def client(data_dir: Path, config_file: Path, provider: FakeProvider | None = No
     return TestClient(create_app(settings, ai_factory=fake_factory(provider) if provider else None))
 
 
-UNSET_OPERATION = {"provider": None, "label": None, "model": None, "effort": None, "endpoint": None, "api_key_env": None, "problem": None}
+UNSET_OPERATION = {"provider": None, "model": None, "effort": None, "endpoint": None, "api_key_env": None, "uses": None, "problem": None}
 
 
 def write(path: Path, content: str) -> None:
@@ -303,7 +303,14 @@ def test_each_feature_saves_its_model_effort_and_prompt(data_dir: Path, config_f
         '[ai]\nprovider = "anthropic"\n\n[ai.operations.impact]\nmodel = "claude-haiku-5-5"\neffort = "low"\n\n[ai.operations.review]\neffort = "high"\n\n'
         "[ai.prompts]\nreview = '''\nFocus on security.\nWrite in Italian.'''\n"
     )
-    assert saved["operations"][1] == {**UNSET_OPERATION, "key": "impact", "title": "Rate impact", "model": "claude-haiku-5-5", "effort": "low"}
+    assert saved["operations"][1] == {
+        **UNSET_OPERATION,
+        "key": "impact",
+        "title": "Rate impact",
+        "model": "claude-haiku-5-5",
+        "effort": "low",
+        "uses": {"label": "Anthropic API", "model": "claude-haiku-5-5", "endpoint": "https://api.anthropic.com"},
+    }
     assert saved["operations"][2] == {**UNSET_OPERATION, "key": "review", "title": "AI review", "effort": "high"}
     assert (
         saved["target"]
@@ -343,12 +350,22 @@ def test_a_feature_can_use_its_own_provider(data_dir: Path, config_file: Path, m
         "key": "review",
         "title": "AI review",
         "provider": "anthropic",
-        "label": "Anthropic API",
         "model": "claude-haiku-5-5",
         "api_key_env": "MY_KEY",
+        "uses": {"label": "Anthropic API", "model": "claude-haiku-5-5", "endpoint": "https://api.anthropic.com"},
         "problem": "Set the MY_KEY environment variable",
     }
     assert saved["target"] == '["claude-code", null, null, {"review": ["anthropic", "claude-haiku-5-5", "https://api.anthropic.com"]}]'
+
+
+def test_a_feature_on_the_general_provider_keeps_its_own_endpoint(data_dir: Path, config_file: Path) -> None:
+    write(config_file, '[ai]\nprovider = "openai-compatible"\nendpoint = "https://corp.example/v1"\nmodel = "big"\n')
+    api = TestClient(create_app(AppSettings(data_dir=data_dir, static_dir=data_dir / "static", config_file=config_file)))
+
+    saved = api.put("/api/ai/operations/chat", json={"provider": "openai-compatible", "endpoint": "http://localhost:11434/v1"}).json()
+
+    assert saved["operations"][3]["uses"] == {"label": "OpenAI-compatible endpoint", "model": None, "endpoint": "http://localhost:11434/v1"}
+    assert saved["operations"][3]["problem"] == "Set model in the [ai.operations.chat] section of your configuration"
 
 
 @pytest.mark.parametrize(

@@ -47,11 +47,13 @@ export function AiFeaturePanel({ ai, operation, prompt, active }: Props) {
   const [saved, setSaved] = useState(false)
   const save = useSaveAiOperation(operation.key)
   const global = ai.configured ? ai.provider : null
-  const own = form.provider !== '' && form.provider !== global ? form.provider : null
-  const ownRemote = own !== null && isRemote(own) ? own : null
+  const ownRoute = form.provider !== global || form.endpoint.trim() !== '' || form.apiKeyEnv.trim() !== ''
+  const own = form.provider !== '' && ownRoute ? form.provider : null
+  const ownRemote = form.provider !== '' && isRemote(form.provider) ? form.provider : null
   const provider = form.provider || global
-  const models = useAiModels(provider, own ? operation.key : undefined, active)
-  const listing = models.data && { ...models.data, problem: models.data.problem === operation.problem ? null : models.data.problem }
+  const models = useAiModels(provider, form.provider ? operation.key : undefined, active)
+  const problem = form.provider === (operation.provider ?? '') ? operation.problem : null
+  const listing = models.data && { ...models.data, problem: models.data.problem === problem ? null : models.data.problem }
   const effort = takesEffort(models.data?.models ?? [], form.model || (own ? null : ai.model))
   const customPrompt = form.prompt.trim() !== prompt.default.trim()
   const update = (change: Partial<Form>) => {
@@ -90,12 +92,12 @@ export function AiFeaturePanel({ ai, operation, prompt, active }: Props) {
       {ownRemote && (
         <>
           <label htmlFor={`${id}-endpoint`}>{`${operation.title} endpoint`}</label>
-          <input id={`${id}-endpoint`} value={form.endpoint} placeholder={ENDPOINT_PLACEHOLDERS[ownRemote]} onChange={(event) => { update({ endpoint: event.target.value }) }} />
+          <input id={`${id}-endpoint`} value={form.endpoint} placeholder={ownRemote === global ? `Same as General: ${ai.endpoint ?? ''}` : ENDPOINT_PLACEHOLDERS[ownRemote]} onChange={(event) => { update({ endpoint: event.target.value }) }} />
           <label htmlFor={`${id}-key`}>{`${operation.title} API key environment variable`}</label>
-          <input id={`${id}-key`} value={form.apiKeyEnv} placeholder={KEY_PLACEHOLDERS[ownRemote]} spellCheck={false} onChange={(event) => { update({ apiKeyEnv: event.target.value }) }} />
+          <input id={`${id}-key`} value={form.apiKeyEnv} placeholder={ownRemote === global ? `Same as General: ${ai.api_key_env ?? 'none'}` : KEY_PLACEHOLDERS[ownRemote]} spellCheck={false} onChange={(event) => { update({ apiKeyEnv: event.target.value }) }} />
         </>
       )}
-      {operation.problem && <ErrorNote message={operation.problem} />}
+      {problem && <ErrorNote message={problem} />}
       <label htmlFor={`${id}-model`}>{`${operation.title} model`}</label>
       <AiModelPicker id={`${id}-model`} models={listing} value={form.model} fallback={fallback} onChange={(model) => { update({ model }) }} />
       <label htmlFor={`${id}-effort`}>{`${operation.title} effort`}</label>
