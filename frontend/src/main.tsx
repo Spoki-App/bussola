@@ -14,6 +14,10 @@ applyCodeFont(loadCodeFont())
 syncDiffWrap()
 syncTheme()
 
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  void navigator.serviceWorker.register('/sw.js').catch(() => undefined)
+}
+
 const queryClient = new QueryClient()
 const rootElement = document.getElementById('root')
 if (!rootElement) {

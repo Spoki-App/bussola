@@ -4,6 +4,7 @@ import secrets
 TOKEN_COOKIE = "bussola_token"
 TOKEN_QUERY = "token"
 TOKEN_ENV = "BUSSOLA_TOKEN"
+TOKEN_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 API_PATH_PREFIX = "/api/"
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
 INVALID_TOKEN_DETAIL = "Missing or invalid session token"

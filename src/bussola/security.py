@@ -5,7 +5,7 @@ from urllib.parse import urlencode
 from fastapi import FastAPI, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from bussola.access import API_PATH_PREFIX, INVALID_TOKEN_CODE, INVALID_TOKEN_DETAIL, TOKEN_QUERY, token_cookie
+from bussola.access import API_PATH_PREFIX, INVALID_TOKEN_CODE, INVALID_TOKEN_DETAIL, TOKEN_COOKIE_MAX_AGE_SECONDS, TOKEN_QUERY, token_cookie
 from bussola.config import AppSettings
 
 type CallNext = Callable[[Request], Awaitable[Response]]
@@ -35,5 +35,5 @@ def _store_token_and_redirect(request: Request, token: str, cookie: str) -> Resp
     remaining = [(key, value) for key, value in request.query_params.multi_items() if key != TOKEN_QUERY]
     target = request.url.path + (f"?{urlencode(remaining)}" if remaining else "")
     response = RedirectResponse(target, status_code=status.HTTP_303_SEE_OTHER)
-    response.set_cookie(cookie, token, httponly=True, samesite="strict", path="/")
+    response.set_cookie(cookie, token, max_age=TOKEN_COOKIE_MAX_AGE_SECONDS, httponly=True, samesite="strict", path="/")
     return response

@@ -95,6 +95,17 @@ describe('theme store', () => {
     expect(window.localStorage.getItem('bussola.theme')).toBe('light')
   })
 
+  it('colors the app window title bar with the background of the chosen theme', () => {
+    const themeColor = document.head.appendChild(Object.assign(document.createElement('meta'), { name: 'theme-color', content: '#ffffff' }))
+
+    selectTheme('dark')
+    expect(themeColor.content).toBe(BUILTIN_PALETTES.dark['--bg'])
+    setOverride('dark', '--bg', '#101010')
+    expect(themeColor.content).toBe('#101010')
+
+    themeColor.remove()
+  })
+
   it('adds an imported theme, selects it and removes it', () => {
     const theme = addTheme({ name: 'Solarized', type: 'light', colors: { '--bg': '#fdf6e3', '--evil': '#000000', '--text': 'red' }, notes: [] })
 

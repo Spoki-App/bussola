@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from bussola.access import allowed_hosts_for, is_local_host, token_cookie
+from bussola.access import TOKEN_COOKIE_MAX_AGE_SECONDS, allowed_hosts_for, is_local_host, token_cookie
 from bussola.app import create_app
 from bussola.config import AppSettings
 from tests.gitrepo import GitFixture
@@ -84,6 +84,12 @@ def test_token_link_sets_a_strict_http_only_cookie_and_strips_the_token(client: 
     assert "HttpOnly" in cookie
     assert "SameSite=strict" in cookie
     assert client.get("/api/health").status_code == 200
+
+
+def test_the_session_cookie_outlives_a_browser_restart(client: TestClient) -> None:
+    response = client.get(f"/?token={TOKEN}", follow_redirects=False)
+
+    assert f"Max-Age={TOKEN_COOKIE_MAX_AGE_SECONDS}" in response.headers["set-cookie"]
 
 
 def test_option_like_refs_are_rejected_by_the_api(tmp_path: Path, git_repo: GitFixture) -> None:
