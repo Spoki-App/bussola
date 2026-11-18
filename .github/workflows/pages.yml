@@ -32,11 +32,11 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: frontend/.nvmrc
-      - run: node --test redirect/link.test.js
+      - run: node --test 'redirect/*.test.js'
       - name: Assemble the site
         run: |
           mkdir _site
-          cp redirect/index.html redirect/page.js redirect/link.js frontend/public/favicon.svg _site/
+          cp redirect/index.html redirect/page.js redirect/link.js redirect/handoff.js frontend/public/favicon.svg _site/
           cp redirect/index.html _site/404.html
       - uses: actions/configure-pages@v5
       - name: Archive the site
