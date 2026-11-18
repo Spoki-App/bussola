@@ -23,7 +23,6 @@ function openLink(link) {
   show('opening')
   handOff(window, FALLBACK_DELAY_MS).then((opened) => {
     if (opened) {
-      hide('opening')
       show('opened')
     } else {
       show('fallback')

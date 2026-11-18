@@ -46,7 +46,7 @@ test('the redirect page says bussola is open when it loses focus and cannot clos
   await expect(page.getByText('Opening bussola://github.com/acme/shop/pull/482 in bussola.')).toBeVisible()
   await page.evaluate(() => window.dispatchEvent(new Event('blur')))
   await expect(page.getByText('bussola is open, you can close this tab.')).toBeVisible()
-  await expect(page.getByText(/^Opening/)).toBeHidden()
+  await expect(page.getByRole('link', { name: 'Open in bussola' })).toBeVisible()
   await page.clock.runFor(1500)
   await expect(page.getByText('Nothing happened?')).toBeHidden()
 })
