@@ -58,7 +58,7 @@ function fieldsOf(form: Form): AiConfigFields {
   }
 }
 
-export function AiPanel() {
+export function AiPanel({ active = true }: { active?: boolean }) {
   const status = useAiStatus()
   const config = useAiConfig()
   const error = status.error ?? config.error
@@ -70,18 +70,18 @@ export function AiPanel() {
   }
   return (
     <div className="stack">
-      <ProviderForm config={config.data} />
+      <ProviderForm config={config.data} active={active} />
       {status.data.configured && <ActiveProvider ai={status.data} />}
     </div>
   )
 }
 
-function ProviderForm({ config }: { config: AiConfig }) {
+function ProviderForm({ config, active }: { config: AiConfig; active: boolean }) {
   const id = useId()
   const [form, setForm] = useState(() => formOf(config))
   const [saved, setSaved] = useState(false)
   const save = useSaveAiConfig()
-  const models = useAiModels(form.provider === 'none' ? null : form.provider)
+  const models = useAiModels(form.provider === 'none' ? null : form.provider, undefined, active)
   const update = (change: Partial<Form>) => {
     setForm({ ...form, ...change })
     setSaved(false)

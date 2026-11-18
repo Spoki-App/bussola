@@ -18,7 +18,7 @@ export function AiSettingsPanel() {
     <div className="stack">
       <Segmented label="AI settings" labels={TABS} value={tab} onChange={setTab} />
       <div role="tabpanel" aria-label={TABS.general} hidden={tab !== 'general'}>
-        <AiPanel />
+        <AiPanel active={tab === 'general'} />
       </div>
       <AiFeatures tab={tab} />
     </div>
@@ -45,17 +45,19 @@ function AiFeatures({ tab }: { tab: Tab }) {
         return (
           prompt && (
             <div key={operation.key} role="tabpanel" aria-label={operation.title} hidden={tab !== operation.key}>
-              <AiFeaturePanel ai={ai} operation={operation} prompt={prompt} />
+              <AiFeaturePanel ai={ai} operation={operation} prompt={prompt} active={tab === operation.key} />
             </div>
           )
         )
       })}
       {tab !== 'general' && (
-        <p className="muted">
-          Saved in the <code>[ai.operations]</code> and <code>[ai.prompts]</code> sections of <code>{ai.config_file ?? 'config.toml'}</code>. A repository cannot change them.
-        </p>
+        <>
+          <p className="muted">
+            Saved in the <code>[ai.operations]</code> and <code>[ai.prompts]</code> sections of <code>{ai.config_file ?? 'config.toml'}</code>. A repository cannot change them.
+          </p>
+          {problem && <ErrorNote message={problem} />}
+        </>
       )}
-      {tab !== 'general' && problem && <ErrorNote message={problem} />}
     </>
   )
 }

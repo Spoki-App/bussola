@@ -9,6 +9,8 @@ export const PROVIDERS: Record<ProviderChoice, string> = {
   'openai-compatible': 'OpenAI-compatible endpoint',
 }
 
+export const PROVIDER_NAMES = (Object.keys(PROVIDERS) as ProviderChoice[]).filter((provider): provider is AiProviderName => provider !== 'none')
+
 export const MODEL_DEFAULTS: Record<ProviderChoice, string> = {
   none: '',
   'claude-code': 'Default of the claude command',

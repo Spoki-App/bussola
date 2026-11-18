@@ -514,14 +514,12 @@ export interface AiChatMessage {
 
 export interface AiPrompt {
   key: AiOperationKey
-  title: string
   default: string
   custom: string | null
 }
 
 export interface AiPrompts {
   prompts: AiPrompt[]
-  config_file: string | null
   problem: string | null
 }
 

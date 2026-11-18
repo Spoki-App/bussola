@@ -68,13 +68,13 @@ export function useSaveAiOperation(key: AiOperationKey) {
   })
 }
 
-export function useAiModels(provider: AiProviderName | null, operation?: AiOperationKey) {
+export function useAiModels(provider: AiProviderName | null, operation?: AiOperationKey, enabled = true) {
   const query = new URLSearchParams({ provider: provider ?? '', ...(operation && { operation }) })
   return useQuery({
     queryKey: [...aiModelsKey, provider, operation ?? null],
     queryFn: () => getJson<AiModels>(`/ai/models?${query.toString()}`),
     retry: false,
     staleTime: Infinity,
-    enabled: provider !== null,
+    enabled: enabled && provider !== null,
   })
 }

@@ -583,15 +583,10 @@ class AiStatusOut(BaseModel):
     operations: list["AiOperationOut"] = []
 
 
-class AiOperationOut(BaseModel):
+class AiOperationOut(AiOperationConfig):
     key: str
     title: str
-    provider: str | None = None
     label: str | None = None
-    model: str | None = None
-    effort: str | None = None
-    endpoint: str | None = None
-    api_key_env: str | None = None
     problem: str | None = None
 
 
@@ -640,14 +635,12 @@ class AiConfigOut(BaseModel):
 
 class AiPromptOut(BaseModel):
     key: str
-    title: str
     default: str
     custom: str | None
 
 
 class AiPromptsOut(BaseModel):
     prompts: list[AiPromptOut]
-    config_file: str | None = None
     problem: str | None = None
 
 

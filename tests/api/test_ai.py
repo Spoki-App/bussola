@@ -287,15 +287,9 @@ def test_settings_cannot_be_saved_without_a_configuration_file(data_dir: Path) -
 def test_the_prompts_start_from_the_defaults(data_dir: Path, config_file: Path) -> None:
     prompts = client(data_dir, config_file).get("/api/ai/prompts").json()
 
-    assert [(prompt["key"], prompt["title"], prompt["custom"]) for prompt in prompts["prompts"]] == [
-        ("describe", "Describe", None),
-        ("impact", "Rate impact", None),
-        ("review", "AI review", None),
-        ("chat", "AI chat", None),
-    ]
+    assert [(prompt["key"], prompt["custom"]) for prompt in prompts["prompts"]] == [("describe", None), ("impact", None), ("review", None), ("chat", None)]
     assert prompts["prompts"][2]["default"].startswith("Report only problems that deserve the author's attention")
     assert prompts["prompts"][3]["default"].startswith("answer: GitHub-flavored Markdown")
-    assert prompts["config_file"] == str(config_file)
 
 
 def test_each_feature_saves_its_model_effort_and_prompt(data_dir: Path, config_file: Path) -> None:

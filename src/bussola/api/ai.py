@@ -7,7 +7,6 @@ from fastapi import Path as PathParameter
 
 from bussola.ai.base import AiError, AiProvider, Cancellation
 from bussola.ai.config import (
-    PROVIDER_LABELS,
     AiOperation,
     AiOperationConfig,
     AiPrompts,
@@ -16,7 +15,6 @@ from bussola.ai.config import (
     UserAiConfig,
     describe_config_error,
     load_user_config,
-    resolve_ai_settings,
     save_user_ai_config,
 )
 from bussola.ai.connection import CONNECTION_TIMEOUT_SECONDS, check_connection
@@ -100,13 +98,11 @@ def put_ai_config(body: AiConfigIn, request: Request) -> AiStatusOut:
 
 @router.get("/ai/prompts")
 def get_ai_prompts(request: Request) -> AiPromptsOut:
-    config_file = app_state(request).settings.config_file
-    shown = str(config_file) if config_file else None
     try:
-        prompts = load_user_config(config_file).ai.prompts
+        prompts = load_user_config(app_state(request).settings.config_file).ai.prompts
     except AiError as error:
-        return AiPromptsOut(prompts=_prompts_out(AiPrompts()), config_file=shown, problem=str(error))
-    return AiPromptsOut(prompts=_prompts_out(prompts), config_file=shown)
+        return AiPromptsOut(prompts=_prompts_out(AiPrompts()), problem=str(error))
+    return AiPromptsOut(prompts=_prompts_out(prompts))
 
 
 @router.put("/ai/operations/{operation}")
@@ -169,12 +165,12 @@ def _models_settings(settings: AiSettings, provider: ProviderName | None, operat
         settings = settings.for_operation(operation)
     if provider is None or provider == settings.provider:
         return settings
-    return resolve_ai_settings(UserAiConfig(provider=provider, timeout=settings.timeout))
+    return settings.on_provider(provider)
 
 
 def _prompts_out(prompts: AiPrompts) -> list[AiPromptOut]:
     custom = prompts.custom()
-    return [AiPromptOut(key=key, title=OPERATIONS[key], default=default, custom=custom.get(key)) for key, default in PROMPTS.items()]
+    return [AiPromptOut(key=key, default=default, custom=custom.get(key)) for key, default in PROMPTS.items()]
 
 
 def _operations_out(state: AppState, settings: AiSettings) -> list[AiOperationOut]:
@@ -182,14 +178,14 @@ def _operations_out(state: AppState, settings: AiSettings) -> list[AiOperationOu
 
 
 def _operation_out(state: AppState, settings: AiSettings, key: AiOperation, title: str) -> AiOperationOut:
-    chosen = settings.operations.of(key)
-    own = chosen.provider not in (None, settings.provider)
+    routed = settings.for_operation(key)
+    own = settings.configured and routed.provider != settings.provider
     return AiOperationOut(
         key=key,
         title=title,
-        **chosen.model_dump(mode="json"),
-        label=PROVIDER_LABELS.get(chosen.provider) if chosen.provider else None,
-        problem=_problem(state, settings.for_operation(key)) if own and settings.configured else None,
+        **settings.operations.of(key).model_dump(),
+        label=routed.label if own else None,
+        problem=_problem(state, routed) if own else None,
     )
 
 

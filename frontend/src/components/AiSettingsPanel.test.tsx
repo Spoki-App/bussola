@@ -42,12 +42,11 @@ const CONFIG: AiConfig = {
 
 const PROMPTS: AiPrompts = {
   prompts: [
-    { key: 'describe', title: 'Describe', default: 'Describe the unit.', custom: null },
-    { key: 'impact', title: 'Rate impact', default: 'Rate the impact.', custom: null },
-    { key: 'review', title: 'AI review', default: 'Report real problems.', custom: 'Only security problems.' },
-    { key: 'chat', title: 'AI chat', default: 'Answer briefly.', custom: null },
+    { key: 'describe', default: 'Describe the unit.', custom: null },
+    { key: 'impact', default: 'Rate the impact.', custom: null },
+    { key: 'review', default: 'Report real problems.', custom: 'Only security problems.' },
+    { key: 'chat', default: 'Answer briefly.', custom: null },
   ],
-  config_file: STATUS.config_file,
   problem: null,
 }
 
@@ -156,6 +155,22 @@ describe('AiSettingsPanel', () => {
       ])
     })
     expect(fetchMock).toHaveBeenCalledWith('/api/ai/models?provider=openai-compatible&operation=chat', expect.anything())
+  })
+
+  it('lists the models of a feature only once its tab is open', async () => {
+    const operations = OPERATIONS.map((operation) => (operation.key === 'chat' ? { ...operation, provider: 'claude-code' as const, label: 'Claude Code CLI' } : operation))
+    const fetchMock = renderPanel({ ...STATUS, operations })
+    await screen.findByRole('tab', { name: 'AI chat' })
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/ai/models?provider=anthropic', expect.anything())
+    })
+    expect(fetchMock.mock.calls.some(([url]) => url.includes('operation='))).toBe(false)
+
+    await waitFor(() => openTab('AI chat'))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/ai/models?provider=claude-code&operation=chat', expect.anything())
+    })
   })
 
   it('falls back to typing the model and shows why the provider did not list its models', async () => {

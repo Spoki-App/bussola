@@ -189,15 +189,19 @@ class AiSettings:
         chosen = self.operations.of(operation)
         if chosen.provider in (None, self.provider):
             return replace(self, model=chosen.model or self.model, effort=chosen.effort)
+        return replace(self.on_provider(chosen.provider, chosen), effort=chosen.effort)
+
+    def on_provider(self, provider: ProviderName, route: AiOperationConfig | None = None) -> "AiSettings":
+        chosen = route or AiOperationConfig()
         own = UserAiConfig(
-            provider=chosen.provider,
+            provider=provider,
             model=chosen.model,
             endpoint=chosen.endpoint,
             api_key_env=chosen.api_key_env,
             timeout=self.timeout,
             max_tokens=self.max_tokens,
         )
-        return replace(resolve_ai_settings(own), effort=chosen.effort, operations=self.operations)
+        return replace(resolve_ai_settings(own), operations=self.operations)
 
     def api_key(self) -> str | None:
         return (os.environ.get(self.api_key_env) or None) if self.api_key_env else None
