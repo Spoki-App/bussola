@@ -10,12 +10,12 @@ def build_provider(settings: AiSettings) -> AiProvider:
         case ProviderName.CLAUDE_CODE:
             return ClaudeCodeProvider(find_claude(), settings.model, settings.timeout, _tuning(settings))
         case ProviderName.ANTHROPIC:
-            endpoint = _required(settings.endpoint, "endpoint")
-            return AnthropicProvider(_required(settings.model, "model"), endpoint, _api_key(settings), settings.timeout, _tuning(settings))
+            endpoint = _required(settings, settings.endpoint, "endpoint")
+            return AnthropicProvider(_required(settings, settings.model, "model"), endpoint, _api_key(settings), settings.timeout, _tuning(settings))
         case ProviderName.OPENAI_COMPATIBLE:
-            endpoint = _required(settings.endpoint, "endpoint")
+            endpoint = _required(settings, settings.endpoint, "endpoint")
             key = _api_key(settings) if settings.api_key_env else None
-            return OpenAiCompatibleProvider(_required(settings.model, "model"), endpoint, key, settings.timeout, _tuning(settings))
+            return OpenAiCompatibleProvider(_required(settings, settings.model, "model"), endpoint, key, settings.timeout, _tuning(settings))
         case ProviderName.NONE:
             raise AiNotConfiguredError("No AI provider is configured")
 
@@ -24,14 +24,14 @@ def _tuning(settings: AiSettings) -> Tuning:
     return Tuning(settings.max_tokens, settings.effort)
 
 
-def _required(value: str | None, name: str) -> str:
+def _required(settings: AiSettings, value: str | None, name: str) -> str:
     if not value:
-        raise AiNotConfiguredError(f"Set {name} in the [ai] section of your configuration")
+        raise AiNotConfiguredError(f"Set {name} in the {settings.section} section of your configuration")
     return value
 
 
 def _api_key(settings: AiSettings) -> str:
-    key_env = _required(settings.api_key_env, "api_key_env")
+    key_env = _required(settings, settings.api_key_env, "api_key_env")
     key = settings.api_key()
     if key is None:
         raise AiNotConfiguredError(f"Set the {key_env} environment variable")

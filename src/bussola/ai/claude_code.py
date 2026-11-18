@@ -49,6 +49,7 @@ READ_CHUNK_BYTES = 64 * 1024
 SIGN_IN_PROBLEMS = ("authenticate", "logged in", "oauth", "api key")
 SIGN_IN_HINT = "Run claude in a terminal and sign in again with /login."
 EXIT_POLL_SECONDS = 0.05
+MODEL_ALIASES = ("opus", "sonnet", "haiku")
 
 
 def find_claude() -> str:
@@ -139,7 +140,7 @@ class ClaudeCodeProvider:
 
     def models(self, cancellation: Cancellation) -> list[ModelInfo]:
         cancellation.check()
-        return []
+        return [ModelInfo(alias) for alias in MODEL_ALIASES]
 
     def complete(self, request: AiRequest, cancellation: Cancellation) -> str:
         if request.tools is None:

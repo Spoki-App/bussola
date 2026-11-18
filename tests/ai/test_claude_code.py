@@ -95,8 +95,8 @@ def test_the_effort_is_passed_to_the_cli(fake_claude: FakeClaude) -> None:
     assert fake_claude.call()["args"][-4:] == ["--model", "claude-haiku-5-5", "--effort", "low"]
 
 
-def test_claude_code_lists_no_models_so_the_model_is_free_text() -> None:
-    assert ClaudeCodeProvider("claude", None, 10.0).models(Cancellation()) == []
+def test_claude_code_lists_the_model_aliases_of_the_cli() -> None:
+    assert [model.id for model in ClaudeCodeProvider("claude", None, 10.0).models(Cancellation())] == ["opus", "sonnet", "haiku"]
 
 
 def test_bussola_settings_such_as_the_session_token_are_not_passed_to_the_cli(fake_claude: FakeClaude, monkeypatch: pytest.MonkeyPatch) -> None:

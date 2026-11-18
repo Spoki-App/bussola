@@ -2,9 +2,7 @@ import type { ReactNode } from 'react'
 
 import { navigate } from '../navigation'
 import { AddRepoForm } from './AddRepoForm'
-import { AiModelsPanel } from './AiModelsPanel'
-import { AiPanel } from './AiPanel'
-import { AiPromptsPanel } from './AiPromptsPanel'
+import { AiSettingsPanel } from './AiSettingsPanel'
 import { CodeFontPanel } from './CodeFontPanel'
 import { DiffLayoutPanel } from './DiffLayoutPanel'
 import { DiffWrapCheckbox } from './DiffWrapToggle'
@@ -82,20 +80,9 @@ export const SETTINGS: Setting[] = [
   },
   {
     category: 'AI',
-    name: 'AI provider',
-    description: 'The provider, model, endpoint and key variable used by the AI features, the code sent per call, and a connection test.',
-    render: () => <AiPanel />,
-  },
-  {
-    category: 'AI',
-    name: 'AI models',
-    description: 'The model and effort used for Describe, Rate impact, AI review and AI chat, each falling back to the model of the AI provider.',
-    render: () => <AiModelsPanel />,
-  },
-  {
-    category: 'AI',
-    name: 'AI prompts',
-    description: 'The instructions given to the model for Describe, Rate impact and AI review.',
-    render: () => <AiPromptsPanel />,
+    name: 'AI provider and features',
+    description:
+      'General: the provider, model, endpoint and key variable used by the AI features, the code sent per call, and a connection test. Describe, Rate impact, AI review and AI chat: the provider, model, effort and prompt of each feature.',
+    render: () => <AiSettingsPanel />,
   },
 ]

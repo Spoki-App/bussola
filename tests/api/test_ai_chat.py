@@ -164,3 +164,19 @@ def test_a_comment_on_a_file_the_pull_request_does_not_change_goes_on_the_whole_
     [thread] = api.call("GET", f"/reviews/{review_id}/threads")
     assert thread["scope"] == "review"
     assert thread["comments"][0]["body"] == "On `docs/tax.md`, line 4:\n\nDocument the new rate here."
+
+
+def test_the_chat_uses_the_provider_model_and_prompt_chosen_for_it(billing: GitFixture, data_dir: Path, config_file: Path) -> None:
+    config_file.write_text(
+        ANTHROPIC_CONFIG + '\n[ai.operations.chat]\nprovider = "claude-code"\nmodel = "haiku"\neffort = "low"\n\n[ai.prompts]\nchat = "Answer in Italian."\n'
+    )
+    provider = FakeProvider({"answer": "Una tassa."})
+    api = client(billing, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    send(api, review_id, "Why 1.2?")
+
+    [request] = provider.requests
+    assert request.system.endswith("\n\nAnswer in Italian.")
+    assert provider.settings is not None
+    assert (provider.settings.provider, provider.settings.model, provider.settings.effort) == ("claude-code", "haiku", "low")

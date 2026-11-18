@@ -4,7 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from bussola.ai.runner import AiRunner, AiTask
+from bussola.ai.runner import AiRunner, AiTask, EditablePrompt
 from bussola.review.ai_review import clipped_body, place_comment, pull_request_text, request_place, tool_lookups
 from bussola.review.context import ReviewContext
 from bussola.review.descriptions import UNIT_KINDS, marked
@@ -59,8 +59,9 @@ CHAT_TOOLS = (
 )
 CHAT_ANSWER = (
     "answer: GitHub-flavored Markdown, short and concrete, in the language of the reviewer's message. Lead with the answer, then the "
-    "reasons. Put names of code in backticks and use a short code block when you suggest a change.\n\n"
+    "reasons. Put names of code in backticks and use a short code block when you suggest a change."
 )
+CHAT_PROMPT = EditablePrompt("chat", CHAT_ANSWER)
 CHAT_COMMENTS = (
     "comments: an empty list, unless the reviewer's new message asks you to add, write or leave comments on the code. Then one entry per "
     "comment to add. path: the file of the lines the comment is about. side: after for lines of the new version, before for lines the "
@@ -72,20 +73,20 @@ CHAT_COMMENTS = (
 )
 CHAT_LINKS = (
     "To point the reviewer at a line, write a Markdown link to #after:PATH:N for line N of PATH in the new version or #before:PATH:N "
-    "for line N of PATH in the old version, such as [the new check](#after:app/billing.py:80): the reviewer clicks it to see that line."
+    "for line N of PATH in the old version, such as [the new check](#after:app/billing.py:80): the reviewer clicks it to see that line.\n\n"
 )
 
 CHAT_ABOUT_PULL_REQUEST = AiTask(
     name="chat_about_pull_request",
-    version=1,
+    version=2,
     system="You are a careful code reviewer who answers another reviewer's questions about a pull request. A pull request changes units: "
     + UNIT_KINDS
     + CHAT_INPUT
     + CHAT_TOOLS
-    + CHAT_ANSWER
     + CHAT_COMMENTS
     + CHAT_LINKS,
     output=ChatAnswer,
+    prompts=(CHAT_PROMPT,),
 )
 
 

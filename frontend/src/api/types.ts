@@ -327,7 +327,7 @@ export interface RepositoryScan {
 
 export interface AiStatus {
   configured: boolean
-  provider: string | null
+  provider: AiProviderName | null
   label: string | null
   model: string | null
   endpoint: string | null
@@ -343,14 +343,27 @@ export type AiOperationKey = 'describe' | 'impact' | 'review' | 'chat'
 
 export type AiEffort = 'low' | 'medium' | 'high'
 
+export type AiProviderName = 'claude-code' | 'anthropic' | 'openai-compatible'
+
 export interface AiOperationChoice {
+  provider: AiProviderName | null
   model: string | null
   effort: AiEffort | null
+  endpoint: string | null
+  api_key_env: string | null
+}
+
+export interface AiRoute {
+  label: string | null
+  model: string | null
+  endpoint: string | null
 }
 
 export interface AiOperation extends AiOperationChoice {
   key: AiOperationKey
   title: string
+  uses: AiRoute | null
+  problem: string | null
 }
 
 export interface AiModel {
@@ -505,18 +518,14 @@ export interface AiChatMessage {
   created_at: string
 }
 
-export type AiPromptKey = 'describe' | 'impact' | 'review'
-
 export interface AiPrompt {
-  key: AiPromptKey
-  title: string
+  key: AiOperationKey
   default: string
   custom: string | null
 }
 
 export interface AiPrompts {
   prompts: AiPrompt[]
-  config_file: string | null
   problem: string | null
 }
 

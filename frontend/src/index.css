@@ -3050,30 +3050,7 @@ button.danger {
   min-width: 200px;
 }
 
-.ai-prompt summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-weight: 550;
-}
-
-.ai-prompt summary::before {
-  content: '▸';
-  color: var(--muted);
-}
-
-.ai-prompt[open] summary::before {
-  content: '▾';
-}
-
-.ai-prompt[open] {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.ai-prompt textarea {
+.ai-prompt {
   width: 100%;
   min-height: 180px;
   padding: 8px 10px;
@@ -3081,18 +3058,6 @@ button.danger {
   font-size: 12px;
   line-height: 1.5;
   resize: vertical;
-}
-
-.ai-operation {
-  margin: 0;
-  padding: 8px 12px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
-.ai-operation legend {
-  padding: 0 4px;
-  font-weight: 550;
 }
 
 .ai-form-actions {

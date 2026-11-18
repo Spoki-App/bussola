@@ -8,9 +8,10 @@ from fastapi import Path as PathParameter
 from bussola.ai.base import AiError, AiProvider, Cancellation
 from bussola.ai.config import (
     AiOperation,
-    AiOperations,
+    AiOperationConfig,
     AiPrompts,
     AiSettings,
+    ProviderName,
     UserAiConfig,
     describe_config_error,
     load_user_config,
@@ -25,16 +26,18 @@ from bussola.api.schemas import (
     AiConfigOut,
     AiModelOut,
     AiModelsOut,
+    AiOperationIn,
     AiOperationOut,
     AiPromptOut,
-    AiPromptsIn,
     AiPromptsOut,
+    AiRouteOut,
     AiStatusOut,
     AiTestOut,
     CancelOut,
 )
 from bussola.api.state import AppState, app_state
 from bussola.errors import ConflictError, InvalidRequestError
+from bussola.review.ai_chat import CHAT_PROMPT
 from bussola.review.ai_review import REVIEW_PROMPT
 from bussola.review.descriptions import DESCRIBE_PROMPT, IMPACT_PROMPT
 
@@ -46,9 +49,10 @@ OPERATIONS = {
     AiOperation.CHAT: "AI chat",
 }
 PROMPTS = {
-    "describe": (OPERATIONS[AiOperation.DESCRIBE], DESCRIBE_PROMPT.default),
-    "impact": (OPERATIONS[AiOperation.IMPACT], IMPACT_PROMPT.default),
-    "review": (OPERATIONS[AiOperation.REVIEW], REVIEW_PROMPT.default),
+    AiOperation.DESCRIBE: DESCRIBE_PROMPT.default,
+    AiOperation.IMPACT: IMPACT_PROMPT.default,
+    AiOperation.REVIEW: REVIEW_PROMPT.default,
+    AiOperation.CHAT: CHAT_PROMPT.default,
 }
 
 
@@ -95,46 +99,29 @@ def put_ai_config(body: AiConfigIn, request: Request) -> AiStatusOut:
 
 @router.get("/ai/prompts")
 def get_ai_prompts(request: Request) -> AiPromptsOut:
-    config_file = app_state(request).settings.config_file
-    shown = str(config_file) if config_file else None
     try:
-        prompts = load_user_config(config_file).ai.prompts
+        prompts = load_user_config(app_state(request).settings.config_file).ai.prompts
     except AiError as error:
-        return AiPromptsOut(prompts=_prompts_out(AiPrompts()), config_file=shown, problem=str(error))
-    return AiPromptsOut(prompts=_prompts_out(prompts), config_file=shown)
+        return AiPromptsOut(prompts=_prompts_out(AiPrompts()), problem=str(error))
+    return AiPromptsOut(prompts=_prompts_out(prompts))
 
 
-@router.put("/ai/prompts")
-def put_ai_prompts(body: AiPromptsIn, request: Request) -> AiPromptsOut:
-    config_file = app_state(request).settings.config_file
-    if config_file is None:
-        raise ConflictError("bussola was started without a configuration file, so the AI prompts cannot be saved")
-    try:
-        current = load_user_config(config_file).ai
-    except AiError as error:
-        raise ConflictError(f"Fix the configuration file before changing the prompts: {error}") from error
-    chosen = {name: None if text is None or text.strip() == PROMPTS[name][1].strip() else text for name, text in body.model_dump().items()}
-    try:
-        save_user_ai_config(config_file, current.model_copy(update={"prompts": AiPrompts.model_validate(chosen)}))
-    except OSError as error:
-        raise ConflictError(f"Could not save {config_file}: {error}") from error
-    except ValueError as error:
-        raise InvalidRequestError(describe_config_error(error)) from error
-    return get_ai_prompts(request)
-
-
-@router.put("/ai/operations")
-def put_ai_operations(body: AiOperations, request: Request) -> AiStatusOut:
+@router.put("/ai/operations/{operation}")
+def put_ai_operation(operation: AiOperation, body: AiOperationIn, request: Request) -> AiStatusOut:
     state = app_state(request)
     config_file = state.settings.config_file
     if config_file is None:
-        raise ConflictError("bussola was started without a configuration file, so the AI models cannot be saved")
+        raise ConflictError("bussola was started without a configuration file, so the AI settings cannot be saved")
     try:
         current = load_user_config(config_file).ai
     except AiError as error:
-        raise ConflictError(f"Fix the configuration file before changing the AI models: {error}") from error
+        raise ConflictError(f"Fix the configuration file before changing the AI settings: {error}") from error
+    prompt = None if body.prompt is None or body.prompt.strip() == PROMPTS[operation].strip() else body.prompt
     try:
-        save_user_ai_config(config_file, current.model_copy(update={"operations": body}))
+        chosen = AiOperationConfig.model_validate(body.model_dump(exclude={"prompt"}))
+        operations = current.operations.model_copy(update={operation: chosen})
+        prompts = AiPrompts.model_validate(current.prompts.model_dump() | {operation: prompt})
+        save_user_ai_config(config_file, current.model_copy(update={"operations": operations, "prompts": prompts}))
     except OSError as error:
         raise ConflictError(f"Could not save {config_file}: {error}") from error
     except ValueError as error:
@@ -143,10 +130,10 @@ def put_ai_operations(body: AiOperations, request: Request) -> AiStatusOut:
 
 
 @router.get("/ai/models")
-def list_ai_models(request: Request) -> AiModelsOut:
+def list_ai_models(request: Request, provider: ProviderName | None = None, operation: AiOperation | None = None) -> AiModelsOut:
     state = app_state(request)
     try:
-        settings = load_ai_settings(state.settings.config_file)
+        settings = _models_settings(load_ai_settings(state.settings.config_file), provider, operation)
         if not settings.configured:
             return AiModelsOut()
         models = _quick_provider(state, settings).models(Cancellation())
@@ -174,13 +161,34 @@ def _quick_provider(state: AppState, settings: AiSettings) -> AiProvider:
     return state.ai_factory(replace(settings, timeout=min(settings.timeout, CONNECTION_TIMEOUT_SECONDS)))
 
 
+def _models_settings(settings: AiSettings, provider: ProviderName | None, operation: AiOperation | None) -> AiSettings:
+    if operation is not None and settings.configured:
+        settings = settings.for_operation(operation)
+    if provider is None or provider == settings.provider:
+        return settings
+    return settings.on_provider(provider)
+
+
 def _prompts_out(prompts: AiPrompts) -> list[AiPromptOut]:
     custom = prompts.custom()
-    return [AiPromptOut(key=key, title=title, default=default, custom=custom.get(key)) for key, (title, default) in PROMPTS.items()]
+    return [AiPromptOut(key=key, default=default, custom=custom.get(key)) for key, default in PROMPTS.items()]
 
 
-def _operations_out(operations: AiOperations) -> list[AiOperationOut]:
-    return [AiOperationOut(key=key, title=title, **operations.of(key).model_dump(mode="json")) for key, title in OPERATIONS.items()]
+def _operations_out(state: AppState, settings: AiSettings) -> list[AiOperationOut]:
+    return [_operation_out(state, settings, key, title) for key, title in OPERATIONS.items()]
+
+
+def _operation_out(state: AppState, settings: AiSettings, key: AiOperation, title: str) -> AiOperationOut:
+    routed = settings.for_operation(key)
+    moved = settings.configured and (routed.provider, routed.endpoint, routed.api_key_env) != (settings.provider, settings.endpoint, settings.api_key_env)
+    rerouted = settings.configured and routed.route() != settings.route()
+    return AiOperationOut(
+        key=key,
+        title=title,
+        **settings.operations.of(key).model_dump(),
+        uses=AiRouteOut(label=routed.label, model=routed.model, endpoint=routed.endpoint) if rerouted else None,
+        problem=_problem(state, routed) if moved else None,
+    )
 
 
 def _status(state: AppState, repo_root: Path | None) -> AiStatusOut:
@@ -200,7 +208,7 @@ def _status(state: AppState, repo_root: Path | None) -> AiStatusOut:
         problem=_problem(state, settings),
         config_file=config_file,
         target=settings.target,
-        operations=_operations_out(settings.operations),
+        operations=_operations_out(state, settings),
     )
 
 
