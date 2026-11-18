@@ -1,14 +1,12 @@
 {
   "id": "/",
   "name": "bussola",
-  "short_name": "bussola",
   "description": "Local, per-function code review on git branches",
   "start_url": "/",
-  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
-  "launch_handler": { "client_mode": ["navigate-existing", "auto"] },
+  "launch_handler": { "client_mode": "navigate-existing" },
   "icons": [
     { "src": "/app-icon.svg", "sizes": "any", "type": "image/svg+xml" },
     { "src": "/app-icon-192.png", "sizes": "192x192", "type": "image/png" },

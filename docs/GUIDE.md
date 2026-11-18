@@ -215,11 +215,11 @@ The handler runs the Python that ran `install-handler`, and keeps the `BUSSOLA_D
 
 ## Installing as an app
 
-In Chrome, Edge and other Chromium browsers, bussola can be installed as an app that opens in its own window, with its own icon in the dock or taskbar: open bussola, then choose **Install bussola** from the install icon in the address bar or from the browser menu. Opening the app opens the home page.
+In Chrome, Edge and other Chromium browsers, bussola can be installed as an app that opens in its own window, with its own icon in the dock or taskbar and a title bar in the colors of your theme: open bussola, then choose **Install bussola** from the install icon in the address bar or from the browser menu. Opening the app opens the home page.
 
 - **Address:** the app belongs to the address it was installed from, port included. Install it from `http://127.0.0.1:8765`, the address `bussola serve` and `bussola://` links use by default. A server on another port (`--port`) works the same way, but is a separate app.
 - **Session token:** the app shares the session cookie with the browser. If it shows "Not authorized" after the server restarted with a new token, open the link printed by `bussola serve` or a `bussola://` link.
-- **Server not running:** the app shows how to start it (`bussola serve`, with `--port` for another port, or a `bussola://` link) and reloads by itself once it is running.
+- **Server not running:** the app shows how to start it and reloads by itself once it is running.
 - **Links:** with the app installed, Chrome 139 and later open addresses in its scope in the app instead of a tab, so `bussola://` links, `https://bussola.spoki.com/` links and the link printed by `bussola serve` open in the app window, reusing it if it is open. In older versions, or if you turned this off in the app settings, they open in a tab. GitHub links in the app still open in your browser.
 
 ## Themes

@@ -24,28 +24,26 @@ const OFFLINE_PAGE = `<!doctype html>
   <body>
     <main>
       <h1>bussola is not running</h1>
-      <p>Start it in a terminal with <code id="command">bussola serve</code>, or open a <a href="bussola://">bussola:// link</a> if you ran <code>bussola install-handler</code>.</p>
+      <p>Start it in a terminal with <code id="command">bussola serve</code><span id="link">, or open a <a href="bussola://">bussola:// link</a> if you ran <code>bussola install-handler</code></span>.</p>
       <p class="muted">This page reloads by itself once bussola is running.</p>
     </main>
     <script>
       if (location.port && location.port !== '${DEFAULT_PORT}') {
         document.getElementById('command').textContent = 'bussola serve --port ' + location.port
+        document.getElementById('link').remove()
       }
       setInterval(() => fetch('/api/health', { cache: 'no-store' }).then(() => location.reload(), () => undefined), 2000)
     </script>
   </body>
 </html>`
 
-function offlineResponse() {
-  return new Response(OFFLINE_PAGE, { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } })
-}
-
-self.addEventListener('install', () => self.skipWaiting())
-
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
+self.addEventListener('install', (event) => {
+  event.addRoutes?.({ condition: { not: { requestMode: 'navigate' } }, source: 'network' })?.catch(() => undefined)
+  self.skipWaiting()
+})
 
 self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate') {
-    event.respondWith(fetch(event.request).catch(offlineResponse))
+    event.respondWith(fetch(event.request).catch(() => new Response(OFFLINE_PAGE, { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } })))
   }
 })

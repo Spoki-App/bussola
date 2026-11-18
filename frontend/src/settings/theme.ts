@@ -114,6 +114,7 @@ function applyTheme(state: ThemeState): void {
     }
   }
   style.colorScheme = theme.type
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', palette['--bg'])
 }
 
 const listeners = new Set<() => void>()
