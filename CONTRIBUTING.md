@@ -50,7 +50,7 @@ Run these before opening a pull request; CI runs the same ones.
 
 ```bash
 uv run ruff format --check . && uv run ruff check . && uv run basedpyright && uv run pytest
-npm --prefix frontend run lint && npm --prefix frontend run typecheck && npm --prefix frontend test && node --test redirect/link.test.js
+npm --prefix frontend run lint && npm --prefix frontend run typecheck && npm --prefix frontend test && node --test 'redirect/*.test.js'
 npm --prefix frontend run build && npm --prefix frontend run e2e
 ```
 

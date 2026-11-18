@@ -1,3 +1,4 @@
+import { handOff } from './handoff.js'
 import { bussolaLink, githubPage } from './link.js'
 
 const FALLBACK_DELAY_MS = 1500
@@ -6,8 +7,12 @@ function show(id) {
   document.getElementById(id).hidden = false
 }
 
+function hide(id) {
+  document.getElementById(id).hidden = true
+}
+
 function openLink(link) {
-  document.getElementById('usage').hidden = true
+  hide('usage')
   document.getElementById('target').textContent = link
   document.getElementById('open').href = link
   const github = githubPage(window.location)
@@ -16,7 +21,13 @@ function openLink(link) {
     show('github-item')
   }
   show('opening')
-  window.setTimeout(() => show('fallback'), FALLBACK_DELAY_MS)
+  handOff(window, FALLBACK_DELAY_MS).then((opened) => {
+    if (opened) {
+      show('opened')
+    } else {
+      show('fallback')
+    }
+  })
   window.location.href = link
 }
 
