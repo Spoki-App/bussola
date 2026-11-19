@@ -416,11 +416,14 @@ def test_saving_the_provider_keeps_the_features(data_dir: Path, config_file: Pat
 def test_the_models_come_from_the_provider(data_dir: Path, config_file: Path) -> None:
     write(config_file, ANTHROPIC_CONFIG)
     provider = FakeProvider({"ok": True})
-    provider.listed = [ModelInfo("claude-opus-5-5", effort=True), ModelInfo("claude-haiku-4-5", effort=False)]
+    provider.listed = [ModelInfo("claude-opus-5-5", effort=True, name="Claude Opus 5.5"), ModelInfo("claude-haiku-4-5", effort=False)]
 
     models = client(data_dir, config_file, provider).get("/api/ai/models").json()
 
-    assert models == {"models": [{"id": "claude-opus-5-5", "effort": True}, {"id": "claude-haiku-4-5", "effort": False}], "problem": None}
+    assert models == {
+        "models": [{"id": "claude-opus-5-5", "effort": True, "name": "Claude Opus 5.5"}, {"id": "claude-haiku-4-5", "effort": False, "name": None}],
+        "problem": None,
+    }
 
 
 def test_models_that_cannot_be_listed_leave_the_model_as_free_text(data_dir: Path, config_file: Path) -> None:

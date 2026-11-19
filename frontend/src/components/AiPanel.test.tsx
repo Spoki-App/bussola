@@ -118,12 +118,12 @@ describe('AiPanel', () => {
   })
 
   it('picks the model from the models the chosen provider lists', async () => {
-    const fetchMock = stubApi({ status: OFF, models: { models: [{ id: 'opus', effort: null }, { id: 'haiku', effort: null }], problem: null } })
+    const fetchMock = stubApi({ status: OFF, models: { models: [{ id: 'fable', effort: null, name: 'Fable 5.2' }, { id: 'haiku', effort: null, name: 'Haiku 5.5' }], problem: null } })
     renderPanel()
 
     fireEvent.change(await screen.findByLabelText('Provider'), { target: { value: 'claude-code' } })
     const model = await screen.findByRole('combobox', { name: 'Model' })
-    expect(Array.from(model.querySelectorAll('option'), (option) => option.textContent)).toEqual(['Default of the claude command', 'opus', 'haiku'])
+    expect(Array.from(model.querySelectorAll('option'), (option) => option.textContent)).toEqual(['Default of the claude command', 'Fable 5.2', 'Haiku 5.5'])
     fireEvent.change(model, { target: { value: 'haiku' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 

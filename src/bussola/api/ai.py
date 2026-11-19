@@ -139,7 +139,7 @@ def list_ai_models(request: Request, provider: ProviderName | None = None, opera
         models = _quick_provider(state, settings).models(Cancellation())
     except AiError as error:
         return AiModelsOut(problem=str(error))
-    return AiModelsOut(models=[AiModelOut(id=model.id, effort=model.effort) for model in models])
+    return AiModelsOut(models=[AiModelOut(id=model.id, effort=model.effort, name=model.name) for model in models])
 
 
 @router.post("/ai/test")

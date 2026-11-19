@@ -21,6 +21,7 @@ from bussola.ai.base import (
     AiRequest,
     AiTimeoutError,
     Cancellation,
+    ModelInfo,
     ToolDefinition,
     ToolOutcome,
     Tuning,
@@ -95,8 +96,37 @@ def test_the_effort_is_passed_to_the_cli(fake_claude: FakeClaude) -> None:
     assert fake_claude.call()["args"][-4:] == ["--model", "claude-haiku-5-5", "--effort", "low"]
 
 
-def test_claude_code_lists_the_model_aliases_of_the_cli() -> None:
-    assert [model.id for model in ClaudeCodeProvider("claude", None, 10.0).models(Cancellation())] == ["opus", "sonnet", "haiku"]
+def test_claude_code_lists_the_models_of_the_cli_with_their_names(fake_claude: FakeClaude) -> None:
+    listed = [
+        {"value": "default", "displayName": "Default (recommended)", "supportsEffort": True},
+        {"value": "opus", "displayName": "Opus 5.5", "supportsEffort": True},
+        {"value": "claude-fable-5-2", "displayName": "Fable 5.2", "supportsEffort": True},
+        {"value": "claude-haiku-4-5-20251001", "displayName": "Haiku 4.5"},
+        {"value": "claude-mystery"},
+        {"displayName": "No value"},
+    ]
+    response = {"type": "control_response", "response": {"subtype": "success", "request_id": "models", "response": {"models": listed}}}
+    fake_claude.answer("\n".join([json.dumps({"type": "system", "subtype": "ui_invalidate"}), "not json", json.dumps(response)]))
+
+    models = provider().models(Cancellation())
+
+    assert models == [
+        ModelInfo("opus", True, "Opus 5.5"),
+        ModelInfo("claude-fable-5-2", True, "Fable 5.2"),
+        ModelInfo("claude-haiku-4-5-20251001", False, "Haiku 4.5"),
+        ModelInfo("claude-mystery", False),
+    ]
+    call = fake_claude.call()
+    assert json.loads(call["prompt"]) == {"type": "control_request", "request_id": "models", "request": {"subtype": "initialize"}}
+    assert call["args"][:6] == ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose"]
+    assert "--safe-mode" in call["args"]
+
+
+def test_claude_code_says_why_it_cannot_list_the_models(fake_claude: FakeClaude) -> None:
+    fake_claude.answer("", exit_code=1, stderr="Invalid API key")
+
+    with pytest.raises(AiProviderError, match=r"cannot list the models: Invalid API key.*/login"):
+        provider().models(Cancellation())
 
 
 def test_bussola_settings_such_as_the_session_token_are_not_passed_to_the_cli(fake_claude: FakeClaude, monkeypatch: pytest.MonkeyPatch) -> None:

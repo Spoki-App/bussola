@@ -22,9 +22,9 @@ export function AiModelPicker({ id, models, value, fallback, onChange }: Props) 
     <select id={id} value={value} onChange={(event) => { onChange(event.target.value) }}>
       <option value="">{fallback}</option>
       {value !== '' && !listed.includes(value) && <option value={value}>{`${value} (not listed)`}</option>}
-      {listed.map((model) => (
-        <option key={model} value={model}>
-          {model}
+      {models?.models.map((model) => (
+        <option key={model.id} value={model.id}>
+          {model.name ?? model.id}
         </option>
       ))}
     </select>
