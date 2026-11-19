@@ -603,6 +603,7 @@ class AiOperationIn(AiOperationConfig):
 class AiModelOut(BaseModel):
     id: str
     effort: bool | None = None
+    name: str | None = None
 
 
 class AiModelsOut(BaseModel):

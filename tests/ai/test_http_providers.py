@@ -136,11 +136,11 @@ def test_the_anthropic_api_gets_the_effort_in_the_output_config(stub: StubServer
     assert stub.requests[0]["json"]["output_config"]["effort"] == "high"
 
 
-def test_the_anthropic_api_lists_its_models_and_whether_they_take_an_effort(stub: StubServer) -> None:
+def test_the_anthropic_api_lists_its_models_their_names_and_whether_they_take_an_effort(stub: StubServer) -> None:
     stub.reply(
         {
             "data": [
-                {"id": "claude-opus-5-5", "capabilities": {"effort": {"supported": True}}},
+                {"id": "claude-opus-5-5", "display_name": "Claude Opus 5.5", "capabilities": {"effort": {"supported": True}}},
                 {"id": "claude-haiku-4-5", "capabilities": {"effort": {"supported": False}}},
                 {"id": "claude-mystery"},
             ]
@@ -149,7 +149,7 @@ def test_the_anthropic_api_lists_its_models_and_whether_they_take_an_effort(stub
 
     models = AnthropicProvider("claude-opus-5-5", stub.url, "sk-test", 5.0).models(Cancellation())
 
-    assert models == [ModelInfo("claude-opus-5-5", True), ModelInfo("claude-haiku-4-5", False), ModelInfo("claude-mystery")]
+    assert models == [ModelInfo("claude-opus-5-5", True, "Claude Opus 5.5"), ModelInfo("claude-haiku-4-5", False), ModelInfo("claude-mystery")]
     assert (stub.requests[0]["method"], stub.requests[0]["path"]) == ("GET", "/v1/models?limit=1000")
     assert stub.requests[0]["headers"]["x-api-key"] == "sk-test"
 

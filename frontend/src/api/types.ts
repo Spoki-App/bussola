@@ -369,6 +369,7 @@ export interface AiOperation extends AiOperationChoice {
 export interface AiModel {
   id: string
   effort: boolean | null
+  name?: string | null
 }
 
 export interface AiModels {

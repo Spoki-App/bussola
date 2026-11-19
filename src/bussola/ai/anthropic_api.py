@@ -89,4 +89,5 @@ def _text(block: Any) -> str:
 def _model_info(fields: dict[str, Any]) -> ModelInfo:
     effort = json_object((json_object(fields.get("capabilities")) or {}).get("effort"))
     supported = effort.get("supported") if effort is not None else None
-    return ModelInfo(str(fields["id"]), supported if isinstance(supported, bool) else None)
+    name = fields.get("display_name")
+    return ModelInfo(str(fields["id"]), supported if isinstance(supported, bool) else None, name if isinstance(name, str) and name else None)

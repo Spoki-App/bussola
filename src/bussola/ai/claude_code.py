@@ -12,7 +12,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import IO, Any
+from typing import IO, Any, cast
 
 from bussola.ai.base import (
     DEFAULT_TUNING,
@@ -49,7 +49,8 @@ READ_CHUNK_BYTES = 64 * 1024
 SIGN_IN_PROBLEMS = ("authenticate", "logged in", "oauth", "api key")
 SIGN_IN_HINT = "Run claude in a terminal and sign in again with /login."
 EXIT_POLL_SECONDS = 0.05
-MODEL_ALIASES = ("opus", "sonnet", "haiku")
+MODELS_REQUEST = json.dumps({"type": "control_request", "request_id": "models", "request": {"subtype": "initialize"}}) + "\n"
+DEFAULT_MODEL = "default"
 
 
 def find_claude() -> str:
@@ -139,8 +140,26 @@ class ClaudeCodeProvider:
         self._timeout = timeout
 
     def models(self, cancellation: Cancellation) -> list[ModelInfo]:
-        cancellation.check()
-        return [ModelInfo(alias) for alias in MODEL_ALIASES]
+        command = [
+            self._executable,
+            "-p",
+            "--input-format",
+            "stream-json",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--no-session-persistence",
+            REQUIRED_FLAG,
+            "--strict-mcp-config",
+            "--tools",
+            "",
+        ]
+        returncode, stdout, stderr = self._run(command, MODELS_REQUEST, cancellation)
+        listed = _listed_models(stdout)
+        if listed is None:
+            detail = (stderr or stdout).strip()[-MAX_ERROR_LENGTH:] or f"exit code {returncode}"
+            raise AiProviderError(_cli_error(f"cannot list the models: {detail}"))
+        return listed
 
     def complete(self, request: AiRequest, cancellation: Cancellation) -> str:
         if request.tools is None:
@@ -340,6 +359,28 @@ else:
 def _kill_group(process: subprocess.Popen[bytes]) -> None:
     with contextlib.suppress(OSError):
         os.killpg(process.pid, signal.SIGKILL)
+
+
+def _listed_models(stdout: str) -> list[ModelInfo] | None:
+    for line in stdout.splitlines():
+        try:
+            message = json_object(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+        if message is None or message.get("type") != "control_response":
+            continue
+        answer = json_object((json_object(message.get("response")) or {}).get("response"))
+        if answer is None:
+            continue
+        models = answer.get("models")
+        items = cast(list[Any], models) if isinstance(models, list) else []
+        return [_model_info(fields) for item in items if (fields := json_object(item)) and fields.get("value") not in (None, "", DEFAULT_MODEL)]
+    return None
+
+
+def _model_info(fields: dict[str, Any]) -> ModelInfo:
+    name = fields.get("displayName")
+    return ModelInfo(str(fields["value"]), fields.get("supportsEffort") is True, name if isinstance(name, str) and name else None)
 
 
 def _envelope(stdout: str) -> dict[str, Any] | None:

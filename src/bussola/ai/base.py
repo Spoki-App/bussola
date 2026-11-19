@@ -92,6 +92,7 @@ DEFAULT_TUNING = Tuning()
 class ModelInfo:
     id: str
     effort: bool | None = None
+    name: str | None = None
 
 
 class AiProvider(Protocol):
