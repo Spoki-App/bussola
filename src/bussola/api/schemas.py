@@ -791,7 +791,7 @@ class AiReviewRunDetailOut(AiReviewRunOut):
     rating: AiReviewRatingOut | None
     parts: list[AiReviewPartOut]
     links: list[AiReviewLinkOut]
-    rules: list[AiReviewRuleOut] = []
+    rules: list[AiReviewRuleOut]
 
 
 class AiChatSnippetOut(BaseModel):

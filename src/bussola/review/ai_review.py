@@ -35,7 +35,7 @@ from bussola.review.descriptions import (
     unrated,
 )
 from bussola.review.keys import key_of
-from bussola.review.review_rules import RuleFile
+from bussola.review.review_rules import RuleFile, review_rules
 from bussola.review.review_tools import SIDES, ReviewTools, label_of, unit_label
 from bussola.review.rows import Side, is_binary, side_lines
 from bussola.review.thread_types import ThreadScope
@@ -215,7 +215,7 @@ class AiReviewJob:
     report: Callable[[AiReviewProgress], None]
     again: bool = False
     limit: int | None = None
-    rules: tuple[RuleFile, ...] = ()
+    rules: bool = True
 
     @property
     def cancellation(self) -> Cancellation:
@@ -285,7 +285,10 @@ def _run(job: AiReviewJob, record: "_RunRecord") -> AiReviewOutcome:
     progress.reviewed(0)
     if groups:
         job.tools.prepare()
-    reviewer = _GroupReviewer(job, snapshots, ai_reviewer(context, job.runner.provider), progress, record, impacts, definitions_only)
+    rules = _rules(job) if groups else ()
+    record.followed(rules)
+    rule_lines = [line for rule in rules for line in marked("rules", f"From {rule.path}:\n{rule.text}", clip=False)]
+    reviewer = _GroupReviewer(job, snapshots, ai_reviewer(context, job.runner.provider), progress, record, impacts, definitions_only, rule_lines)
     context.store.commit()
     outcome: BatchResult[int, tuple[int, int]] = run_batch(
         range(len(groups)), lambda index: reviewer.review(groups[index]), cancellation, lambda batch: progress.reviewed(done[batch.done])
@@ -383,20 +386,24 @@ class RunStatus(StrEnum):
 
 
 class _RunRecord:
-    def __init__(self, context: ReviewContext, run: AiReviewRun, rules: tuple[RuleFile, ...]) -> None:
+    def __init__(self, context: ReviewContext, run: AiReviewRun) -> None:
         self._context = context
         self._run = run
-        self._details: dict[str, Any] = {"rating": None, "parts": [], "rules": [{"path": rule.path, "clipped": rule.clipped} for rule in rules]}
+        self._details: dict[str, Any] = {"rating": None, "parts": [], "rules": []}
 
     @classmethod
     def start(cls, job: AiReviewJob) -> "_RunRecord":
         provider = job.runner.provider
         review_id, revision_id = job.context.review.id, job.revision.id
         run = AiReviewRun(review_id, revision_id, provider.name, provider.label, provider.model, job.again, RunStatus.RUNNING, effort=provider.effort)
-        record = cls(job.context, job.context.store.ai_reviews.add_run(run), job.rules)
+        record = cls(job.context, job.context.store.ai_reviews.add_run(run))
         record._save()
         job.context.store.commit()
         return record
+
+    def followed(self, rules: tuple[RuleFile, ...]) -> None:
+        self._details["rules"] = [{"path": rule.path, "clipped": rule.clipped} for rule in rules]
+        self._save()
 
     def part(self, part: dict[str, Any]) -> None:
         self._details["parts"].append(part)
@@ -422,6 +429,7 @@ class _GroupReviewer:
     record: _RunRecord
     impacts: dict[int, Impact]
     definitions_only: bool
+    rules: list[str]
 
     def review(self, group: list[UnitSnapshot]) -> tuple[int, int]:
         context, revision = self.job.context, self.job.revision
@@ -457,12 +465,8 @@ class _GroupReviewer:
         lines = [f"Reviewed commits: before {revision.merge_base_sha}, after {revision.head_sha}", ""]
         if pull_request:
             lines += ["The pull request:", *marked("description", pull_request, clip=clip), ""]
-        if self.job.rules:
-            lines += [
-                "The repository's review rules:",
-                *(line for rule in self.job.rules for line in marked("rules", f"From {rule.path}:\n{rule.text}", clip=False)),
-                "",
-            ]
+        if self.rules:
+            lines += ["The repository's review rules:", *self.rules, ""]
         focus = {snapshot.id for snapshot in group}
         others = [unit_label(snapshot) for snapshot in self.snapshots if snapshot.id not in focus]
         if others:
@@ -624,6 +628,13 @@ def pull_request_text(context: ReviewContext) -> str | None:
 def _impacts(context: ReviewContext, snapshots: list[UnitSnapshot]) -> dict[int, Impact]:
     found = stored_descriptions(snapshots, context.store.descriptions.descriptions(context.review.id))
     return {unit_id: Impact(description.impact) for unit_id, description in found.items()}
+
+
+def _rules(job: AiReviewJob) -> tuple[RuleFile, ...]:
+    if not job.rules:
+        return ()
+    changed = {path for snapshot in job.tools.snapshots for path in (snapshot.path, snapshot.old_path) if path}
+    return review_rules(job.tools.repo, job.revision.head_sha, changed, job.tools.ignore)
 
 
 def _status(outcome: AiReviewOutcome) -> "RunStatus":
