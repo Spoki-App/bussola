@@ -31,6 +31,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Fixed
 
+- The review rows on the home page line up: the progress bar, the count, the number left to review and the comments start at the same place in every row and every repository, whether or not a row has an "N unresolved" badge or a long title ([#142](https://github.com/Spoki-App/bussola/issues/142)).
 - A unit that changes after **Mark as reviewed** now shows the changes since that review, like an approved unit does: it opens on the new **Reviewed → current** diff instead of only base to head ([#98](https://github.com/Spoki-App/bussola/issues/98)).
 - **AI review** of a pull request too large for one prompt no longer fails every unit with "Prompt is too long": without **Code per call** set, it sends only the definitions of each unit and the model opens the code of each one through its code lookups ([#102](https://github.com/Spoki-App/bussola/issues/102)).
 - Cmd+click on a method call, such as `order.requeue()`, no longer lists module-level functions with the same name when the language server cannot tell the type of the object: a call on an object lists methods, a plain call lists functions, and a call on an imported module still lists both ([#80](https://github.com/Spoki-App/bussola/issues/80)).

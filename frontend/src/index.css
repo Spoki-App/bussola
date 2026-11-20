@@ -481,6 +481,10 @@ textarea {
 }
 
 .review-list {
+  --review-course-width: 200px;
+  --review-count-width: 64px;
+  --review-todo-width: 96px;
+  --review-comments-width: 172px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -488,7 +492,7 @@ textarea {
 
 .review-list li {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(140px, 220px) 64px 96px minmax(110px, auto);
+  grid-template-columns: minmax(0, 1fr) var(--review-course-width) var(--review-count-width) var(--review-todo-width) var(--review-comments-width);
   align-items: center;
   gap: 20px;
   padding: 12px 8px;
@@ -504,6 +508,7 @@ textarea {
   color: var(--text);
   font-weight: 550;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .review-link code {
@@ -515,6 +520,17 @@ textarea {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+.review-todo {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.review-list .comment-count {
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .review-count strong {
@@ -1038,8 +1054,12 @@ button.busy {
     box-shadow: var(--shadow-dialog);
   }
 
+  .review-list {
+    --review-course-width: 140px;
+  }
+
   .review-list li {
-    grid-template-columns: minmax(200px, 1fr) 140px 64px minmax(64px, auto);
+    grid-template-columns: minmax(0, 1fr) var(--review-course-width) var(--review-count-width) var(--review-comments-width);
   }
 
   .review-todo {
@@ -3173,17 +3193,13 @@ button.danger {
   }
 
   .review-list li {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) var(--review-count-width);
     gap: 8px 12px;
   }
 
   .review-list li > .course {
     grid-column: 1 / -1;
     grid-row: 2;
-  }
-
-  .review-list .comment-count {
-    min-width: 0;
   }
 
   .inline-form input {
