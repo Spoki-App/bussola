@@ -75,7 +75,7 @@ At each refresh every unit thread, open or resolved, gets an anchor on the lates
 2. If its unit changed, the selected line is searched in the new text; among several matches, the one whose surrounding lines match the stored context best wins, then the one closest to the old offset.
 3. If its unit key is gone but a unit with the same hash exists (a rename or a move), it follows that unit.
 4. Otherwise the line is searched in the other units of the same file, which covers a whole-file unit later split into functions.
-5. If none of these finds the line, the thread is `outdated` and shows the original snippet.
+5. If none of these finds the line, the thread is `outdated` and shows the original snippet. Its anchor still names the unit with its last unit key when the latest revision has one, so the conversation panel can go to it.
 
 ## Moved code
 

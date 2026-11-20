@@ -17,7 +17,7 @@ import { ThreadView } from './components/ThreadView'
 import { useSearch } from './navigation'
 import { ReviewPage } from './pages/ReviewPage'
 import { AskAiContext, sameRange, snippetLabel, type ChatSnippetDraft } from './review/askAi'
-import { linkFocusFromSearch, resolveLinkFocus } from './review/linkFocus'
+import { linkFocusFromSearch, needsThreads, resolveLinkFocus } from './review/linkFocus'
 import { unitTitle } from './review/logic'
 import { moveLinksByUnit } from './review/moves'
 import { draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, isOpen, nextDraft, threadRow, type Draft } from './review/threadPlacement'
@@ -76,7 +76,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
       linkFocus
         ? {
             key: search,
-            ready: threadsSettled || (linkFocus.thread === null && linkFocus.comment === null),
+            ready: threadsSettled || !needsThreads(linkFocus),
             resolve: (units: Unit[]) => resolveLinkFocus(linkFocus, units, threads.data ?? []),
           }
         : undefined,

@@ -58,6 +58,18 @@ def test_thread_becomes_outdated_when_its_line_is_deleted(api: ApiClient, git_re
     assert listed["anchor"]["outdated"] is True
     assert listed["line_text"] == "    result = sum(items)"
     assert listed["context_before"] == ["def total(items):", "    count = len(items)"]
+    assert (listed["anchor"]["unit_id"], listed["anchor"]["file_line"]) == (api.unit(review, "app.py::total")["id"], None)
+
+
+def test_outdated_thread_has_no_unit_when_its_unit_leaves_the_diff(api: ApiClient, git_repo: GitFixture) -> None:
+    review = start(git_repo, api)
+    thread = comment_on(api, review, "app.py::total", 2)
+
+    git_repo.commit({"app.py": "def total(items):\n    return 0\n" + OTHER})
+    api.refresh(review)
+    anchor = thread_anchor(api, review, thread["id"])["anchor"]
+
+    assert (anchor["outdated"], anchor["unit_id"]) == (True, None)
 
 
 def test_thread_follows_a_renamed_unit(api: ApiClient, git_repo: GitFixture) -> None:

@@ -10,12 +10,14 @@ export interface LinkFocus {
   line: number | null
   thread: string | null
   comment: string | null
+  code: string | null
 }
 
 export interface FocusTarget {
   unitId: number | null
   elementId: string
   line?: number
+  lastLine?: number
 }
 
 export interface LinkState {
@@ -49,7 +51,7 @@ export const TARGET_ROW_SELECTOR = '.row-target, .row-target-old, .row-target-ne
 
 export const LinkScrollContext = createContext<LinkScroll | null>(null)
 
-const FOCUS_KEYS: Record<keyof LinkFocus, true> = { path: true, line: true, thread: true, comment: true }
+const FOCUS_KEYS: Record<keyof LinkFocus, true> = { path: true, line: true, thread: true, comment: true, code: true }
 const FOCUS_PARAMS = Object.keys(FOCUS_KEYS)
 
 export function withoutLinkFocus(search: string): string {
@@ -61,10 +63,22 @@ export function withoutLinkFocus(search: string): string {
   return rest ? `?${rest}` : ''
 }
 
-export function showThread(reviewId: number, threadId: string) {
+function showLinkFocus(reviewId: number, name: keyof LinkFocus, value: string) {
   const params = new URLSearchParams(withoutLinkFocus(window.location.search))
-  params.set('thread', threadId)
+  params.set(name, value)
   showReview(reviewId, `?${params.toString()}`, false)
+}
+
+export function showThread(reviewId: number, threadId: string) {
+  showLinkFocus(reviewId, 'thread', threadId)
+}
+
+export function showThreadCode(reviewId: number, threadId: string) {
+  showLinkFocus(reviewId, 'code', threadId)
+}
+
+export function needsThreads(focus: LinkFocus): boolean {
+  return focus.thread !== null || focus.comment !== null || focus.code !== null
 }
 
 export function linkFocusFromSearch(search: string): LinkFocus | null {
@@ -76,8 +90,9 @@ export function linkFocusFromSearch(search: string): LinkFocus | null {
     line: path !== null && line !== null && POSITIVE_NUMBER.test(line) ? Number(line) : null,
     thread: params.get('thread'),
     comment: params.get('comment'),
+    code: params.get('code'),
   }
-  return focus.path === null && focus.thread === null && focus.comment === null ? null : focus
+  return focus.path === null && !needsThreads(focus) ? null : focus
 }
 
 function linkedThread(focus: LinkFocus, threads: Thread[]): Thread | undefined {
@@ -124,7 +139,27 @@ export function threadElementId(threadId: string): string {
   return `thread-${threadId}`
 }
 
+export function codeTarget(thread: Thread, units: Unit[]): FocusTarget | null {
+  const unitId = thread.anchor?.unit_id ?? null
+  if (unitId === null || !units.some((unit) => unit.id === unitId)) {
+    return null
+  }
+  const line = thread.anchor?.file_line ?? null
+  if (!isInline(thread) || line === null) {
+    return { unitId, elementId: unitElementId(unitId) }
+  }
+  if (thread.side === 'base') {
+    return { unitId, elementId: threadElementId(thread.id) }
+  }
+  return { unitId, elementId: unitElementId(unitId), line, lastLine: thread.anchor?.end_file_line ?? line }
+}
+
 export function resolveLinkFocus(focus: LinkFocus, units: Unit[], threads: Thread[]): FocusTarget | null {
+  const coded = focus.code === null ? undefined : threads.find((thread) => thread.id === focus.code)
+  const inCode = coded && codeTarget(coded, units)
+  if (inCode) {
+    return inCode
+  }
   const thread = linkedThread(focus, threads)
   if (thread) {
     const unitId = isInline(thread) ? thread.anchor?.unit_id ?? null : null
@@ -204,9 +239,18 @@ function linkRole(state: LinkState | null, elementId: string, unitId: number | n
 
 const noLink = () => () => undefined
 
-export function useLinkedElementId(): string | null {
+export function useLinkedTarget(): FocusTarget | null {
   const link = useContext(LinkScrollContext)
-  return useSyncExternalStore(link?.subscribe ?? noLink, () => link?.current()?.target.elementId ?? null)
+  return useSyncExternalStore(link?.subscribe ?? noLink, () => link?.current()?.target ?? null)
+}
+
+export function useLinkedElementId(): string | null {
+  return useLinkedTarget()?.elementId ?? null
+}
+
+export function targetsThreadLines(target: FocusTarget | null, thread: Thread): boolean {
+  const anchor = thread.anchor
+  return target?.line !== undefined && anchor !== null && target.unitId === anchor.unit_id && target.line === anchor.file_line
 }
 
 const USER_INPUT_EVENTS = ['wheel', 'touchmove', 'keydown', 'mousedown'] as const

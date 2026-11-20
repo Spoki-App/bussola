@@ -73,14 +73,15 @@ function thread(id: string, unitId: number | null, remoteUrl: string | null = nu
   }
 }
 
-const focus = (values: Partial<LinkFocus>): LinkFocus => ({ path: null, line: null, thread: null, comment: null, ...values })
+const focus = (values: Partial<LinkFocus>): LinkFocus => ({ path: null, line: null, thread: null, comment: null, code: null, ...values })
 const units = [unit(1, 'src/app.py', 1, 9), unit(2, 'src/app.py', 12, 30), unit(3, 'README.md', null, null)]
 
 describe('linkFocusFromSearch', () => {
   it('reads the focus of a link', () => {
     const search = `?path=src%2Fapp.py&line=42&thread=${THREAD_ID}&comment=501`
 
-    expect(linkFocusFromSearch(search)).toEqual({ path: 'src/app.py', line: 42, thread: THREAD_ID, comment: '501' })
+    expect(linkFocusFromSearch(search)).toEqual({ path: 'src/app.py', line: 42, thread: THREAD_ID, comment: '501', code: null })
+    expect(linkFocusFromSearch(`?code=${THREAD_ID}`)).toEqual(focus({ code: THREAD_ID }))
   })
 
   it('keeps only a positive line of a path and returns null without a focus', () => {
@@ -93,7 +94,7 @@ describe('linkFocusFromSearch', () => {
 
 describe('withoutLinkFocus', () => {
   it('drops only the link parameters', () => {
-    expect(withoutLinkFocus('?path=a.py&line=2&thread=t&comment=1')).toBe('')
+    expect(withoutLinkFocus('?path=a.py&line=2&thread=t&comment=1&code=t')).toBe('')
     expect(withoutLinkFocus('?path=a.py&view=split')).toBe('?view=split')
     expect(withoutLinkFocus('')).toBe('')
   })
@@ -133,6 +134,21 @@ describe('resolveLinkFocus', () => {
   it('opens the conversation panel for threads that are not shown in a unit', () => {
     expect(resolveLinkFocus(focus({ thread: THREAD_ID }), units, [thread(THREAD_ID, null)])).toEqual({ unitId: null, elementId: `thread-${THREAD_ID}` })
     expect(resolveLinkFocus(focus({ thread: THREAD_ID }), units, [thread(THREAD_ID, null, null, 'file')])?.unitId).toBeNull()
+  })
+
+  it('goes to the commented lines of a thread in the code', () => {
+    const range = { ...thread(THREAD_ID, 2), anchor: { revision_id: 1, line_offset: 0, outdated: false, unit_id: 2, file_line: 14, end_file_line: 16 } }
+
+    expect(resolveLinkFocus(focus({ code: THREAD_ID }), units, [range])).toEqual({ unitId: 2, elementId: 'unit-2', line: 14, lastLine: 16 })
+    expect(resolveLinkFocus(focus({ code: THREAD_ID }), units, [{ ...range, side: 'base' }])).toEqual({ unitId: 2, elementId: `thread-${THREAD_ID}` })
+  })
+
+  it('goes to the unit an outdated thread was in, or nowhere when it left the diff', () => {
+    const outdated = thread(THREAD_ID, null)
+    const inUnit = { ...outdated, anchor: { revision_id: 1, line_offset: null, outdated: true, unit_id: 1, file_line: null, end_file_line: null } }
+
+    expect(resolveLinkFocus(focus({ code: THREAD_ID }), units, [inUnit])).toEqual({ unitId: 1, elementId: 'unit-1' })
+    expect(resolveLinkFocus(focus({ code: THREAD_ID }), units, [outdated])).toBeNull()
   })
 
   it('finds the imported thread of a GitHub discussion anchor', () => {
