@@ -65,10 +65,10 @@ describe('submit review', () => {
     expect(needsSummary('APPROVE', 0)).toBe(false)
   })
 
-  it('says what was submitted and what is still pending', () => {
+  it('says what was submitted, leaving unsent comments to the sync that follows', () => {
     const message = submittedMessage({ event: 'REQUEST_CHANGES', published: { review_url: 'https://github.com/acme/widgets/pull/7#pullrequestreview-1', outcomes: [sent, sent, failed] }, unsent_comments: 1 })
 
-    expect(message).toBe('Changes requested on GitHub. Sent 2 comments to GitHub. 1 comment not sent yet; Sync sends it again.')
+    expect(message).toBe('Changes requested on GitHub. Sent 2 comments to GitHub.')
   })
 
   it('names only the comments when no review was needed', () => {

@@ -44,8 +44,15 @@ export function submittedMessage(result: ReviewSubmitResult): string {
   if (sent > 0) {
     parts.push(`Sent ${plural(sent, 'comment')} to GitHub.`)
   }
-  if (result.unsent_comments > 0) {
-    parts.push(`${plural(result.unsent_comments, 'comment')} not sent yet; Sync sends ${result.unsent_comments === 1 ? 'it' : 'them'} again.`)
-  }
   return parts.join(' ')
+}
+
+export type SubmitStep = 'syncing' | 'finishing' | 'done' | 'sync-failed' | 'finish-failed'
+
+export const SUBMIT_STEPS: Record<SubmitStep, string> = {
+  syncing: 'Syncing...',
+  finishing: 'Synced. Marking as reviewed...',
+  done: 'Synced and marked as reviewed.',
+  'sync-failed': 'Sync failed, so it was not marked as reviewed: press Sync, then Mark as reviewed.',
+  'finish-failed': 'Synced, but Mark as reviewed failed: press Mark as reviewed to try again.',
 }

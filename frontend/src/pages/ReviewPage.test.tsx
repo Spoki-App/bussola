@@ -63,6 +63,16 @@ function stubServer() {
   )
 }
 
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+    this.open = true
+  }
+  HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+    this.open = false
+    this.dispatchEvent(new Event('close'))
+  }
+})
+
 describe('ReviewPage window title', () => {
   beforeEach(() => {
     document.title = 'bussola'
@@ -169,16 +179,6 @@ describe('ReviewPage conversation panel', () => {
 })
 
 describe('ReviewPage merge', () => {
-  beforeAll(() => {
-    HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
-      this.open = true
-    }
-    HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
-      this.open = false
-      this.dispatchEvent(new Event('close'))
-    }
-  })
-
   beforeEach(() => {
     let state = 'OPEN'
     const options: MergeOptions = {
@@ -225,5 +225,108 @@ describe('ReviewPage merge', () => {
     expect(await screen.findByText('Pull request merged.')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     await waitFor(() => { expect(screen.queryByRole('button', { name: 'Merge' })).not.toBeInTheDocument() })
+  })
+})
+
+describe('ReviewPage submit review', () => {
+  const failure = (detail: string) => Promise.resolve(Response.json({ detail }, { status: 502 }))
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const STEPS = ['/api/reviews/3/forge/review', '/api/reviews/3/sync', '/api/reviews/3/sessions']
+
+  function stubSubmit({ submit = true, sync = true, finish = true, syncBody = synced, syncGate = Promise.resolve() } = {}) {
+    const posts: string[] = []
+    const answers: Record<string, [boolean, unknown, string]> = {
+      [STEPS[0]]: [submit, { event: 'COMMENT', published: { review_url: null, outcomes: [] }, unsent_comments: 0 }, 'GitHub refused the review'],
+      [STEPS[1]]: [sync, syncBody, 'Could not reach GitHub'],
+      [STEPS[2]]: [finish, {}, 'Database is locked'],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url in answers) {
+          posts.push(url)
+          const [ok, body, error] = answers[url]
+          const answer = () => (ok ? Promise.resolve(Response.json(body)) : failure(error))
+          return url === STEPS[1] ? syncGate.then(answer) : answer()
+        }
+        if (url === '/api/reviews/3/forge/sync') {
+          return Promise.resolve(Response.json({ changes: 0, new_commits: false, state: 'OPEN' }))
+        }
+        return Promise.resolve(Response.json(url === '/api/reviews/3' ? reviewWithTitle('feat: first title') : []))
+      }),
+    )
+    return posts
+  }
+
+  async function submitReview() {
+    const page = renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Submit review' }))
+    const dialog = screen.getByRole('dialog', { name: 'Finish your review' })
+    fireEvent.change(within(dialog).getByLabelText('Review summary (Markdown)'), { target: { value: 'Looks good' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Submit review' }))
+    return page
+  }
+
+  it('syncs and marks as reviewed after submitting, sending the review once', async () => {
+    const posts = stubSubmit()
+
+    await submitReview()
+
+    expect(await screen.findByText('Synced and marked as reviewed.', { exact: false })).toBeInTheDocument()
+    expect(posts).toEqual(STEPS)
+  })
+
+  it('does not mark as reviewed when the sync fails', async () => {
+    const posts = stubSubmit({ sync: false })
+
+    await submitReview()
+
+    expect(await screen.findByText('Sync failed, so it was not marked as reviewed', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('Could not reach GitHub')).toBeInTheDocument()
+    expect(posts).toEqual(STEPS.slice(0, 2))
+  })
+
+  it('does not mark as reviewed when the sync could only check the local branch', async () => {
+    const posts = stubSubmit({ syncBody: { ...synced, refresh: { ...synced.refresh, warning: 'Could not fetch (offline). Checked the local branch instead.' } } })
+
+    await submitReview()
+
+    expect(await screen.findByText('Sync failed, so it was not marked as reviewed', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('Could not fetch (offline)', { exact: false })).toBeInTheDocument()
+    expect(posts).toEqual(STEPS.slice(0, 2))
+  })
+
+  it('still marks as reviewed when the page is left during the sync', async () => {
+    let openGate: () => void = () => undefined
+    const posts = stubSubmit({ syncGate: new Promise<void>((done) => { openGate = done }) })
+
+    const { unmount } = await submitReview()
+    await waitFor(() => { expect(posts).toEqual(STEPS.slice(0, 2)) })
+    unmount()
+    openGate()
+
+    await waitFor(() => { expect(posts).toEqual(STEPS) })
+  })
+
+  it('says when marking as reviewed fails after the sync', async () => {
+    stubSubmit({ finish: false })
+
+    await submitReview()
+
+    expect(await screen.findByText('Synced, but Mark as reviewed failed', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('Database is locked')).toBeInTheDocument()
+  })
+
+  it('neither syncs nor marks as reviewed when the submit fails', async () => {
+    const posts = stubSubmit({ submit: false })
+
+    await submitReview()
+
+    expect(await screen.findByText('GitHub refused the review')).toBeInTheDocument()
+    expect(posts).toEqual(STEPS.slice(0, 1))
   })
 })
