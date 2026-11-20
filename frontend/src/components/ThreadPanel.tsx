@@ -55,21 +55,17 @@ function Location({ thread }: { thread: Thread }) {
   )
 }
 
-function OutdatedCode({ reviewId, thread }: { reviewId: number; thread: Thread }) {
-  if (thread.anchor?.unit_id == null) {
-    return (
-      <>
-        <CodePreview thread={thread} />
-        <p className="muted code-preview-note">The code is no longer in the diff.</p>
-      </>
-    )
-  }
+function ElsewhereCode({ reviewId, thread }: { reviewId: number; thread: Thread }) {
+  const inDiff = thread.anchor?.unit_id != null
   return (
-    <CodePreview
-      thread={thread}
-      showTitle={thread.anchor.outdated ? 'The commented lines changed. Go to the unit they were in.' : undefined}
-      onShow={() => { showThreadCode(reviewId, thread.id) }}
-    />
+    <>
+      <CodePreview
+        thread={thread}
+        showTitle={thread.anchor?.outdated ? 'The commented lines changed. Go to the unit they were in.' : undefined}
+        onShow={inDiff ? () => { showThreadCode(reviewId, thread.id) } : undefined}
+      />
+      {!inDiff && <p className="muted code-preview-note">The code is no longer in the diff.</p>}
+    </>
   )
 }
 
@@ -176,7 +172,7 @@ export function ThreadPanel({ reviewId, threads }: Props) {
           {elsewhere.map((thread) => (
             <div key={thread.id}>
               <Location thread={thread} />
-              <OutdatedCode reviewId={reviewId} thread={thread} />
+              <ElsewhereCode reviewId={reviewId} thread={thread} />
               <ThreadView reviewId={reviewId} thread={thread} />
             </div>
           ))}

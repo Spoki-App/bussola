@@ -166,14 +166,10 @@ function targetLineOf(row: DiffRow, side: GutterSide): number | null {
   return row.change === 'added' ? null : row.old_line
 }
 
-function targetPositions(rows: DiffRow[], target: TargetLine | undefined): number[] {
-  if (!target) {
-    return []
-  }
-  const last = target.lastLine ?? target.line
-  return rows.flatMap((row, position) => {
-    const line = targetLineOf(row, target.side)
-    return line !== null && line >= target.line && line <= last ? [position] : []
+function targetRowsOf(rows: DiffRow[], side: GutterSide, first: number, last: number): DiffRow[] {
+  return rows.filter((row) => {
+    const line = targetLineOf(row, side)
+    return line !== null && line >= first && line <= last
   })
 }
 
@@ -249,8 +245,11 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
   )
   const widgetMap = widgets ? widgets(index.changeKeyOf) : undefined
   const pinnedKeys = Object.keys(widgetMap ?? {}).join(',')
-  const targetKey = targetPositions(rows, target).join(',')
-  const targetRows = useMemo(() => new Set(targetKey ? targetKey.split(',').map((position) => rows[Number(position)]) : []), [rows, targetKey])
+  const { side: targetSide, line: targetFirst, lastLine: targetLast } = target ?? {}
+  const targetRows = useMemo(
+    () => new Set(targetSide === undefined || targetFirst === undefined ? [] : targetRowsOf(rows, targetSide, targetFirst, targetLast ?? targetFirst)),
+    [rows, targetSide, targetFirst, targetLast],
+  )
   const segments = useMemo(() => {
     const keys = new Set(pinnedKeys.split(','))
     const pinned = new Set(rows.flatMap((row, position) => (keys.has(index.changeKeyOf(row) ?? '') || targetRows.has(row) ? [position] : [])))

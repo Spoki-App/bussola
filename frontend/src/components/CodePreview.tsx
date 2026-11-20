@@ -13,7 +13,8 @@ interface Props {
 
 export function CodePreview({ thread, onShow, showTitle }: Props) {
   const [expanded, setExpanded] = useState(false)
-  const lines = useMemo(() => previewLines(thread), [thread])
+  const { path, line_text: lineText, context_before: before, context_after: after } = thread
+  const lines = useMemo(() => previewLines({ path, line_text: lineText, context_before: before, context_after: after }), [path, lineText, before, after])
   const compact = useMemo(() => compactPreview(lines), [lines])
   if (lines.length === 0) {
     return null

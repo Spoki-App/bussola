@@ -77,6 +77,10 @@ export function showThreadCode(reviewId: number, threadId: string) {
   showLinkFocus(reviewId, 'code', threadId)
 }
 
+export function needsThreads(focus: LinkFocus): boolean {
+  return focus.thread !== null || focus.comment !== null || focus.code !== null
+}
+
 export function linkFocusFromSearch(search: string): LinkFocus | null {
   const params = new URLSearchParams(search)
   const path = params.get('path')
@@ -88,7 +92,7 @@ export function linkFocusFromSearch(search: string): LinkFocus | null {
     comment: params.get('comment'),
     code: params.get('code'),
   }
-  return focus.path === null && focus.thread === null && focus.comment === null && focus.code === null ? null : focus
+  return focus.path === null && !needsThreads(focus) ? null : focus
 }
 
 function linkedThread(focus: LinkFocus, threads: Thread[]): Thread | undefined {

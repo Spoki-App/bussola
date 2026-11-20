@@ -5,7 +5,7 @@ import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/
 import type { DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
 import type { NavigationRequest } from '../api/navigation'
 import type { NavigationClick, ScreenPoint, UnitTarget } from '../review/codeNavigation'
-import { TARGET_ROW_SELECTOR, unitElementId, useLinkedScroll } from '../review/linkFocus'
+import { TARGET_ROW_SELECTOR, unitElementId, useLinkedScroll, type FocusTarget } from '../review/linkFocus'
 import { unitTitle } from '../review/logic'
 import { ReviewLinkContext } from '../review/reviewLink'
 import { useAiDescription } from '../hooks/useAiDescription'
@@ -50,22 +50,21 @@ interface Props {
   onNavigate?: (click: NavigationClick) => void
   canNavigate?: (request: NavigationRequest) => Promise<boolean>
   navigationTarget?: UnitTarget
-  linkedLine?: number
-  linkedLastLine?: number
+  linkedTarget?: FocusTarget
 }
 
 const APPROVE_LABELS = { approve: 'Approve', approve_under_name: 'Approve under this name', confirm_removal: 'Confirm removal' } as const
 
 const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', reviewed: 'Reviewed → current', base: 'Base → head' }
 
-function targetLine(target: LineLink | undefined, linkedLine: number | undefined, linkedLastLine: number | undefined): TargetLine | undefined {
+function targetLine(target: LineLink | undefined, linked: FocusTarget | undefined): TargetLine | undefined {
   if (target) {
     return { side: target.side === 'base' ? 'old' : 'new', line: target.line }
   }
-  return linkedLine === undefined ? undefined : { side: 'new', line: linkedLine, lastLine: linkedLastLine }
+  return linked?.line === undefined ? undefined : { side: 'new', line: linked.line, lastLine: linked.lastLine }
 }
 
-export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, unitLabels, onNavigate, canNavigate, navigationTarget, linkedLine, linkedLastLine }: Props) {
+export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, unitLabels, onNavigate, canNavigate, navigationTarget, linkedTarget }: Props) {
   const todo = unit.todo
   const [expanded, setExpanded] = useState(todo)
   const [wasTodo, setWasTodo] = useState(todo)
@@ -298,7 +297,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
               highlighted={highlightRows?.(unit, diff.data)}
               onNavigate={navigateFrom}
               canNavigate={canNavigateFrom}
-              target={targetLine(lineLink ?? navigationTarget, linkedLine, linkedLastLine)}
+              target={targetLine(lineLink ?? navigationTarget, linkedTarget)}
               widgets={renderWidgets ? (changeKeyOf) => renderWidgets(unit, diff.data, changeKeyOf) : undefined}
             />
           )}
