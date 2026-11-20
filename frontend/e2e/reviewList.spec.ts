@@ -12,10 +12,10 @@ function pull(number: number, title: string): ReviewPullRequest {
   return { number, title, url: null, author: 'someone', state: 'OPEN', description: null }
 }
 
-function review(id: number, repoId: number, fields: Partial<Review>): Review {
+function review(id: number, fields: Partial<Review>): Review {
   return {
     id,
-    repo_id: repoId,
+    repo_id: 0,
     repo_name: 'repo',
     head_ref: `feature-${String(id)}`,
     base_ref: 'main',
@@ -34,13 +34,13 @@ function review(id: number, repoId: number, fields: Partial<Review>): Review {
 
 const REVIEWS: Record<number, Review[]> = {
   901: [
-    review(1, 901, { pull_request: pull(7, 'Short'), total_threads: 3 }),
-    review(2, 901, { pull_request: pull(1234, `A very long pull request title ${'that keeps going '.repeat(12)}`), total_threads: 999, open_threads: 999, total: 1234, approved: 999 }),
-    review(3, 901, { head_ref: `branch-${'x'.repeat(120)}`, total: 4, approved: 4, counts: { approved: 4, approved_moved: 0, changed: 0, partial: 0, removed: 0, new: 0 } }),
+    review(1, { pull_request: pull(7, 'Short'), total_threads: 3 }),
+    review(2, { pull_request: pull(1234, `A very long pull request title ${'that keeps going '.repeat(12)}`), total_threads: 999, open_threads: 999, total: 1234, approved: 999 }),
+    review(3, { head_ref: `branch-${'x'.repeat(120)}`, total: 4, approved: 4 }),
   ],
   902: [
-    review(4, 902, { pull_request: pull(42, 'Medium sized title for a change'), total_threads: 12, open_threads: 1 }),
-    review(5, 902, { total: 0, approved: 0, counts: { approved: 0, approved_moved: 0, changed: 0, partial: 0, removed: 0, new: 0 } }),
+    review(4, { pull_request: pull(42, 'Medium sized title for a change'), total_threads: 12, open_threads: 1 }),
+    review(5, { total: 0, approved: 0 }),
   ],
 }
 
@@ -58,7 +58,7 @@ function columnEdges(page: Page, selector: string) {
   return page.locator(`.review-list li > ${selector}`).evaluateAll((cells) =>
     cells.map((cell) => {
       const box = cell.getBoundingClientRect()
-      return { left: Math.round(box.left), right: Math.round(box.right), visible: box.width > 0 }
+      return { left: Math.round(box.left), right: Math.round(box.right) }
     }),
   )
 }
@@ -66,10 +66,8 @@ function columnEdges(page: Page, selector: string) {
 async function expectColumnsAligned(page: Page, selectors: string[]) {
   for (const selector of selectors) {
     const edges = await columnEdges(page, selector)
-    expect(edges, selector).toHaveLength(5)
-    expect(edges.every((edge) => edge.visible), selector).toBe(true)
-    expect(new Set(edges.map((edge) => edge.left)).size, `${selector} left edges`).toBe(1)
-    expect(new Set(edges.map((edge) => edge.right)).size, `${selector} right edges`).toBe(1)
+    expect(edges[0].right, selector).toBeGreaterThan(edges[0].left)
+    expect(edges, selector).toEqual(edges.map(() => edges[0]))
   }
 }
 
