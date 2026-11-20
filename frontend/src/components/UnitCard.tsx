@@ -271,30 +271,32 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
               }}
             />
           )}
-          {earlierMode && (
-            <div className="segmented" role="group" aria-label="Diff mode">
-              {[earlierMode, 'base' as const].map((option) => (
-                <button key={option} type="button" className={diff.data?.mode === option ? 'active' : ''} onClick={() => { setMode(option) }}>
-                  {MODE_LABELS[option]}
-                </button>
-              ))}
-            </div>
-          )}
-          {selected.size > 0 && (
-            <button type="button" className="approve" disabled={busy} onClick={approveSelection}>
-              {`Approve selection (${String(selected.size)})`}
-            </button>
-          )}
-          {unit.rows_approved > 0 && (
-            <button type="button" disabled={busy || rows.length === 0} onClick={revokeRows}>
-              Revoke lines
-            </button>
-          )}
-          {unit.action === 'revoke' && (
-            <button type="button" disabled={busy} onClick={revokeUnit}>
-              Revoke
-            </button>
-          )}
+          <div className="unit-controls">
+            {earlierMode && (
+              <div className="segmented" role="group" aria-label="Diff mode">
+                {[earlierMode, 'base' as const].map((option) => (
+                  <button key={option} type="button" className={diff.data?.mode === option ? 'active' : ''} onClick={() => { setMode(option) }}>
+                    {MODE_LABELS[option]}
+                  </button>
+                ))}
+              </div>
+            )}
+            {selected.size > 0 && (
+              <button type="button" className="approve" disabled={busy} onClick={approveSelection}>
+                {`Approve selection (${String(selected.size)})`}
+              </button>
+            )}
+            {unit.rows_approved > 0 && (
+              <button type="button" disabled={busy || rows.length === 0} onClick={revokeRows}>
+                Revoke lines
+              </button>
+            )}
+            {unit.action === 'revoke' && (
+              <button type="button" disabled={busy} onClick={revokeUnit}>
+                Revoke
+              </button>
+            )}
+          </div>
           {approveAction && (
             <button type="button" className={`icon-button ${selected.size > 0 ? 'approve-quiet' : 'approve'}`} aria-label={approveAction.label} title={approveAction.label} disabled={busy} onClick={approveUnit}>
               <ActionIcon path={approveAction.icon} />

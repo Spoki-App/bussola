@@ -1357,24 +1357,40 @@ button.busy {
 }
 
 .unit-heading,
-.unit-actions {
+.unit-actions,
+.unit-controls {
   display: flex;
   align-items: center;
   gap: 6px 10px;
 }
 
-.unit-heading {
+.unit-heading,
+.unit-actions {
   flex: 1 1 0;
+  max-width: max-content;
+}
+
+.unit-heading {
   flex-wrap: wrap;
-  min-width: min(12rem, 100%);
+  min-width: min(8rem, 100%);
 }
 
 .unit-actions {
-  flex-shrink: 0;
   margin-left: auto;
 }
 
-.unit-heading > * {
+.unit-controls {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.unit-controls:empty {
+  display: none;
+}
+
+.unit-heading > *,
+.unit-actions > :not(.unit-controls),
+.unit-controls > * {
   flex-shrink: 0;
 }
 
@@ -3240,6 +3256,11 @@ button.danger {
 
   .inline-form input {
     min-width: 0;
+  }
+
+  .unit-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 }
 

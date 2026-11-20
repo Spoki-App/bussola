@@ -16,14 +16,14 @@ function git(repo: string, ...args: string[]) {
   execFileSync('git', args, { cwd: repo, stdio: 'ignore' })
 }
 
-function createRepository(name: string, file: string, base: string, head: string): string {
+function createRepository(name: string, file: string, base: string, head: string, lineLength = 60): string {
   const repo = join(root, name)
   mkdirSync(repo)
   git(repo, 'init', '-q', '-b', 'main')
   git(repo, 'config', 'user.email', 'e2e@example.com')
   git(repo, 'config', 'user.name', 'E2E Reviewer')
   git(repo, 'config', 'commit.gpgsign', 'false')
-  writeFileSync(join(repo, 'pyproject.toml'), '[tool.ruff]\nline-length = 60\n')
+  writeFileSync(join(repo, 'pyproject.toml'), `[tool.ruff]\nline-length = ${String(lineLength)}\n`)
   writeFileSync(join(repo, file), base)
   git(repo, 'add', '-A')
   git(repo, 'commit', '-q', '-m', 'base')
@@ -33,13 +33,14 @@ function createRepository(name: string, file: string, base: string, head: string
   return repo
 }
 
-async function openReview(page: Page, path: string) {
+async function openReview(page: Page, path: string): Promise<number> {
   await page.goto(`/?token=${E2E_TOKEN}`)
   const repo = await page.request.post('/api/repos', { data: { path } })
   const { id: repoId } = (await repo.json()) as { id: number }
   const review = await page.request.post(`/api/repos/${String(repoId)}/reviews`, { data: { head_ref: 'wide', base_ref: 'main' } })
   const { id: reviewId } = (await review.json()) as { id: number }
   await page.goto(`/reviews/${String(reviewId)}`)
+  return reviewId
 }
 
 async function box(locator: Locator) {
@@ -124,16 +125,39 @@ test('the column of units follows the repository line length, preset steps and f
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
 })
 
-test('the approve button stays on the header line of a narrow unit and a long name is cut instead', async ({ page }) => {
-  const name = 'synchronise_every_catalogue_item_with_the_remote_hub_and_report'
-  await openReview(page, createRepository('long-name', 'catalogue.py', `def ${name}():\n    return 0\n`, `def ${name}():\n    return 1\n`))
+const LONG_NAME = 'synchronise_every_catalogue_item_with_the_remote_hub_and_report'
+
+async function besideTheName(card: Locator, button: Locator): Promise<boolean> {
+  const name = await box(card.locator('.qualified-name'))
+  const target = await box(button)
+  return target.x >= name.x + name.width && target.y < name.y + name.height && target.y + target.height > name.y
+}
+
+async function headerFits(card: Locator): Promise<boolean> {
+  return card.locator('.unit-header').evaluate((header) => header.scrollWidth <= header.clientWidth && [...header.querySelectorAll('button')].every((button) => button.getBoundingClientRect().right <= header.getBoundingClientRect().right + 1))
+}
+
+test('the approve button stays next to the name of a narrow unit, which is cut instead, and the header never overflows', async ({ page }) => {
+  const repo = createRepository('long-name', 'catalogue.py', `def ${LONG_NAME}():\n    return 0\n`, `def ${LONG_NAME}():\n    return 1\n`, 50)
+  const reviewId = await openReview(page, repo)
   await page.getByRole('tab', { name: 'Unified' }).click()
-  const card = page.locator('article.unit-card', { hasText: name })
+  const card = page.locator('article.unit-card', { hasText: LONG_NAME })
   const approve = card.getByRole('button', { name: 'Approve', exact: true })
   await expect(approve).toBeVisible()
-
-  const disclosure = await box(card.getByRole('button', { name: 'Collapse unit' }))
-  const approveBox = await box(approve)
-  expect(Math.abs(approveBox.y + approveBox.height / 2 - (disclosure.y + disclosure.height / 2))).toBeLessThan(2)
+  expect(await besideTheName(card, approve)).toBe(true)
   expect(await card.locator('.qualified-name').evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+
+  await approve.click()
+  await expect(card.getByText('Approved', { exact: true })).toBeVisible()
+  writeFileSync(join(repo, 'catalogue.py'), `def ${LONG_NAME}():\n    return 2\n`)
+  git(repo, 'commit', '-q', '-am', 'again')
+  await page.request.post(`/api/reviews/${String(reviewId)}/refresh`, { data: { fetch: false } })
+  await page.reload()
+  await expect(card.getByRole('group', { name: 'Diff mode' })).toBeVisible()
+  expect(await besideTheName(card, approve)).toBe(true)
+  expect(await headerFits(card)).toBe(true)
+
+  await page.setViewportSize({ width: 360, height: 900 })
+  await expect(approve).toBeVisible()
+  expect(await headerFits(card)).toBe(true)
 })
