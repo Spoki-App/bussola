@@ -205,6 +205,10 @@ const RUN: AiReviewRunDetail = {
     { path: 'app.py', side: 'base', line: 1, unit_id: 4 },
     { path: 'shop.py', side: 'head', line: 5, unit_id: null },
   ],
+  rules: [
+    { path: '.cursor/BUGBOT.md', clipped: false },
+    { path: 'CLAUDE.md', clipped: true },
+  ],
 }
 
 function renderDetails(onShowLine?: (target: CodeTarget) => void) {
@@ -252,6 +256,7 @@ describe('AI review details', () => {
     const dialog = await screen.findByRole('dialog', { name: 'AI review details' })
     expect(await within(dialog).findByText(/^Completed: AI review with Anthropic API \(claude-opus-5-5\)/)).toBeInTheDocument()
     expect(within(dialog).getByText('callers')).toBeInTheDocument()
+    expect(within(dialog).getByText(/^Review rules followed:/)).toHaveTextContent('Review rules followed: .cursor/BUGBOT.md, CLAUDE.md (clipped)')
     expect(within(dialog).getByText('1 code lookup')).toBeInTheDocument()
     expect(within(dialog).getByText('find_usages(path: app.py, line: 1, name: total)')).toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: 'app.py::total, line 2 after' }))

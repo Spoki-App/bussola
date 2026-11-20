@@ -10,6 +10,7 @@ import pytest
 from bussola.ai.base import AiRequest, AiUnreachableError, Cancellation, run_cancellable
 from bussola.review.ai_review import SEVERITY_MARKS, Severity
 from bussola.review.context import ReviewContext
+from bussola.review.review_rules import CLIPPED_RULES, MAX_RULE_FILE_CHARACTERS
 from bussola.review.threads import NewThread, create_thread
 from bussola.storage.database import Database
 from bussola.storage.models import ForgeLink, Revision, Thread
@@ -557,3 +558,97 @@ def test_a_run_of_another_review_is_not_found(billing: GitFixture, data_dir: Pat
     [run_out] = api.call("GET", f"/reviews/{review_id}/ai-review/runs")
 
     assert api.call("GET", f"/reviews/{review_id}/ai-review/runs/{run_out['id'] + 1}", 404)["detail"] == "AI review run not found"
+
+
+def last_run(api: ApiClient, review_id: int) -> Json:
+    latest = max(api.call("GET", f"/reviews/{review_id}/ai-review/runs"), key=lambda run_out: run_out["id"])
+    return api.call("GET", f"/reviews/{review_id}/ai-review/runs/{latest['id']}")
+
+
+@pytest.fixture
+def ruled(git_repo: GitFixture) -> GitFixture:
+    git_repo.commit(
+        {
+            ".cursor/BUGBOT.md": "Bugbot: check the money math.\n",
+            "CLAUDE.md": "Claude: prices are in cents.\n",
+            "AGENTS.md": "Agents: keep the API stable.\n",
+            "shop/billing/CLAUDE.md": "Billing: totals never go negative.\n",
+            "shop/billing/.cursor/BUGBOT.md": "Billing bugbot: watch the rounding.\n",
+            "shop/billing/total.py": "def total(items):\n    return sum(items)\n",
+            "web/REVIEW.md": "Web: not part of this change.\n",
+            "web/page.py": "TITLE = 'shop'\n",
+            "secret/CLAUDE.md": "Hidden: excluded from reviews.\n",
+            "secret/data.py": "VALUE = 1\n",
+            ".bussola.toml": 'ignore = ["secret/**"]\n',
+        },
+        "base",
+    )
+    git_repo.branch("feature")
+    git_repo.commit(
+        {
+            "shop/billing/total.py": "def total(items):\n    return sum(items) * 1.2\n",
+            "shop/billing/CLAUDE.md": "Billing: totals never go negative, even with tax.\n",
+            "secret/data.py": "VALUE = 2\n",
+        },
+        "add tax",
+    )
+    return git_repo
+
+
+def test_the_review_follows_the_repository_rules_for_the_changed_files(ruled: GitFixture, data_dir: Path, config_file: Path) -> None:
+    ruled.write({"CLAUDE.md": "Not committed: ignore me.\n"})
+    provider = FakeProvider(NOTHING)
+    api = client(ruled, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    run(api, review_id)
+
+    [request] = reviews(provider)
+    assert "review rules" in request.system
+    order = [
+        "From .cursor/BUGBOT.md:\nBugbot: check the money math.",
+        "From CLAUDE.md:\nClaude: prices are in cents.",
+        "From AGENTS.md:\nAgents: keep the API stable.",
+        "From shop/billing/.cursor/BUGBOT.md:\nBilling bugbot: watch the rounding.",
+        "From shop/billing/CLAUDE.md:\nBilling: totals never go negative, even with tax.",
+    ]
+    positions = [request.prompt.index(text) for text in order]
+    assert positions == sorted(positions)
+    assert request.prompt.index("The repository's review rules:") < positions[0] < request.prompt.index("The units to review:")
+    assert "Not committed" not in request.prompt
+    assert "Web: not part" not in request.prompt
+    assert "Hidden:" not in request.prompt
+    paths = [text.split(":")[0].removeprefix("From ") for text in order]
+    assert last_run(api, review_id)["rules"] == [{"path": path, "clipped": False} for path in paths]
+
+
+def test_the_repository_can_turn_the_review_rules_off(ruled: GitFixture, data_dir: Path, config_file: Path) -> None:
+    ruled.write({".bussola.toml": 'ignore = ["secret/**"]\nreview_rules = false\n'})
+    provider = FakeProvider(NOTHING)
+    api = client(ruled, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    run(api, review_id)
+
+    [request] = reviews(provider)
+    assert "From " not in request.prompt
+    assert "The repository's review rules:" not in request.prompt
+    assert last_run(api, review_id)["rules"] == []
+
+
+def test_large_rule_files_are_clipped_to_keep_the_prompt_small(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
+    rules = {"CLAUDE.md": "a" * (MAX_RULE_FILE_CHARACTERS + 10), "REVIEW.md": "b" * MAX_RULE_FILE_CHARACTERS, "AGENTS.md": "c"}
+    git_repo.commit({**rules, "app.py": "RATE = 1\n"}, "base")
+    git_repo.branch("feature")
+    git_repo.commit({"app.py": "RATE = 2\n"}, "raise the rate")
+    provider = FakeProvider(NOTHING)
+    api = client(git_repo, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    run(api, review_id)
+
+    [request] = reviews(provider)
+    assert "a" * MAX_RULE_FILE_CHARACTERS + CLIPPED_RULES in request.prompt
+    assert "a" * (MAX_RULE_FILE_CHARACTERS + 1) not in request.prompt
+    assert "From AGENTS.md" not in request.prompt
+    assert last_run(api, review_id)["rules"] == [{"path": "CLAUDE.md", "clipped": True}, {"path": "REVIEW.md", "clipped": False}]

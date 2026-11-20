@@ -169,6 +169,14 @@ class GitRepo:
             raise InvalidRefError(commit)
         return [path for path in self.run("ls-tree", "-r", "--name-only", "-z", commit).decode(errors="replace").split("\0") if path]
 
+    def blobs_at(self, commit: str, paths: list[str]) -> list[BlobRef]:
+        if not OBJECT_ID.fullmatch(commit):
+            raise InvalidRefError(commit)
+        if not paths:
+            return []
+        entries = self.run("--literal-pathspecs", "ls-tree", "-z", "--full-tree", commit, "--", *paths).decode(errors="surrogateescape").split("\0")
+        return [blob for object_type, blob in map(_tree_entry, filter(None, entries)) if object_type == BLOB_TYPE]
+
     def tree_blobs(self, commit: str) -> list[BlobRef]:
         if not OBJECT_ID.fullmatch(commit):
             raise InvalidRefError(commit)
