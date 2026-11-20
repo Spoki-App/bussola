@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlsplit
+from xml.parsers.expat import ExpatError
 
 CHROME_APPS_DIR = Path.home() / "Applications" / "Chrome Apps.localized"
 INFO_PLIST = Path("Contents") / "Info.plist"
@@ -63,7 +64,7 @@ def _run(command: Sequence[str]) -> bool:
 def _read_info(path: Path) -> dict[str, Any] | None:
     try:
         info = plistlib.loads(path.read_bytes())
-    except (OSError, plistlib.InvalidFileException, ValueError):
+    except (OSError, plistlib.InvalidFileException, ValueError, ExpatError):
         return None
     return cast(dict[str, Any], info) if isinstance(info, dict) else None
 

@@ -47,6 +47,9 @@ def test_a_broken_bundle_or_a_missing_folder_finds_no_app(tmp_path: Path) -> Non
     broken = tmp_path / "broken.app" / "Contents"
     broken.mkdir(parents=True)
     (broken / "Info.plist").write_text("not a plist")
+    truncated = tmp_path / "truncated.app" / "Contents"
+    truncated.mkdir(parents=True)
+    (truncated / "Info.plist").write_text('<?xml version="1.0"?><plist version="1.0"><dict><key>CrAppModeShortcutID</key>')
 
     assert installed_app(REVIEW_URL, tmp_path) is None
     assert installed_app(REVIEW_URL, tmp_path / "missing") is None
