@@ -5,7 +5,7 @@ import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/
 import type { DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
 import type { NavigationRequest } from '../api/navigation'
 import type { NavigationClick, ScreenPoint, UnitTarget } from '../review/codeNavigation'
-import { TARGET_ROW_SELECTOR, unitElementId, useLinkedScroll, type FocusTarget } from '../review/linkFocus'
+import { TARGET_ROW_SELECTOR, revealElement, unitElementId, useLinkedScroll, type FocusTarget } from '../review/linkFocus'
 import { unitTitle } from '../review/logic'
 import { ReviewLinkContext } from '../review/reviewLink'
 import { useAiDescription } from '../hooks/useAiDescription'
@@ -165,7 +165,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
     }
     onFocus(unit.id)
     const element = linkedRef.current?.querySelector(TARGET_ROW_SELECTOR) ?? linkedRef.current
-    element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    revealElement(element, 'center')
   }, [navigationTarget, diffLoaded, onFocus, unit.id, linkedRef])
 
   const showLine = useCallback((link: LineLink) => {
@@ -180,7 +180,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
   }, [unit.path])
   useEffect(() => {
     if (lineLink) {
-      linkedRef.current?.querySelector(TARGET_ROW_SELECTOR)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      revealElement(linkedRef.current?.querySelector(TARGET_ROW_SELECTOR), 'center')
     }
   }, [lineLink, diff.data, linkedRef])
 

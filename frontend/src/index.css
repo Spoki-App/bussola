@@ -1254,6 +1254,8 @@ button.busy {
   background: var(--bg);
   overflow: clip;
   scroll-margin-top: calc(var(--file-header-height, 48px) + 8px);
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 320px;
 }
 
 .units.fixed-width {

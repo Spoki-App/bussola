@@ -182,8 +182,17 @@ function targetRowIn(element: Element | null, target: FocusTarget | undefined): 
   return target?.line === undefined ? element : (element?.querySelector(TARGET_ROW_SELECTOR) ?? element)
 }
 
+export function revealElement(element: Element | null | undefined, block: ScrollLogicalPosition) {
+  if (!element) {
+    return
+  }
+  const top = element.getBoundingClientRect().top
+  const nearby = top > -window.innerHeight && top < window.innerHeight
+  element.scrollIntoView({ behavior: nearby ? 'smooth' : 'instant', block })
+}
+
 export function scrollToElement(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  revealElement(document.getElementById(id), 'start')
 }
 
 export function createLinkScroll(): LinkScroll {
