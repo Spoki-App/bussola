@@ -22,13 +22,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 - **Submit review** also runs **Sync** and **Mark as reviewed** once the review is on GitHub, so the review moves to the latest commits and comments and **Since my last review** starts from there without two more clicks. Comments sent with the review are not sent again, and if either step fails the header says which one, to retry with its button ([#145](https://github.com/Spoki-App/bussola/issues/145)).
 - A `https://bussola.spoki.com/` link closes its tab once bussola has opened, so links from Slack or chat no longer leave a trail of tabs. When the browser does not allow closing it, the page says bussola is open and the tab can be closed, instead of showing the GitHub and install links ([#122](https://github.com/Spoki-App/bussola/issues/122)).
 - The selected lines offer only **Compare with...** to start a comparison. The bar it opens shows the first range as a chip with its unit and number of lines and a short hint for the next step, instead of one long sentence, and holds the actions: **Compare with selection** (which replaces **Compare with first range** above the selected lines), a clipboard button for **Compare with clipboard** (moved from the selected lines) and **Cancel** ([#83](https://github.com/Spoki-App/bussola/issues/83)).
-
-### Changed
-
 - **Submit review** writes the summary with the same editor as comments, with **Write**, **Preview**, **Rich text**, the formatting toolbar and its shortcuts. After an AI review newer than your last review on the pull request, the summary starts with the AI review's verdict and summary, never replacing text you wrote, and **Request changes** is selected when the AI review left comments that are still open ([#99](https://github.com/Spoki-App/bussola/issues/99)).
-
-### Changed
-
 - **Merge** opens the merge options in a dialog, like **Submit review**, instead of a panel next to the button: the merge method, the prefilled commit title and message, **Delete the branch after merging**, the reasons merging is blocked, and **Cancel** and **Merge**. If GitHub refuses the merge the dialog stays open with the reason; after a merge it closes and the header shows the result ([#101](https://github.com/Spoki-App/bussola/issues/101)).
 
 ### Fixed
