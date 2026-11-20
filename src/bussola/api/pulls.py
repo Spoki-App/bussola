@@ -11,6 +11,7 @@ from bussola.forge.addresses import parse_pull_request_url
 from bussola.forge.base import ForgeError
 from bussola.forge.pulls import (
     ForgeSession,
+    MissingPullHeadError,
     PullRequestFetchError,
     existing_review,
     find_repo_for,
@@ -59,7 +60,7 @@ def open_pull_request_link(body: PullRequestLinkIn, store: StoreDep, reviewer: R
     store.commit()
     try:
         review = review_pull_request(ForgeSession(store, adapter, open_repo(repo), reviewer), repo, address.number, address.repository)
-    except (ForgeError, PullRequestFetchError):
+    except (ForgeError, PullRequestFetchError, MissingPullHeadError):
         store.session.rollback()
         existing = existing_review(store, repo, address.repository, address.number)
         if existing is None:

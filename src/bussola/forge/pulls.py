@@ -23,10 +23,8 @@ class PullRequestFetchError(GitError):
     pass
 
 
-class MissingPullHeadError(PullRequestFetchError):
-    def __init__(self, command: list[str]) -> None:
-        super().__init__(command, MISSING_HEAD_MESSAGE)
-        self.args = (MISSING_HEAD_MESSAGE,)
+class MissingPullHeadError(InvalidRequestError):
+    code = "missing_pull_head"
 
 
 class NoLocalCloneError(NotFoundError):
@@ -161,19 +159,19 @@ def fetch_pull_request(git_repo: GitRepo, remote: GitHubRemote, pull: PullReques
     except GitError as error:
         if f"couldn't find remote ref {pull_head}" not in error.stderr:
             raise PullRequestFetchError(error.command, error.stderr) from error
-        _fetch_head_branch(git_repo, remote, pull, [f"+refs/heads/{pull.head_ref}:{head_ref}", base_refspec])
+        _fetch_head_branch(git_repo, remote, pull, head_ref, base_refspec)
     return head_ref, base_ref
 
 
-def _fetch_head_branch(git_repo: GitRepo, remote: GitHubRemote, pull: PullRequest, refspecs: list[str]) -> None:
+def _fetch_head_branch(git_repo: GitRepo, remote: GitHubRemote, pull: PullRequest, head_ref: str, base_refspec: str) -> None:
     if pull.is_cross_repository or not git_repo.is_valid_branch_name(pull.head_ref):
-        raise MissingPullHeadError(refspecs)
+        raise MissingPullHeadError(MISSING_HEAD_MESSAGE)
     try:
-        git_repo.fetch_refspecs(remote.remote, refspecs)
+        git_repo.fetch_refspecs(remote.remote, [f"+refs/heads/{pull.head_ref}:{head_ref}", base_refspec])
     except GitError as error:
-        raise MissingPullHeadError(error.command) from error
-    if git_repo.resolve_commit(pull_ref(pull.number)) != pull.head_sha:
-        raise MissingPullHeadError(refspecs)
+        raise MissingPullHeadError(MISSING_HEAD_MESSAGE) from error
+    if git_repo.resolve_commit(head_ref) != pull.head_sha:
+        raise MissingPullHeadError(MISSING_HEAD_MESSAGE)
 
 
 def require_remote(adapter: ForgeAdapter, git_repo: GitRepo, repository: str | None = None) -> GitHubRemote:

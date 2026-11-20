@@ -58,6 +58,7 @@ def without_gh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 GITHUB_URL = "git@github.com:acme/widgets.git"
+HEAD_BRANCH = "sum-items"
 BASE = "def total(items):\n    return 0\n"
 FIRST = "def total(items):\n    return sum(items)\n"
 SECOND = "def total(items):\n    return sum(items, 0)\n"
@@ -71,13 +72,13 @@ class GitHubSandbox:
 
     def open_pull_request(self, files: dict[str, str], state: str = "OPEN", base: str = "main", pull_head: bool = True, cross_repository: bool = False) -> str:
         head = self.contributor.commit(files, "contribution")
-        self.contributor.git("push", "-q", "--force", "origin", "HEAD:refs/pull/7/head" if pull_head else "HEAD:refs/heads/sum-items")
+        self.contributor.git("push", "-q", "--force", "origin", "HEAD:refs/pull/7/head" if pull_head else f"HEAD:refs/heads/{HEAD_BRANCH}")
         pull = {
             "number": 7,
             "title": "Sum the items",
             "url": "https://github.com/acme/widgets/pull/7",
             "headRefOid": head,
-            "headRefName": "sum-items",
+            "headRefName": HEAD_BRANCH,
             "baseRefName": base,
             "author": {"login": "bob"},
             "state": state,
@@ -103,5 +104,5 @@ def github(tmp_path: Path, git_repo: GitFixture, fake_gh: FakeGh) -> GitHubSandb
     GitFixture(tmp_path).git("clone", "-q", str(bare), str(contributor.root))
     contributor.git("config", "user.email", "bob@example.com")
     contributor.git("config", "user.name", "Bob")
-    contributor.git("checkout", "-q", "-b", "sum-items")
+    contributor.git("checkout", "-q", "-b", HEAD_BRANCH)
     return GitHubSandbox(git_repo, contributor, fake_gh)
