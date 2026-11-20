@@ -27,6 +27,7 @@ export type GutterSide = 'old' | 'new'
 export interface TargetLine {
   side: GutterSide
   line: number
+  lastLine?: number
 }
 
 interface Props {
@@ -138,7 +139,7 @@ function gutterSide(row: DiffRow): GutterSide {
   return row.change === 'removed' ? 'old' : 'new'
 }
 
-function rowClasses(row: DiffRow | undefined, highlighted: ReadonlySet<string> | undefined, targetRow: DiffRow | undefined): string[] {
+function rowClasses(row: DiffRow | undefined, highlighted: ReadonlySet<string> | undefined, targetRows: ReadonlySet<DiffRow>): string[] {
   if (!row) {
     return []
   }
@@ -146,23 +147,34 @@ function rowClasses(row: DiffRow | undefined, highlighted: ReadonlySet<string> |
     ...(row.approved ? ['row-approved'] : []),
     ...(row.placeholder ? ['row-placeholder'] : []),
     ...(highlighted?.has(rowKey(row)) ? ['row-commented'] : []),
-    ...(row === targetRow ? ['row-target'] : []),
+    ...(targetRows.has(row) ? ['row-target'] : []),
   ]
 }
 
-function lineClasses(rows: (DiffRow | undefined)[], highlighted: ReadonlySet<string> | undefined, targetRow: DiffRow | undefined): string[] {
+function lineClasses(rows: (DiffRow | undefined)[], highlighted: ReadonlySet<string> | undefined, targetRows: ReadonlySet<DiffRow>): string[] {
   const [oldRow, newRow] = rows
   if (rows.length === 2 && oldRow !== newRow) {
-    return [...rowClasses(oldRow, highlighted, targetRow).map((name) => `${name}-old`), ...rowClasses(newRow, highlighted, targetRow).map((name) => `${name}-new`)]
+    return [...rowClasses(oldRow, highlighted, targetRows).map((name) => `${name}-old`), ...rowClasses(newRow, highlighted, targetRows).map((name) => `${name}-new`)]
   }
-  return rowClasses(oldRow, highlighted, targetRow)
+  return rowClasses(oldRow, highlighted, targetRows)
 }
 
-function targetPosition(rows: DiffRow[], target: TargetLine | undefined): number {
-  if (!target) {
-    return -1
+function targetLineOf(row: DiffRow, side: GutterSide): number | null {
+  if (side === 'new') {
+    return row.change === 'removed' ? null : row.new_line
   }
-  return rows.findIndex((row) => (target.side === 'new' ? row.change !== 'removed' && row.new_line === target.line : row.change !== 'added' && row.old_line === target.line))
+  return row.change === 'added' ? null : row.old_line
+}
+
+function targetPositions(rows: DiffRow[], target: TargetLine | undefined): number[] {
+  if (!target) {
+    return []
+  }
+  const last = target.lastLine ?? target.line
+  return rows.flatMap((row, position) => {
+    const line = targetLineOf(row, target.side)
+    return line !== null && line >= target.line && line <= last ? [position] : []
+  })
 }
 
 function hiddenLabel(segment: Segment): string {
@@ -237,13 +249,13 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
   )
   const widgetMap = widgets ? widgets(index.changeKeyOf) : undefined
   const pinnedKeys = Object.keys(widgetMap ?? {}).join(',')
-  const targetIndex = targetPosition(rows, target)
+  const targetKey = targetPositions(rows, target).join(',')
+  const targetRows = useMemo(() => new Set(targetKey ? targetKey.split(',').map((position) => rows[Number(position)]) : []), [rows, targetKey])
   const segments = useMemo(() => {
     const keys = new Set(pinnedKeys.split(','))
-    const pinned = new Set(rows.flatMap((row, position) => (keys.has(index.changeKeyOf(row) ?? '') || position === targetIndex ? [position] : [])))
+    const pinned = new Set(rows.flatMap((row, position) => (keys.has(index.changeKeyOf(row) ?? '') || targetRows.has(row) ? [position] : [])))
     return segmentRows(rows, expanded, pinned)
-  }, [rows, expanded, index, pinnedKeys, targetIndex])
-  const targetRow = targetIndex < 0 ? undefined : rows[targetIndex]
+  }, [rows, expanded, index, pinnedKeys, targetRows])
   const header = diff.unified.split('\n').slice(0, FILE_HEADER_LINES).join('\n')
   const file = useMemo(() => parseDiff(collapsedUnified(header, rows, segments))[0], [header, rows, segments])
   const tokens = useMemo(() => {
@@ -278,7 +290,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       className={selectable ? 'diff selectable' : 'diff'}
       generateLineClassName={({ changes, defaultGenerate }) => {
         const rows = (changes as (ChangeData | null)[]).map(index.rowOf)
-        return [defaultGenerate(), ...lineClasses(rows, highlighted, targetRow)].join(' ')
+        return [defaultGenerate(), ...lineClasses(rows, highlighted, targetRows)].join(' ')
       }}
       renderGutter={({ change, side }) => {
         const row = index.rowOf(change)

@@ -76,7 +76,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
       linkFocus
         ? {
             key: search,
-            ready: threadsSettled || (linkFocus.thread === null && linkFocus.comment === null),
+            ready: threadsSettled || (linkFocus.thread === null && linkFocus.comment === null && linkFocus.code === null),
             resolve: (units: Unit[]) => resolveLinkFocus(linkFocus, units, threads.data ?? []),
           }
         : undefined,

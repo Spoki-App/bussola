@@ -413,4 +413,16 @@ describe('UnitDiffView navigation', () => {
 
     expect(table.querySelector('.row-target')).toHaveTextContent('step_15()')
   })
+
+  it('marks every line of a target range', () => {
+    chooseLayout('unified')
+    const context = Array.from({ length: 20 }, (_, index) => row('context', index + 2, index + 2, `    step_${String(index)}()`))
+    const table = view({ rows: [header, removed, added, ...context], target: { side: 'new', line: 17, lastLine: 19 } })
+
+    expect([...table.querySelectorAll('.row-target')].map((line) => line.textContent)).toEqual([
+      expect.stringContaining('step_14()'),
+      expect.stringContaining('step_15()'),
+      expect.stringContaining('step_16()'),
+    ])
+  })
 })

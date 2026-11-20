@@ -121,6 +121,61 @@ describe('ThreadPanel filters', () => {
   })
 })
 
+describe('ThreadPanel code previews', () => {
+  afterEach(() => {
+    window.history.replaceState(null, '', '/')
+  })
+
+  const commented: Thread = {
+    ...inline,
+    line_text: '    count = len(items)\n    total = sum(items)\n    tax = total * rate\n    fee = 2\n    return total + tax + fee',
+    line_count: 5,
+    context_before: ['def total(items):'],
+    context_after: ['def other():'],
+    anchor: { revision_id: 1, line_offset: 1, outdated: false, unit_id: 7, file_line: 12, end_file_line: 16 },
+  }
+
+  it('previews the commented lines of a thread in the code and expands the rest', () => {
+    const { container } = renderPanel([commented])
+
+    const preview = container.querySelector('.code-preview pre')
+    expect(preview?.querySelectorAll('.code-preview-line.target')).toHaveLength(3)
+    expect(preview).toHaveTextContent('def total(items):')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show 3 more lines' }))
+
+    expect(preview?.querySelectorAll('.code-preview-line.target')).toHaveLength(5)
+    expect(screen.getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('jumps to the code of a thread from its link', () => {
+    window.history.replaceState(null, '', '/reviews/1')
+    renderPanel([commented])
+
+    fireEvent.click(screen.getByRole('button', { name: 'total (src/shop/cart.py:12)' }))
+
+    expect(window.location.search).toBe('?code=t3')
+  })
+
+  it('jumps from an outdated thread to the unit it was in', () => {
+    window.history.replaceState(null, '', '/reviews/1')
+    renderPanel([{ ...outdated, anchor: { revision_id: 1, line_offset: null, outdated: true, unit_id: 7, file_line: null, end_file_line: null } }])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go to code' }))
+
+    expect(window.location.search).toBe('?code=t1')
+    expect(screen.queryByText('The code is no longer in the diff.')).toBeNull()
+  })
+
+  it('says when the code of an outdated thread is no longer in the diff', () => {
+    const { container } = renderPanel([outdated])
+
+    expect(container.querySelector('.code-preview-line.target')).toHaveTextContent('return 0')
+    expect(screen.queryByRole('button', { name: 'Go to code' })).toBeNull()
+    expect(screen.getByText('The code is no longer in the diff.')).toBeTruthy()
+  })
+})
+
 describe('ThreadPanel', () => {
   it('names the unit of a thread shown outside its card with its module', () => {
     const { container } = render(

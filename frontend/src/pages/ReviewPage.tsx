@@ -449,6 +449,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                           canNavigate={navigation.canNavigate}
                           navigationTarget={navigation.target?.unitId === unit.id ? navigation.target : undefined}
                           linkedLine={linkedTargetNow?.unitId === unit.id ? linkedTargetNow.line : undefined}
+                          linkedLastLine={linkedTargetNow?.unitId === unit.id ? linkedTargetNow.lastLine : undefined}
                         />
                       )}
                     />

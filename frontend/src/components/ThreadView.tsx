@@ -17,10 +17,9 @@ import { isResolved } from '../review/threadPlacement'
 interface Props {
   reviewId: number
   thread: Thread
-  showSnippet?: boolean
 }
 
-export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
+export function ThreadView({ reviewId, thread }: Props) {
   const resolved = isResolved(thread)
   const { ref: linkedRef, linked } = useLinkedScroll<HTMLDivElement>(threadElementId(thread.id))
   const [collapsed, setCollapsed] = useState(resolved)
@@ -74,7 +73,6 @@ export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
       )}
       {!collapsed && (
         <>
-          {showSnippet && thread.line_text !== null && <Snippet thread={thread} />}
           {thread.comments.map((comment) => (
             <CommentItem key={comment.id} reviewId={reviewId} comment={comment} />
           ))}
@@ -83,28 +81,6 @@ export function ThreadView({ reviewId, thread, showSnippet = false }: Props) {
       )}
       {failure && <ErrorNote message={describeError(failure)} />}
     </div>
-  )
-}
-
-function Snippet({ thread }: { thread: Thread }) {
-  return (
-    <pre className="snippet">
-      {thread.context_before.map((line, index) => (
-        <div key={`b${String(index)}`} className="muted">
-          {line || ' '}
-        </div>
-      ))}
-      {(thread.line_text ?? '').split('\n').map((line, index) => (
-        <div key={`t${String(index)}`} className="snippet-target">
-          {line || ' '}
-        </div>
-      ))}
-      {thread.context_after.map((line, index) => (
-        <div key={`a${String(index)}`} className="muted">
-          {line || ' '}
-        </div>
-      ))}
-    </pre>
   )
 }
 

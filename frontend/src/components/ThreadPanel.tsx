@@ -3,10 +3,11 @@ import { useState } from 'react'
 import { describeError } from '../api/client'
 import { useCreateThread } from '../api/threads'
 import type { Thread } from '../api/types'
-import { showThread, threadElementId, useLinkedElementId } from '../review/linkFocus'
+import { showThreadCode, threadElementId, useLinkedElementId } from '../review/linkFocus'
 import { isInline, isOpen, isResolved } from '../review/threadPlacement'
 import { readStored, writeStored } from '../settings/storage'
 import { ErrorNote } from './Badges'
+import { CodePreview } from './CodePreview'
 import { Composer } from './Composer'
 import { QualifiedName } from './QualifiedName'
 import { Segmented } from './Segmented'
@@ -51,6 +52,24 @@ function Location({ thread }: { thread: Thread }) {
       <QualifiedName module={thread.module} name={thread.qualified_name} />
       {thread.path && <span className="muted">{` in ${thread.path}`}</span>}
     </p>
+  )
+}
+
+function OutdatedCode({ reviewId, thread }: { reviewId: number; thread: Thread }) {
+  if (thread.anchor?.unit_id == null) {
+    return (
+      <>
+        <CodePreview thread={thread} />
+        <p className="muted code-preview-note">The code is no longer in the diff.</p>
+      </>
+    )
+  }
+  return (
+    <CodePreview
+      thread={thread}
+      showTitle={thread.anchor.outdated ? 'The commented lines changed. Go to the unit they were in.' : undefined}
+      onShow={() => { showThreadCode(reviewId, thread.id) }}
+    />
   )
 }
 
@@ -130,10 +149,11 @@ export function ThreadPanel({ reviewId, threads }: Props) {
           <ul className="thread-jumps">
             {inline.map((thread) => (
               <li key={thread.id}>
-                <button type="button" className="link" onClick={() => { showThread(reviewId, thread.id) }}>
+                <button type="button" className="link" onClick={() => { showThreadCode(reviewId, thread.id) }}>
                   {inlineLabel(thread)}
                 </button>
                 <span className="muted">{inlineSummary(thread)}</span>
+                <CodePreview thread={thread} />
               </li>
             ))}
           </ul>
@@ -156,7 +176,8 @@ export function ThreadPanel({ reviewId, threads }: Props) {
           {elsewhere.map((thread) => (
             <div key={thread.id}>
               <Location thread={thread} />
-              <ThreadView reviewId={reviewId} thread={thread} showSnippet />
+              <OutdatedCode reviewId={reviewId} thread={thread} />
+              <ThreadView reviewId={reviewId} thread={thread} />
             </div>
           ))}
         </section>

@@ -113,10 +113,12 @@ def get_thread(context: ReviewContext, thread_id: str) -> Thread:
 def _view(
     thread: Thread, comments: list[Comment], anchor: ThreadAnchor | None, revision: Revision, snapshots: dict[tuple[str, str, str], UnitSnapshot]
 ) -> ThreadView:
-    if anchor is None or anchor.outdated or anchor.revision_id != revision.id or anchor.line_offset is None:
+    if anchor is None:
         return ThreadView(thread, comments, anchor, None, None)
     snapshot = snapshots.get((anchor.path or "", anchor.kind or "", anchor.qualified_name or ""))
-    if snapshot is None:
+    if anchor.outdated:
+        return ThreadView(thread, comments, anchor, snapshot.id if snapshot else None, None)
+    if snapshot is None or anchor.revision_id != revision.id or anchor.line_offset is None:
         return ThreadView(thread, comments, anchor, None, None)
     lines = side_lines(snapshot, thread.side or Side.HEAD)
     if anchor.line_offset >= len(lines):
