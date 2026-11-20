@@ -4,6 +4,10 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Fixed
+
+- Resizing the window on a large review no longer lags, above all in the installed app: the units outside the window are no longer laid out again at every step, which on a review of 700 units took the layout of each step from about 125 ms to under 3 ms ([#148](https://github.com/Spoki-App/bussola/issues/148)).
+
 ## [0.3.0] - 2026-11-20
 
 ### Added
