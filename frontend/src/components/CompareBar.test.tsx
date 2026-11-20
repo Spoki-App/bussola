@@ -41,6 +41,15 @@ describe('CompareBar', () => {
     expect(onCompareSelection).toHaveBeenCalledOnce()
   })
 
+  it('offers the clipboard as an icon button named in its tooltip', () => {
+    renderBar()
+
+    const button = screen.getByRole('button', { name: 'Compare with clipboard' })
+    expect(button).toHaveClass('icon-button')
+    expect(button).toHaveAttribute('title', 'Compare with clipboard')
+    expect(button).toHaveTextContent('')
+  })
+
   it('compares with the text in the clipboard', async () => {
     stubClipboard(() => Promise.resolve('return total\n'))
     const { onCompareClipboard } = renderBar()

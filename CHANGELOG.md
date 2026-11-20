@@ -4,6 +4,10 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Changed
+
+- **Describe** and the approve button of a unit card are icons, with their name in the tooltip: a sparkle for **Describe**, a check mark for **Approve**, a check mark with an arrow for **Approve under this name** and a bin for **Confirm removal**. They stay on the first line of the header, which no longer wraps them below a long unit name in a narrow column: the name is cut first. The clipboard button of the compare bar has the same size and style ([#153](https://github.com/Spoki-App/bussola/issues/153)).
+
 ### Fixed
 
 - Resizing the window on a large review no longer lags, above all in the installed app: the units outside the window are no longer laid out again at every step, which on a review of 700 units took the layout of each step from about 125 ms to under 3 ms ([#148](https://github.com/Spoki-App/bussola/issues/148)).
