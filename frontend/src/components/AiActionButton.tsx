@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode, type Ref } from 'react'
+import { useRef, useState, type ButtonHTMLAttributes, type ReactNode, type Ref } from 'react'
 
 import { useAiStatus } from '../api/ai'
 import { describeError } from '../api/client'
@@ -6,6 +6,7 @@ import type { AiStatus } from '../api/types'
 import { useModalDialog } from '../hooks/useModalDialog'
 import { hasAiConsent, rememberAiConsent } from '../settings/aiConsent'
 import { ErrorNote } from './Badges'
+import { IconButton } from './IconButton'
 import { Spinner } from './Spinner'
 
 interface AiActionButtonProps {
@@ -25,14 +26,17 @@ export function AiActionButton({ repoId, label, title, icon, disabled = false, r
   const [checking, setChecking] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const ai = status.data
-  const tooltip = (text?: string) => (icon ? (text ? `${label}: ${text}` : label) : text)
-  if (status.isError && ai === undefined) {
-    const reason = `Could not check the AI provider: ${describeError(status.error)}`
-    return (
-      <button type="button" className={icon ? 'icon-button' : undefined} title={tooltip(reason)} aria-label={label} disabled>
-        {icon ?? label}
+  const button = (description: string | undefined, props: ButtonHTMLAttributes<HTMLButtonElement> & { ref?: Ref<HTMLButtonElement> }) =>
+    icon ? (
+      <IconButton label={label} description={description} icon={checking ? <Spinner /> : icon} {...props} />
+    ) : (
+      <button type="button" title={description} {...props}>
+        {checking && <Spinner />}
+        {label}
       </button>
     )
+  if (status.isError && ai === undefined) {
+    return button(`Could not check the AI provider: ${describeError(status.error)}`, { disabled: true })
   }
   if (ai === undefined || (!ai.configured && ai.problem === null)) {
     return notice ? <ErrorNote message={notice} /> : null
@@ -67,19 +71,13 @@ export function AiActionButton({ repoId, label, title, icon, disabled = false, r
   }
   return (
     <>
-      <button
-        ref={ref}
-        type="button"
-        className={[icon && 'icon-button', checking && 'busy'].filter(Boolean).join(' ') || undefined}
-        title={tooltip(ai.problem ?? title)}
-        aria-label={label}
-        aria-busy={checking}
-        disabled={disabled || ai.problem !== null || ai.target === null}
-        onClick={() => { void start() }}
-      >
-        {checking ? <Spinner /> : icon}
-        {!icon && label}
-      </button>
+      {button(ai.problem ?? title, {
+        ref,
+        className: checking ? 'busy' : undefined,
+        'aria-busy': checking,
+        disabled: disabled || ai.problem !== null || ai.target === null,
+        onClick: () => { void start() },
+      })}
       {notice && <ErrorNote message={notice} />}
       {asking?.target && (
         <AiNoticeDialog

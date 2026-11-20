@@ -17,6 +17,7 @@ import { AiDescription } from './AiDescription'
 import { ErrorNote, ImpactBadge, KindBadge, StateBadge } from './Badges'
 import { CopyLinkButton } from './CopyLinkButton'
 import { DiffWrapButton } from './DiffWrapToggle'
+import { Icon, IconButton } from './IconButton'
 import { ImagePreview } from './ImagePreview'
 import { QualifiedName } from './QualifiedName'
 import { UnitDiffView, type GutterSide, type TargetLine } from './UnitDiffView'
@@ -63,9 +64,9 @@ const DESCRIBE_ICON = 'M7 2.5l1.3 3.5 3.2 1.2-3.2 1.3L7 12 5.7 8.5 2.5 7.2 5.7 6
 
 function ActionIcon({ path }: { path: string }) {
   return (
-    <svg className="action-icon" viewBox="0 0 16 16" aria-hidden="true">
+    <Icon>
       <path d={path} />
-    </svg>
+    </Icon>
   )
 }
 
@@ -298,9 +299,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
             )}
           </div>
           {approveAction && (
-            <button type="button" className={`icon-button ${selected.size > 0 ? 'approve-quiet' : 'approve'}`} aria-label={approveAction.label} title={approveAction.label} disabled={busy} onClick={approveUnit}>
-              <ActionIcon path={approveAction.icon} />
-            </button>
+            <IconButton label={approveAction.label} icon={<ActionIcon path={approveAction.icon} />} className={selected.size > 0 ? 'approve-quiet' : 'approve'} disabled={busy} onClick={approveUnit} />
           )}
         </div>
       </header>

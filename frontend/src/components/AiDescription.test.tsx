@@ -289,4 +289,16 @@ describe('AI description on a unit card', () => {
 
     expect(screen.queryByRole('button', { name: 'Describe' })).toBeNull()
   })
+
+  it('offers Describe as an icon in the unit actions, named in its tooltip', async () => {
+    renderCard()
+
+    const button = await screen.findByRole('button', { name: 'Describe' })
+
+    expect(button).toHaveClass('icon-button')
+    expect(button).toHaveTextContent('')
+    expect(button).toHaveAttribute('title', 'Describe: Ask the AI provider what this unit does and what the change does to it')
+    expect(button.querySelector('svg.action-icon')).not.toBeNull()
+    expect(button.closest('.unit-actions')).not.toBeNull()
+  })
 })
