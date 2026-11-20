@@ -119,14 +119,18 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
     setSynced(null)
     setMessage(null)
     setSubmitted({ result, step: 'syncing' })
-    sync.mutate(undefined, {
-      onSuccess: (syncResult) => {
+    void sync.mutateAsync(undefined).then(
+      (syncResult) => {
         setSynced(syncResult)
+        if (syncResult.refresh.warning) {
+          toStep('sync-failed')
+          return
+        }
         toStep('finishing')
-        finish.mutate(undefined, { onSuccess: () => { toStep('done') }, onError: () => { toStep('finish-failed') } })
+        void finish.mutateAsync(undefined).then(() => { toStep('done') }, () => { toStep('finish-failed') })
       },
-      onError: () => { toStep('sync-failed') },
-    })
+      () => { toStep('sync-failed') },
+    )
   }
   useKeyboardShortcuts({ r: runSync })
   const needsLink = synced !== null && !isPullRequest && synced.unsent_comments > 0

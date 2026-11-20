@@ -44,9 +44,6 @@ export function submittedMessage(result: ReviewSubmitResult): string {
   if (sent > 0) {
     parts.push(`Sent ${plural(sent, 'comment')} to GitHub.`)
   }
-  if (result.unsent_comments > 0) {
-    parts.push(`${plural(result.unsent_comments, 'comment')} not sent yet; Sync sends ${result.unsent_comments === 1 ? 'it' : 'them'} again.`)
-  }
   return parts.join(' ')
 }
 
