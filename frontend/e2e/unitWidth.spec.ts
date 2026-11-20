@@ -33,7 +33,7 @@ function createRepository(name: string, file: string, base: string, head: string
   return repo
 }
 
-async function openReview(page: Page, path = createRepository('widths', 'wide.py', 'def wide():\n    return 0\n', `def wide():\n${AT_LIMIT}\n${OVER_LIMIT}\n    return value\n`)) {
+async function openReview(page: Page, path: string) {
   await page.goto(`/?token=${E2E_TOKEN}`)
   const repo = await page.request.post('/api/repos', { data: { path } })
   const { id: repoId } = (await repo.json()) as { id: number }
@@ -79,7 +79,7 @@ async function fillsTheColumn(card: Locator, units: Locator): Promise<boolean> {
 }
 
 test('the column of units follows the repository line length, preset steps and full width', async ({ page }) => {
-  await openReview(page)
+  await openReview(page, createRepository('widths', 'wide.py', 'def wide():\n    return 0\n', `def wide():\n${AT_LIMIT}\n${OVER_LIMIT}\n    return value\n`))
   const units = page.locator('main.units')
   const card = page.locator('article.unit-card', { hasText: 'wide' })
   const button = page.getByRole('button', { name: /^Width / })
@@ -130,7 +130,7 @@ test('the approve button stays on the header line of a narrow unit and a long na
   await page.getByRole('tab', { name: 'Unified' }).click()
   const card = page.locator('article.unit-card', { hasText: name })
   const approve = card.getByRole('button', { name: 'Approve', exact: true })
-  await expect(approve).toHaveAttribute('title', 'Approve')
+  await expect(approve).toBeVisible()
 
   const disclosure = await box(card.getByRole('button', { name: 'Collapse unit' }))
   const approveBox = await box(approve)

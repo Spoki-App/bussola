@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ComponentProps } from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -19,7 +20,7 @@ const LOCAL: AiStatus = {
   operations: [],
 }
 
-function renderButton(status: AiStatus, onRun = vi.fn(), later: AiStatus | null = status) {
+function renderButton(status: AiStatus, onRun = vi.fn(), later: AiStatus | null = status, props: Partial<ComponentProps<typeof AiActionButton>> = {}) {
   let calls = 0
   vi.stubGlobal(
     'fetch',
@@ -33,7 +34,7 @@ function renderButton(status: AiStatus, onRun = vi.fn(), later: AiStatus | null 
   )
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <AiActionButton repoId={3} label="Describe" onRun={onRun} />
+      <AiActionButton repoId={3} label="Describe" onRun={onRun} {...props} />
     </QueryClientProvider>,
   )
   return onRun
@@ -219,17 +220,12 @@ describe('AiActionButton', () => {
     expect(onRun).toHaveBeenCalledTimes(1)
   })
 
-  it('shows an icon named by its label and replaced by the spinner while checking', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(Response.json(LOCAL))))
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <AiActionButton repoId={3} label="Describe" title="Describe: ask the AI provider" icon={<svg data-testid="icon" />} onRun={vi.fn()} />
-      </QueryClientProvider>,
-    )
+  it('shows an icon named by its label, in its tooltip too, and replaced by the spinner while checking', async () => {
+    renderButton(LOCAL, vi.fn(), LOCAL, { title: 'Ask the AI provider', icon: <svg data-testid="icon" /> })
 
     const button = await screen.findByRole('button', { name: 'Describe' })
 
-    expect(button).toHaveAttribute('title', 'Describe: ask the AI provider')
+    expect(button).toHaveAttribute('title', 'Describe: Ask the AI provider')
     expect(button).toHaveTextContent('')
     expect(screen.getByTestId('icon')).toBeInTheDocument()
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))

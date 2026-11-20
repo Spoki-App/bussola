@@ -263,7 +263,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
             <AiActionButton
               repoId={repoId}
               label="Describe"
-              title="Describe: ask the AI provider what this unit does and what the change does to it"
+              title="Ask the AI provider what this unit does and what the change does to it"
               icon={<ActionIcon path={DESCRIBE_ICON} />}
               onRun={(target) => {
                 setExpanded(true)

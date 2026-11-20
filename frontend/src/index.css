@@ -345,17 +345,6 @@ button.icon-button {
   padding: 0 7px;
 }
 
-.action-icon {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.75;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -1332,7 +1321,8 @@ button.busy {
   color: var(--accent);
 }
 
-.wrap-icon {
+.wrap-icon,
+.action-icon {
   display: block;
   width: 16px;
   height: 16px;
@@ -1354,7 +1344,7 @@ button.busy {
   top: var(--file-header-height, 0px);
   z-index: 1;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
   min-height: 46px;
@@ -1374,9 +1364,9 @@ button.busy {
 }
 
 .unit-heading {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   flex-wrap: wrap;
-  min-width: 0;
+  min-width: min(12rem, 100%);
 }
 
 .unit-actions {
@@ -2337,13 +2327,6 @@ button.link:hover:not(:disabled) {
   align-items: center;
   gap: 6px;
   margin-left: auto;
-}
-
-button.compare-clipboard {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 8px;
 }
 
 .compare-bar .error-note {

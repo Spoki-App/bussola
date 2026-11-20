@@ -25,11 +25,11 @@ export function AiActionButton({ repoId, label, title, icon, disabled = false, r
   const [checking, setChecking] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const ai = status.data
-  const ariaLabel = icon ? label : undefined
+  const tooltip = (text?: string) => (icon ? (text ? `${label}: ${text}` : label) : text)
   if (status.isError && ai === undefined) {
     const reason = `Could not check the AI provider: ${describeError(status.error)}`
     return (
-      <button type="button" className={icon ? 'icon-button' : undefined} title={reason} aria-label={ariaLabel} disabled>
+      <button type="button" className={icon ? 'icon-button' : undefined} title={tooltip(reason)} aria-label={label} disabled>
         {icon ?? label}
       </button>
     )
@@ -71,8 +71,8 @@ export function AiActionButton({ repoId, label, title, icon, disabled = false, r
         ref={ref}
         type="button"
         className={[icon && 'icon-button', checking && 'busy'].filter(Boolean).join(' ') || undefined}
-        title={ai.problem ?? title}
-        aria-label={ariaLabel}
+        title={tooltip(ai.problem ?? title)}
+        aria-label={label}
         aria-busy={checking}
         disabled={disabled || ai.problem !== null || ai.target === null}
         onClick={() => { void start() }}

@@ -61,7 +61,7 @@ export function CompareBar({ title, lineCount, onCompareSelection, onCompareClip
         <button type="button" className="primary" disabled={!hasSelection} title={hasSelection ? 'Compare the first range with the selected lines' : 'Select a second range first'} onClick={onCompareSelection}>
           Compare with selection
         </button>
-        <button type="button" className="compare-clipboard" aria-label="Compare with clipboard" title="Compare with clipboard" onClick={compareClipboard}>
+        <button type="button" className="icon-button" aria-label="Compare with clipboard" title="Compare with clipboard" onClick={compareClipboard}>
           <ClipboardIcon />
         </button>
         <button type="button" onClick={onCancel}>
