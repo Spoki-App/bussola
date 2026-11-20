@@ -93,6 +93,8 @@ Long lines in the diff wrap by default. A wrapped line keeps the indentation of 
 
 Units that still need review start open and the others closed. Approving a unit closes its card, and a card opens again when its unit needs review again (approval revoked, or new changes).
 
+The approve button at the right of a unit's header is an icon, named in its tooltip: a check mark for **Approve**, a check mark with an arrow for **Approve under this name** (a renamed or moved unit) and a bin for **Confirm removal**. The buttons stay on the first line of the header; when the card is narrow the unit's name is cut first, and the labels after it move to a second line only when the name would get shorter than about 20 characters.
+
 | State | Meaning |
 |---|---|
 | New | Not approved yet |
@@ -326,7 +328,7 @@ Only your own configuration chooses the provider, model and endpoint. A reposito
 
 ### AI descriptions
 
-With a provider configured, each unit card has a **Describe** button. One request to the provider explains what the unit does and what this change does to it, and rates the impact of the change as Low, Medium or High with a one-line reason. Before answering, the model can follow the code with the same lookups as the AI review: where a name is defined or used, any lines of a file, a text search and the other changed units, at the reviewed commits and never in files the repository excludes from reviews. The answer appears above the diff in a collapsible block, rendered as Markdown and labelled as AI generated with the provider and model, and **N code lookups** under it lists every lookup the model made with its result. When it mentions a specific change it links to the line: clicking the link scrolls the diff to that line and highlights it. While it runs the card shows that it is working and a **Cancel** button; a failure is shown on the card and **Describe** stays available.
+With a provider configured, each unit card has a **Describe** button, the sparkle icon at the right of its header. One request to the provider explains what the unit does and what this change does to it, and rates the impact of the change as Low, Medium or High with a one-line reason. Before answering, the model can follow the code with the same lookups as the AI review: where a name is defined or used, any lines of a file, a text search and the other changed units, at the reviewed commits and never in files the repository excludes from reviews. The answer appears above the diff in a collapsible block, rendered as Markdown and labelled as AI generated with the provider and model, and **N code lookups** under it lists every lookup the model made with its result. When it mentions a specific change it links to the line: clicking the link scrolls the diff to that line and highlights it. While it runs the card shows that it is working and a **Cancel** button; a failure is shown on the card and **Describe** stays available.
 
 Descriptions are kept per review for each version of a unit, so they are there when you open the review again. When a new revision changes a unit, its description is marked **outdated** until you press **Regenerate**; units that did not change keep theirs, also when their file is renamed. **Regenerate** asks the provider again and replaces the description. Binary files cannot be described.
 

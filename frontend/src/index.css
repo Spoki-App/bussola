@@ -337,6 +337,25 @@ button.approve-quiet {
   color: var(--sea);
 }
 
+button.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  padding: 0 7px;
+}
+
+.action-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -1267,10 +1286,6 @@ button.busy {
   contain: inline-size;
 }
 
-.units.fixed-width .unit-header {
-  flex-wrap: wrap;
-}
-
 .units.fixed-width::before {
   content: '';
   display: block;
@@ -1351,13 +1366,32 @@ button.busy {
   box-shadow: 0 1px 0 var(--border);
 }
 
-.unit-header > * {
+.unit-heading,
+.unit-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.unit-heading {
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.unit-actions {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.unit-heading > * {
   flex-shrink: 0;
 }
 
-.unit-header > .qualified-name {
-  flex: 0 1 auto;
-  min-width: 0;
+.unit-heading > .qualified-name {
+  flex: 1 1 0;
+  min-width: min(20ch, 100%);
+  max-width: max-content;
   font-size: 13px;
 }
 
@@ -3223,10 +3257,6 @@ button.danger {
 
   .inline-form input {
     min-width: 0;
-  }
-
-  .unit-header {
-    flex-wrap: wrap;
   }
 }
 

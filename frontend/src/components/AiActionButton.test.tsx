@@ -218,4 +218,24 @@ describe('AiActionButton', () => {
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(onRun).toHaveBeenCalledTimes(1)
   })
+
+  it('shows an icon named by its label and replaced by the spinner while checking', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(Response.json(LOCAL))))
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <AiActionButton repoId={3} label="Describe" title="Describe: ask the AI provider" icon={<svg data-testid="icon" />} onRun={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    const button = await screen.findByRole('button', { name: 'Describe' })
+
+    expect(button).toHaveAttribute('title', 'Describe: ask the AI provider')
+    expect(button).toHaveTextContent('')
+    expect(screen.getByTestId('icon')).toBeInTheDocument()
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
+    fireEvent.click(button)
+    expect(button).toHaveAttribute('aria-busy', 'true')
+    expect(button.querySelector('.spinner')).not.toBeNull()
+    expect(screen.queryByTestId('icon')).toBeNull()
+  })
 })

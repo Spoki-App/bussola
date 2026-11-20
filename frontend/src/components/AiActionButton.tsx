@@ -1,4 +1,4 @@
-import { useRef, useState, type Ref } from 'react'
+import { useRef, useState, type ReactNode, type Ref } from 'react'
 
 import { useAiStatus } from '../api/ai'
 import { describeError } from '../api/client'
@@ -12,23 +12,25 @@ interface AiActionButtonProps {
   repoId: number
   label: string
   title?: string
+  icon?: ReactNode
   disabled?: boolean
   ref?: Ref<HTMLButtonElement>
   onRun: (target: string) => void
 }
 
-export function AiActionButton({ repoId, label, title, disabled = false, ref, onRun }: AiActionButtonProps) {
+export function AiActionButton({ repoId, label, title, icon, disabled = false, ref, onRun }: AiActionButtonProps) {
   const status = useAiStatus(repoId)
   const [asking, setAsking] = useState<AiStatus | null>(null)
   const starting = useRef(false)
   const [checking, setChecking] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const ai = status.data
+  const ariaLabel = icon ? label : undefined
   if (status.isError && ai === undefined) {
     const reason = `Could not check the AI provider: ${describeError(status.error)}`
     return (
-      <button type="button" title={reason} disabled>
-        {label}
+      <button type="button" className={icon ? 'icon-button' : undefined} title={reason} aria-label={ariaLabel} disabled>
+        {icon ?? label}
       </button>
     )
   }
@@ -68,14 +70,15 @@ export function AiActionButton({ repoId, label, title, disabled = false, ref, on
       <button
         ref={ref}
         type="button"
-        className={checking ? 'busy' : undefined}
+        className={[icon && 'icon-button', checking && 'busy'].filter(Boolean).join(' ') || undefined}
         title={ai.problem ?? title}
+        aria-label={ariaLabel}
         aria-busy={checking}
         disabled={disabled || ai.problem !== null || ai.target === null}
         onClick={() => { void start() }}
       >
-        {checking && <Spinner />}
-        {label}
+        {checking ? <Spinner /> : icon}
+        {!icon && label}
       </button>
       {notice && <ErrorNote message={notice} />}
       {asking?.target && (

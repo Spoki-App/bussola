@@ -16,26 +16,26 @@ function git(repo: string, ...args: string[]) {
   execFileSync('git', args, { cwd: repo, stdio: 'ignore' })
 }
 
-function createRepository(): string {
-  const repo = join(root, 'widths')
+function createRepository(name: string, file: string, base: string, head: string): string {
+  const repo = join(root, name)
   mkdirSync(repo)
   git(repo, 'init', '-q', '-b', 'main')
   git(repo, 'config', 'user.email', 'e2e@example.com')
   git(repo, 'config', 'user.name', 'E2E Reviewer')
   git(repo, 'config', 'commit.gpgsign', 'false')
   writeFileSync(join(repo, 'pyproject.toml'), '[tool.ruff]\nline-length = 60\n')
-  writeFileSync(join(repo, 'wide.py'), 'def wide():\n    return 0\n')
+  writeFileSync(join(repo, file), base)
   git(repo, 'add', '-A')
   git(repo, 'commit', '-q', '-m', 'base')
   git(repo, 'checkout', '-q', '-b', 'wide')
-  writeFileSync(join(repo, 'wide.py'), `def wide():\n${AT_LIMIT}\n${OVER_LIMIT}\n    return value\n`)
+  writeFileSync(join(repo, file), head)
   git(repo, 'commit', '-q', '-am', 'wide')
   return repo
 }
 
-async function openReview(page: Page) {
+async function openReview(page: Page, path = createRepository('widths', 'wide.py', 'def wide():\n    return 0\n', `def wide():\n${AT_LIMIT}\n${OVER_LIMIT}\n    return value\n`)) {
   await page.goto(`/?token=${E2E_TOKEN}`)
-  const repo = await page.request.post('/api/repos', { data: { path: createRepository() } })
+  const repo = await page.request.post('/api/repos', { data: { path } })
   const { id: repoId } = (await repo.json()) as { id: number }
   const review = await page.request.post(`/api/repos/${String(repoId)}/reviews`, { data: { head_ref: 'wide', base_ref: 'main' } })
   const { id: reviewId } = (await review.json()) as { id: number }
@@ -122,4 +122,18 @@ test('the column of units follows the repository line length, preset steps and f
   const unitsBox = await box(units)
   expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(unitsBox.x + unitsBox.width)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+})
+
+test('the approve button stays on the header line of a narrow unit and a long name is cut instead', async ({ page }) => {
+  const name = 'synchronise_every_catalogue_item_with_the_remote_hub_and_report'
+  await openReview(page, createRepository('long-name', 'catalogue.py', `def ${name}():\n    return 0\n`, `def ${name}():\n    return 1\n`))
+  await page.getByRole('tab', { name: 'Unified' }).click()
+  const card = page.locator('article.unit-card', { hasText: name })
+  const approve = card.getByRole('button', { name: 'Approve', exact: true })
+  await expect(approve).toHaveAttribute('title', 'Approve')
+
+  const disclosure = await box(card.getByRole('button', { name: 'Collapse unit' }))
+  const approveBox = await box(approve)
+  expect(Math.abs(approveBox.y + approveBox.height / 2 - (disclosure.y + disclosure.height / 2))).toBeLessThan(2)
+  expect(await card.locator('.qualified-name').evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
 })
