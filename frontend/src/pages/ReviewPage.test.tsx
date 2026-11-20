@@ -63,6 +63,16 @@ function stubServer() {
   )
 }
 
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+    this.open = true
+  }
+  HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+    this.open = false
+    this.dispatchEvent(new Event('close'))
+  }
+})
+
 describe('ReviewPage window title', () => {
   beforeEach(() => {
     document.title = 'bussola'
@@ -169,16 +179,6 @@ describe('ReviewPage conversation panel', () => {
 })
 
 describe('ReviewPage merge', () => {
-  beforeAll(() => {
-    HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
-      this.open = true
-    }
-    HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
-      this.open = false
-      this.dispatchEvent(new Event('close'))
-    }
-  })
-
   beforeEach(() => {
     let state = 'OPEN'
     const options: MergeOptions = {
@@ -231,16 +231,6 @@ describe('ReviewPage merge', () => {
 describe('ReviewPage submit review', () => {
   const failure = (detail: string) => Promise.resolve(Response.json({ detail }, { status: 502 }))
 
-  beforeAll(() => {
-    HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
-      this.open = true
-    }
-    HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
-      this.open = false
-      this.dispatchEvent(new Event('close'))
-    }
-  })
-
   afterEach(() => {
     vi.unstubAllGlobals()
   })
@@ -249,20 +239,18 @@ describe('ReviewPage submit review', () => {
 
   function stubSubmit({ submit = true, sync = true, finish = true } = {}) {
     const posts: string[] = []
+    const answers: Record<string, [boolean, unknown, string]> = {
+      [STEPS[0]]: [submit, { event: 'COMMENT', published: { review_url: null, outcomes: [] }, unsent_comments: 0 }, 'GitHub refused the review'],
+      [STEPS[1]]: [sync, synced, 'Could not reach GitHub'],
+      [STEPS[2]]: [finish, {}, 'Database is locked'],
+    }
     vi.stubGlobal(
       'fetch',
-      vi.fn((url: string, init?: RequestInit) => {
-        if (init?.method === 'POST' && STEPS.includes(url)) {
+      vi.fn((url: string) => {
+        if (url in answers) {
           posts.push(url)
-        }
-        if (url === '/api/reviews/3/forge/review') {
-          return submit ? Promise.resolve(Response.json({ event: 'COMMENT', published: { review_url: null, outcomes: [] }, unsent_comments: 0 })) : failure('GitHub refused the review')
-        }
-        if (url === '/api/reviews/3/sync') {
-          return sync ? Promise.resolve(Response.json(synced)) : failure('Could not reach GitHub')
-        }
-        if (url === '/api/reviews/3/sessions') {
-          return finish ? Promise.resolve(Response.json({})) : failure('Database is locked')
+          const [ok, body, error] = answers[url]
+          return ok ? Promise.resolve(Response.json(body)) : failure(error)
         }
         if (url === '/api/reviews/3/forge/sync') {
           return Promise.resolve(Response.json({ changes: 0, new_commits: false, state: 'OPEN' }))
