@@ -6,7 +6,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Added
 
-- The AI review follows the repository's own review rules, with every provider: the Cursor Bugbot files (`.cursor/BUGBOT.md`, also in the folders of the changed files), `CLAUDE.md`, `REVIEW.md` and `AGENTS.md`, read from the reviewed commits, so its findings follow what the team asks reviewers to look at. A rule file the pull request changes counts as it was before it, so a pull request cannot rewrite the rules it is reviewed against. Excluded files are skipped, the rules are capped in size, **Details** lists the files each run followed, and `review_rules = false` in `.bussola.toml` turns this off ([#152](https://github.com/Spoki-App/bussola/issues/152)).
+- The AI review follows the repository's own review rules, with every provider: the Cursor Bugbot files (`.cursor/BUGBOT.md`, also in the folders of the changed files), `CLAUDE.md`, `REVIEW.md` and `AGENTS.md`, read from the reviewed commits, so its findings follow what the team asks reviewers to look at. A rule file the pull request changes counts as it was before it, so a pull request cannot rewrite the rules it is reviewed against. Every changed area gets its own rule files with the root ones, and when they are too long the root `CLAUDE.md` and `AGENTS.md` are cut before any `BUGBOT.md`, `REVIEW.md` or area file. Excluded files are skipped, the rules are capped in size, **Details** lists the files each run followed, and `review_rules = false` in `.bussola.toml` turns this off ([#152](https://github.com/Spoki-App/bussola/issues/152)).
 
 ### Fixed
 

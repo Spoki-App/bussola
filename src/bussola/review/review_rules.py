@@ -8,8 +8,9 @@ from bussola.review.descriptions import clipped_text
 from bussola.storage.models import Revision
 
 RULE_FILES = (".cursor/BUGBOT.md", "CLAUDE.md", ".claude/CLAUDE.md", "REVIEW.md", "AGENTS.md")
-MAX_RULE_FILE_CHARACTERS = 20_000
-MAX_RULES_CHARACTERS = 40_000
+REVIEW_FILES = ("BUGBOT.md", "REVIEW.md")
+MAX_RULE_FILE_CHARACTERS = 50_000
+MAX_RULES_CHARACTERS = 120_000
 
 
 @dataclass(frozen=True)
@@ -27,19 +28,27 @@ def review_rules(
     found = [before[path] for path in candidates if path in before and path in after and not matches_any(path, ignore)]
     if not found:
         return ()
-    rules: list[RuleFile] = []
-    room = budget
     with repo.blob_reader() as reader:
-        for blob in found:
-            if room <= 0:
-                break
-            text = reader.read(blob.object_id).decode(errors="replace").strip()
-            if not text:
-                continue
-            limit = min(room, MAX_RULE_FILE_CHARACTERS)
-            rules.append(RuleFile(blob.path, clipped_text(text, limit), len(text) > limit))
-            room -= min(len(text), limit)
-    return tuple(rules)
+        texts = {blob.path: text for blob in found if (text := reader.read(blob.object_id).decode(errors="replace").strip())}
+    limits = _limits(texts, budget)
+    return tuple(RuleFile(path, clipped_text(text, limits[path]), len(text) > limits[path]) for path, text in texts.items() if path in limits)
+
+
+def _limits(texts: dict[str, str], budget: int) -> dict[str, int]:
+    limits: dict[str, int] = {}
+    room = budget
+    for path in sorted(texts, key=_priority):
+        if room <= 0:
+            break
+        limits[path] = min(len(texts[path]), room, MAX_RULE_FILE_CHARACTERS)
+        room -= limits[path]
+    return limits
+
+
+def _priority(path: str) -> int:
+    if PurePosixPath(path).name in REVIEW_FILES:
+        return 0
+    return 2 if path in RULE_FILES else 1
 
 
 def _rule_blobs(repo: GitRepo, commit: str) -> dict[str, BlobRef]:

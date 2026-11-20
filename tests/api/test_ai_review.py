@@ -10,7 +10,7 @@ import pytest
 from bussola.ai.base import AiRequest, AiUnreachableError, Cancellation, run_cancellable
 from bussola.review.ai_review import SEVERITY_MARKS, Severity
 from bussola.review.context import ReviewContext
-from bussola.review.review_rules import MAX_RULE_FILE_CHARACTERS
+from bussola.review.review_rules import MAX_RULE_FILE_CHARACTERS, MAX_RULES_CHARACTERS
 from bussola.review.threads import NewThread, create_thread
 from bussola.storage.database import Database
 from bussola.storage.models import ForgeLink, Revision, Thread
@@ -641,7 +641,8 @@ def test_the_repository_can_turn_the_review_rules_off(ruled: GitFixture, data_di
 
 
 def test_large_rule_files_are_clipped_to_keep_the_prompt_small(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
-    rules = {"CLAUDE.md": "a" * (MAX_RULE_FILE_CHARACTERS + 10), "REVIEW.md": "b" * MAX_RULE_FILE_CHARACTERS, "AGENTS.md": "c"}
+    rest = MAX_RULES_CHARACTERS - 2 * MAX_RULE_FILE_CHARACTERS
+    rules = {"CLAUDE.md": "a" * MAX_RULE_FILE_CHARACTERS, "REVIEW.md": "r" * (MAX_RULE_FILE_CHARACTERS + 10), "AGENTS.md": "c" * MAX_RULE_FILE_CHARACTERS}
     git_repo.commit({**rules, "app.py": "RATE = 1\n"}, "base")
     git_repo.branch("feature")
     git_repo.commit({"app.py": "RATE = 2\n"}, "raise the rate")
@@ -652,22 +653,62 @@ def test_large_rule_files_are_clipped_to_keep_the_prompt_small(git_repo: GitFixt
     run(api, review_id)
 
     [request] = reviews(provider)
-    assert "a" * MAX_RULE_FILE_CHARACTERS + "\n[... 10 more characters not shown]" in request.prompt
-    assert "a" * (MAX_RULE_FILE_CHARACTERS + 1) not in request.prompt
-    assert "From AGENTS.md" not in request.prompt
-    assert only_run(api, review_id)["rules"] == [{"path": "CLAUDE.md", "clipped": True}, {"path": "REVIEW.md", "clipped": False}]
+    assert "r" * MAX_RULE_FILE_CHARACTERS + "\n[... 10 more characters not shown]" in request.prompt
+    assert f"From CLAUDE.md:\n{'a' * MAX_RULE_FILE_CHARACTERS}\n</rules-" in request.prompt
+    assert f"From AGENTS.md:\n{'c' * rest}\n[... {MAX_RULE_FILE_CHARACTERS - rest} more characters not shown]" in request.prompt
+    clipped = [{"path": "CLAUDE.md", "clipped": False}, {"path": "REVIEW.md", "clipped": True}, {"path": "AGENTS.md", "clipped": True}]
+    assert only_run(api, review_id)["rules"] == clipped
 
 
-def test_the_code_limit_also_caps_the_review_rules(ruled: GitFixture, data_dir: Path, config_file: Path) -> None:
-    limit(config_file, 40)
+def sized(text: str, characters: int) -> str:
+    return text + "x" * (characters - len(text))
+
+
+AREA_RULES = {
+    ".cursor/BUGBOT.md": sized("Root Bugbot rules: the area BUGBOT.md files add to these.", 30_000),
+    "CLAUDE.md": sized("Root guide for the whole backend.", 38_000),
+    "credits/CLAUDE.md": sized("Credits: balances are integers.", 6_000),
+    "message/.cursor/BUGBOT.md": sized("Message: check the send retries.", 4_000),
+    "internal_api/agent_tools/.cursor/BUGBOT.md": sized("Agent tools: validate every tool input.", 5_000),
+}
+
+
+@pytest.fixture
+def areas(git_repo: GitFixture) -> GitFixture:
+    code = dict.fromkeys(("message/send.py", "credits/balance.py", "internal_api/agent_tools/tools.py", "billing/invoice.py"), "VALUE = 1\n")
+    git_repo.commit({**AREA_RULES, **code, "billing/.cursor/BUGBOT.md": "Billing: not part of this change.\n"}, "base")
+    git_repo.branch("feature")
+    git_repo.commit(dict.fromkeys(("message/send.py", "credits/balance.py", "internal_api/agent_tools/tools.py"), "VALUE = 2\n"), "change three areas")
+    return git_repo
+
+
+def test_the_root_rules_and_the_rules_of_every_changed_area_are_followed_whole(areas: GitFixture, data_dir: Path, config_file: Path) -> None:
     provider = FakeProvider(NOTHING)
-    api = client(ruled, data_dir, config_file, provider)
+    api = client(areas, data_dir, config_file, provider)
     review_id = api.start_review()
 
     run(api, review_id)
 
+    [request] = reviews(provider)
+    order = [".cursor/BUGBOT.md", "CLAUDE.md", "credits/CLAUDE.md", "message/.cursor/BUGBOT.md", "internal_api/agent_tools/.cursor/BUGBOT.md"]
+    positions = [request.prompt.index(f"From {path}:\n{AREA_RULES[path]}\n</rules-") for path in order]
+    assert positions == sorted(positions)
+    assert "Billing: not part" not in request.prompt
+    assert only_run(api, review_id)["rules"] == [{"path": path, "clipped": False} for path in order]
+
+
+def test_a_short_budget_trims_the_root_guide_before_bugbot_and_the_area_rules(areas: GitFixture, data_dir: Path, config_file: Path) -> None:
+    limit(config_file, 50_000)
+    provider = FakeProvider(NOTHING)
+    api = client(areas, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    run(api, review_id)
+
+    kept = 50_000 - sum(len(text) for path, text in AREA_RULES.items() if path != "CLAUDE.md")
     for request in reviews(provider):
-        assert "From .cursor/BUGBOT.md:\nBugbot: check the money math." in request.prompt
-        assert "From CLAUDE.md:\nClaude: pri\n[... " in request.prompt
-        assert "Agents:" not in request.prompt
-    assert only_run(api, review_id)["rules"] == [{"path": ".cursor/BUGBOT.md", "clipped": False}, {"path": "CLAUDE.md", "clipped": True}]
+        for path in (".cursor/BUGBOT.md", "credits/CLAUDE.md", "message/.cursor/BUGBOT.md", "internal_api/agent_tools/.cursor/BUGBOT.md"):
+            assert f"From {path}:\n{AREA_RULES[path]}\n</rules-" in request.prompt
+        assert f"From CLAUDE.md:\n{AREA_RULES['CLAUDE.md'][:kept]}\n[... {38_000 - kept} more characters not shown]" in request.prompt
+    rules = {rule["path"]: rule["clipped"] for rule in only_run(api, review_id)["rules"]}
+    assert rules == {path: path == "CLAUDE.md" for path in AREA_RULES}
