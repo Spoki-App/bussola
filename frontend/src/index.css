@@ -481,6 +481,8 @@ textarea {
 }
 
 .review-list {
+  --review-count-width: 76px;
+  --review-comments-width: 172px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -488,11 +490,12 @@ textarea {
 
 .review-list li {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(140px, 220px) 64px 96px minmax(110px, auto);
+  grid-template-columns: minmax(0, 1fr) 200px var(--review-count-width) 96px var(--review-comments-width);
   align-items: center;
   gap: 20px;
   padding: 12px 8px;
   border-bottom: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
 }
 
 .review-list li:hover {
@@ -504,6 +507,7 @@ textarea {
   color: var(--text);
   font-weight: 550;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .review-link code {
@@ -511,10 +515,17 @@ textarea {
   font-weight: 400;
 }
 
+.review-count,
+.review-todo {
+  text-align: right;
+}
+
 .review-count {
   color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
+}
+
+.review-todo {
+  white-space: nowrap;
 }
 
 .review-count strong {
@@ -1039,7 +1050,7 @@ button.busy {
   }
 
   .review-list li {
-    grid-template-columns: minmax(200px, 1fr) 140px 64px minmax(64px, auto);
+    grid-template-columns: minmax(0, 1fr) 140px var(--review-count-width) var(--review-comments-width);
   }
 
   .review-todo {
@@ -2799,9 +2810,12 @@ button.danger {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-width: 110px;
   color: var(--muted);
   white-space: nowrap;
+}
+
+.pull-list .comment-count {
+  min-width: 110px;
 }
 
 .comment-count.empty {
@@ -3173,17 +3187,13 @@ button.danger {
   }
 
   .review-list li {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) var(--review-count-width);
     gap: 8px 12px;
   }
 
   .review-list li > .course {
     grid-column: 1 / -1;
     grid-row: 2;
-  }
-
-  .review-list .comment-count {
-    min-width: 0;
   }
 
   .inline-form input {

@@ -31,6 +31,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ### Fixed
 
+- The review rows on the home page line up: the progress bar, the count, the number left to review and the comments start at the same place in every row and every repository, whether or not a row has an "N unresolved" badge or a long title ([#142](https://github.com/Spoki-App/bussola/issues/142)).
 - Opening a pull request no longer fails with "couldn't find remote ref refs/pull/<n>/head" when GitHub has no such ref: bussola fetches the pull request's branch instead and checks it is at the pull request's head. For a pull request from a fork it says to push a new commit to the branch and retry, instead of showing the git error ([#129](https://github.com/Spoki-App/bussola/issues/129)).
 - A unit that changes after **Mark as reviewed** now shows the changes since that review, like an approved unit does: it opens on the new **Reviewed → current** diff instead of only base to head ([#98](https://github.com/Spoki-App/bussola/issues/98)).
 - **AI review** of a pull request too large for one prompt no longer fails every unit with "Prompt is too long": without **Code per call** set, it sends only the definitions of each unit and the model opens the code of each one through its code lookups ([#102](https://github.com/Spoki-App/bussola/issues/102)).
