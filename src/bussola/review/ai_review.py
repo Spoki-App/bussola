@@ -35,7 +35,7 @@ from bussola.review.descriptions import (
     unrated,
 )
 from bussola.review.keys import key_of
-from bussola.review.review_rules import RuleFile, review_rules
+from bussola.review.review_rules import MAX_RULES_CHARACTERS, RuleFile, review_rules
 from bussola.review.review_tools import SIDES, ReviewTools, label_of, unit_label
 from bussola.review.rows import Side, is_binary, side_lines
 from bussola.review.thread_types import ThreadScope
@@ -634,7 +634,8 @@ def _rules(job: AiReviewJob) -> tuple[RuleFile, ...]:
     if not job.rules:
         return ()
     changed = {path for snapshot in job.tools.snapshots for path in (snapshot.path, snapshot.old_path) if path}
-    return review_rules(job.tools.repo, job.revision.head_sha, changed, job.tools.ignore)
+    budget = MAX_RULES_CHARACTERS if job.limit is None else min(MAX_RULES_CHARACTERS, job.limit)
+    return review_rules(job.tools.repo, job.revision, changed, job.tools.ignore, budget)
 
 
 def _status(outcome: AiReviewOutcome) -> "RunStatus":
