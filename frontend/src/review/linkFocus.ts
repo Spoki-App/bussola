@@ -239,9 +239,18 @@ function linkRole(state: LinkState | null, elementId: string, unitId: number | n
 
 const noLink = () => () => undefined
 
-export function useLinkedElementId(): string | null {
+export function useLinkedTarget(): FocusTarget | null {
   const link = useContext(LinkScrollContext)
-  return useSyncExternalStore(link?.subscribe ?? noLink, () => link?.current()?.target.elementId ?? null)
+  return useSyncExternalStore(link?.subscribe ?? noLink, () => link?.current()?.target ?? null)
+}
+
+export function useLinkedElementId(): string | null {
+  return useLinkedTarget()?.elementId ?? null
+}
+
+export function targetsThreadLines(target: FocusTarget | null, thread: Thread): boolean {
+  const anchor = thread.anchor
+  return target?.line !== undefined && anchor !== null && target.unitId === anchor.unit_id && target.line === anchor.file_line
 }
 
 const USER_INPUT_EVENTS = ['wheel', 'touchmove', 'keydown', 'mousedown'] as const

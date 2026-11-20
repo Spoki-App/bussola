@@ -99,6 +99,34 @@ describe('ThreadView links', () => {
   })
 })
 
+describe('ThreadView line links', () => {
+  it('opens a resolved thread when a link highlights its lines', () => {
+    Element.prototype.scrollIntoView = () => undefined
+    const link = createLinkScroll()
+    const resolved: Thread = {
+      ...thread(false, true),
+      scope: 'unit',
+      status: 'resolved',
+      line_text: 'return 0',
+      anchor: { revision_id: 1, line_offset: 0, outdated: false, unit_id: 7, file_line: 12, end_file_line: 12 },
+    }
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <LinkScrollContext value={link}>
+          <ThreadView reviewId={1} thread={resolved} />
+        </LinkScrollContext>
+      </QueryClientProvider>,
+    )
+
+    act(() => { link.start({ unitId: 7, elementId: 'unit-7', line: 13 }) })
+    expect(screen.getByRole('button', { name: '▸' })).toHaveAttribute('aria-expanded', 'false')
+
+    act(() => { link.start({ unitId: 7, elementId: 'unit-7', line: 12, lastLine: 12 }) })
+    expect(screen.getByRole('button', { name: '▾' })).toHaveAttribute('aria-expanded', 'true')
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+  })
+})
+
 describe('ThreadView authors', () => {
   it('marks threads and comments the AI review added', () => {
     const ai = { id: 2, email: 'anthropic.claude-opus-5-5@ai.bussola.invalid', name: 'Anthropic API (claude-opus-5-5)', ai: true }

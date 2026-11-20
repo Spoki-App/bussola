@@ -9,7 +9,7 @@ import { ExternalLink } from './ExternalLink'
 import { Composer } from './Composer'
 import { Markdown } from './Markdown'
 import { ReplyBox } from './ReplyBox'
-import { threadElementId, useLinkedScroll } from '../review/linkFocus'
+import { targetsThreadLines, threadElementId, useLinkedScroll, useLinkedTarget } from '../review/linkFocus'
 import { ReviewLinkContext } from '../review/reviewLink'
 import { plural } from '../review/text'
 import { isResolved } from '../review/threadPlacement'
@@ -22,8 +22,9 @@ interface Props {
 export function ThreadView({ reviewId, thread }: Props) {
   const resolved = isResolved(thread)
   const { ref: linkedRef, linked } = useLinkedScroll<HTMLDivElement>(threadElementId(thread.id))
+  const linkedLines = targetsThreadLines(useLinkedTarget(), thread)
   const [collapsed, setCollapsed] = useState(resolved)
-  if (linked && collapsed) {
+  if ((linked || linkedLines) && collapsed) {
     setCollapsed(false)
   }
   const makeLink = useContext(ReviewLinkContext)

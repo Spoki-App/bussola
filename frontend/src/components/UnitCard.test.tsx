@@ -211,6 +211,49 @@ describe('UnitCard', () => {
     expect(screen.queryByRole('button', { name: /Approve selection/ })).toBeNull()
   })
 
+  it('marks the line of the latest jump, whether a link or a code navigation', async () => {
+    Element.prototype.scrollIntoView = () => undefined
+    const row = (index: number): DiffRow => ({
+      change: 'context',
+      old_index: index,
+      new_index: index,
+      old_line: index + 1,
+      new_line: index + 1,
+      text: `step_${String(index + 1)}()`,
+      row_hash: null,
+      approved: false,
+      selection_id: null,
+      placeholder: false,
+    })
+    const diff: UnitDiff = {
+      unit_id: 1,
+      mode: 'base',
+      available_modes: ['base'],
+      approved_text_unavailable: false,
+      binary: false,
+      unified: 'diff --git a/app.py b/app.py\n--- a/app.py\n+++ b/app.py\n',
+      rows: [row(0), row(1), row(2)],
+    }
+    vi.stubGlobal('fetch', vi.fn((url: string) => (url.includes('/diff') ? Promise.resolve(Response.json(diff)) : new Promise(() => undefined))))
+    const card = (props: Partial<Parameters<typeof UnitCard>[0]>) => (
+      <QueryClientProvider client={client}>
+        <UnitCard reviewId={1} repoId={1} unit={unit('new')} focused={false} onFocus={() => undefined} register={() => undefined} {...props} />
+      </QueryClientProvider>
+    )
+    const client = new QueryClient()
+    const navigated = { unitId: 1, line: 1, side: 'head' as const }
+    const view = render(card({ navigationTarget: navigated }))
+    const marked = () => [...view.container.querySelectorAll('tr.row-target')].map((line) => line.textContent)
+    await waitFor(() => { expect(marked()).toEqual([expect.stringContaining('step_1()')]) })
+
+    view.rerender(card({ navigationTarget: navigated, linkedTarget: { unitId: 1, elementId: 'unit-1', line: 2, lastLine: 3 } }))
+    expect(marked()).toEqual([expect.stringContaining('step_2()'), expect.stringContaining('step_3()')])
+
+    view.rerender(card({ navigationTarget: { ...navigated, line: 3 }, linkedTarget: { unitId: 1, elementId: 'unit-1', line: 2, lastLine: 3 } }))
+    expect(marked()).toEqual([expect.stringContaining('step_3()')])
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+  })
+
   it('offers the reviewed version when the unit changed since it was marked as reviewed', async () => {
     const diff: UnitDiff = {
       unit_id: 1,

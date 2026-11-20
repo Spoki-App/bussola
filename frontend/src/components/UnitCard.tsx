@@ -75,9 +75,16 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
   const [mode, setMode] = useState<DiffMode | undefined>(undefined)
   const [lineLink, setLineLink] = useState<LineLink | undefined>(undefined)
   const [seenTarget, setSeenTarget] = useState<UnitTarget | undefined>(undefined)
+  const [seenLinked, setSeenLinked] = useState<FocusTarget | undefined>(undefined)
+  const [linkedIsLatest, setLinkedIsLatest] = useState(false)
+  if (linkedTarget !== seenLinked) {
+    setSeenLinked(linkedTarget)
+    setLinkedIsLatest(linkedTarget !== undefined)
+  }
   if (navigationTarget !== seenTarget) {
     setSeenTarget(navigationTarget)
     setLineLink(undefined)
+    setLinkedIsLatest(false)
     if (navigationTarget) {
       setExpanded(true)
     }
@@ -166,6 +173,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
       return
     }
     setLineLink({ ...link })
+    setLinkedIsLatest(false)
     if (link.side === 'base') {
       setMode('base')
     }
@@ -297,7 +305,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
               highlighted={highlightRows?.(unit, diff.data)}
               onNavigate={navigateFrom}
               canNavigate={canNavigateFrom}
-              target={targetLine(lineLink ?? navigationTarget, linkedTarget)}
+              target={targetLine(linkedIsLatest ? undefined : (lineLink ?? navigationTarget), linkedTarget)}
               widgets={renderWidgets ? (changeKeyOf) => renderWidgets(unit, diff.data, changeKeyOf) : undefined}
             />
           )}
