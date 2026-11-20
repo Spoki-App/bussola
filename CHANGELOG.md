@@ -7,6 +7,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 ### Fixed
 
 - Resizing the window on a large review no longer lags, above all in the installed app: the units outside the window are no longer laid out again at every step, which on a review of 700 units took the layout of each step from about 125 ms to under 3 ms ([#148](https://github.com/Spoki-App/bussola/issues/148)).
+- On macOS, `bussola://` and `https://bussola.spoki.com/` links open in the bussola app installed in Chrome instead of a new browser tab, and so does the page `bussola serve` opens at start. Chrome moves into the app only the links clicked inside Chrome, not the addresses that bussola hands to it, so these links opened in a tab even with the app installed ([#150](https://github.com/Spoki-App/bussola/issues/150)).
 
 ## [0.3.0] - 2026-11-20
 
