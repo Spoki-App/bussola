@@ -12,7 +12,7 @@ import { ErrorNote } from './Badges'
 import { Composer } from './Composer'
 
 const OWN_PULL_REQUEST = 'You cannot approve or request changes on your own pull request.'
-const SUBMIT_TITLE = 'Send your unsent comments to GitHub as one review with a summary, and comment, approve or request changes.'
+const SUBMIT_TITLE = 'Send your unsent comments to GitHub as one review with a summary, and comment, approve or request changes. Then sync and mark as reviewed.'
 
 interface Props {
   reviewId: number

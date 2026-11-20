@@ -49,3 +49,13 @@ export function submittedMessage(result: ReviewSubmitResult): string {
   }
   return parts.join(' ')
 }
+
+export type SubmitStep = 'syncing' | 'finishing' | 'done' | 'sync-failed' | 'finish-failed'
+
+export const SUBMIT_STEPS: Record<SubmitStep, string> = {
+  syncing: 'Syncing...',
+  finishing: 'Synced. Marking as reviewed...',
+  done: 'Synced and marked as reviewed.',
+  'sync-failed': 'Sync failed, so it was not marked as reviewed: press Sync, then Mark as reviewed.',
+  'finish-failed': 'Synced, but Mark as reviewed failed: press Mark as reviewed to try again.',
+}

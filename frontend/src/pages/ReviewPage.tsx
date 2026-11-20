@@ -45,7 +45,7 @@ import {
 } from '../review/linkFocus'
 import { ReviewLinkContext, reviewLinkMaker } from '../review/reviewLink'
 import { reviewDocumentTitle } from '../review/reviewName'
-import { submittedMessage } from '../review/submitReview'
+import { SUBMIT_STEPS, submittedMessage, type SubmitStep } from '../review/submitReview'
 import { buildUnitTree, unitsInOrder } from '../review/unitTree'
 import { filterGroups, matchesUnitQuery } from '../review/unitSearch'
 import { readStored, writeStored } from '../settings/storage'
@@ -107,7 +107,7 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
   const sync = useSync(review.id)
   const finish = useFinishReview(review.id)
   const revision = review.latest_revision
-  const [submitted, setSubmitted] = useState<ReviewSubmitResult | null>(null)
+  const [submitted, setSubmitted] = useState<{ result: ReviewSubmitResult; step: SubmitStep } | null>(null)
 
   const runSync = () => {
     setMessage(null)
@@ -115,9 +115,18 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
     sync.mutate(undefined, { onSuccess: setSynced })
   }
   const onSubmitted = (result: ReviewSubmitResult) => {
+    const toStep = (step: SubmitStep) => { setSubmitted((current) => current && { ...current, step }) }
     setSynced(null)
     setMessage(null)
-    setSubmitted(result)
+    setSubmitted({ result, step: 'syncing' })
+    sync.mutate(undefined, {
+      onSuccess: (syncResult) => {
+        setSynced(syncResult)
+        toStep('finishing')
+        finish.mutate(undefined, { onSuccess: () => { toStep('done') }, onError: () => { toStep('finish-failed') } })
+      },
+      onError: () => { toStep('sync-failed') },
+    })
   }
   useKeyboardShortcuts({ r: runSync })
   const needsLink = synced !== null && !isPullRequest && synced.unsent_comments > 0
@@ -181,7 +190,7 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
       </div>
       {message && <p className="notice">{message}</p>}
       {synced && <SyncSummary result={synced} />}
-      {submitted && <PublishSummary message={submittedMessage(submitted)} published={submitted.published} />}
+      {submitted && <PublishSummary message={`${submittedMessage(submitted.result)} ${SUBMIT_STEPS[submitted.step]}`} published={submitted.result.published} />}
       {merging && <MergeDialog reviewId={review.id} onMerged={setMerged} onClose={() => { setMerging(false) }} />}
       {merged && (
         <PublishSummary
