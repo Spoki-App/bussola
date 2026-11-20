@@ -220,7 +220,7 @@ In Chrome, Edge and other Chromium browsers, bussola can be installed as an app 
 - **Address:** the app belongs to the address it was installed from, port included. Install it from `http://127.0.0.1:8765`, the address `bussola serve` and `bussola://` links use by default. A server on another port (`--port`) works the same way, but is a separate app.
 - **Session token:** the app shares the session cookie with the browser, which keeps it for 30 days, across browser restarts. If the app shows "Not authorized" after the server restarted with a new token, open the link printed by `bussola serve` or a `bussola://` link.
 - **Server not running:** the app shows how to start it and reloads by itself once it is running.
-- **Links:** with the app installed, Chrome 139 and later open addresses in its scope in the app instead of a tab, so `bussola://` links, `https://bussola.spoki.com/` links and the link printed by `bussola serve` open in a window of the app. In older versions, or if you turned this off in the app settings, they open in a tab. GitHub links in the app still open in your browser.
+- **Links:** on macOS, with the app installed in Chrome, `bussola://` links, `https://bussola.spoki.com/` links and the page `bussola serve` opens at start open in a window of the app: bussola looks for the app Chrome installed for the address of the server and asks Chrome to open the link in it. Without the app for that address, on Linux and Windows, and with other Chromium browsers, they open in a tab. Links clicked inside Chrome to an address of the app open in the app on Chrome 139 and later, unless you turned this off in the app settings. GitHub links in the app still open in your browser.
 
 ## Themes
 

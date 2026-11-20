@@ -10,7 +10,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import webbrowser
 from collections.abc import Callable, Mapping, Set
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -26,6 +25,7 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 from bussola.access import API_PATH_PREFIX, INVALID_TOKEN_CODE, TOKEN_ENV, TOKEN_QUERY, host_port, is_ipv6_host, is_local_host, new_token, token_cookie
 from bussola.config import APP_NAME, DATA_DIR_ENV, DEFAULT_HOST, DEFAULT_PORT
 from bussola.errors import DomainError
+from bussola.handler.chrome_app import open_url
 from bussola.handler.links import BUSSOLA_MODULE, browser_path, parse_link
 
 SERVERS_DIR = "servers"
@@ -231,7 +231,7 @@ class Launcher:
     data_dir: Path
     start: Callable[[ServerAddress, Mapping[str, str]], Process] = start_server
     probe: Callable[[ServerAddress], Probe] = probe_server
-    open_browser: Callable[[str], bool] = webbrowser.open
+    open_browser: Callable[[str], bool] = open_url
     sleep: Callable[[float], object] = time.sleep
     timeout: float = START_TIMEOUT_SECONDS
     exit_grace: float = EXIT_GRACE_SECONDS
