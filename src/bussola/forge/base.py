@@ -43,6 +43,7 @@ class PullRequest:
     author: str = ""
     state: str = "OPEN"
     is_draft: bool = False
+    is_cross_repository: bool = False
     comment_count: int = 0
     unresolved_threads: int = 0
     body: str = ""

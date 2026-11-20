@@ -132,6 +132,9 @@ class GitRepo:
             raise InvalidRefError(remote)
         self.run("fetch", "--quiet", "--no-tags", "--end-of-options", remote, *refspecs)
 
+    def update_ref(self, ref: str, commit: str) -> None:
+        self.run("update-ref", "--end-of-options", ref, commit)
+
     def is_valid_branch_name(self, name: str) -> bool:
         try:
             self.run("check-ref-format", "--branch", name)
