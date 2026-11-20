@@ -775,6 +775,11 @@ class AiReviewRatingOut(BaseModel):
     error: str | None
 
 
+class AiReviewRuleOut(BaseModel):
+    path: str
+    clipped: bool
+
+
 class AiReviewLinkOut(BaseModel):
     path: str
     side: Side
@@ -786,6 +791,7 @@ class AiReviewRunDetailOut(AiReviewRunOut):
     rating: AiReviewRatingOut | None
     parts: list[AiReviewPartOut]
     links: list[AiReviewLinkOut]
+    rules: list[AiReviewRuleOut]
 
 
 class AiChatSnippetOut(BaseModel):

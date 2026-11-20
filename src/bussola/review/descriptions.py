@@ -292,12 +292,12 @@ def _side(tag: str, content_hash: str | None, text: str | None, missing: str, li
 
 
 def marked(tag: str, text: str, *, clip: bool = True, limit: int = MAX_SIDE_CHARACTERS) -> list[str]:
-    clipped = _clipped(text, limit) if clip else text
+    clipped = clipped_text(text, limit) if clip else text
     marker = f"{tag}-{hashlib.sha256(clipped.encode()).hexdigest()[:MARKER_HASH_LENGTH]}"
     return [f"<{marker}>", clipped, f"</{marker}>"]
 
 
-def _clipped(text: str, limit: int) -> str:
+def clipped_text(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     return f"{text[:limit]}\n[... {len(text) - limit} more characters not shown]"

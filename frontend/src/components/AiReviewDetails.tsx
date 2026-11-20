@@ -93,6 +93,18 @@ function RunDetail({ run, onOpenThread, onLineLink }: { run: AiReviewRunDetail }
           {run.rating.failed.length > 0 && ` Not rated: ${run.rating.failed.join(', ')}${run.rating.error ? ` (${run.rating.error})` : ''}.`}
         </p>
       )}
+      {run.rules.length > 0 && (
+        <p className="muted">
+          {'Review rules followed: '}
+          {run.rules.map((rule, index) => (
+            <span key={rule.path}>
+              {index > 0 && ', '}
+              <code>{rule.path}</code>
+              {rule.clipped && ' (clipped)'}
+            </span>
+          ))}
+        </p>
+      )}
       {run.parts.length === 0 && <p className="muted">No unit was reviewed in this run.</p>}
       {run.parts.map((part, index) => (
         <Part key={index} part={part} title={run.parts.length > 1 ? `Part ${String(index + 1)} of ${String(run.parts.length)}` : null} onOpenThread={onOpenThread} onLineLink={onLineLink} />

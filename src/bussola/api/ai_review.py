@@ -9,7 +9,17 @@ from bussola.ai.config import AiOperation
 from bussola.api.deps import ContextDep, repo_of, resolve_revision
 from bussola.api.descriptions import ai_provider, ai_runner, code_limit
 from bussola.api.navigation import unit_at, units_by_path
-from bussola.api.schemas import AiReviewIn, AiReviewLinkOut, AiReviewOut, AiReviewPartOut, AiReviewRunDetailOut, AiReviewRunOut, AiReviewStatusOut, CancelOut
+from bussola.api.schemas import (
+    AiReviewIn,
+    AiReviewLinkOut,
+    AiReviewOut,
+    AiReviewPartOut,
+    AiReviewRuleOut,
+    AiReviewRunDetailOut,
+    AiReviewRunOut,
+    AiReviewStatusOut,
+    CancelOut,
+)
 from bussola.api.state import app_state
 from bussola.config import load_repo_config
 from bussola.errors import NotFoundError
@@ -30,12 +40,13 @@ def start_ai_review(context: ContextDep, body: AiReviewIn, request: Request) -> 
     provider = ai_provider(state, context, body.target, AiOperation.REVIEW)
     revision = resolve_revision(context, None)
     git_repo = open_repo(repo_of(context))
-    ignore = load_repo_config(git_repo.root).ignore
+    repo_config = load_repo_config(git_repo.root)
     try:
         with state.ai_calls.start(body.call_id) as cancellation, state.ai_reviews.start(context.review.id, cancellation) as report:
             snapshots = context.store.reviews.snapshots(revision.id)
-            tools = ReviewTools(git_repo, revision, snapshots, state.navigator, ignore, cancellation)
-            outcome = run_ai_review(AiReviewJob(context, revision, ai_runner(state, provider), tools, report, body.again, code_limit(state, provider)))
+            tools = ReviewTools(git_repo, revision, snapshots, state.navigator, repo_config.ignore, cancellation)
+            job = AiReviewJob(context, revision, ai_runner(state, provider), tools, report, body.again, code_limit(state, provider), repo_config.review_rules)
+            outcome = run_ai_review(job)
     except AiCancelledError:
         outcome = AiReviewOutcome(reviewed=0, findings=0, failed=0, cancelled=True, error=None)
     return AiReviewOut(reviewed=outcome.reviewed, findings=outcome.findings, failed=outcome.failed, cancelled=outcome.cancelled, error=outcome.error)
@@ -72,7 +83,8 @@ def get_ai_review_run(context: ContextDep, run_id: int, request: Request) -> AiR
     parts: list[dict[str, Any]] = run.details.get("parts", [])
     shown = [AiReviewPartOut.model_validate(part) for part in parts]
     links = line_links(context, [part.get("summary") or "" for part in parts])
-    return AiReviewRunDetailOut(**brief.model_dump(), rating=run.details.get("rating"), parts=shown, links=links)
+    rules = [AiReviewRuleOut.model_validate(rule) for rule in run.details.get("rules", [])]
+    return AiReviewRunDetailOut(**brief.model_dump(), rating=run.details.get("rating"), parts=shown, links=links, rules=rules)
 
 
 def link_targets(text: str) -> set[tuple[str, str, int]]:

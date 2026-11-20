@@ -494,6 +494,7 @@ export interface AiReviewRunDetail extends AiReviewRun {
   rating: { rated: number; failed: string[]; error: string | null } | null
   parts: AiReviewPart[]
   links: AiReviewLink[]
+  rules: { path: string; clipped: boolean }[]
 }
 
 export interface AiChatSnippet {
