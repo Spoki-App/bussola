@@ -1,6 +1,5 @@
 import os
 import threading
-import webbrowser
 from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
@@ -14,6 +13,7 @@ from bussola.config import DEFAULT_HOST, DEFAULT_PORT, AppSettings, default_data
 from bussola.errors import DomainError
 from bussola.git import GitError, GitRepo, InvalidRefError
 from bussola.handler import registration
+from bussola.handler.chrome_app import open_url
 from bussola.handler.opening import COMMAND, USAGE_ERROR_EXIT_CODE, open_link
 from bussola.handler.server import ServerAddress
 from bussola.handler.serving import run_published
@@ -81,7 +81,7 @@ def serve(
     address = ServerAddress(host, port, token)
     url = address.reachable().url("/")
     if not no_open:
-        threading.Timer(BROWSER_OPEN_DELAY_SECONDS, webbrowser.open, args=[url]).start()
+        threading.Timer(BROWSER_OPEN_DELAY_SECONDS, open_url, args=[url]).start()
     typer.echo(f"bussola listening on {url}")
     run_published(create_app(settings), settings.data_dir, address)
 
