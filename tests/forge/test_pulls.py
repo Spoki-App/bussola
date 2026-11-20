@@ -142,6 +142,31 @@ def test_a_branch_that_moved_past_the_pull_request_head_is_reported_clearly(api:
     assert error["detail"] == MISSING_HEAD_MESSAGE
 
 
+def test_a_branch_that_moved_past_the_pull_request_head_does_not_move_the_review(api: ApiClient, github: GitHubSandbox) -> None:
+    head = github.open_pull_request({"app.py": FIRST}, pull_head=False)
+    repo = register(api)
+    review = api.call("POST", f"/repos/{repo}/pulls/7/review", 201)["id"]
+    github.contributor.commit({"app.py": SECOND}, "newer")
+    github.contributor.git("push", "-q", "origin", f"HEAD:refs/heads/{HEAD_BRANCH}")
+
+    refreshed = api.call("POST", f"/reviews/{review}/refresh", body={"fetch": True})
+
+    assert MISSING_HEAD_MESSAGE in refreshed["warning"]
+    assert (refreshed["created"], refreshed["revision"]["head_sha"]) == (False, head)
+    assert github.local.git("rev-parse", "refs/bussola/pull/7").strip() == head
+
+
+def test_rejects_option_like_head_branch_names_without_a_pull_head_ref(api: ApiClient, github: GitHubSandbox) -> None:
+    github.open_pull_request({"app.py": FIRST}, pull_head=False)
+    github.fake_gh.configure(prs=[{**github.fake_gh.state()["prs"][0], "headRefName": "--upload-pack=touch pwned"}])
+    repo = register(api)
+
+    error = api.call("POST", f"/repos/{repo}/pulls/7/review", 400)
+
+    assert error["detail"] == MISSING_HEAD_MESSAGE
+    assert not (github.local.root / "pwned").exists()
+
+
 @pytest.mark.usefixtures("fake_gh")
 def test_repository_without_github_remote_lists_nothing(api: ApiClient, git_repo: GitFixture) -> None:
     git_repo.commit({"a.txt": "a\n"})
