@@ -16,10 +16,17 @@ from bussola.storage.repositories import Store
 PULL_REF_PREFIX = "refs/bussola/pull/"
 OPEN_STATE = "OPEN"
 MERGED_STATE = "MERGED"
+MISSING_HEAD_MESSAGE = "GitHub has no head ref for this pull request; push a new commit to its branch and retry"
 
 
 class PullRequestFetchError(GitError):
     pass
+
+
+class MissingPullHeadError(PullRequestFetchError):
+    def __init__(self, command: list[str]) -> None:
+        super().__init__(command, MISSING_HEAD_MESSAGE)
+        self.args = (MISSING_HEAD_MESSAGE,)
 
 
 class NoLocalCloneError(NotFoundError):
@@ -147,11 +154,26 @@ def fetch_pull_request(git_repo: GitRepo, remote: GitHubRemote, pull: PullReques
         raise InvalidRequestError(f"Unexpected base branch name {pull.base_ref!r}")
     head_ref = pull_ref(pull.number)
     base_ref = f"{remote.remote}/{pull.base_ref}"
+    base_refspec = f"+refs/heads/{pull.base_ref}:refs/remotes/{base_ref}"
+    pull_head = f"refs/pull/{pull.number}/head"
     try:
-        git_repo.fetch_refspecs(remote.remote, [f"+refs/pull/{pull.number}/head:{head_ref}", f"+refs/heads/{pull.base_ref}:refs/remotes/{base_ref}"])
+        git_repo.fetch_refspecs(remote.remote, [f"+{pull_head}:{head_ref}", base_refspec])
     except GitError as error:
-        raise PullRequestFetchError(error.command, error.stderr) from error
+        if f"couldn't find remote ref {pull_head}" not in error.stderr:
+            raise PullRequestFetchError(error.command, error.stderr) from error
+        _fetch_head_branch(git_repo, remote, pull, [f"+refs/heads/{pull.head_ref}:{head_ref}", base_refspec])
     return head_ref, base_ref
+
+
+def _fetch_head_branch(git_repo: GitRepo, remote: GitHubRemote, pull: PullRequest, refspecs: list[str]) -> None:
+    if pull.is_cross_repository or not git_repo.is_valid_branch_name(pull.head_ref):
+        raise MissingPullHeadError(refspecs)
+    try:
+        git_repo.fetch_refspecs(remote.remote, refspecs)
+    except GitError as error:
+        raise MissingPullHeadError(error.command) from error
+    if git_repo.resolve_commit(pull_ref(pull.number)) != pull.head_sha:
+        raise MissingPullHeadError(refspecs)
 
 
 def require_remote(adapter: ForgeAdapter, git_repo: GitRepo, repository: str | None = None) -> GitHubRemote:

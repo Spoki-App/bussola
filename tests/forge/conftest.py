@@ -69,9 +69,9 @@ class GitHubSandbox:
         self.contributor = contributor
         self.fake_gh = fake_gh
 
-    def open_pull_request(self, files: dict[str, str], state: str = "OPEN", base: str = "main") -> str:
+    def open_pull_request(self, files: dict[str, str], state: str = "OPEN", base: str = "main", pull_head: bool = True, cross_repository: bool = False) -> str:
         head = self.contributor.commit(files, "contribution")
-        self.contributor.git("push", "-q", "--force", "origin", "HEAD:refs/pull/7/head")
+        self.contributor.git("push", "-q", "--force", "origin", "HEAD:refs/pull/7/head" if pull_head else "HEAD:refs/heads/sum-items")
         pull = {
             "number": 7,
             "title": "Sum the items",
@@ -82,6 +82,7 @@ class GitHubSandbox:
             "author": {"login": "bob"},
             "state": state,
             "isDraft": False,
+            "isCrossRepository": cross_repository,
             "body": "Sums the items instead of returning zero.\n\n- [x] tested",
             "comments": {"totalCount": 2},
             "reviewThreads": {"nodes": [{"isResolved": False, "comments": {"totalCount": 3}}, {"isResolved": True, "comments": {"totalCount": 1}}]},

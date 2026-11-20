@@ -66,7 +66,7 @@ query($owner: String!, $name: String!, $number: Int!) {
   viewer { login }
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      number title url state isDraft body headRefOid headRefName baseRefName
+      number title url state isDraft body headRefOid headRefName baseRefName isCrossRepository
       author { login }
       comments(first: 100) { nodes { databaseId author { login } body createdAt url } }
       reviews(first: 100) { nodes { databaseId author { login } body submittedAt url } }
@@ -514,6 +514,7 @@ def _pull_request(item: JsonObject) -> PullRequest:
         author=_login(item.get("author")),
         state=item.get("state", "OPEN"),
         is_draft=bool(item.get("isDraft", False)),
+        is_cross_repository=bool(item.get("isCrossRepository", False)),
         comment_count=_comment_count(item),
         unresolved_threads=sum(1 for thread in _nodes(item.get("reviewThreads")) if not thread.get("isResolved", False)),
         body=str(item.get("body") or ""),

@@ -5,6 +5,7 @@ import pytest
 
 from bussola.forge.base import Conversation, ForgeError
 from bussola.forge.github import GitHubAdapter
+from bussola.forge.pulls import MISSING_HEAD_MESSAGE
 from bussola.git import GitError, GitRepo
 from tests.apiclient import ApiClient
 from tests.forge.conftest import FIRST, GITHUB_URL, SECOND, GitHubSandbox
@@ -108,6 +109,37 @@ def test_rejects_option_like_base_branch_names(api: ApiClient, github: GitHubSan
     error = api.call("POST", f"/repos/{repo}/pulls/7/review", 400)
 
     assert "Unexpected base branch name" in error["detail"]
+
+
+def test_a_pull_request_without_a_pull_head_ref_is_fetched_from_its_branch(api: ApiClient, github: GitHubSandbox) -> None:
+    head = github.open_pull_request({"app.py": FIRST}, pull_head=False)
+    repo = register(api)
+
+    review = api.call("POST", f"/repos/{repo}/pulls/7/review", 201)
+
+    assert (review["head_ref"], review["latest_revision"]["head_sha"]) == ("refs/bussola/pull/7", head)
+    assert api.states(review["id"]) == {"app.py::total": "new"}
+
+
+def test_a_fork_pull_request_without_a_pull_head_ref_is_reported_clearly(api: ApiClient, github: GitHubSandbox) -> None:
+    github.open_pull_request({"app.py": FIRST}, pull_head=False, cross_repository=True)
+    repo = register(api)
+
+    error = api.call("POST", f"/repos/{repo}/pulls/7/review", 400)
+
+    assert error["detail"] == MISSING_HEAD_MESSAGE
+    assert api.call("GET", f"/repos/{repo}/reviews") == []
+
+
+def test_a_branch_that_moved_past_the_pull_request_head_is_reported_clearly(api: ApiClient, github: GitHubSandbox) -> None:
+    github.open_pull_request({"app.py": FIRST}, pull_head=False)
+    github.contributor.commit({"app.py": SECOND}, "newer")
+    github.contributor.git("push", "-q", "origin", "HEAD:refs/heads/sum-items")
+    repo = register(api)
+
+    error = api.call("POST", f"/repos/{repo}/pulls/7/review", 400)
+
+    assert error["detail"] == MISSING_HEAD_MESSAGE
 
 
 @pytest.mark.usefixtures("fake_gh")
