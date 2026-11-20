@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { Comment, Thread, Unit } from '../api/types'
 import {
   linkFocusFromSearch,
   resolveLinkFocus,
+  revealElement,
   withoutLinkFocus,
   type LinkFocus,
 } from './linkFocus'
@@ -172,5 +173,30 @@ describe('resolveLinkFocus', () => {
   it('uses the path when the thread is unknown', () => {
     expect(resolveLinkFocus(focus({ comment: '9', path: 'README.md' }), units, [])?.unitId).toBe(3)
     expect(resolveLinkFocus(focus({ comment: '9' }), units, [])).toBeNull()
+  })
+})
+
+describe('revealElement', () => {
+  const placed = (top: number) => {
+    const element = document.createElement('div')
+    element.getBoundingClientRect = () => DOMRect.fromRect({ y: top, height: 100 })
+    const scroll = vi.fn()
+    element.scrollIntoView = scroll
+    return { element, scroll }
+  }
+
+  it('scrolls smoothly to a target within a window of the view', () => {
+    const { element, scroll } = placed(window.innerHeight / 2)
+    revealElement(element, 'center')
+    expect(scroll).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' })
+  })
+
+  it('jumps to a farther target, whose skipped cards would move it during a smooth scroll', () => {
+    const below = placed(window.innerHeight * 5)
+    const above = placed(-window.innerHeight * 5)
+    revealElement(below.element, 'start')
+    revealElement(above.element, 'start')
+    expect(below.scroll).toHaveBeenCalledWith({ behavior: 'instant', block: 'start' })
+    expect(above.scroll).toHaveBeenCalledWith({ behavior: 'instant', block: 'start' })
   })
 })
