@@ -4,6 +4,8 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-20
+
 ### Added
 
 - Comments on code in the conversation panel show a preview of the commented lines with a line of context, highlighted like the diff and expandable. A click on a comment in **In the code** scrolls to its unit, expands it and highlights the commented lines, and an outdated comment has **Go to code** to open the unit it was in, or says the code is no longer in the diff ([#128](https://github.com/Spoki-App/bussola/issues/128)).
