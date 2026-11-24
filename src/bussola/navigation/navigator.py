@@ -12,7 +12,7 @@ from bussola.navigation.external import Imported, LibrarySource, ProjectLayout, 
 from bussola.navigation.index import MAX_FILE_BYTES, IndexCache, IndexedFile, Starter, SymbolIndex, start_daemon
 from bussola.navigation.lsp import ServerLocation
 from bussola.navigation.positions import byte_to_utf16, preview, source_lines, utf16_to_byte
-from bussola.navigation.scopes import Enclosing, enclosing_at
+from bussola.navigation.scopes import MODULE_LEVEL, Enclosing, enclosing_at
 from bussola.navigation.servers import LanguageServers, server_command
 from bussola.navigation.specs import SERVER_SPECS, ServerSpec
 from bussola.navigation.symbols import SourceLanguage, Symbol, identifier_at, is_member, language_for, references, symbol_of
@@ -164,16 +164,19 @@ class Navigator:
             files.seed(click.path, source)
             role, locations = self._ask_server(repo, commit, spec, position, origin)
             from_server = tuple(target for location in locations if (target := files.target(role, location)) is not None)
-            if from_server:
-                return Navigation(True, symbol.name, origin, Resolver.LANGUAGE_SERVER, from_server, missing)
             index = self.indexes.get(repo, commit, ignore)
+            namesakes = _namesakes(index, language, symbol, click.path, files) if index is not None and origin == Origin.DEFINITION else []
+            others = tuple(target for file, definition in namesakes[:MAX_TARGETS] if (target := files.symbol_target(TargetRole.DEFINITION, file, definition)))
+            if from_server:
+                return Navigation(True, symbol.name, origin, Resolver.LANGUAGE_SERVER, others + from_server, missing)
             if index is None:
                 return Navigation(False, symbol.name, origin, missing_server=missing)
             if origin == Origin.DEFINITION:
-                targets = _usages(index, language, symbol, click.path, files)
+                shadowing = {file.path for file, _definition in namesakes} - {click.path}
+                targets = _usages(index, language, symbol, shadowing, files)
             else:
                 targets = _definitions(index, language, node, click.path, files)
-            return Navigation(True, symbol.name, origin, Resolver.TREE_SITTER, targets, missing)
+            return Navigation(True, symbol.name, origin, Resolver.TREE_SITTER, others + targets, missing)
 
     def close(self) -> None:
         self.servers.close()
@@ -227,10 +230,17 @@ def _layout(root: Path, commit: str) -> ProjectLayout:
         return ProjectLayout.of(list(blobs), lambda path: reader.read(blobs[path]))
 
 
-def _shadowing_files(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, path: str) -> set[str]:
+def _namesakes(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, path: str, files: SourceFiles) -> list[tuple[IndexedFile, Symbol]]:
     if symbol.member:
-        return set()
-    return {file.path for file, definition in index.definitions(language.family, symbol.name) if file.path != path and not definition.member}
+        return []
+    found: list[tuple[IndexedFile, Symbol]] = []
+    for file, definition in index.definitions(language.family, symbol.name):
+        if definition.member or (file.path == path and definition.row == symbol.row):
+            continue
+        files.source(file.path, file.object_id)
+        if files.enclosing(file.path, definition.row, definition.start) == MODULE_LEVEL:
+            found.append((file, definition))
+    return sorted(found, key=lambda item: (item[0].path, item[1].row))
 
 
 def _definitions(index: SymbolIndex, language: SourceLanguage, node: Node, path: str, files: SourceFiles) -> tuple[Target, ...]:
@@ -251,8 +261,7 @@ def _same_kind(found: list[tuple[IndexedFile, Symbol]], language: SourceLanguage
     return same or found
 
 
-def _usages(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, path: str, files: SourceFiles) -> tuple[Target, ...]:
-    shadowing = _shadowing_files(index, language, symbol, path)
+def _usages(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, shadowing: set[str], files: SourceFiles) -> tuple[Target, ...]:
     targets: list[Target] = []
     for file in index.files_using(language.family, symbol.name):
         if file.path in shadowing:

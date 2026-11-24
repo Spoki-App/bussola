@@ -88,15 +88,20 @@ function Results({ result, onChoose }: { result: NavigationResult; onChoose: (ta
   }
   const groups = groupTargets(result.targets)
   const found = foundBy(result)
+  const namesakes = result.origin === 'definition'
+  const definitionsTitle = namesakes ? 'Other definitions with the same name' : 'Definitions'
+  const note = (
+    <p className="navigation-found-by">
+      <span className={found.byName ? 'label warn' : 'label symbol'}>{found.label}</span>
+      <span className="muted">{found.detail}</span>
+    </p>
+  )
   return (
     <div className="navigation-results">
-      <p className="navigation-found-by">
-        <span className={found.byName ? 'label warn' : 'label symbol'}>{found.label}</span>
-        <span className="muted">{found.detail}</span>
-      </p>
+      {!namesakes && note}
       {groups.definitions.length > 0 && (
-        <section aria-label="Definitions">
-          <h3>Definitions</h3>
+        <section aria-label={definitionsTitle}>
+          <h3>{definitionsTitle}</h3>
           <ul>
             {groups.definitions.map((target) => (
               <Entry key={`${target.path}:${String(target.line)}:${String(target.column)}`} target={target} onChoose={onChoose} />
@@ -104,6 +109,7 @@ function Results({ result, onChoose }: { result: NavigationResult; onChoose: (ta
           </ul>
         </section>
       )}
+      {namesakes && groups.files.length > 0 && note}
       {groups.files.map((file) => (
         <section key={file.path} aria-label={`Usages in ${file.path}`}>
           <h3>

@@ -179,10 +179,27 @@ describe('useCodeNavigation', () => {
       cleanup()
     }
     expect(notes).toEqual([
-      'As a symbolFound by the language server, so only this symbol is listed.',
+      'As a symbolFound by the language server, so they all refer to this symbol.',
       'By nameThe language server gave no answer, so other symbols with the same name can be listed too.',
       'By nameNo language server is installed for this language, so other symbols with the same name can be listed too.',
     ])
+  })
+
+  it('lists other global definitions with the same name first, then the usages, and never jumps straight to one', async () => {
+    serve(() => found([target('payments.py', 1, null, 'definition'), target('orders.py', 5, null, 'usage')], { origin: 'definition' }))
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'Usages of price' })
+    expect(Array.from(popup.querySelectorAll('h3, .navigation-found-by'), (element) => element.textContent)).toEqual([
+      'Other definitions with the same name',
+      'By nameThe language server gave no answer, so other symbols with the same name can be listed too.',
+      'orders.py1 usage',
+    ])
+    cleanup()
+
+    serve(() => found([target('payments.py', 1, null, 'definition')], { origin: 'definition' }))
+    renderHarness()
+    expect(await screen.findByRole('dialog', { name: 'Usages of price' })).toHaveTextContent('Other definitions with the same name')
   })
 
   it('colors each preview like review code, by the language of its file, and leaves unknown languages plain', async () => {

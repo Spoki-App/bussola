@@ -169,8 +169,11 @@ export function groupTargets(targets: NavigationTarget[]): TargetGroups {
 }
 
 export function directTarget(result: NavigationResult): NavigationTarget | null {
+  if (result.targets.length !== 1) {
+    return null
+  }
   const [only] = result.targets
-  return result.targets.length === 1 ? only : null
+  return result.origin === 'definition' && only.role === 'definition' ? null : only
 }
 
 function wording(result: NavigationResult): { title: string; empty: string } {
@@ -188,7 +191,7 @@ export interface FoundBy {
 
 export function foundBy(result: NavigationResult): FoundBy {
   if (result.resolver === 'language-server') {
-    return { byName: false, label: 'As a symbol', detail: 'Found by the language server, so only this symbol is listed.' }
+    return { byName: false, label: 'As a symbol', detail: 'Found by the language server, so they all refer to this symbol.' }
   }
   const reason = result.server_hint ? 'No language server is installed for this language' : 'The language server gave no answer'
   return { byName: true, label: 'By name', detail: `${reason}, so other symbols with the same name can be listed too.` }
