@@ -298,3 +298,38 @@ def test_a_class_attribute_lists_its_usages(tmp_path: Path, git_repo: GitFixture
 
     assert (found.symbol, found.origin) == ("BLOCKED", Origin.DEFINITION)
     assert [(target.line, target.enclosing) for target in found.targets] == [(7, Enclosing(UnitKind.METHOD, "Checkout.check"))]
+
+
+def test_usages_by_name_leave_out_files_that_define_the_same_name(tmp_path: Path, git_repo: GitFixture) -> None:
+    files = {
+        "channels.py": "class _Concat:\n    pass\n\n\ndef merge():\n    return _Concat()\n",
+        "payments.py": "class _Concat:\n    pass\n\n\ndef pay():\n    return _Concat()\n",
+        "orders.py": "from channels import _Concat\n\n\ndef order():\n    return _Concat()\n",
+    }
+    commit = git_repo.commit(files)
+    starter = ManualStarter()
+    navigator = Navigator(tmp_path / "data", starter)
+    navigator.prepare(git_repo.repo, commit, ())
+    starter.run()
+
+    found = navigator.navigate(git_repo.repo, commit, (), Click("channels.py", 1, 7))
+
+    assert (found.symbol, found.origin) == ("_Concat", Origin.DEFINITION)
+    assert sorted({target.path for target in found.targets}) == ["channels.py", "orders.py"]
+
+
+def test_usages_by_name_of_a_method_keep_files_with_a_method_of_the_same_name(tmp_path: Path, git_repo: GitFixture) -> None:
+    files = {
+        "cart.py": "class Cart:\n    def total(self):\n        return 1\n",
+        "order.py": "class Order:\n    def total(self):\n        return 2\n\n\ndef bill(cart):\n    return cart.total()\n",
+    }
+    commit = git_repo.commit(files)
+    starter = ManualStarter()
+    navigator = Navigator(tmp_path / "data", starter)
+    navigator.prepare(git_repo.repo, commit, ())
+    starter.run()
+
+    found = navigator.navigate(git_repo.repo, commit, (), Click("cart.py", 2, 9))
+
+    assert (found.symbol, found.origin) == ("total", Origin.DEFINITION)
+    assert [(target.path, target.line) for target in found.targets] == [("order.py", 7)]

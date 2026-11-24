@@ -1681,6 +1681,15 @@ button.copy-link.failed {
   background: var(--bg-subtle);
 }
 
+.navigation-found-by {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
 .navigation-location {
   display: flex;
   flex-wrap: wrap;
@@ -1696,7 +1705,8 @@ button.copy-link.failed {
   color: var(--muted);
 }
 
-.label.in-review {
+.label.in-review,
+.label.symbol {
   color: var(--success);
   font-weight: 600;
 }

@@ -169,7 +169,10 @@ class Navigator:
             index = self.indexes.get(repo, commit, ignore)
             if index is None:
                 return Navigation(False, symbol.name, origin, missing_server=missing)
-            targets = _usages(index, language, symbol, files) if origin == Origin.DEFINITION else _definitions(index, language, node, click.path, files)
+            if origin == Origin.DEFINITION:
+                targets = _usages(index, language, symbol, click.path, files)
+            else:
+                targets = _definitions(index, language, node, click.path, files)
             return Navigation(True, symbol.name, origin, Resolver.TREE_SITTER, targets, missing)
 
     def close(self) -> None:
@@ -224,6 +227,12 @@ def _layout(root: Path, commit: str) -> ProjectLayout:
         return ProjectLayout.of(list(blobs), lambda path: reader.read(blobs[path]))
 
 
+def _shadowing_files(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, path: str) -> set[str]:
+    if symbol.member:
+        return set()
+    return {file.path for file, definition in index.definitions(language.family, symbol.name) if file.path != path and not definition.member}
+
+
 def _definitions(index: SymbolIndex, language: SourceLanguage, node: Node, path: str, files: SourceFiles) -> tuple[Target, ...]:
     symbol = symbol_of(language, node)
     found = sorted(index.definitions(language.family, symbol.name), key=lambda item: (item[0].path != path, item[0].path, item[1].row))
@@ -242,9 +251,12 @@ def _same_kind(found: list[tuple[IndexedFile, Symbol]], language: SourceLanguage
     return same or found
 
 
-def _usages(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, files: SourceFiles) -> tuple[Target, ...]:
+def _usages(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, path: str, files: SourceFiles) -> tuple[Target, ...]:
+    shadowing = _shadowing_files(index, language, symbol, path)
     targets: list[Target] = []
     for file in index.files_using(language.family, symbol.name):
+        if file.path in shadowing:
+            continue
         source = files.source(file.path, file.object_id)
         for usage in references(language_for(file.path) or language, source, symbol.name):
             target = files.symbol_target(TargetRole.USAGE, file, usage)

@@ -2,7 +2,7 @@ import { useEffect, useMemo, type KeyboardEvent, type MouseEvent } from 'react'
 
 import type { Documentation, EnclosingUnit, LibrarySource, NavigationResult, NavigationTarget } from '../api/navigation'
 import { useModalDialog } from '../hooks/useModalDialog'
-import { emptyMessage, groupTargets, missingDocumentation, signatureMarkdown, titleOf, type ScreenPoint } from '../review/codeNavigation'
+import { emptyMessage, foundBy, groupTargets, missingDocumentation, signatureMarkdown, titleOf, type ScreenPoint } from '../review/codeNavigation'
 import { sourceLines } from '../review/sourceLines'
 import { plural } from '../review/text'
 import { ErrorNote } from './Badges'
@@ -87,8 +87,13 @@ function Results({ result, onChoose }: { result: NavigationResult; onChoose: (ta
     return <p className="muted">{emptyMessage(result)}</p>
   }
   const groups = groupTargets(result.targets)
+  const found = foundBy(result)
   return (
     <div className="navigation-results">
+      <p className="navigation-found-by">
+        <span className={found.byName ? 'label warn' : 'label symbol'}>{found.label}</span>
+        <span className="muted">{found.detail}</span>
+      </p>
       {groups.definitions.length > 0 && (
         <section aria-label="Definitions">
           <h3>Definitions</h3>

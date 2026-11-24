@@ -180,6 +180,20 @@ function wording(result: NavigationResult): { title: string; empty: string } {
     : { title: `Definitions of ${symbol}`, empty: `No definition of ${symbol} found.` }
 }
 
+export interface FoundBy {
+  byName: boolean
+  label: string
+  detail: string
+}
+
+export function foundBy(result: NavigationResult): FoundBy {
+  if (result.resolver === 'language-server') {
+    return { byName: false, label: 'As a symbol', detail: 'Found by the language server, so only this symbol is listed.' }
+  }
+  const reason = result.server_hint ? 'No language server is installed for this language' : 'The language server gave no answer'
+  return { byName: true, label: 'By name', detail: `${reason}, so other symbols with the same name can be listed too.` }
+}
+
 export function emptyMessage(result: NavigationResult): string {
   return wording(result).empty
 }

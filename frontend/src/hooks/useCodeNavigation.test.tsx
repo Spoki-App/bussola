@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { UNSETTLED_ANSWER_MS, type Documentation, type NavigationResult, type NavigationTarget, type SourceFile } from '../api/navigation'
@@ -164,6 +164,25 @@ describe('useCodeNavigation', () => {
     const entries = within(popup).getAllByRole('button')
     expect(entries.map((entry) => entry.querySelector('.navigation-location')?.textContent)).toEqual(['cart.py:1module level', 'cart.py:5in Cart.total', 'notes.txt:2'])
     expect(entries[1].querySelector('.qualified-name')).toHaveAttribute('title', 'Cart.total')
+  })
+
+  it('says whether the usages were found as the symbol or by name, and why by name', async () => {
+    const usages = [target('cart.py', 1, null, 'usage'), target('order.py', 2, null, 'usage')]
+    const hint = { family: 'python', language: 'Python', install: 'uv tool install basedpyright' }
+    const answers = [found(usages, { origin: 'definition', resolver: 'language-server' }), found(usages, { origin: 'definition' }), found(usages, { origin: 'definition', server_hint: hint })]
+    const notes: (string | null | undefined)[] = []
+    for (const answer of answers) {
+      serve(() => answer)
+      renderHarness()
+      const popup = await screen.findByRole('dialog', { name: 'Usages of price' })
+      notes.push(popup.querySelector('.navigation-found-by')?.textContent)
+      cleanup()
+    }
+    expect(notes).toEqual([
+      'As a symbolFound by the language server, so only this symbol is listed.',
+      'By nameThe language server gave no answer, so other symbols with the same name can be listed too.',
+      'By nameNo language server is installed for this language, so other symbols with the same name can be listed too.',
+    ])
   })
 
   it('colors each preview like review code, by the language of its file, and leaves unknown languages plain', async () => {
