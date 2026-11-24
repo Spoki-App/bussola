@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { useAiReviewRun, useAiReviewRuns } from '../api/aiReview'
 import { describeError } from '../api/client'
-import type { AiReviewFinding, AiReviewLookup, AiReviewPart, AiReviewRunDetail } from '../api/types'
+import type { AiReviewFinding, AiReviewLookup, AiReviewPart, AiReviewRule, AiReviewRunDetail } from '../api/types'
 import type { CodeTarget } from '../hooks/useCodeNavigation'
 import { useModalDialog } from '../hooks/useModalDialog'
 import type { LineLink } from '../markdown/lineLinks'
@@ -77,6 +77,29 @@ export function AiReviewDetails({ reviewId, onClose, onShowLine }: Props) {
   )
 }
 
+const RULE_NOTES: Record<NonNullable<AiReviewRule['skipped']>, string> = {
+  room: ' (no room left)',
+  ignored: ' (excluded by .bussola.toml)',
+}
+
+function RuleFiles({ title, rules }: { title: string; rules: AiReviewRule[] }) {
+  if (rules.length === 0) {
+    return null
+  }
+  return (
+    <p className="muted">
+      {title}
+      {rules.map((rule, index) => (
+        <span key={rule.path}>
+          {index > 0 && ', '}
+          <code>{rule.path}</code>
+          {rule.skipped ? RULE_NOTES[rule.skipped] : rule.clipped && ' (clipped)'}
+        </span>
+      ))}
+    </p>
+  )
+}
+
 interface Links {
   onOpenThread: (threadId: string) => void
   onLineLink: (link: LineLink) => void
@@ -93,6 +116,9 @@ function RunDetail({ run, onOpenThread, onLineLink }: { run: AiReviewRunDetail }
           {run.rating.failed.length > 0 && ` Not rated: ${run.rating.failed.join(', ')}${run.rating.error ? ` (${run.rating.error})` : ''}.`}
         </p>
       )}
+      {run.rules_error && <ErrorNote message={run.rules_error} />}
+      <RuleFiles title="Review rules followed: " rules={run.rules.filter((rule) => rule.skipped === null)} />
+      <RuleFiles title="Review rules not sent: " rules={run.rules.filter((rule) => rule.skipped !== null)} />
       {run.parts.length === 0 && <p className="muted">No unit was reviewed in this run.</p>}
       {run.parts.map((part, index) => (
         <Part key={index} part={part} title={run.parts.length > 1 ? `Part ${String(index + 1)} of ${String(run.parts.length)}` : null} onOpenThread={onOpenThread} onLineLink={onLineLink} />

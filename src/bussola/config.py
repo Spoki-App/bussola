@@ -23,6 +23,7 @@ class RepoConfig(BaseModel):
     base_branch: str | None = None
     file_level: tuple[str, ...] = DEFAULT_FILE_LEVEL
     ignore: tuple[str, ...] = ()
+    review_rules: bool = True
     ai: Any = None
 
 

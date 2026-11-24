@@ -205,17 +205,24 @@ const RUN: AiReviewRunDetail = {
     { path: 'app.py', side: 'base', line: 1, unit_id: 4 },
     { path: 'shop.py', side: 'head', line: 5, unit_id: null },
   ],
+  rules: [
+    { path: '.cursor/BUGBOT.md', clipped: false, skipped: null },
+    { path: 'CLAUDE.md', clipped: true, skipped: null },
+    { path: 'AGENTS.md', clipped: false, skipped: 'room' },
+    { path: 'docs/REVIEW.md', clipped: false, skipped: 'ignored' },
+  ],
+  rules_error: null,
 }
 
-function renderDetails(onShowLine?: (target: CodeTarget) => void) {
+function renderDetails(onShowLine?: (target: CodeTarget) => void, run: AiReviewRunDetail = RUN) {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) => {
       const answers: Record<string, unknown> = {
         '/api/repos/3/ai': AI,
         '/api/reviews/1/ai-review': { ...IDLE, reviewed_units: 2, runs: 1 },
-        '/api/reviews/1/ai-review/runs': [RUN],
-        '/api/reviews/1/ai-review/runs/7': RUN,
+        '/api/reviews/1/ai-review/runs': [run],
+        '/api/reviews/1/ai-review/runs/7': run,
       }
       return Promise.resolve(Response.json(answers[url] ?? []))
     }),
@@ -244,6 +251,16 @@ describe('AI review details', () => {
     window.history.replaceState(null, '', '/')
   })
 
+  it('says when the review rules could not be read', async () => {
+    renderDetails(undefined, { ...RUN, rules: [], rules_error: 'The review rules could not be read, so this run did not follow them: git failed' })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Details' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'AI review details' })
+    expect(await within(dialog).findByText(/The review rules could not be read/)).toBeInTheDocument()
+    expect(within(dialog).queryByText(/^Review rules followed:/)).not.toBeInTheDocument()
+  })
+
   it('shows what the last run checked, found and looked up, and opens a finding in the review', async () => {
     renderDetails()
 
@@ -252,6 +269,10 @@ describe('AI review details', () => {
     const dialog = await screen.findByRole('dialog', { name: 'AI review details' })
     expect(await within(dialog).findByText(/^Completed: AI review with Anthropic API \(claude-opus-5-5\)/)).toBeInTheDocument()
     expect(within(dialog).getByText('callers')).toBeInTheDocument()
+    expect(within(dialog).getByText(/^Review rules followed:/)).toHaveTextContent('Review rules followed: .cursor/BUGBOT.md, CLAUDE.md (clipped)')
+    expect(within(dialog).getByText(/^Review rules not sent:/)).toHaveTextContent(
+      'Review rules not sent: AGENTS.md (no room left), docs/REVIEW.md (excluded by .bussola.toml)',
+    )
     expect(within(dialog).getByText('1 code lookup')).toBeInTheDocument()
     expect(within(dialog).getByText('find_usages(path: app.py, line: 1, name: total)')).toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: 'app.py::total, line 2 after' }))

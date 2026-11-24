@@ -643,3 +643,28 @@ def test_tool_arguments_that_are_not_json_are_not_run(stub: StubServer) -> None:
 
     assert tools.calls == []
     assert stub.requests[1]["json"]["messages"][-1]["content"] == "Error: The arguments are not a JSON object"
+
+
+def test_the_part_of_the_prompt_shared_by_every_call_of_a_review_is_cached_by_the_anthropic_api(stub: StubServer) -> None:
+    stub.reply({"stop_reason": "end_turn", "content": [{"type": "text", "text": "{}"}]})
+    request = replace(REQUEST, prompt="The rules.\nThe code.", shared_prefix=len("The rules.\n"))
+
+    AnthropicProvider("claude-opus-5-5", stub.url, "sk-test", 5.0).complete(request, Cancellation())
+
+    [sent] = stub.requests
+    assert sent["json"]["messages"] == [
+        {
+            "role": "user",
+            "content": [{"type": "text", "text": "The rules.\n", "cache_control": {"type": "ephemeral"}}, {"type": "text", "text": "The code."}],
+        }
+    ]
+
+
+def test_other_providers_get_the_shared_part_first_in_one_prompt(stub: StubServer) -> None:
+    stub.reply({"choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}]})
+    request = replace(REQUEST, prompt="The rules.\nThe code.", shared_prefix=len("The rules.\n"))
+
+    OpenAiCompatibleProvider("local-model", stub.url, None, 5.0).complete(request, Cancellation())
+
+    [sent] = stub.requests
+    assert sent["json"]["messages"][1] == {"role": "user", "content": "The rules.\nThe code."}

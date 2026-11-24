@@ -9,7 +9,7 @@ from typing import Any, Protocol, cast
 
 from pydantic import BaseModel, ValidationError
 
-from bussola.ai.base import AiOutputError, AiProvider, AiRequest, Cancellation, ToolRunner, describe_validation_error
+from bussola.ai.base import AiOutputError, AiProvider, AiRequest, Cancellation, SharedPrompt, ToolRunner, describe_validation_error
 
 DEFAULT_MAX_TOKENS = 16000
 NAME_MAPS = frozenset({"properties", "$defs"})
@@ -81,12 +81,16 @@ class AiRunner:
     def system(self, task: AiTask[Any]) -> str:
         return task.system + PROMPT_SEPARATOR.join(self._prompts.get(prompt.setting, prompt.default) for prompt in task.prompts)
 
-    def run[T: BaseModel](self, task: AiTask[T], prompt: str, cancellation: Cancellation, content_hash: str | None = None, *, refresh: bool = False) -> T:
+    def run[T: BaseModel](
+        self, task: AiTask[T], prompt: str | SharedPrompt, cancellation: Cancellation, content_hash: str | None = None, *, refresh: bool = False
+    ) -> T:
         key = self._key(task, content_hash)
         cached = None if refresh else self._cached(task, key)
         if cached is not None:
             return cached
-        request = AiRequest(task.name, self.system(task), prompt, output_schema(task.output), self.provider.max_tokens or task.max_tokens, self._tools)
+        text, shared = (prompt.text, len(prompt.shared)) if isinstance(prompt, SharedPrompt) else (prompt, 0)
+        max_tokens = self.provider.max_tokens or task.max_tokens
+        request = AiRequest(task.name, self.system(task), text, output_schema(task.output), max_tokens, self._tools, shared)
         result = parse_output(self.provider.complete(request, cancellation), task.output)
         if key is not None and self._cache is not None:
             with contextlib.suppress(Exception):

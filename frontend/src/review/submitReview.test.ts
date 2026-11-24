@@ -43,6 +43,8 @@ describe('submit review', () => {
       ...run(2, '2026-11-12T10:05:00Z'),
       rating: null,
       links: [],
+      rules: [],
+      rules_error: null,
       parts: [part('Fix the total.\n\n- [refunds](#after:app.py:3) are skipped'), part(null), part('  Also see [the old line](<#before:app.py:9>).  ')],
     }
     const reviewedAt = '2026-11-11T00:00:00Z'
