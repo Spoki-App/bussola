@@ -20,6 +20,7 @@ from bussola.navigation.symbols import parse as parse_source
 from bussola.units.extractors.treesitter import parse
 
 MAX_TARGETS = 200
+MAX_NAMESAKES = 50
 CHECKOUTS_DIR = "checkouts"
 CACHED_LAYOUTS = 4
 
@@ -164,13 +165,19 @@ class Navigator:
             files.seed(click.path, source)
             role, locations = self._ask_server(repo, commit, spec, position, origin)
             from_server = tuple(target for location in locations if (target := files.target(role, location)) is not None)
-            if from_server:
-                return Navigation(True, symbol.name, origin, Resolver.LANGUAGE_SERVER, from_server, missing)
             index = self.indexes.get(repo, commit, ignore)
+            namesakes = _namesakes(index, language, symbol, click.path) if index is not None and origin == Origin.DEFINITION else []
+            others = tuple(target for file, definition in namesakes[:MAX_NAMESAKES] if (target := files.symbol_target(TargetRole.DEFINITION, file, definition)))
+            if from_server:
+                return Navigation(True, symbol.name, origin, Resolver.LANGUAGE_SERVER, (others + from_server)[:MAX_TARGETS], missing)
             if index is None:
                 return Navigation(False, symbol.name, origin, missing_server=missing)
-            targets = _usages(index, language, symbol, files) if origin == Origin.DEFINITION else _definitions(index, language, node, click.path, files)
-            return Navigation(True, symbol.name, origin, Resolver.TREE_SITTER, targets, missing)
+            if origin == Origin.DEFINITION:
+                shadowing = {file.path for file, _definition in namesakes}
+                targets = _usages(index, language, symbol, shadowing, files)
+            else:
+                targets = _definitions(index, language, node, click.path, files)
+            return Navigation(True, symbol.name, origin, Resolver.TREE_SITTER, (others + targets)[:MAX_TARGETS], missing)
 
     def close(self) -> None:
         self.servers.close()
@@ -224,6 +231,13 @@ def _layout(root: Path, commit: str) -> ProjectLayout:
         return ProjectLayout.of(list(blobs), lambda path: reader.read(blobs[path]))
 
 
+def _namesakes(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, path: str) -> list[tuple[IndexedFile, Symbol]]:
+    if symbol.member:
+        return []
+    found = [(file, definition) for file, definition in index.definitions(language.family, symbol.name) if definition.top_level and file.path != path]
+    return sorted(found, key=lambda item: (item[0].path, item[1].row))
+
+
 def _definitions(index: SymbolIndex, language: SourceLanguage, node: Node, path: str, files: SourceFiles) -> tuple[Target, ...]:
     symbol = symbol_of(language, node)
     found = sorted(index.definitions(language.family, symbol.name), key=lambda item: (item[0].path != path, item[0].path, item[1].row))
@@ -242,11 +256,11 @@ def _same_kind(found: list[tuple[IndexedFile, Symbol]], language: SourceLanguage
     return same or found
 
 
-def _usages(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, files: SourceFiles) -> tuple[Target, ...]:
+def _usages(index: SymbolIndex, language: SourceLanguage, symbol: Symbol, shadowing: set[str], files: SourceFiles) -> tuple[Target, ...]:
     targets: list[Target] = []
     for file in index.files_using(language.family, symbol.name):
         source = files.source(file.path, file.object_id)
-        for usage in references(language_for(file.path) or language, source, symbol.name):
+        for usage in references(language_for(file.path) or language, source, symbol.name, file.path in shadowing):
             target = files.symbol_target(TargetRole.USAGE, file, usage)
             if target is not None:
                 targets.append(target)

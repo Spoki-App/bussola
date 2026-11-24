@@ -28,14 +28,22 @@ def enclosing_at(family: str, root: Node, row: int, column: int) -> Enclosing:
     target = root.descendant_for_point_range((row, column), (row, column))
     if target is None:
         return MODULE_LEVEL
-    scope_of = SCOPE_RULES[family]
-    scopes = [scope for ancestor in _ancestors(target) if (scope := scope_of(ancestor)) is not None and _contains(scope.body, target)]
+    scopes = _scopes(family, target)
     if not scopes:
         return MODULE_LEVEL
     name = ".".join(scope.name for scope in reversed(scopes))
     in_class = len(scopes) > 1 and scopes[1].kind == UnitKind.CLASS
     kind = UnitKind.METHOD if scopes[0].kind == UnitKind.FUNCTION and in_class else scopes[0].kind
     return Enclosing(kind, name)
+
+
+def is_module_level(family: str, node: Node) -> bool:
+    return not _scopes(family, node)
+
+
+def _scopes(family: str, target: Node) -> list[Scope]:
+    scope_of = SCOPE_RULES[family]
+    return [scope for ancestor in _ancestors(target) if (scope := scope_of(ancestor)) is not None and _contains(scope.body, target)]
 
 
 def _ancestors(node: Node) -> Iterator[Node]:

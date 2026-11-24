@@ -483,6 +483,24 @@ def signature_change(git_repo: GitFixture) -> GitFixture:
 
 
 @pytest.mark.usefixtures("git_only_path")
+def test_usages_for_the_model_leave_out_other_definitions_with_the_same_name(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
+    git_repo.commit({"billing.py": "def total(items):\n    return sum(items)\n", "legacy.py": "def total():\n    return 0\n", "shop.py": SHOP}, "base")
+    git_repo.branch("feature")
+    git_repo.commit({"billing.py": "def total(items, rate):\n    return sum(items) * rate\n"}, "add rate")
+    seen: list[str] = []
+
+    def review(request: AiRequest) -> Json:
+        assert request.tools is not None
+        seen.append(request.tools.call("find_usages", {"path": "billing.py", "side": "after", "line": 1, "name": "total"}).text)
+        return {**NOTHING, **rated(HIGH)}
+
+    api = client(git_repo, data_dir, config_file, FakeProvider(review))
+    run(api, api.start_review())
+
+    assert seen == ["shop.py:1: from billing import total\nshop.py:5: return total(cart)\nshop.py:9: subtotal = total(cart)"]
+
+
+@pytest.mark.usefixtures("git_only_path")
 def test_the_model_can_follow_the_code_outside_the_pull_request_with_tools(
     signature_change: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
