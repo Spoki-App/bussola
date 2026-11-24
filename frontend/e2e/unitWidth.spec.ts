@@ -127,6 +127,10 @@ test('the column of units follows the repository line length, preset steps and f
 
 const LONG_NAME = 'synchronise_every_catalogue_item_with_the_remote_hub_and_report'
 
+async function waitForAutoWidth(page: Page, columns: number) {
+  await expect(page.getByRole('button', { name: /^Width / })).toHaveText(`Width Auto ${String(columns)}`)
+}
+
 async function besideTheName(card: Locator, button: Locator): Promise<boolean> {
   const name = await box(card.locator('.qualified-name'))
   const target = await box(button)
@@ -140,6 +144,7 @@ async function headerFits(card: Locator): Promise<boolean> {
 test('the approve button stays next to the name of a narrow unit, which is cut instead, and the header never overflows', async ({ page }) => {
   const repo = createRepository('long-name', 'catalogue.py', `def ${LONG_NAME}():\n    return 0\n`, `def ${LONG_NAME}():\n    return 1\n`, 50)
   const reviewId = await openReview(page, repo)
+  await waitForAutoWidth(page, 50)
   await page.getByRole('tab', { name: 'Unified' }).click()
   const card = page.locator('article.unit-card', { hasText: LONG_NAME })
   const approve = card.getByRole('button', { name: 'Approve', exact: true })
@@ -153,6 +158,7 @@ test('the approve button stays next to the name of a narrow unit, which is cut i
   git(repo, 'commit', '-q', '-am', 'again')
   await page.request.post(`/api/reviews/${String(reviewId)}/refresh`, { data: { fetch: false } })
   await page.reload()
+  await waitForAutoWidth(page, 50)
   await expect(card.getByRole('group', { name: 'Diff mode' })).toBeVisible()
   expect(await besideTheName(card, approve)).toBe(true)
   expect(await headerFits(card)).toBe(true)
@@ -165,6 +171,7 @@ test('the approve button stays next to the name of a narrow unit, which is cut i
 test('the text buttons of a unit stay on one row while its heading still has room to give', async ({ page }) => {
   const base = 'ROWS = []\n'
   await openReview(page, createRepository('module-rows', 'rows.py', base, `${base}ROWS.append(1)\nROWS.append(2)\nROWS.append(3)\n`))
+  await waitForAutoWidth(page, 60)
   await page.getByRole('tab', { name: 'Unified' }).click()
   const card = page.locator('article.unit-card', { hasText: 'Module code' })
   await card.locator('td.diff-code', { hasText: 'ROWS.append(1)' }).click()
