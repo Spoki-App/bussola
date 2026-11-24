@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { plural } from '../review/text'
 import { ErrorNote } from './Badges'
+import { Icon, IconButton } from './IconButton'
 
 interface Props {
   title: string
@@ -61,9 +62,7 @@ export function CompareBar({ title, lineCount, onCompareSelection, onCompareClip
         <button type="button" className="primary" disabled={!hasSelection} title={hasSelection ? 'Compare the first range with the selected lines' : 'Select a second range first'} onClick={onCompareSelection}>
           Compare with selection
         </button>
-        <button type="button" className="compare-clipboard" aria-label="Compare with clipboard" title="Compare with clipboard" onClick={compareClipboard}>
-          <ClipboardIcon />
-        </button>
+        <IconButton label="Compare with clipboard" icon={<ClipboardIcon />} onClick={compareClipboard} />
         <button type="button" onClick={onCancel}>
           Cancel
         </button>
@@ -75,9 +74,9 @@ export function CompareBar({ title, lineCount, onCompareSelection, onCompareClip
 
 function ClipboardIcon() {
   return (
-    <svg className="copy-link-icon" viewBox="0 0 16 16" aria-hidden="true">
+    <Icon>
       <rect x="3.5" y="3" width="9" height="11" rx="1.5" />
       <path d="M6 3V2.5A.5.5 0 0 1 6.5 2h3a.5.5 0 0 1 .5.5V3a.5.5 0 0 1-.5.5h-3A.5.5 0 0 1 6 3Z" />
-    </svg>
+    </Icon>
   )
 }

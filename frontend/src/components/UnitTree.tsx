@@ -35,9 +35,11 @@ function ClassStandIn({ name, module, kind }: { name: string; module: string | n
   return (
     <article className="unit-card class-stand-in">
       <header className="unit-header">
-        <KindBadge kind={kind} />
-        <QualifiedName module={module} name={name} />
-        <span className="label">{kind === 'type' ? 'only its methods changed here' : 'no changes outside its methods'}</span>
+        <div className="unit-heading">
+          <KindBadge kind={kind} />
+          <QualifiedName module={module} name={name} />
+          <span className="label">{kind === 'type' ? 'only its methods changed here' : 'no changes outside its methods'}</span>
+        </div>
       </header>
     </article>
   )

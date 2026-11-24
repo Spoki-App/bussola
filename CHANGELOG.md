@@ -8,6 +8,10 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 - The AI review follows the repository's own review rules, with every provider: the Cursor Bugbot files (`.cursor/BUGBOT.md`, also in the folders of the changed files), `CLAUDE.md`, `REVIEW.md` and `AGENTS.md`, read from the reviewed commits, so its findings follow what the team asks reviewers to look at. A rule file the pull request changes counts as it was before it, so a pull request cannot rewrite the rules it is reviewed against. Every changed area gets its own rule files with the root ones, and when they are too long the root `CLAUDE.md` and `AGENTS.md` are cut before any `BUGBOT.md`, `REVIEW.md` or area file. With `max_code_characters` set, the rules take at most half of it and the code the rest. The rules are cached by the Anthropic API across the parts of a review. **Details** lists the files each run followed and the ones not sent (no room, or excluded by `.bussola.toml`), a rule file that cannot be read no longer stops the review, and `review_rules = false` in `.bussola.toml` turns this off ([#152](https://github.com/Spoki-App/bussola/issues/152)).
 
+### Changed
+
+- **Describe** and the approve button of a unit card are icons, with their name in the tooltip: a sparkle for **Describe**, a check mark for **Approve**, a check mark with an arrow for **Approve under this name** and a bin for **Confirm removal**. They stay on the first line of the header, which no longer wraps them below a long unit name in a narrow column: the name is cut first. The clipboard button of the compare bar has the same size and style ([#153](https://github.com/Spoki-App/bussola/issues/153)).
+
 ### Fixed
 
 - Resizing the window on a large review no longer lags, above all in the installed app: the units outside the window are no longer laid out again at every step, which on a review of 700 units took the layout of each step from about 125 ms to under 3 ms ([#148](https://github.com/Spoki-App/bussola/issues/148)).

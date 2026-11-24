@@ -337,6 +337,14 @@ button.approve-quiet {
   color: var(--sea);
 }
 
+button.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  padding: 0 7px;
+}
+
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -1267,10 +1275,6 @@ button.busy {
   contain: inline-size;
 }
 
-.units.fixed-width .unit-header {
-  flex-wrap: wrap;
-}
-
 .units.fixed-width::before {
   content: '';
   display: block;
@@ -1317,7 +1321,8 @@ button.busy {
   color: var(--accent);
 }
 
-.wrap-icon {
+.wrap-icon,
+.action-icon {
   display: block;
   width: 16px;
   height: 16px;
@@ -1339,7 +1344,7 @@ button.busy {
   top: var(--file-header-height, 0px);
   z-index: 1;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
   min-height: 46px;
@@ -1351,13 +1356,49 @@ button.busy {
   box-shadow: 0 1px 0 var(--border);
 }
 
-.unit-header > * {
+.unit-heading,
+.unit-actions,
+.unit-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.unit-heading,
+.unit-actions {
+  flex: 1 1 0;
+  max-width: max-content;
+}
+
+.unit-heading {
+  flex-wrap: wrap;
+  min-width: min(8rem, 100%);
+}
+
+.unit-actions {
+  flex-grow: 1000;
+  margin-left: auto;
+}
+
+.unit-controls {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.unit-controls:empty {
+  display: none;
+}
+
+.unit-heading > *,
+.unit-actions > :not(.unit-controls),
+.unit-controls > * {
   flex-shrink: 0;
 }
 
-.unit-header > .qualified-name {
-  flex: 0 1 auto;
-  min-width: 0;
+.unit-heading > .qualified-name {
+  flex: 1 1 0;
+  min-width: min(20ch, 100%);
+  max-width: max-content;
   font-size: 13px;
 }
 
@@ -2305,13 +2346,6 @@ button.link:hover:not(:disabled) {
   margin-left: auto;
 }
 
-button.compare-clipboard {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 8px;
-}
-
 .compare-bar .error-note {
   margin: 0;
 }
@@ -3225,8 +3259,9 @@ button.danger {
     min-width: 0;
   }
 
-  .unit-header {
+  .unit-actions {
     flex-wrap: wrap;
+    justify-content: flex-end;
   }
 }
 

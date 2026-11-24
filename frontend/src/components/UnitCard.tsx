@@ -2,7 +2,7 @@ import { memo, useCallback, useContext, useEffect, useState, type ReactNode } fr
 
 import { describeError } from '../api/client'
 import { useApprove, useRevoke, useRevokeSelections, useUnitDiff } from '../api/hooks'
-import type { DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
+import type { ApprovalAction, DiffMode, DiffRow, Unit, UnitDiff } from '../api/types'
 import type { NavigationRequest } from '../api/navigation'
 import type { NavigationClick, ScreenPoint, UnitTarget } from '../review/codeNavigation'
 import { TARGET_ROW_SELECTOR, revealElement, unitElementId, useLinkedScroll, type FocusTarget } from '../review/linkFocus'
@@ -17,6 +17,7 @@ import { AiDescription } from './AiDescription'
 import { ErrorNote, ImpactBadge, KindBadge, StateBadge } from './Badges'
 import { CopyLinkButton } from './CopyLinkButton'
 import { DiffWrapButton } from './DiffWrapToggle'
+import { Icon, IconButton } from './IconButton'
 import { ImagePreview } from './ImagePreview'
 import { QualifiedName } from './QualifiedName'
 import { UnitDiffView, type GutterSide, type TargetLine } from './UnitDiffView'
@@ -53,7 +54,21 @@ interface Props {
   linkedTarget?: FocusTarget
 }
 
-const APPROVE_LABELS = { approve: 'Approve', approve_under_name: 'Approve under this name', confirm_removal: 'Confirm removal' } as const
+const APPROVE_ACTIONS: Partial<Record<ApprovalAction, { label: string; icon: string }>> = {
+  approve: { label: 'Approve', icon: 'M3 8.5l3.2 3L13 4.5' },
+  approve_under_name: { label: 'Approve under this name', icon: 'M1.5 8.5l2.7 2.5L9 5.5M10.5 10.5h4M12.5 8.5l2 2-2 2' },
+  confirm_removal: { label: 'Confirm removal', icon: 'M2.5 4.5h11M6 4.5v-2h4v2M4 4.5l.8 9h6.4l.8-9M6.75 7v4M9.25 7v4' },
+}
+
+const DESCRIBE_ICON = 'M7 2.5l1.3 3.5 3.2 1.2-3.2 1.3L7 12 5.7 8.5 2.5 7.2 5.7 6zM12.5 10v4M10.5 12h4'
+
+function ActionIcon({ path }: { path: string }) {
+  return (
+    <Icon>
+      <path d={path} />
+    </Icon>
+  )
+}
 
 const MODE_LABELS: Record<DiffMode, string> = { approved: 'Approved → current', reviewed: 'Reviewed → current', base: 'Base → head' }
 
@@ -108,6 +123,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
   const revoke = useRevoke(reviewId)
   const revokeSelections = useRevokeSelections(reviewId)
   const ai = useAiDescription(reviewId, unit)
+  const [describeNotice, setDescribeNotice] = useState<string | null>(null)
   const rows = diff.data?.rows ?? []
   const busy = approve.isPending || revoke.isPending || revokeSelections.isPending
   const failure = approve.error ?? revoke.error ?? revokeSelections.error
@@ -224,66 +240,74 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
   }
 
   const earlierMode = diff.data?.available_modes.find((option) => option !== 'base')
+  const approveAction = APPROVE_ACTIONS[unit.action]
+  const canDescribe = !unit.binary && ai.loaded && !ai.description && !ai.pending
 
   return (
     <article id={unitElementId(unit.id)} ref={linkedRef} className={`unit-card state-${unit.state}${focused ? ' focused' : ''}`} onClick={() => { onFocus(unit.id) }}>
       <header className="unit-header">
-        <button type="button" className="disclosure" aria-expanded={expanded} aria-label={expanded ? 'Collapse unit' : 'Expand unit'} onClick={() => { setExpanded(!expanded) }}>
-          {expanded ? '▾' : '▸'}
-        </button>
-        <KindBadge kind={unit.kind} />
-        <QualifiedName module={unit.qualified_name ? unit.module : null} name={unitTitle(unit)} />
-        {makeLink && unit.head_start !== null && <CopyLinkButton link={makeLink({ path: unit.path, line: unit.head_start })} label="Copy link to this unit" className="icon" />}
-        <StateBadge state={unit.state} />
-        {ai.rating && <ImpactBadge rating={ai.rating} />}
-        {unit.change_type !== 'modified' && <span className="label">{unit.change_type}</span>}
-        {unit.base_changed && <span className="label" title="The base changed since you approved this unit">base changed</span>}
-        {unit.rows_total > 0 && <span className="label">{`${String(unit.rows_approved)}/${String(unit.rows_total)} lines approved`}</span>}
-        {unit.open_threads > 0 && <span className={`label threads${unit.todo ? '' : ' warn'}`}>{`${String(unit.open_threads)} open thread${unit.open_threads > 1 ? 's' : ''}`}</span>}
-        {unitLabels?.(unit)}
-        <span className="spacer" />
-        {!unit.binary && ai.loaded && !ai.description && !ai.pending && (
-          <AiActionButton
-            repoId={repoId}
-            label="Describe"
-            title="Ask the AI provider what this unit does and what the change does to it"
-            onRun={(target) => {
-              setExpanded(true)
-              ai.run(target, false)
-            }}
-          />
-        )}
-        {earlierMode && (
-          <div className="segmented" role="group" aria-label="Diff mode">
-            {[earlierMode, 'base' as const].map((option) => (
-              <button key={option} type="button" className={diff.data?.mode === option ? 'active' : ''} onClick={() => { setMode(option) }}>
-                {MODE_LABELS[option]}
+        <div className="unit-heading">
+          <button type="button" className="disclosure" aria-expanded={expanded} aria-label={expanded ? 'Collapse unit' : 'Expand unit'} onClick={() => { setExpanded(!expanded) }}>
+            {expanded ? '▾' : '▸'}
+          </button>
+          <KindBadge kind={unit.kind} />
+          <QualifiedName module={unit.qualified_name ? unit.module : null} name={unitTitle(unit)} />
+          {makeLink && unit.head_start !== null && <CopyLinkButton link={makeLink({ path: unit.path, line: unit.head_start })} label="Copy link to this unit" className="icon" />}
+          <StateBadge state={unit.state} />
+          {ai.rating && <ImpactBadge rating={ai.rating} />}
+          {unit.change_type !== 'modified' && <span className="label">{unit.change_type}</span>}
+          {unit.base_changed && <span className="label" title="The base changed since you approved this unit">base changed</span>}
+          {unit.rows_total > 0 && <span className="label">{`${String(unit.rows_approved)}/${String(unit.rows_total)} lines approved`}</span>}
+          {unit.open_threads > 0 && <span className={`label threads${unit.todo ? '' : ' warn'}`}>{`${String(unit.open_threads)} open thread${unit.open_threads > 1 ? 's' : ''}`}</span>}
+          {unitLabels?.(unit)}
+        </div>
+        <div className="unit-actions">
+          {canDescribe && (
+            <AiActionButton
+              repoId={repoId}
+              label="Describe"
+              title="Ask the AI provider what this unit does and what the change does to it"
+              icon={<ActionIcon path={DESCRIBE_ICON} />}
+              onNotice={setDescribeNotice}
+              onRun={(target) => {
+                setExpanded(true)
+                ai.run(target, false)
+              }}
+            />
+          )}
+          <div className="unit-controls">
+            {earlierMode && (
+              <div className="segmented" role="group" aria-label="Diff mode">
+                {[earlierMode, 'base' as const].map((option) => (
+                  <button key={option} type="button" className={diff.data?.mode === option ? 'active' : ''} onClick={() => { setMode(option) }}>
+                    {MODE_LABELS[option]}
+                  </button>
+                ))}
+              </div>
+            )}
+            {selected.size > 0 && (
+              <button type="button" className="approve" disabled={busy} onClick={approveSelection}>
+                {`Approve selection (${String(selected.size)})`}
               </button>
-            ))}
+            )}
+            {unit.rows_approved > 0 && (
+              <button type="button" disabled={busy || rows.length === 0} onClick={revokeRows}>
+                Revoke lines
+              </button>
+            )}
+            {unit.action === 'revoke' && (
+              <button type="button" disabled={busy} onClick={revokeUnit}>
+                Revoke
+              </button>
+            )}
           </div>
-        )}
-        {selected.size > 0 && (
-          <button type="button" className="approve" disabled={busy} onClick={approveSelection}>
-            {`Approve selection (${String(selected.size)})`}
-          </button>
-        )}
-        {unit.rows_approved > 0 && (
-          <button type="button" disabled={busy || rows.length === 0} onClick={revokeRows}>
-            Revoke lines
-          </button>
-        )}
-        {unit.action === 'revoke' && (
-          <button type="button" disabled={busy} onClick={revokeUnit}>
-            Revoke
-          </button>
-        )}
-        {unit.action in APPROVE_LABELS && (
-          <button type="button" className={selected.size > 0 ? 'approve-quiet' : 'approve'} disabled={busy} onClick={approveUnit}>
-            {APPROVE_LABELS[unit.action as keyof typeof APPROVE_LABELS]}
-          </button>
-        )}
+          {approveAction && (
+            <IconButton label={approveAction.label} icon={<ActionIcon path={approveAction.icon} />} className={selected.size > 0 ? 'approve-quiet' : 'approve'} disabled={busy} onClick={approveUnit} />
+          )}
+        </div>
       </header>
       {failure && <ErrorNote message={describeError(failure)} />}
+      {canDescribe && describeNotice && <ErrorNote message={describeNotice} />}
       {!expanded && (ai.pending || ai.error) && <AiDescription repoId={repoId} ai={ai} />}
       {expanded && (
         <div className="unit-body">

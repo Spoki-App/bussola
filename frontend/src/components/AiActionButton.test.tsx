@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ComponentProps } from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -19,7 +20,7 @@ const LOCAL: AiStatus = {
   operations: [],
 }
 
-function renderButton(status: AiStatus, onRun = vi.fn(), later: AiStatus | null = status) {
+function renderButton(status: AiStatus, onRun = vi.fn(), later: AiStatus | null = status, props: Partial<ComponentProps<typeof AiActionButton>> = {}) {
   let calls = 0
   vi.stubGlobal(
     'fetch',
@@ -33,7 +34,7 @@ function renderButton(status: AiStatus, onRun = vi.fn(), later: AiStatus | null 
   )
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <AiActionButton repoId={3} label="Describe" onRun={onRun} />
+      <AiActionButton repoId={3} label="Describe" onRun={onRun} {...props} />
     </QueryClientProvider>,
   )
   return onRun
@@ -204,6 +205,17 @@ describe('AiActionButton', () => {
     expect(onRun).not.toHaveBeenCalled()
   })
 
+  it('hands the reason to onNotice instead of showing it next to the button', async () => {
+    const onNotice = vi.fn()
+    renderButton(LOCAL, vi.fn(), { ...LOCAL, configured: false, provider: null, label: null, target: null, problem: null }, { onNotice })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Describe' }))
+
+    await waitFor(() => { expect(onNotice).toHaveBeenLastCalledWith('AI is turned off for this repository') })
+    expect(onNotice).toHaveBeenCalledWith(null)
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('runs once for a double click', async () => {
     window.localStorage.setItem('bussola.aiConsent', JSON.stringify([LOCAL.target]))
     const onRun = renderButton(LOCAL)
@@ -217,5 +229,31 @@ describe('AiActionButton', () => {
     })
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(onRun).toHaveBeenCalledTimes(1)
+  })
+
+  it('names a text button by its text, without an aria-label, and keeps its title as is', async () => {
+    renderButton(LOCAL, vi.fn(), LOCAL, { title: 'Ask the AI provider' })
+
+    const button = await screen.findByRole('button', { name: 'Describe' })
+
+    expect(button).toHaveTextContent('Describe')
+    expect(button).not.toHaveAttribute('aria-label')
+    expect(button).toHaveAttribute('title', 'Ask the AI provider')
+  })
+
+  it('shows an icon named by its label, in its tooltip too, and replaced by the spinner while checking', async () => {
+    renderButton(LOCAL, vi.fn(), LOCAL, { title: 'Ask the AI provider', icon: <svg data-testid="icon" /> })
+
+    const button = await screen.findByRole('button', { name: 'Describe' })
+
+    expect(button).toHaveAttribute('title', 'Describe: Ask the AI provider')
+    expect(button).toHaveAttribute('aria-label', 'Describe')
+    expect(button).toHaveTextContent('')
+    expect(screen.getByTestId('icon')).toBeInTheDocument()
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
+    fireEvent.click(button)
+    expect(button).toHaveAttribute('aria-busy', 'true')
+    expect(button.querySelector('.spinner')).not.toBeNull()
+    expect(screen.queryByTestId('icon')).toBeNull()
   })
 })
