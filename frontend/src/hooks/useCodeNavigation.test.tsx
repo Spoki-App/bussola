@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { UNSETTLED_ANSWER_MS, type Documentation, type NavigationResult, type NavigationTarget, type SourceFile } from '../api/navigation'
@@ -11,6 +11,7 @@ type NavigationReply = (params: URLSearchParams) => NavigationResult
 const LIB = 'def price(item):\n    return item.cost\n\n\ndef discount(item):\n    return 0\n'
 const CART = 'from lib import price\n\n\ndef total(items):\n    return price(items)\n'
 const GITHUB = 'https://github.com/acme/widgets/blob/abc123'
+const NAMESAKES = 'Defined with the same name at the top level of other files, so they are other symbols, not this one.'
 const SHORTCUTS = '/work/.venv/lib/python3.12/site-packages/django/shortcuts.py'
 const SHORTCUTS_SOURCE = 'def render(request, template_name):\n    pass\n'
 const RENDER: Documentation = { qualified_name: 'django.shortcuts.render', package: 'Django', version: '5.1', url: 'https://docs.djangoproject.com/en/5.1/topics/http/shortcuts/#django.shortcuts.render', home_url: 'https://www.djangoproject.com/', signature: null, language: 'python', docstring: null, source: null }
@@ -164,6 +165,58 @@ describe('useCodeNavigation', () => {
     const entries = within(popup).getAllByRole('button')
     expect(entries.map((entry) => entry.querySelector('.navigation-location')?.textContent)).toEqual(['cart.py:1module level', 'cart.py:5in Cart.total', 'notes.txt:2'])
     expect(entries[1].querySelector('.qualified-name')).toHaveAttribute('title', 'Cart.total')
+  })
+
+  it('says whether the usages were found as the symbol or by name, and why by name', async () => {
+    const usages = [target('cart.py', 1, null, 'usage'), target('order.py', 2, null, 'usage')]
+    const hint = { family: 'python', language: 'Python', install: 'uv tool install basedpyright' }
+    const answers = [found(usages, { origin: 'definition', resolver: 'language-server' }), found(usages, { origin: 'definition' }), found(usages, { origin: 'definition', server_hint: hint })]
+    const notes: (string | null | undefined)[] = []
+    for (const answer of answers) {
+      serve(() => answer)
+      renderHarness()
+      const popup = await screen.findByRole('dialog', { name: 'Usages of price' })
+      notes.push(popup.querySelector('.navigation-found-by')?.textContent)
+      cleanup()
+    }
+    expect(notes).toEqual([
+      'As a symbolFound by the language server, so they all refer to this symbol.',
+      'By nameThe language server gave no answer, so other symbols with the same name can be listed too.',
+      'By nameNo language server is installed for this language, so other symbols with the same name can be listed too.',
+    ])
+  })
+
+  it('lists other global definitions with the same name first, then the usages, and never jumps straight to one', async () => {
+    serve(() => found([target('payments.py', 1, null, 'definition'), target('orders.py', 5, null, 'usage')], { origin: 'definition' }))
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'Usages of price' })
+    expect(Array.from(popup.querySelectorAll('h3, .navigation-found-by'), (element) => element.textContent)).toEqual([
+      'Other definitions with the same name',
+      `By name${NAMESAKES}`,
+      'By nameThe language server gave no answer, so other symbols with the same name can be listed too.',
+      'orders.py1 usage',
+    ])
+    cleanup()
+
+    serve(() => found([target('payments.py', 1, null, 'definition')], { origin: 'definition' }))
+    renderHarness()
+    const alone = await screen.findByRole('dialog', { name: 'Usages of price' })
+    expect(Array.from(alone.querySelectorAll('h3, .navigation-found-by'), (element) => element.textContent)).toEqual([
+      'Other definitions with the same name',
+      `By name${NAMESAKES}`,
+    ])
+  })
+
+  it('marks the other definitions as found by name even when the language server found the usages', async () => {
+    serve(() => found([target('payments.py', 1, null, 'definition'), target('orders.py', 5, null, 'usage')], { origin: 'definition', resolver: 'language-server' }))
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'Usages of price' })
+    expect(Array.from(popup.querySelectorAll('.navigation-found-by'), (element) => element.textContent)).toEqual([
+      `By name${NAMESAKES}`,
+      'As a symbolFound by the language server, so they all refer to this symbol.',
+    ])
   })
 
   it('colors each preview like review code, by the language of its file, and leaves unknown languages plain', async () => {

@@ -10,7 +10,7 @@ from bussola.ai.base import Cancellation
 from bussola.ai.tools import MAX_TOOL_OUTPUT_CHARACTERS, AiTool, Toolbox, ToolError
 from bussola.git import GitError, GitRepo
 from bussola.globs import matches_any
-from bussola.navigation.navigator import Click, Navigation, Navigator, Origin, Target
+from bussola.navigation.navigator import Click, Navigation, Navigator, Origin, Target, TargetRole
 from bussola.navigation.positions import byte_to_utf16, source_lines
 from bussola.review.descriptions import UNIT_NAMES, unit_prompt
 from bussola.review.rows import Side, side_commit
@@ -120,7 +120,8 @@ class ReviewTools:
             if definition is None:
                 return f"No definition of {location.name} was found, so its usages are unknown. Try search."
             found = self._wait(SIDES[location.side], Click(definition.path, definition.line, definition.column))
-        return self._targets(found.targets, f"No usages of {location.name} were found.")
+        usages = tuple(target for target in found.targets if target.role == TargetRole.USAGE)
+        return self._targets(usages, f"No usages of {location.name} were found.")
 
     def read_file(self, request: FileRange) -> str:
         if request.end_line < request.start_line:

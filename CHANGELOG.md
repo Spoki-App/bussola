@@ -12,6 +12,7 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 - Resizing the window on a large review no longer lags, above all in the installed app: the units outside the window are no longer laid out again at every step, which on a review of 700 units took the layout of each step from about 125 ms to under 3 ms ([#148](https://github.com/Spoki-App/bussola/issues/148)).
 - On macOS, `bussola://` and `https://bussola.spoki.com/` links open in the bussola app installed in Chrome instead of a new browser tab, and so does the page `bussola serve` opens at start. Chrome moves into the app only the links clicked inside Chrome, not the addresses that bussola hands to it, so these links opened in a tab even with the app installed ([#150](https://github.com/Spoki-App/bussola/issues/150)).
+- The Cmd+click list says whether its definitions or usages were found **As a symbol** by the language server or **By name** by the index, and why by name (no language server installed, or no answer from it). On a definition, the list starts with the other definitions with the same name at the top level of a file, not methods or names inside a function, and in the files that define one of them, usages by name keep only the qualified ones, such as `module.name`, unless the file imports the name: their plain uses were listed as if they used the clicked one ([#156](https://github.com/Spoki-App/bussola/issues/156)).
 
 ## [0.3.0] - 2026-11-20
 

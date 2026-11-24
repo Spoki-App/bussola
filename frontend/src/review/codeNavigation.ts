@@ -169,8 +169,11 @@ export function groupTargets(targets: NavigationTarget[]): TargetGroups {
 }
 
 export function directTarget(result: NavigationResult): NavigationTarget | null {
+  if (result.targets.length !== 1) {
+    return null
+  }
   const [only] = result.targets
-  return result.targets.length === 1 ? only : null
+  return result.origin === 'definition' && only.role === 'definition' ? null : only
 }
 
 function wording(result: NavigationResult): { title: string; empty: string } {
@@ -178,6 +181,26 @@ function wording(result: NavigationResult): { title: string; empty: string } {
   return result.origin === 'definition'
     ? { title: `Usages of ${symbol}`, empty: `No usages of ${symbol} found.` }
     : { title: `Definitions of ${symbol}`, empty: `No definition of ${symbol} found.` }
+}
+
+export interface FoundBy {
+  byName: boolean
+  label: string
+  detail: string
+}
+
+export const NAMESAKES_FOUND_BY: FoundBy = {
+  byName: true,
+  label: 'By name',
+  detail: 'Defined with the same name at the top level of other files, so they are other symbols, not this one.',
+}
+
+export function foundBy(result: NavigationResult): FoundBy {
+  if (result.resolver === 'language-server') {
+    return { byName: false, label: 'As a symbol', detail: 'Found by the language server, so they all refer to this symbol.' }
+  }
+  const reason = result.server_hint ? 'No language server is installed for this language' : 'The language server gave no answer'
+  return { byName: true, label: 'By name', detail: `${reason}, so other symbols with the same name can be listed too.` }
 }
 
 export function emptyMessage(result: NavigationResult): string {
