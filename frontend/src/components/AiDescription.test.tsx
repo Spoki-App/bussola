@@ -60,16 +60,19 @@ const DESCRIBED: UnitDescription = {
 
 interface Routes {
   ai?: AiStatus
+  aiLater?: AiStatus
   stored?: UnitDescription[] | null
   answer?: () => Response | null
 }
 
-function renderCard({ ai = AI, stored = [], answer = () => Response.json(DESCRIBED) }: Routes = {}) {
+function renderCard({ ai = AI, aiLater = ai, stored = [], answer = () => Response.json(DESCRIBED) }: Routes = {}) {
   let saved = stored ?? []
   let cancelRunning: () => void = () => undefined
+  let aiCalls = 0
   const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async (url) => {
     if (url === '/api/repos/3/ai') {
-      return Response.json(ai)
+      aiCalls += 1
+      return Response.json(aiCalls === 1 ? ai : aiLater)
     }
     if (url === '/api/reviews/1/descriptions?revision_id=2') {
       return stored === null ? Response.json({ detail: 'Server error' }, { status: 500 }) : Response.json(saved)
@@ -288,5 +291,27 @@ describe('AI description on a unit card', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(screen.queryByRole('button', { name: 'Describe' })).toBeNull()
+  })
+
+  it('offers Describe as an icon in the unit actions, named in its tooltip', async () => {
+    renderCard()
+
+    const button = await screen.findByRole('button', { name: 'Describe' })
+
+    expect(button).toHaveClass('icon-button')
+    expect(button).toHaveTextContent('')
+    expect(button).toHaveAttribute('title', 'Describe: Ask the AI provider what this unit does and what the change does to it')
+    expect(button.querySelector('svg.action-icon')).not.toBeNull()
+    expect(button.closest('.unit-actions')).not.toBeNull()
+  })
+
+  it('shows why Describe cannot start under the header, not among the unit actions', async () => {
+    renderCard({ aiLater: { ...AI, configured: false, provider: null, label: null, target: null } })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Describe' }))
+
+    const notice = await screen.findByRole('alert')
+    expect(notice).toHaveTextContent('AI is turned off for this repository')
+    expect(notice.closest('.unit-header')).toBeNull()
   })
 })

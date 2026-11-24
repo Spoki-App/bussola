@@ -1,4 +1,4 @@
-import { useRef, useState, type Ref } from 'react'
+import { useRef, useState, type ButtonHTMLAttributes, type ReactNode, type Ref } from 'react'
 
 import { useAiStatus } from '../api/ai'
 import { describeError } from '../api/client'
@@ -6,31 +6,39 @@ import type { AiStatus } from '../api/types'
 import { useModalDialog } from '../hooks/useModalDialog'
 import { hasAiConsent, rememberAiConsent } from '../settings/aiConsent'
 import { ErrorNote } from './Badges'
+import { IconButton } from './IconButton'
 import { Spinner } from './Spinner'
 
 interface AiActionButtonProps {
   repoId: number
   label: string
   title?: string
+  icon?: ReactNode
   disabled?: boolean
   ref?: Ref<HTMLButtonElement>
   onRun: (target: string) => void
+  onNotice?: (notice: string | null) => void
 }
 
-export function AiActionButton({ repoId, label, title, disabled = false, ref, onRun }: AiActionButtonProps) {
+export function AiActionButton({ repoId, label, title, icon, disabled = false, ref, onRun, onNotice }: AiActionButtonProps) {
   const status = useAiStatus(repoId)
   const [asking, setAsking] = useState<AiStatus | null>(null)
   const starting = useRef(false)
   const [checking, setChecking] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const report = onNotice ?? setNotice
   const ai = status.data
-  if (status.isError && ai === undefined) {
-    const reason = `Could not check the AI provider: ${describeError(status.error)}`
-    return (
-      <button type="button" title={reason} disabled>
+  const button = (description: string | undefined, props: ButtonHTMLAttributes<HTMLButtonElement> & { ref?: Ref<HTMLButtonElement> }) =>
+    icon ? (
+      <IconButton label={label} description={description} icon={checking ? <Spinner /> : icon} {...props} />
+    ) : (
+      <button type="button" title={description} {...props}>
+        {checking && <Spinner />}
         {label}
       </button>
     )
+  if (status.isError && ai === undefined) {
+    return button(`Could not check the AI provider: ${describeError(status.error)}`, { disabled: true })
   }
   if (ai === undefined || (!ai.configured && ai.problem === null)) {
     return notice ? <ErrorNote message={notice} /> : null
@@ -41,16 +49,16 @@ export function AiActionButton({ repoId, label, title, disabled = false, ref, on
     }
     starting.current = true
     setChecking(true)
-    setNotice(null)
+    report(null)
     try {
       const result = await status.refetch()
       if (result.isError) {
-        setNotice(`Could not check the AI provider: ${describeError(result.error)}`)
+        report(`Could not check the AI provider: ${describeError(result.error)}`)
         return
       }
       const fresh = result.data
       if (!fresh?.configured || fresh.problem !== null || fresh.target === null) {
-        setNotice(fresh?.problem ?? 'AI is turned off for this repository')
+        report(fresh?.problem ?? 'AI is turned off for this repository')
         return
       }
       if (hasAiConsent(fresh.target)) {
@@ -65,18 +73,13 @@ export function AiActionButton({ repoId, label, title, disabled = false, ref, on
   }
   return (
     <>
-      <button
-        ref={ref}
-        type="button"
-        className={checking ? 'busy' : undefined}
-        title={ai.problem ?? title}
-        aria-busy={checking}
-        disabled={disabled || ai.problem !== null || ai.target === null}
-        onClick={() => { void start() }}
-      >
-        {checking && <Spinner />}
-        {label}
-      </button>
+      {button(ai.problem ?? title, {
+        ref,
+        className: checking ? 'busy' : undefined,
+        'aria-busy': checking,
+        disabled: disabled || ai.problem !== null || ai.target === null,
+        onClick: () => { void start() },
+      })}
       {notice && <ErrorNote message={notice} />}
       {asking?.target && (
         <AiNoticeDialog

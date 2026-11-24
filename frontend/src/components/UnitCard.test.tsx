@@ -275,4 +275,24 @@ describe('UnitCard', () => {
     expect(screen.getByRole('button', { name: 'Base → head' })).not.toHaveClass('active')
     expect(screen.queryByRole('button', { name: 'Approved → current' })).toBeNull()
   })
+
+  it('shows each approve action as its own icon, named and titled by its label', () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
+    const client = new QueryClient()
+    const card = (overrides: Partial<Unit>) => (
+      <QueryClientProvider client={client}>
+        <UnitCard reviewId={1} repoId={1} unit={unit('new', overrides)} focused={false} onFocus={() => undefined} register={() => undefined} />
+      </QueryClientProvider>
+    )
+    const { rerender } = render(card({ action: 'approve' }))
+    const icons = new Set<string | null | undefined>()
+    for (const [action, label] of [['approve', 'Approve'], ['approve_under_name', 'Approve under this name'], ['confirm_removal', 'Confirm removal']] as const) {
+      rerender(card({ action }))
+      const button = screen.getByRole('button', { name: label })
+      expect(button).toHaveAttribute('title', label)
+      expect(button).toHaveTextContent('')
+      icons.add(button.querySelector('svg path')?.getAttribute('d'))
+    }
+    expect(icons.size).toBe(3)
+  })
 })
