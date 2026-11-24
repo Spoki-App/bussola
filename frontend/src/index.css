@@ -1376,6 +1376,7 @@ button.busy {
 }
 
 .unit-actions {
+  flex-grow: 1000;
   margin-left: auto;
 }
 

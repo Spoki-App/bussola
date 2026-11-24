@@ -123,6 +123,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
   const revoke = useRevoke(reviewId)
   const revokeSelections = useRevokeSelections(reviewId)
   const ai = useAiDescription(reviewId, unit)
+  const [describeNotice, setDescribeNotice] = useState<string | null>(null)
   const rows = diff.data?.rows ?? []
   const busy = approve.isPending || revoke.isPending || revokeSelections.isPending
   const failure = approve.error ?? revoke.error ?? revokeSelections.error
@@ -240,6 +241,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
 
   const earlierMode = diff.data?.available_modes.find((option) => option !== 'base')
   const approveAction = APPROVE_ACTIONS[unit.action]
+  const canDescribe = !unit.binary && ai.loaded && !ai.description && !ai.pending
 
   return (
     <article id={unitElementId(unit.id)} ref={linkedRef} className={`unit-card state-${unit.state}${focused ? ' focused' : ''}`} onClick={() => { onFocus(unit.id) }}>
@@ -260,12 +262,13 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
           {unitLabels?.(unit)}
         </div>
         <div className="unit-actions">
-          {!unit.binary && ai.loaded && !ai.description && !ai.pending && (
+          {canDescribe && (
             <AiActionButton
               repoId={repoId}
               label="Describe"
               title="Ask the AI provider what this unit does and what the change does to it"
               icon={<ActionIcon path={DESCRIBE_ICON} />}
+              onNotice={setDescribeNotice}
               onRun={(target) => {
                 setExpanded(true)
                 ai.run(target, false)
@@ -304,6 +307,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
         </div>
       </header>
       {failure && <ErrorNote message={describeError(failure)} />}
+      {canDescribe && describeNotice && <ErrorNote message={describeNotice} />}
       {!expanded && (ai.pending || ai.error) && <AiDescription repoId={repoId} ai={ai} />}
       {expanded && (
         <div className="unit-body">

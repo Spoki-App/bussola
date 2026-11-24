@@ -22,4 +22,13 @@ describe('IconButton', () => {
 
     expect(screen.getByRole('button', { name: 'Describe' })).toHaveAttribute('title', 'Describe: Ask the AI provider')
   })
+
+  it('gives assistive tech the description alone, and keeps its own name and tooltip over passed props', () => {
+    const passed = { title: 'Other', 'aria-label': 'Other' } as Record<string, string>
+    render(<IconButton label="Describe" description="Ask the AI provider" icon={<Icon><path d="M0 0" /></Icon>} {...passed} />)
+
+    const button = screen.getByRole('button', { name: 'Describe' })
+    expect(button).toHaveAttribute('aria-description', 'Ask the AI provider')
+    expect(button).toHaveAttribute('title', 'Describe: Ask the AI provider')
+  })
 })

@@ -161,3 +161,22 @@ test('the approve button stays next to the name of a narrow unit, which is cut i
   await expect(approve).toBeVisible()
   expect(await headerFits(card)).toBe(true)
 })
+
+test('the text buttons of a unit stay on one row while its heading still has room to give', async ({ page }) => {
+  const base = 'ROWS = []\n'
+  await openReview(page, createRepository('module-rows', 'rows.py', base, `${base}ROWS.append(1)\nROWS.append(2)\nROWS.append(3)\n`))
+  await page.getByRole('tab', { name: 'Unified' }).click()
+  const card = page.locator('article.unit-card', { hasText: 'Module code' })
+  await card.locator('td.diff-code', { hasText: 'ROWS.append(1)' }).click()
+  await card.getByRole('button', { name: 'Approve selection (1)' }).click()
+  await expect(card.getByText(/^1\/\d+ lines approved$/)).toBeVisible()
+  await card.locator('td.diff-code', { hasText: 'ROWS.append(2)' }).click()
+
+  const select = await box(card.getByRole('button', { name: 'Approve selection (1)' }))
+  const revoke = await box(card.getByRole('button', { name: 'Revoke lines' }))
+  const approve = await box(card.getByRole('button', { name: 'Approve', exact: true }))
+  const middle = (target: { y: number; height: number }) => target.y + target.height / 2
+  expect(Math.abs(middle(select) - middle(revoke))).toBeLessThan(2)
+  expect(Math.abs(middle(select) - middle(approve))).toBeLessThan(2)
+  expect(await headerFits(card)).toBe(true)
+})

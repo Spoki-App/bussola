@@ -9,7 +9,7 @@ interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
 
 export function IconButton({ label, description, icon, className, ref, ...props }: IconButtonProps) {
   return (
-    <button ref={ref} type="button" className={className ? `icon-button ${className}` : 'icon-button'} aria-label={label} title={description ? `${label}: ${description}` : label} {...props}>
+    <button {...props} ref={ref} type="button" className={className ? `icon-button ${className}` : 'icon-button'} aria-label={label} aria-description={description ?? undefined} title={description ? `${label}: ${description}` : label}>
       {icon}
     </button>
   )

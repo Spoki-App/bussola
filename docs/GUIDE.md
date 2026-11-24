@@ -93,7 +93,7 @@ Long lines in the diff wrap by default. A wrapped line keeps the indentation of 
 
 Units that still need review start open and the others closed. Approving a unit closes its card, and a card opens again when its unit needs review again (approval revoked, or new changes).
 
-The approve button at the right of a unit's header is an icon, named in its tooltip: a check mark for **Approve**, a check mark with an arrow for **Approve under this name** (a renamed or moved unit) and a bin for **Confirm removal**. The buttons stay on the first line of the header: when the card is narrow the unit's name is cut first, the labels after it move to a second line only when the name would get shorter than about 20 characters, and the buttons move below only on a screen too narrow for them next to the name.
+The approve button at the right of a unit's header is an icon, named in its tooltip: a check mark for **Approve**, a check mark with an arrow for **Approve under this name** (a renamed or moved unit) and a bin for **Confirm removal**. The buttons stay next to the unit's name, and the name gives way first: when the card is narrow the name is cut, the labels after it move to a second line when the name would get shorter than about 20 characters, and the text buttons, such as the diff mode and **Revoke lines**, wrap among themselves only when the name and its labels cannot get any narrower. The buttons move below the name only when even the shortest name and the buttons do not fit side by side, as on a phone. When **Describe** cannot start, the reason is shown under the header.
 
 | State | Meaning |
 |---|---|

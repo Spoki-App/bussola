@@ -17,14 +17,16 @@ interface AiActionButtonProps {
   disabled?: boolean
   ref?: Ref<HTMLButtonElement>
   onRun: (target: string) => void
+  onNotice?: (notice: string | null) => void
 }
 
-export function AiActionButton({ repoId, label, title, icon, disabled = false, ref, onRun }: AiActionButtonProps) {
+export function AiActionButton({ repoId, label, title, icon, disabled = false, ref, onRun, onNotice }: AiActionButtonProps) {
   const status = useAiStatus(repoId)
   const [asking, setAsking] = useState<AiStatus | null>(null)
   const starting = useRef(false)
   const [checking, setChecking] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const report = onNotice ?? setNotice
   const ai = status.data
   const button = (description: string | undefined, props: ButtonHTMLAttributes<HTMLButtonElement> & { ref?: Ref<HTMLButtonElement> }) =>
     icon ? (
@@ -47,16 +49,16 @@ export function AiActionButton({ repoId, label, title, icon, disabled = false, r
     }
     starting.current = true
     setChecking(true)
-    setNotice(null)
+    report(null)
     try {
       const result = await status.refetch()
       if (result.isError) {
-        setNotice(`Could not check the AI provider: ${describeError(result.error)}`)
+        report(`Could not check the AI provider: ${describeError(result.error)}`)
         return
       }
       const fresh = result.data
       if (!fresh?.configured || fresh.problem !== null || fresh.target === null) {
-        setNotice(fresh?.problem ?? 'AI is turned off for this repository')
+        report(fresh?.problem ?? 'AI is turned off for this repository')
         return
       }
       if (hasAiConsent(fresh.target)) {
