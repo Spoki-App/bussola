@@ -778,6 +778,7 @@ class AiReviewRatingOut(BaseModel):
 class AiReviewRuleOut(BaseModel):
     path: str
     clipped: bool
+    skipped: Literal["room", "ignored"] | None = None
 
 
 class AiReviewLinkOut(BaseModel):
@@ -792,6 +793,7 @@ class AiReviewRunDetailOut(AiReviewRunOut):
     parts: list[AiReviewPartOut]
     links: list[AiReviewLinkOut]
     rules: list[AiReviewRuleOut]
+    rules_error: str | None = None
 
 
 class AiChatSnippetOut(BaseModel):

@@ -84,7 +84,9 @@ def get_ai_review_run(context: ContextDep, run_id: int, request: Request) -> AiR
     shown = [AiReviewPartOut.model_validate(part) for part in parts]
     links = line_links(context, [part.get("summary") or "" for part in parts])
     rules = [AiReviewRuleOut.model_validate(rule) for rule in run.details.get("rules", [])]
-    return AiReviewRunDetailOut(**brief.model_dump(), rating=run.details.get("rating"), parts=shown, links=links, rules=rules)
+    return AiReviewRunDetailOut(
+        **brief.model_dump(), rating=run.details.get("rating"), parts=shown, links=links, rules=rules, rules_error=run.details.get("rules_error")
+    )
 
 
 def link_targets(text: str) -> set[tuple[str, str, int]]:

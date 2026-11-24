@@ -77,6 +77,17 @@ class AiRequest:
     schema: dict[str, Any]
     max_tokens: int
     tools: ToolRunner | None = None
+    shared_prefix: int = 0
+
+
+@dataclass(frozen=True)
+class SharedPrompt:
+    shared: str
+    rest: str
+
+    @property
+    def text(self) -> str:
+        return self.shared + self.rest
 
 
 @dataclass(frozen=True)

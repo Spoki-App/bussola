@@ -223,6 +223,7 @@ const DETAIL: AiReviewRunDetail = {
   rating: null,
   links: [],
   rules: [],
+  rules_error: null,
   parts: [{ units: [], summary: 'Needs work before merging.\n\n- [the total](#after:app.py:3) skips refunds', findings: [{ thread_id: 't1', place: 'app.py:3', body: 'Refunds' }], lookups: [], error: null }],
 }
 

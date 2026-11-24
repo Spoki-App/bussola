@@ -35,7 +35,7 @@ class AnthropicProvider:
         return {"x-api-key": self._api_key, "anthropic-version": API_VERSION}
 
     def complete(self, request: AiRequest, cancellation: Cancellation) -> str:
-        messages: list[dict[str, Any]] = [{"role": "user", "content": request.prompt}]
+        messages: list[dict[str, Any]] = [{"role": "user", "content": _prompt_content(request)}]
         for _ in range(MAX_TOOL_ROUNDS):
             response = self._send(request, messages, cancellation)
             content = cast(list[Any], response.get("content")) if isinstance(response.get("content"), list) else []
@@ -65,6 +65,13 @@ class AnthropicProvider:
         if stop_message:
             raise AiOutputError(stop_message)
         return response
+
+
+def _prompt_content(request: AiRequest) -> str | list[dict[str, Any]]:
+    shared, rest = request.prompt[: request.shared_prefix], request.prompt[request.shared_prefix :]
+    if not shared.strip() or not rest.strip():
+        return request.prompt
+    return [{"type": "text", "text": shared, "cache_control": {"type": "ephemeral"}}, {"type": "text", "text": rest}]
 
 
 def _tool_results(tools: ToolRunner, content: list[Any]) -> list[dict[str, Any]]:

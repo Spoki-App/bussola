@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 
 from bussola.ai.base import AiRequest, AiUnreachableError, Cancellation, run_cancellable
+from bussola.git import GitError
+from bussola.review import ai_review
 from bussola.review.ai_review import SEVERITY_MARKS, Severity
 from bussola.review.context import ReviewContext
 from bussola.review.review_rules import MAX_RULE_FILE_CHARACTERS, MAX_RULES_CHARACTERS
@@ -565,6 +567,14 @@ def only_run(api: ApiClient, review_id: int) -> Json:
     return api.call("GET", f"/reviews/{review_id}/ai-review/runs/{last['id']}")
 
 
+def sent(path: str, *, clipped: bool = False) -> Json:
+    return {"path": path, "clipped": clipped, "skipped": None}
+
+
+def not_sent(path: str, skipped: str) -> Json:
+    return {"path": path, "clipped": False, "skipped": skipped}
+
+
 @pytest.fixture
 def ruled(git_repo: GitFixture) -> GitFixture:
     git_repo.commit(
@@ -618,12 +628,15 @@ def test_the_review_follows_the_repository_rules_for_the_changed_files_as_they_w
     positions = [request.prompt.index(f"From {path}:\n{text}") for path, text in followed.items()]
     assert positions == sorted(positions)
     assert request.prompt.index("The repository's review rules:") < positions[0] < request.prompt.index("The units to review:")
+    assert request.prompt[request.shared_prefix :].startswith("The units to review:")
     assert "Not committed" not in request.prompt
     assert "From shop/billing/CLAUDE.md:\nBilling: nothing to report" not in request.prompt
     assert "From shop/AGENTS.md" not in request.prompt
     assert "Web: not part" not in request.prompt
     assert "Hidden:" not in request.prompt
-    assert only_run(api, review_id)["rules"] == [{"path": path, "clipped": False} for path in followed]
+    details = only_run(api, review_id)
+    assert details["rules"] == [sent(path) for path in followed]
+    assert details["rules_error"] is None
 
 
 def test_the_repository_can_turn_the_review_rules_off(ruled: GitFixture, data_dir: Path, config_file: Path) -> None:
@@ -640,9 +653,51 @@ def test_the_repository_can_turn_the_review_rules_off(ruled: GitFixture, data_di
     assert only_run(api, review_id)["rules"] == []
 
 
-def test_large_rule_files_are_clipped_to_keep_the_prompt_small(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
+def test_rule_files_excluded_from_reviews_are_listed_as_not_sent(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
+    git_repo.commit({".cursor/BUGBOT.md": "Check the money math.\n", "CLAUDE.md": "Prices are in cents.\n", "app.py": "RATE = 1\n"}, "base")
+    git_repo.branch("feature")
+    git_repo.commit({"app.py": "RATE = 2\n"}, "raise the rate")
+    git_repo.write({".bussola.toml": 'ignore = ["*.md"]\n'})
+    provider = FakeProvider(NOTHING)
+    api = client(git_repo, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    run(api, review_id)
+
+    [request] = reviews(provider)
+    assert "The repository's review rules:" not in request.prompt
+    assert only_run(api, review_id)["rules"] == [not_sent(".cursor/BUGBOT.md", "ignored"), not_sent("CLAUDE.md", "ignored")]
+
+
+def test_a_review_runs_without_the_rules_when_they_cannot_be_read(
+    ruled: GitFixture, data_dir: Path, config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(*_: object) -> None:
+        raise GitError(["cat-file", "--batch"], "object 1234 is missing")
+
+    monkeypatch.setattr(ai_review, "review_rules", broken)
+    provider = FakeProvider(NOTHING)
+    api = client(ruled, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    assert run(api, review_id)["error"] is None
+
+    [request] = reviews(provider)
+    assert "The repository's review rules:" not in request.prompt
+    details = only_run(api, review_id)
+    assert details["status"] == "completed"
+    assert details["rules"] == []
+    assert details["rules_error"] == "The review rules could not be read, so this run did not follow them: git cat-file --batch failed: object 1234 is missing"
+
+
+def test_large_rule_files_are_clipped_and_the_rest_left_out_to_keep_the_prompt_small(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
     rest = MAX_RULES_CHARACTERS - 2 * MAX_RULE_FILE_CHARACTERS
-    rules = {"CLAUDE.md": "a" * MAX_RULE_FILE_CHARACTERS, "REVIEW.md": "r" * (MAX_RULE_FILE_CHARACTERS + 10), "AGENTS.md": "c" * MAX_RULE_FILE_CHARACTERS}
+    rules = {
+        "CLAUDE.md": "a" * MAX_RULE_FILE_CHARACTERS,
+        ".claude/CLAUDE.md": "d" * MAX_RULE_FILE_CHARACTERS,
+        "REVIEW.md": "r" * (MAX_RULE_FILE_CHARACTERS + 10),
+        "AGENTS.md": "Agents: keep the API stable.",
+    }
     git_repo.commit({**rules, "app.py": "RATE = 1\n"}, "base")
     git_repo.branch("feature")
     git_repo.commit({"app.py": "RATE = 2\n"}, "raise the rate")
@@ -655,9 +710,35 @@ def test_large_rule_files_are_clipped_to_keep_the_prompt_small(git_repo: GitFixt
     [request] = reviews(provider)
     assert "r" * MAX_RULE_FILE_CHARACTERS + "\n[... 10 more characters not shown]" in request.prompt
     assert f"From CLAUDE.md:\n{'a' * MAX_RULE_FILE_CHARACTERS}\n</rules-" in request.prompt
-    assert f"From AGENTS.md:\n{'c' * rest}\n[... {MAX_RULE_FILE_CHARACTERS - rest} more characters not shown]" in request.prompt
-    clipped = [{"path": "CLAUDE.md", "clipped": False}, {"path": "REVIEW.md", "clipped": True}, {"path": "AGENTS.md", "clipped": True}]
-    assert only_run(api, review_id)["rules"] == clipped
+    assert f"From .claude/CLAUDE.md:\n{'d' * rest}\n[... {MAX_RULE_FILE_CHARACTERS - rest} more characters not shown]" in request.prompt
+    assert "Agents:" not in request.prompt
+    expected = [sent("CLAUDE.md"), sent(".claude/CLAUDE.md", clipped=True), sent("REVIEW.md", clipped=True), not_sent("AGENTS.md", "room")]
+    assert only_run(api, review_id)["rules"] == expected
+
+
+BASE_APP = "def total(items):\n    return sum(items)\n\n\ndef name():\n    return 'shop'\n"
+TAXED_APP = "def total(items):\n    return sum(items) * 1.2\n\n\ndef name():\n    return 'store'\n"
+
+
+def test_with_a_code_limit_the_rules_take_at_most_half_and_the_code_the_rest(git_repo: GitFixture, data_dir: Path, config_file: Path) -> None:
+    git_repo.commit({"app.py": BASE_APP, "CLAUDE.md": sized("Prices are in cents.", 1_000)}, "base")
+    git_repo.branch("feature")
+    git_repo.commit({"app.py": TAXED_APP}, "add tax")
+    limit(config_file, 800)
+    provider = FakeProvider(NOTHING)
+    api = client(git_repo, data_dir, config_file, provider)
+    review_id = api.start_review()
+
+    run(api, review_id)
+
+    first, second = reviews(provider)
+    rule = f"From CLAUDE.md:\n{sized('Prices are in cents.', 1_000)[:400]}\n[... 600 more characters not shown]"
+    assert rule in first.prompt
+    assert rule in second.prompt
+    assert ("Name: total" in first.prompt) != ("Name: total" in second.prompt)
+    assert first.prompt[: first.shared_prefix] == second.prompt[: second.shared_prefix]
+    assert rule in first.prompt[: first.shared_prefix]
+    assert only_run(api, review_id)["rules"] == [sent("CLAUDE.md", clipped=True)]
 
 
 def sized(text: str, characters: int) -> str:
@@ -694,11 +775,11 @@ def test_the_root_rules_and_the_rules_of_every_changed_area_are_followed_whole(a
     positions = [request.prompt.index(f"From {path}:\n{AREA_RULES[path]}\n</rules-") for path in order]
     assert positions == sorted(positions)
     assert "Billing: not part" not in request.prompt
-    assert only_run(api, review_id)["rules"] == [{"path": path, "clipped": False} for path in order]
+    assert only_run(api, review_id)["rules"] == [sent(path) for path in order]
 
 
 def test_a_short_budget_trims_the_root_guide_before_bugbot_and_the_area_rules(areas: GitFixture, data_dir: Path, config_file: Path) -> None:
-    limit(config_file, 50_000)
+    limit(config_file, 100_000)
     provider = FakeProvider(NOTHING)
     api = client(areas, data_dir, config_file, provider)
     review_id = api.start_review()
