@@ -2,7 +2,7 @@ import { useEffect, useMemo, type KeyboardEvent, type MouseEvent } from 'react'
 
 import type { Documentation, EnclosingUnit, LibrarySource, NavigationResult, NavigationTarget } from '../api/navigation'
 import { useModalDialog } from '../hooks/useModalDialog'
-import { emptyMessage, foundBy, groupTargets, missingDocumentation, signatureMarkdown, titleOf, type ScreenPoint } from '../review/codeNavigation'
+import { emptyMessage, foundBy, groupTargets, missingDocumentation, NAMESAKES_FOUND_BY, signatureMarkdown, titleOf, type FoundBy, type ScreenPoint } from '../review/codeNavigation'
 import { sourceLines } from '../review/sourceLines'
 import { plural } from '../review/text'
 import { ErrorNote } from './Badges'
@@ -82,26 +82,30 @@ function Entry({ target, onChoose }: { target: NavigationTarget; onChoose: (targ
   )
 }
 
-function Results({ result, onChoose }: { result: NavigationResult; onChoose: (target: NavigationTarget) => void }) {
-  if (result.targets.length === 0) {
-    return <p className="muted">{emptyMessage(result)}</p>
-  }
-  const groups = groupTargets(result.targets)
-  const found = foundBy(result)
-  const namesakes = result.origin === 'definition'
-  const definitionsTitle = namesakes ? 'Other definitions with the same name' : 'Definitions'
-  const note = (
+function FoundByNote({ found }: { found: FoundBy }) {
+  return (
     <p className="navigation-found-by">
       <span className={found.byName ? 'label warn' : 'label symbol'}>{found.label}</span>
       <span className="muted">{found.detail}</span>
     </p>
   )
+}
+
+function Results({ result, onChoose }: { result: NavigationResult; onChoose: (target: NavigationTarget) => void }) {
+  if (result.targets.length === 0) {
+    return <p className="muted">{emptyMessage(result)}</p>
+  }
+  const groups = groupTargets(result.targets)
+  const found = <FoundByNote found={foundBy(result)} />
+  const namesakes = result.origin === 'definition'
+  const definitionsTitle = namesakes ? 'Other definitions with the same name' : 'Definitions'
   return (
     <div className="navigation-results">
-      {!namesakes && note}
+      {!namesakes && found}
       {groups.definitions.length > 0 && (
         <section aria-label={definitionsTitle}>
           <h3>{definitionsTitle}</h3>
+          {namesakes && <FoundByNote found={NAMESAKES_FOUND_BY} />}
           <ul>
             {groups.definitions.map((target) => (
               <Entry key={`${target.path}:${String(target.line)}:${String(target.column)}`} target={target} onChoose={onChoose} />
@@ -109,7 +113,7 @@ function Results({ result, onChoose }: { result: NavigationResult; onChoose: (ta
           </ul>
         </section>
       )}
-      {namesakes && groups.files.length > 0 && note}
+      {namesakes && groups.files.length > 0 && found}
       {groups.files.map((file) => (
         <section key={file.path} aria-label={`Usages in ${file.path}`}>
           <h3>

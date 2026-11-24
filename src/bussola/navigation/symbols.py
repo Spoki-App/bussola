@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from tree_sitter import Language, Node, Parser, Tree
 
+from bussola.navigation.scopes import is_module_level
 from bussola.units.extractors import ecmascript, go, python
 from bussola.units.extractors.javascript import JAVASCRIPT as JAVASCRIPT_EXTRACTOR
 from bussola.units.extractors.treesitter import node_text
@@ -18,6 +19,7 @@ class Symbol:
     start: int
     definition: bool
     member: bool = False
+    top_level: bool = False
 
 
 @dataclass(frozen=True)
@@ -42,6 +44,7 @@ GO_MEMBERS = frozenset({go.METHOD_DECLARATION})
 GO_DEFINITIONS = frozenset({go.FUNCTION_DECLARATION}) | GO_MEMBERS | go.TYPE_SPECS
 GO_VARIABLES = frozenset({"var_spec", "const_spec"})
 MEMBER_IDENTIFIERS = frozenset({"property_identifier", "field_identifier"})
+QUALIFIED_TYPES = frozenset({"qualified_type", "nested_type_identifier"})
 ECMASCRIPT_IDENTIFIERS = frozenset(
     {"identifier", "property_identifier", "type_identifier", "shorthand_property_identifier", "shorthand_property_identifier_pattern"}
 )
@@ -136,9 +139,12 @@ def file_symbols(language: SourceLanguage, source: bytes) -> FileSymbols:
     return FileSymbols(tuple(definitions), tuple(sorted(used)))
 
 
-def references(language: SourceLanguage, source: bytes, name: str) -> list[Symbol]:
+def references(language: SourceLanguage, source: bytes, name: str, shadowed: bool = False) -> list[Symbol]:
     wanted = name.encode()
-    return [symbol_of(language, node) for node in _identifiers(language, parse(language, source)) if node.text == wanted and not language.is_definition(node)]
+    found = [node for node in _identifiers(language, parse(language, source)) if node.text == wanted and not language.is_definition(node)]
+    if shadowed and not any(_in_import(node) for node in found):
+        found = [node for node in found if is_qualified(node)]
+    return [symbol_of(language, node) for node in found]
 
 
 def symbol_at(language: SourceLanguage, source: bytes, row: int, column: int) -> Symbol | None:
@@ -171,12 +177,28 @@ def _identifiers(language: SourceLanguage, tree: Tree) -> Iterator[Node]:
 def symbol_of(language: SourceLanguage, node: Node) -> Symbol:
     row, start = node.start_point
     definition = language.is_definition(node)
-    return Symbol(node_text(node), row, start, definition, definition and language.is_member_definition(node))
+    member = definition and language.is_member_definition(node)
+    top_level = definition and not member and is_module_level(language.family, node)
+    return Symbol(node_text(node), row, start, definition, member, top_level)
 
 
 def is_member(node: Node) -> bool:
     parent = node.parent
     return node.type in MEMBER_IDENTIFIERS or (parent is not None and parent.type == "attribute" and parent.child_by_field_name("attribute") == node)
+
+
+def is_qualified(node: Node) -> bool:
+    parent = node.parent
+    return is_member(node) or (parent is not None and parent.type in QUALIFIED_TYPES and parent.child_by_field_name("name") == node)
+
+
+def _in_import(node: Node) -> bool:
+    ancestor = node.parent
+    while ancestor is not None:
+        if "import" in ancestor.type:
+            return True
+        ancestor = ancestor.parent
+    return False
 
 
 def nodes(root: Node) -> Iterator[Node]:

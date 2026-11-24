@@ -11,6 +11,7 @@ type NavigationReply = (params: URLSearchParams) => NavigationResult
 const LIB = 'def price(item):\n    return item.cost\n\n\ndef discount(item):\n    return 0\n'
 const CART = 'from lib import price\n\n\ndef total(items):\n    return price(items)\n'
 const GITHUB = 'https://github.com/acme/widgets/blob/abc123'
+const NAMESAKES = 'Defined with the same name at the top level of other files, so they are other symbols, not this one.'
 const SHORTCUTS = '/work/.venv/lib/python3.12/site-packages/django/shortcuts.py'
 const SHORTCUTS_SOURCE = 'def render(request, template_name):\n    pass\n'
 const RENDER: Documentation = { qualified_name: 'django.shortcuts.render', package: 'Django', version: '5.1', url: 'https://docs.djangoproject.com/en/5.1/topics/http/shortcuts/#django.shortcuts.render', home_url: 'https://www.djangoproject.com/', signature: null, language: 'python', docstring: null, source: null }
@@ -192,6 +193,7 @@ describe('useCodeNavigation', () => {
     const popup = await screen.findByRole('dialog', { name: 'Usages of price' })
     expect(Array.from(popup.querySelectorAll('h3, .navigation-found-by'), (element) => element.textContent)).toEqual([
       'Other definitions with the same name',
+      `By name${NAMESAKES}`,
       'By nameThe language server gave no answer, so other symbols with the same name can be listed too.',
       'orders.py1 usage',
     ])
@@ -199,7 +201,22 @@ describe('useCodeNavigation', () => {
 
     serve(() => found([target('payments.py', 1, null, 'definition')], { origin: 'definition' }))
     renderHarness()
-    expect(await screen.findByRole('dialog', { name: 'Usages of price' })).toHaveTextContent('Other definitions with the same name')
+    const alone = await screen.findByRole('dialog', { name: 'Usages of price' })
+    expect(Array.from(alone.querySelectorAll('h3, .navigation-found-by'), (element) => element.textContent)).toEqual([
+      'Other definitions with the same name',
+      `By name${NAMESAKES}`,
+    ])
+  })
+
+  it('marks the other definitions as found by name even when the language server found the usages', async () => {
+    serve(() => found([target('payments.py', 1, null, 'definition'), target('orders.py', 5, null, 'usage')], { origin: 'definition', resolver: 'language-server' }))
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'Usages of price' })
+    expect(Array.from(popup.querySelectorAll('.navigation-found-by'), (element) => element.textContent)).toEqual([
+      `By name${NAMESAKES}`,
+      'As a symbolFound by the language server, so they all refer to this symbol.',
+    ])
   })
 
   it('colors each preview like review code, by the language of its file, and leaves unknown languages plain', async () => {

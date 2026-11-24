@@ -189,6 +189,12 @@ export interface FoundBy {
   detail: string
 }
 
+export const NAMESAKES_FOUND_BY: FoundBy = {
+  byName: true,
+  label: 'By name',
+  detail: 'Defined with the same name at the top level of other files, so they are other symbols, not this one.',
+}
+
 export function foundBy(result: NavigationResult): FoundBy {
   if (result.resolver === 'language-server') {
     return { byName: false, label: 'As a symbol', detail: 'Found by the language server, so they all refer to this symbol.' }

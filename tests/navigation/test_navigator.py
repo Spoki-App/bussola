@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from bussola.navigation.navigator import Click, Navigator, Origin, TargetRole
+from bussola.navigation.navigator import Click, Navigation, Navigator, Origin, TargetRole
 from bussola.navigation.scopes import Enclosing
 from bussola.units.model import UnitKind
 from tests.gitrepo import GitFixture
@@ -341,3 +341,82 @@ def test_usages_by_name_of_a_method_keep_files_with_a_method_of_the_same_name(tm
 
     assert (found.symbol, found.origin) == ("total", Origin.DEFINITION)
     assert [(target.path, target.line) for target in found.targets] == [("order.py", 7)]
+
+
+def navigate_once(tmp_path: Path, git_repo: GitFixture, files: dict[str, str], click: Click) -> Navigation:
+    commit = git_repo.commit(files)
+    starter = ManualStarter()
+    navigator = Navigator(tmp_path / "data", starter)
+    navigator.prepare(git_repo.repo, commit, ())
+    starter.run()
+    return navigator.navigate(git_repo.repo, commit, (), click)
+
+
+def test_files_with_a_namesake_keep_qualified_usages_and_imports_of_the_name(tmp_path: Path, git_repo: GitFixture) -> None:
+    files = {
+        "channels.py": "class Concat:\n    pass\n",
+        "payments.py": "import channels\n\n\nclass Concat:\n    pass\n\n\ndef pay():\n    return Concat(), channels.Concat()\n",
+        "fallback.py": "try:\n    from channels import Concat\nexcept ImportError:\n    class Concat:\n        pass\n\n\nVALUE = Concat()\n",
+    }
+
+    found = navigate_once(tmp_path, git_repo, files, Click("channels.py", 1, 7))
+
+    assert [(target.role, target.path, target.line) for target in found.targets] == [
+        (TargetRole.DEFINITION, "fallback.py", 4),
+        (TargetRole.DEFINITION, "payments.py", 4),
+        (TargetRole.USAGE, "fallback.py", 2),
+        (TargetRole.USAGE, "fallback.py", 8),
+        (TargetRole.USAGE, "payments.py", 9),
+    ]
+
+
+def test_go_usages_through_the_package_name_are_kept_in_packages_with_the_same_name(tmp_path: Path, git_repo: GitFixture) -> None:
+    files = {
+        "a/a.go": "package a\n\ntype Config struct{}\n\nfunc New() Config { return Config{} }\n",
+        "b/b.go": 'package b\n\nimport "example.com/a"\n\ntype Config struct{}\n\nfunc New() Config {\n\t_ = a.New()\n\treturn Config{}\n}\n',
+    }
+
+    found = navigate_once(tmp_path, git_repo, files, Click("a/a.go", 5, 6))
+
+    assert (found.symbol, found.origin) == ("New", Origin.DEFINITION)
+    assert [(target.role, target.path, target.line) for target in found.targets] == [(TargetRole.DEFINITION, "b/b.go", 7), (TargetRole.USAGE, "b/b.go", 8)]
+
+
+OVERLOADS = (
+    "from typing import overload\n\n\n"
+    "@overload\ndef parse(text: str) -> str: ...\n"
+    "@overload\ndef parse(text: int) -> int: ...\n"
+    "def parse(text):\n    return 1\n"
+)
+
+
+def test_other_definitions_in_the_clicked_file_are_not_listed_as_namesakes(tmp_path: Path, git_repo: GitFixture) -> None:
+    files = {
+        "parse.py": OVERLOADS,
+        "other.py": "def parse():\n    return 1\n",
+    }
+
+    found = navigate_once(tmp_path, git_repo, files, Click("parse.py", 8, 5))
+
+    assert [(target.role, target.path, target.line) for target in found.targets if target.role == TargetRole.DEFINITION] == [
+        (TargetRole.DEFINITION, "other.py", 1)
+    ]
+
+
+def test_namesakes_take_at_most_their_share_and_the_whole_list_stays_within_the_limit(
+    tmp_path: Path, git_repo: GitFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("bussola.navigation.navigator.MAX_NAMESAKES", 2)
+    monkeypatch.setattr("bussola.navigation.navigator.MAX_TARGETS", 4)
+    files = {f"same_{number}.py": "def pay():\n    return 1\n" for number in range(3)}
+    files["pay.py"] = "def pay():\n    return 1\n"
+    files["calls.py"] = "from pay import pay\n\npay()\npay()\npay()\npay()\n"
+
+    found = navigate_once(tmp_path, git_repo, files, Click("pay.py", 1, 5))
+
+    assert [(target.role, target.path) for target in found.targets] == [
+        (TargetRole.DEFINITION, "same_0.py"),
+        (TargetRole.DEFINITION, "same_1.py"),
+        (TargetRole.USAGE, "calls.py"),
+        (TargetRole.USAGE, "calls.py"),
+    ]

@@ -181,6 +181,40 @@ def test_go_references_follow_selectors_types_and_variables() -> None:
     assert usages("cart.go", GO_SOURCE, "limit") == [17]
 
 
+def top_level(path: str, source: str) -> list[tuple[str, int]]:
+    return [(symbol.name, symbol.row + 1) for symbol in symbols_of(path, source).definitions if symbol.top_level]
+
+
+def shadowed_usages(path: str, source: str, name: str) -> list[int]:
+    return [symbol.row + 1 for symbol in references(language(path), source.encode(), name, shadowed=True)]
+
+
+def test_only_definitions_outside_functions_and_classes_are_top_level() -> None:
+    python_source = "LIMIT = 1\n\n\nclass Cart:\n    size = 2\n\n\ndef build():\n    class Local:\n        pass\n\n    def inner():\n        pass\n"
+    typescript_source = "export function outer() {\n  function inner() {}\n  class Local {}\n}\n\nexport class Cart {\n  total() {}\n}\n"
+    go_source = "package cart\n\ntype Rate int\n\nfunc New() {\n\ttype local struct{}\n}\n\nfunc (r Rate) Total() {}\n"
+
+    assert top_level("cart.py", python_source) == [("LIMIT", 1), ("Cart", 4), ("build", 8)]
+    assert top_level("cart.ts", typescript_source) == [("outer", 1), ("Cart", 6)]
+    assert top_level("cart.go", go_source) == [("Rate", 3), ("New", 5)]
+
+
+def test_in_a_file_that_shadows_the_name_only_qualified_references_are_kept_unless_the_file_imports_it() -> None:
+    python_source = "import channels\n\n\nclass Concat:\n    pass\n\n\ndef pay():\n    return Concat(), channels.Concat()\n"
+    fallback = "try:\n    from fast import parse\nexcept ImportError:\n    def parse(text):\n        return text\n\n\nVALUE = parse('1')\n"
+    go_source = 'package b\n\nimport "a"\n\ntype Config struct{}\n\nfunc New() Config {\n\tvar c a.Config\n\ta.New()\n\treturn Config{}\n}\n'
+    typescript_source = (
+        "import * as other from './other'\n\nexport type Rate = other.Rate\nexport function price(rate: Rate): other.Rate {\n  return other.price(rate)\n}\n"
+    )
+
+    assert shadowed_usages("payments.py", python_source, "Concat") == [9]
+    assert shadowed_usages("parser.py", fallback, "parse") == [2, 8]
+    assert shadowed_usages("b.go", go_source, "Config") == [8]
+    assert shadowed_usages("b.go", go_source, "New") == [9]
+    assert shadowed_usages("price.ts", typescript_source, "Rate") == [3, 4]
+    assert shadowed_usages("price.ts", typescript_source, "price") == [5]
+
+
 class Click(NamedTuple):
     path: str
     source: str
