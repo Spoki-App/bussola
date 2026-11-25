@@ -237,7 +237,12 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   }, [fileTree, order, ratingsInUse])
   const unitList = useMemo(() => groups.flatMap((group) => unitsInOrder(group.tree)), [groups])
   const shownUnits = useMemo(() => new Set(unitList.map((unit) => unit.id)), [unitList])
-  const navigation = useCodeNavigation(reviewId, revisionId, (unitId) => shownUnits.has(unitId))
+  const showAllUnits = () => {
+    setFilter('all')
+    setQuery('')
+    setImpactFilter('all')
+  }
+  const navigation = useCodeNavigation(reviewId, revisionId, (unitId) => shownUnits.has(unitId), showAllUnits)
   const [focusedId, setFocusedId] = useState<number | null>(null)
   const actions = useRef(new Map<number, UnitActions>())
   const [panelHidden, setPanelHidden] = useState(loadPanelHidden)
@@ -276,9 +281,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   if (linkIsNew) {
     setSeenLinkKey(link.key)
     setAppliedLink(null)
-    setFilter('all')
-    setQuery('')
-    setImpactFilter('all')
+    showAllUnits()
   }
   const linkPending = link !== undefined && !linkIsNew && appliedLink === null
   const viewChanged = filter !== 'all' || query !== '' || impactFilter !== 'all'

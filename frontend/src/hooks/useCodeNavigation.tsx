@@ -55,31 +55,30 @@ function takeHint(hint: ServerHint | null): ServerHint | null {
   return hint
 }
 
-export function useCodeNavigation(reviewId: number, revisionId: number | undefined, hasUnit: (unitId: number) => boolean): CodeNavigation {
+export function useCodeNavigation(reviewId: number, revisionId: number | undefined, hasUnit: (unitId: number) => boolean, showUnit: (unitId: number) => void): CodeNavigation {
   usePrepareNavigation(reviewId, revisionId)
   const queryClient = useQueryClient()
-  const unitShown = useRef(hasUnit)
+  const page = useRef({ hasUnit, showUnit })
   useEffect(() => {
-    unitShown.current = hasUnit
+    page.current = { hasUnit, showUnit }
   })
   const [popup, setPopup] = useState<Popup | null>(null)
   const [stack, setStack] = useState<CodeLocation[]>([])
   const [target, setTarget] = useState<UnitTarget | null>(null)
   const [hint, setHint] = useState<ServerHint | null>(null)
   const latest = useRef(0)
-  const inPage = useCallback((found: CodeTarget): found is CodeTarget & { unit_id: number } => found.unit_id !== null && unitShown.current(found.unit_id), [])
 
-  const reveal = useCallback(
-    (found: CodeTarget) => {
-      if (inPage(found)) {
-        setStack([])
-        setTarget({ unitId: found.unit_id, line: found.line, side: found.side })
-        return
-      }
+  const reveal = useCallback((found: CodeTarget) => {
+    if (found.unit_id === null) {
       setStack((current) => [...current, { path: found.path, line: found.line, side: found.side }])
-    },
-    [inPage],
-  )
+      return
+    }
+    if (!page.current.hasUnit(found.unit_id)) {
+      page.current.showUnit(found.unit_id)
+    }
+    setStack([])
+    setTarget({ unitId: found.unit_id, line: found.line, side: found.side })
+  }, [])
 
   const canNavigate = useCallback(
     (request: NavigationRequest) => {

@@ -52,8 +52,10 @@ function serve(reply: NavigationReply, prepared: () => boolean = () => true) {
   return requests
 }
 
+const showUnit = vi.fn<(unitId: number) => void>()
+
 function Harness() {
-  const navigation = useCodeNavigation(1, 9, (unitId) => unitId === 4)
+  const navigation = useCodeNavigation(1, 9, (unitId) => unitId === 4, showUnit)
   return (
     <>
       <button type="button" onClick={() => { navigation.navigate({ path: 'cart.py', side: 'head', line: 5, column: 12, point: { x: 40, y: 60 } }) }}>
@@ -102,6 +104,7 @@ describe('useCodeNavigation', () => {
 
   beforeEach(() => {
     window.localStorage.clear()
+    showUnit.mockClear()
   })
 
   afterEach(() => {
@@ -117,6 +120,31 @@ describe('useCodeNavigation', () => {
     expect(await screen.findByLabelText('target')).toHaveTextContent('4:1')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(Object.fromEntries(requests[0])).toEqual({ side: 'head', revision_id: '9', path: 'cart.py', line: '5', column: '12' })
+  })
+
+  it('asks the page to show a unit of the review hidden by the view, then jumps to it instead of opening the source', async () => {
+    serve(() => found([target('lib.py', 3, 5)]))
+    renderHarness()
+
+    expect(await screen.findByLabelText('target')).toHaveTextContent('5:3')
+    expect(showUnit).toHaveBeenCalledExactlyOnceWith(5)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('jumps to a hidden unit of the review chosen in the list, and only asks to show the units that are hidden', async () => {
+    serve(() => found([target('lib.py', 1, 4), target('cart.py', 5, 7, 'usage')]))
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'Definitions of price' })
+    fireEvent.click(within(popup).getByRole('button', { name: /^lib\.py:1/ }))
+    expect(screen.getByLabelText('target')).toHaveTextContent('4:1')
+    expect(showUnit).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cmd+click price' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Definitions of price' })).getByRole('button', { name: /^cart\.py:5/ }))
+    expect(screen.getByLabelText('target')).toHaveTextContent('7:5')
+    expect(showUnit).toHaveBeenCalledExactlyOnceWith(7)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('lists definitions first and usages by file, marks what is in the review and works with the keyboard', async () => {
@@ -373,7 +401,7 @@ describe('useCodeNavigation', () => {
       }
       return found(params.get('line') === '5' ? [target('lib.py', 1, 4)] : [])
     })
-    const { result } = renderHook(() => useCodeNavigation(1, 9, () => true), {
+    const { result } = renderHook(() => useCodeNavigation(1, 9, () => true, showUnit), {
       wrapper: ({ children }) => <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>,
     })
     const ask = (line: number, column: number) => result.current.canNavigate({ path: 'cart.py', side: 'head', line, column })
