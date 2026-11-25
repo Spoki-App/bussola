@@ -55,12 +55,12 @@ function takeHint(hint: ServerHint | null): ServerHint | null {
   return hint
 }
 
-export function useCodeNavigation(reviewId: number, revisionId: number | undefined, hasUnit: (unitId: number) => boolean, showUnit: (unitId: number) => void): CodeNavigation {
+export function useCodeNavigation(reviewId: number, revisionId: number | undefined, showUnit: (unitId: number) => void): CodeNavigation {
   usePrepareNavigation(reviewId, revisionId)
   const queryClient = useQueryClient()
-  const page = useRef({ hasUnit, showUnit })
+  const latestShowUnit = useRef(showUnit)
   useEffect(() => {
-    page.current = { hasUnit, showUnit }
+    latestShowUnit.current = showUnit
   })
   const [popup, setPopup] = useState<Popup | null>(null)
   const [stack, setStack] = useState<CodeLocation[]>([])
@@ -73,9 +73,7 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
       setStack((current) => [...current, { path: found.path, line: found.line, side: found.side }])
       return
     }
-    if (!page.current.hasUnit(found.unit_id)) {
-      page.current.showUnit(found.unit_id)
-    }
+    latestShowUnit.current(found.unit_id)
     setStack([])
     setTarget({ unitId: found.unit_id, line: found.line, side: found.side })
   }, [])

@@ -242,7 +242,11 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     setQuery('')
     setImpactFilter('all')
   }
-  const navigation = useCodeNavigation(reviewId, revisionId, (unitId) => shownUnits.has(unitId), showAllUnits)
+  const navigation = useCodeNavigation(reviewId, revisionId, (unitId) => {
+    if (!shownUnits.has(unitId)) {
+      showAllUnits()
+    }
+  })
   const [focusedId, setFocusedId] = useState<number | null>(null)
   const actions = useRef(new Map<number, UnitActions>())
   const [panelHidden, setPanelHidden] = useState(loadPanelHidden)
