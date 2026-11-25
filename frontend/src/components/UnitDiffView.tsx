@@ -40,6 +40,7 @@ interface Props {
   onLineSelectEnd?: () => void
   highlighted?: ReadonlySet<string>
   widgets?: (rowFor: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
+  gutterMarkers?: (rowFor: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   onNavigate?: (row: DiffRow, side: GutterSide, column: number, point: ScreenPoint) => void
   canNavigate?: (row: DiffRow, side: GutterSide, column: number) => Promise<boolean>
   target?: TargetLine
@@ -196,7 +197,7 @@ function renderSegments(segments: Segment[], hunks: HunkData[], expand: (id: str
   })
 }
 
-export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, highlighted, onNavigate, canNavigate, target, viewType: fixedViewType }: Props) {
+export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onLineNumberClick, onLineSelectEnd, widgets, gutterMarkers, highlighted, onNavigate, canNavigate, target, viewType: fixedViewType }: Props) {
   const modified = useMemo(() => hasModification(diff.rows), [diff.rows])
   const preferredViewType = useViewType(modified)
   const viewType = fixedViewType ?? preferredViewType
@@ -244,7 +245,8 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
     },
   )
   const widgetMap = widgets ? widgets(index.changeKeyOf) : undefined
-  const pinnedKeys = Object.keys(widgetMap ?? {}).join(',')
+  const markerMap = gutterMarkers ? gutterMarkers(index.changeKeyOf) : undefined
+  const pinnedKeys = [...Object.keys(widgetMap ?? {}), ...Object.keys(markerMap ?? {})].join(',')
   const { side: targetSide, line: targetFirst, lastLine: targetLast } = target ?? {}
   const targetRows = useMemo(
     () => new Set(targetSide === undefined || targetFirst === undefined ? [] : targetRowsOf(rows, targetSide, targetFirst, targetLast ?? targetFirst)),
@@ -294,12 +296,11 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       renderGutter={({ change, side }) => {
         const row = index.rowOf(change)
         const line = makeLink ? linkedHeadLine(row, side) : null
-        if (!makeLink || line === null) {
-          return gutterNumber(row, side)
-        }
+        const marker = row && side === gutterSide(row) ? markerMap?.[changeKeyOf(row) ?? ''] : undefined
         return (
           <>
-            <CopyLinkButton link={makeLink({ path, line })} label={`Copy link to line ${String(line)}`} className="line-link" focusable={false} />
+            {makeLink && line !== null && <CopyLinkButton link={makeLink({ path, line })} label={`Copy link to line ${String(line)}`} className="line-link" focusable={false} />}
+            {marker}
             {gutterNumber(row, side)}
           </>
         )

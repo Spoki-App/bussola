@@ -4,6 +4,10 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Changed
+
+- Resolved threads no longer take a block inside the code: they fold into a small icon next to the line number of their line, with the number of resolved threads when several share it. A click on the icon shows them, with **Reopen**, and another folds them again; a link to a resolved thread or to its lines still shows it. Open threads and the conversation panel are unchanged ([#158](https://github.com/Spoki-App/bussola/issues/158)).
+
 ## [0.4.0] - 2026-11-24
 
 ### Added

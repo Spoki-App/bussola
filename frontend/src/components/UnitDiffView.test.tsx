@@ -52,6 +52,7 @@ function chooseLayout(layout: DiffLayout) {
 interface Options {
   rows?: DiffRow[]
   threads?: DiffRow[]
+  markers?: DiffRow[]
   highlighted?: ReadonlySet<string>
   onRowClick?: (row: DiffRow, extend: boolean) => void
   onLineNumberClick?: (row: DiffRow, side: 'old' | 'new', extend: boolean) => void
@@ -60,7 +61,7 @@ interface Options {
   makeLink?: MakeLink | null
 }
 
-function view({ rows = rewritten, threads = [], highlighted, onRowClick, onLineNumberClick, onNavigate, target, makeLink }: Options = {}) {
+function view({ rows = rewritten, threads = [], markers = [], highlighted, onRowClick, onLineNumberClick, onNavigate, target, makeLink }: Options = {}) {
   const { container } = render(
     <ReviewLinkContext value={makeLink ?? null}>
       <UnitDiffView
@@ -74,6 +75,7 @@ function view({ rows = rewritten, threads = [], highlighted, onRowClick, onLineN
         onNavigate={onNavigate}
         target={target}
         widgets={(changeKeyOf) => Object.fromEntries(threads.map((thread) => [changeKeyOf(thread) ?? '', <p key={thread.text}>{`thread on ${thread.text.trim()}`}</p>]))}
+        gutterMarkers={(changeKeyOf) => Object.fromEntries(markers.map((marker) => [changeKeyOf(marker) ?? '', <i key={marker.text} data-testid="marker" />]))}
       />
     </ReviewLinkContext>,
   )
@@ -215,6 +217,27 @@ describe('UnitDiffView layout', () => {
     expect(writeText).toHaveBeenCalledWith('bussola://review?repo=acme/widgets&pr=7&path=app.py&line=2')
     await waitFor(() => { expect(button).toHaveAttribute('title', 'Link copied') })
     Reflect.deleteProperty(navigator, 'clipboard')
+  })
+
+  it.each([
+    ['removed', removed, 'old'],
+    ['added', added, 'new'],
+    ['unchanged', header, 'new'],
+  ] as const)('shows a gutter marker of a %s line next to its line number on its own side', (_, line, side) => {
+    chooseLayout('split')
+    const table = view({ markers: [line] })
+
+    const marker = screen.getByTestId('marker')
+    expect(gutter(table, line.text, side)).toContainElement(marker)
+    expect(gutter(table, line.text, side).textContent).toBe(String(side === 'old' ? line.old_line : line.new_line))
+  })
+
+  it('keeps a line with a gutter marker out of the hidden lines', () => {
+    const rows = [...Array.from({ length: 12 }, (_, index) => row('context', index, index, `line ${String(index)}`)), row('added', null, 12, 'line 12')]
+    expect(() => codeCell(view({ rows }), 'line 0')).toThrow()
+
+    cleanup()
+    expect(codeCell(view({ rows, markers: [rows[0]] }), 'line 0').closest('tr')).toContainElement(screen.getByTestId('marker'))
   })
 
   it('marks the commented side of a split line only', () => {
