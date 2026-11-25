@@ -75,7 +75,7 @@ function view({ rows = rewritten, threads = [], markers = [], highlighted, onRow
         onNavigate={onNavigate}
         target={target}
         widgets={(changeKeyOf) => Object.fromEntries(threads.map((thread) => [changeKeyOf(thread) ?? '', <p key={thread.text}>{`thread on ${thread.text.trim()}`}</p>]))}
-        gutterMarkers={(changeKeyOf) => Object.fromEntries(markers.map((marker) => [changeKeyOf(marker) ?? '', <i key={marker.text} data-testid="marker" />]))}
+        gutterMarkers={(changeKeyOf) => Object.fromEntries(markers.map((marker) => [changeKeyOf(marker) ?? '', <button key={marker.text} type="button" data-testid="marker" />]))}
       />
     </ReviewLinkContext>,
   )
@@ -230,6 +230,24 @@ describe('UnitDiffView layout', () => {
     const marker = screen.getByTestId('marker')
     expect(gutter(table, line.text, side)).toContainElement(marker)
     expect(gutter(table, line.text, side).textContent).toBe(String(side === 'old' ? line.old_line : line.new_line))
+  })
+
+  it('makes room for gutter markers only when a line has one', () => {
+    expect(view()).not.toHaveClass('has-markers')
+    cleanup()
+    expect(view({ markers: [added] })).toHaveClass('has-markers')
+  })
+
+  it('does not start a comment from a press on a gutter marker', () => {
+    chooseLayout('split')
+    const onLineNumberClick = vi.fn()
+    const table = view({ markers: [added], onLineNumberClick })
+
+    fireEvent.mouseDown(screen.getByTestId('marker'), { button: 0 })
+    expect(onLineNumberClick).not.toHaveBeenCalled()
+
+    fireEvent.mouseDown(gutter(table, '    return sum(items)', 'new'), { button: 0 })
+    expect(onLineNumberClick).toHaveBeenCalledWith(added, 'new', false)
   })
 
   it('keeps a line with a gutter marker out of the hidden lines', () => {

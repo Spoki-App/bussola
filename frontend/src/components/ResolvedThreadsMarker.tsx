@@ -27,7 +27,6 @@ export function ResolvedThreadsMarker({ threads, expanded, onShow }: Props) {
       aria-label={label}
       aria-expanded={expanded}
       title={label}
-      onMouseDown={(event) => { event.stopPropagation() }}
       onClick={() => { onShow(!expanded) }}
     >
       <svg className="resolved-marker-icon" viewBox="0 0 16 16" aria-hidden="true">

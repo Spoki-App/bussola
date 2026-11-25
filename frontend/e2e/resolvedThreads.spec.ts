@@ -24,7 +24,7 @@ function createRepository(): string {
   git(repo, 'add', '-A')
   git(repo, 'commit', '-q', '-m', 'base')
   git(repo, 'checkout', '-q', '-b', 'price')
-  writeFileSync(join(repo, 'price.py'), 'def price():\n    amount = 10\n    return amount\n')
+  writeFileSync(join(repo, 'price.py'), `def price():\n${Array.from({ length: 110 }, (_, index) => `    part_${String(index)} = ${String(index)}\n`).join('')}    return part_0\n`)
   git(repo, 'commit', '-q', '-am', 'price')
   return repo
 }
@@ -46,25 +46,33 @@ test('a resolved thread folds into an icon next to its line number, which opens 
   await page.goto(`/reviews/${String(reviewId)}`)
 
   const card = page.locator('article.unit-card', { hasText: 'price' })
-  const line = card.locator('td.diff-gutter-insert', { hasText: /^2$/ })
+  const line = card.locator('td.diff-gutter-insert', { hasText: /^102$/ })
   await line.click()
   await card.getByPlaceholder('Leave a comment (Markdown)').fill('Name the constant')
   await card.getByRole('button', { name: 'Start thread' }).click()
   const thread = card.getByTestId('thread')
   await expect(thread).toContainText('Name the constant')
   const threadId = (await thread.getAttribute('id')) ?? ''
+  await thread.getByRole('textbox', { name: 'Reply' }).click()
+  await thread.getByRole('textbox', { name: 'Reply (Markdown)' }).fill('Half written')
 
   await thread.getByRole('button', { name: 'Resolve' }).click()
-  await expect(thread).toHaveCount(0)
+  await expect(thread.getByRole('button', { name: 'Reopen' })).toBeVisible()
+  await expect(thread.getByRole('textbox', { name: 'Reply (Markdown)' })).toHaveValue('Half written')
   const marker = line.getByRole('button', { name: '1 resolved thread' })
-  await expect(marker).toHaveAttribute('aria-expanded', 'false')
+  await expect(marker).toHaveAttribute('aria-expanded', 'true')
+  const lineBox = await line.boundingBox()
+  const codeBox = await line.locator('xpath=following-sibling::td[contains(@class, "diff-code")][1]').boundingBox()
+  expect(lineBox?.height).toBeCloseTo(codeBox?.height ?? 0, 0)
 
   await marker.click()
-  await expect(thread).toContainText('Name the constant')
-  await expect(thread.getByRole('button', { name: 'Reopen' })).toBeVisible()
-  await expect(marker).toHaveAttribute('aria-expanded', 'true')
-  await expect(card.getByPlaceholder('Leave a comment (Markdown)')).toHaveCount(0)
+  await expect(thread).toHaveCount(0)
+  await expect(marker).toHaveAttribute('aria-expanded', 'false')
 
+  await line.hover()
+  await marker.click()
+  await expect(thread).toContainText('Name the constant')
+  await expect(card.getByPlaceholder('Leave a comment (Markdown)')).toHaveCount(0)
   await marker.click()
   await expect(thread).toHaveCount(0)
 

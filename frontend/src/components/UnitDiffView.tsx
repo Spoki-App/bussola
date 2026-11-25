@@ -288,7 +288,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       tokens={shownTokens}
       selectedChanges={selectedChanges}
       widgets={widgetMap}
-      className={selectable ? 'diff selectable' : 'diff'}
+      className={['diff', selectable ? 'selectable' : '', markerMap && Object.keys(markerMap).length > 0 ? 'has-markers' : ''].filter(Boolean).join(' ')}
       generateLineClassName={({ changes, defaultGenerate }) => {
         const rows = (changes as (ChangeData | null)[]).map(index.rowOf)
         return [defaultGenerate(), ...lineClasses(rows, highlighted, targetRows)].join(' ')
@@ -308,7 +308,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       gutterEvents={{
         onMouseDown: ({ change, side }, event: MouseEvent<HTMLElement>) => {
           const row = index.rowOf(change)
-          if (!row || !onLineNumberClick || event.button !== 0) {
+          if (!row || !onLineNumberClick || event.button !== 0 || (event.target instanceof Element && event.target.closest('button'))) {
             return
           }
           event.preventDefault()

@@ -45,6 +45,17 @@ describe('ResolvedThreadsMarker', () => {
     expect(onShow).toHaveBeenLastCalledWith(false)
   })
 
+  it('lets a press on it reach the window, which ends following a link', () => {
+    const onWindowMouseDown = vi.fn()
+    window.addEventListener('mousedown', onWindowMouseDown)
+    render(<ResolvedThreadsMarker threads={[resolved('t1')]} expanded={false} onShow={() => undefined} />)
+
+    fireEvent.mouseDown(screen.getByRole('button', { name: '1 resolved thread' }))
+
+    expect(onWindowMouseDown).toHaveBeenCalledOnce()
+    window.removeEventListener('mousedown', onWindowMouseDown)
+  })
+
   it('counts several resolved threads on the same line', () => {
     render(<ResolvedThreadsMarker threads={[resolved('t1'), resolved('t2')]} expanded={false} onShow={() => undefined} />)
 

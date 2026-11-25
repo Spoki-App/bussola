@@ -71,6 +71,23 @@ export function threadRow(thread: Thread, diff: UnitDiff): DiffRow | undefined {
   return diff.rows.findLast((row) => row.new_index !== null && row.new_index <= last)
 }
 
+export function threadsByRowKey(threads: Thread[], diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined): Map<string, Thread[]> {
+  const grouped = new Map<string, Thread[]>()
+  for (const thread of threads) {
+    const row = threadRow(thread, diff)
+    const key = row ? changeKeyOf(row) : undefined
+    if (key) {
+      grouped.set(key, [...(grouped.get(key) ?? []), thread])
+    }
+  }
+  return grouped
+}
+
+export function shownResolvedAfter(shown: ReadonlySet<string>, before: Thread[], after: Thread[]): ReadonlySet<string> {
+  const wasOpen = new Set(before.filter(isOpen).map((thread) => thread.id))
+  return new Set(after.filter((thread) => isResolved(thread) && (shown.has(thread.id) || wasOpen.has(thread.id))).map((thread) => thread.id))
+}
+
 export function isOpen(thread: Thread): boolean {
   return thread.resolvable && thread.status === 'open'
 }

@@ -21,7 +21,7 @@ import { AskAiContext, sameRange, snippetLabel, type ChatSnippetDraft } from './
 import { linkFocusFromSearch, needsThreads, resolveLinkFocus } from './review/linkFocus'
 import { unitTitle } from './review/logic'
 import { moveLinksByUnit } from './review/moves'
-import { draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, isOpen, isResolved, nextDraft, threadRow, type Draft } from './review/threadPlacement'
+import { draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, isOpen, isResolved, nextDraft, shownResolvedAfter, threadsByRowKey, type Draft } from './review/threadPlacement'
 
 interface CompareStart {
   range: CodeRangeRequest
@@ -48,18 +48,6 @@ function AskAiButton({ snippet, onAsked }: { snippet: ChatSnippetDraft; onAsked:
   )
 }
 
-function threadsByRowKey(threads: Thread[], diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined): Map<string, Thread[]> {
-  const grouped = new Map<string, Thread[]>()
-  for (const thread of threads) {
-    const row = threadRow(thread, diff)
-    const key = row ? changeKeyOf(row) : undefined
-    if (key) {
-      grouped.set(key, [...(grouped.get(key) ?? []), thread])
-    }
-  }
-  return grouped
-}
-
 export function ReviewRoute({ reviewId }: { reviewId: number }) {
   const review = useReview(reviewId)
   const revisionId = review.data?.latest_revision?.id
@@ -81,6 +69,11 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
     return grouped
   }, [threads.data])
   const [shownResolved, setShownResolved] = useState<ReadonlySet<string>>(new Set())
+  const [knownThreads, setKnownThreads] = useState(threads.data)
+  if (threads.data !== knownThreads) {
+    setKnownThreads(threads.data)
+    setShownResolved(shownResolvedAfter(shownResolved, knownThreads ?? [], threads.data ?? []))
+  }
   const showResolved = useCallback((threadIds: string[], shown: boolean) => {
     setShownResolved((current) => {
       if (threadIds.every((id) => current.has(id) === shown)) {
