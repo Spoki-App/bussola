@@ -55,7 +55,7 @@ function takeHint(hint: ServerHint | null): ServerHint | null {
   return hint
 }
 
-export function useCodeNavigation(reviewId: number, revisionId: number | undefined, showUnit: (unitId: number) => void): CodeNavigation {
+export function useCodeNavigation(reviewId: number, revisionId: number | undefined, showUnit: (unitId: number) => Promise<boolean>): CodeNavigation {
   usePrepareNavigation(reviewId, revisionId)
   const queryClient = useQueryClient()
   const latestShowUnit = useRef(showUnit)
@@ -67,15 +67,32 @@ export function useCodeNavigation(reviewId: number, revisionId: number | undefin
   const [target, setTarget] = useState<UnitTarget | null>(null)
   const [hint, setHint] = useState<ServerHint | null>(null)
   const latest = useRef(0)
+  const latestReveal = useRef(0)
 
   const reveal = useCallback((found: CodeTarget) => {
-    if (found.unit_id === null) {
+    latestReveal.current += 1
+    const id = latestReveal.current
+    const openSource = () => {
       setStack((current) => [...current, { path: found.path, line: found.line, side: found.side }])
+    }
+    const unitId = found.unit_id
+    if (unitId === null) {
+      openSource()
       return
     }
-    latestShowUnit.current(found.unit_id)
-    setStack([])
-    setTarget({ unitId: found.unit_id, line: found.line, side: found.side })
+    void latestShowUnit.current(unitId)
+      .catch(() => false)
+      .then((shown) => {
+        if (latestReveal.current !== id) {
+          return
+        }
+        if (!shown) {
+          openSource()
+          return
+        }
+        setStack([])
+        setTarget({ unitId, line: found.line, side: found.side })
+      })
   }, [])
 
   const canNavigate = useCallback(

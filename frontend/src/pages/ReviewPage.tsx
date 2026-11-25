@@ -1,9 +1,10 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useDescriptions } from '../api/descriptions'
 import { useSync } from '../api/forge'
-import { useApprove, useFinishReview, useReview, useUnits } from '../api/hooks'
+import { unitsQuery, useApprove, useFinishReview, useReview, useUnits } from '../api/hooks'
 import { useLineLength } from '../api/lineLength'
 import type { DiffRow, MergeResult, ReviewDetail, ReviewSubmitResult, SyncResult, Unit, UnitDescription, UnitDiff, UnitFilter } from '../api/types'
 import { AiChat } from '../components/AiChat'
@@ -242,10 +243,17 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     setQuery('')
     setImpactFilter('all')
   }
-  const navigation = useCodeNavigation(reviewId, revisionId, (unitId) => {
-    if (!shownUnits.has(unitId)) {
-      showAllUnits()
+  const queryClient = useQueryClient()
+  const navigation = useCodeNavigation(reviewId, revisionId, async (unitId) => {
+    if (shownUnits.has(unitId) && query === deferredQuery) {
+      return true
     }
+    const allUnits = await queryClient.query({ ...unitsQuery(reviewId, revisionId, 'all'), staleTime: 'static' })
+    if (!allUnits.some((unit) => unit.id === unitId)) {
+      return false
+    }
+    showAllUnits()
+    return true
   })
   const [focusedId, setFocusedId] = useState<number | null>(null)
   const actions = useRef(new Map<number, UnitActions>())

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query'
+import { queryOptions, useMutation, useQuery, useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query'
 
 import { deleteJson, getJson, postJson } from './client'
 import type {
@@ -103,13 +103,15 @@ export function useReview(reviewId: number) {
   })
 }
 
-export function useUnits(reviewId: number, revisionId: number | undefined, filter: UnitFilter) {
-  return useQuery({
+export function unitsQuery(reviewId: number, revisionId: number | undefined, filter: UnitFilter) {
+  return queryOptions({
     queryKey: [...keys.units(reviewId), revisionId, filter],
     queryFn: () => getJson<Unit[]>(`/reviews/${String(reviewId)}/units?revision_id=${String(revisionId)}&filter=${filter}`),
-    enabled: revisionId !== undefined,
-    placeholderData: (previous) => previous,
   })
+}
+
+export function useUnits(reviewId: number, revisionId: number | undefined, filter: UnitFilter) {
+  return useQuery({ ...unitsQuery(reviewId, revisionId, filter), enabled: revisionId !== undefined, placeholderData: (previous) => previous })
 }
 
 export function useUnitDiff(reviewId: number, unit: Unit, mode: DiffMode | undefined, enabled: boolean) {
