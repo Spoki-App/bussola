@@ -46,6 +46,7 @@ interface Props {
   onComment?: (target: CommentTarget) => void
   onCommentSelectEnd?: () => void
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
+  renderGutterMarkers?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
   unitLabels?: (unit: Unit) => ReactNode
   onNavigate?: (click: NavigationClick) => void
@@ -79,7 +80,7 @@ function targetLine(target: LineLink | undefined, linked: FocusTarget | undefine
   return linked?.line === undefined ? undefined : { side: 'new', line: linked.line, lastLine: linked.lastLine }
 }
 
-export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, highlightRows, unitLabels, onNavigate, canNavigate, navigationTarget, linkedTarget }: Props) {
+export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused, onFocus, register, onComment, onCommentSelectEnd, renderWidgets, renderGutterMarkers, highlightRows, unitLabels, onNavigate, canNavigate, navigationTarget, linkedTarget }: Props) {
   const todo = unit.todo
   const [expanded, setExpanded] = useState(todo)
   const [wasTodo, setWasTodo] = useState(todo)
@@ -331,6 +332,7 @@ export const UnitCard = memo(function UnitCard({ reviewId, repoId, unit, focused
               canNavigate={canNavigateFrom}
               target={targetLine(linkedIsLatest ? undefined : (lineLink ?? navigationTarget), linkedTarget)}
               widgets={renderWidgets ? (changeKeyOf) => renderWidgets(unit, diff.data, changeKeyOf) : undefined}
+              gutterMarkers={renderGutterMarkers ? (changeKeyOf) => renderGutterMarkers(unit, diff.data, changeKeyOf) : undefined}
             />
           )}
         </div>

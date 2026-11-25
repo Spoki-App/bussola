@@ -58,6 +58,7 @@ export interface ReviewExtensions {
   onComment?: (target: CommentTarget) => void
   onCommentSelectEnd?: () => void
   renderWidgets?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
+  renderGutterMarkers?: (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => Record<string, ReactNode>
   highlightRows?: (unit: Unit, diff: UnitDiff) => ReadonlySet<string> | undefined
   unitLabels?: (unit: Unit) => ReactNode
   fileActions?: (path: string) => ReactNode
@@ -456,6 +457,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                           onComment={extensions.onComment}
                           onCommentSelectEnd={extensions.onCommentSelectEnd}
                           renderWidgets={extensions.renderWidgets}
+                          renderGutterMarkers={extensions.renderGutterMarkers}
                           highlightRows={extensions.highlightRows}
                           unitLabels={extensions.unitLabels}
                           onNavigate={navigation.navigate}

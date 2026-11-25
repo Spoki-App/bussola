@@ -12,6 +12,7 @@ import type { CommentTarget } from './components/UnitCard'
 import { Composer } from './components/Composer'
 import { FileCommentButton } from './components/FileCommentButton'
 import { MoveLinks } from './components/MoveLinks'
+import { ResolvedThreadsMarker } from './components/ResolvedThreadsMarker'
 import { ThreadPanel } from './components/ThreadPanel'
 import { ThreadView } from './components/ThreadView'
 import { useSearch } from './navigation'
@@ -20,7 +21,7 @@ import { AskAiContext, sameRange, snippetLabel, type ChatSnippetDraft } from './
 import { linkFocusFromSearch, needsThreads, resolveLinkFocus } from './review/linkFocus'
 import { unitTitle } from './review/logic'
 import { moveLinksByUnit } from './review/moves'
-import { draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, isOpen, nextDraft, threadRow, type Draft } from './review/threadPlacement'
+import { draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, isOpen, isResolved, nextDraft, shownResolvedAfter, threadsByRowKey, type Draft } from './review/threadPlacement'
 
 interface CompareStart {
   range: CodeRangeRequest
@@ -67,6 +68,21 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
     }
     return grouped
   }, [threads.data])
+  const [shownResolved, setShownResolved] = useState<ReadonlySet<string>>(new Set())
+  const [knownThreads, setKnownThreads] = useState(threads.data)
+  if (threads.data !== knownThreads) {
+    setKnownThreads(threads.data)
+    setShownResolved(shownResolvedAfter(shownResolved, knownThreads ?? [], threads.data ?? []))
+  }
+  const showResolved = useCallback((threadIds: string[], shown: boolean) => {
+    setShownResolved((current) => {
+      if (threadIds.every((id) => current.has(id) === shown)) {
+        return current
+      }
+      const others = [...current].filter((id) => !threadIds.includes(id))
+      return new Set(shown ? [...others, ...threadIds] : others)
+    })
+  }, [])
   const openCount = (threads.data ?? []).filter(isOpen).length
   const search = useSearch()
   const linkFocus = useMemo(() => linkFocusFromSearch(search), [search])
@@ -92,8 +108,9 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
           widgets[key] = [...(widgets[key] ?? []), node]
         }
       }
-      for (const thread of threadsByUnit.get(unit.id) ?? []) {
-        place(threadRow(thread, diff), <ThreadView key={thread.id} reviewId={reviewId} thread={thread} />)
+      const inline = (threadsByUnit.get(unit.id) ?? []).filter((thread) => !isResolved(thread) || shownResolved.has(thread.id))
+      for (const [key, threads] of threadsByRowKey(inline, diff, changeKeyOf)) {
+        widgets[key] = threads.map((thread) => <ThreadView key={thread.id} reviewId={reviewId} thread={thread} startCollapsed={false} />)
       }
       if (draft?.unitId === unit.id && draft.mode === diff.mode && !draft.selecting) {
         const request = draftRequest(draft)
@@ -124,7 +141,20 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
       }
       return Object.fromEntries(Object.entries(widgets).map(([key, nodes]) => [key, <div key={key} className="widgets">{nodes}</div>]))
     },
-    [threadsByUnit, draft, createThread, creating, createError, reviewId, compareStart],
+    [threadsByUnit, shownResolved, draft, createThread, creating, createError, reviewId, compareStart],
+  )
+
+  const renderGutterMarkers = useCallback(
+    (unit: Unit, diff: UnitDiff, changeKeyOf: (row: DiffRow) => string | undefined) => {
+      const resolvedByKey = threadsByRowKey((threadsByUnit.get(unit.id) ?? []).filter(isResolved), diff, changeKeyOf)
+      return Object.fromEntries(
+        [...resolvedByKey].map(([key, resolved]) => {
+          const ids = resolved.map((thread) => thread.id)
+          return [key, <ResolvedThreadsMarker key={key} threads={resolved} expanded={ids.every((id) => shownResolved.has(id))} onShow={(shown) => { showResolved(ids, shown) }} />]
+        }),
+      )
+    },
+    [threadsByUnit, shownResolved, showResolved],
   )
 
   const onComment = useCallback((target: CommentTarget) => {
@@ -162,6 +192,7 @@ export function ReviewRoute({ reviewId }: { reviewId: number }) {
           onCommentSelectEnd,
           highlightRows,
           renderWidgets,
+          renderGutterMarkers,
           fileActions,
           sidePanel: { label: 'conversation', count: openCount, content: sidePanelContent },
           link,

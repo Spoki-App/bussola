@@ -1527,7 +1527,8 @@ button.busy {
   gap: 4px;
 }
 
-.copy-link-icon {
+.copy-link-icon,
+.resolved-marker-icon {
   flex: none;
   width: 14px;
   height: 14px;
@@ -1539,7 +1540,8 @@ button.busy {
 }
 
 button.copy-link.icon,
-button.copy-link.line-link {
+button.copy-link.line-link,
+.diff button.resolved-marker {
   min-height: 0;
   padding: 2px;
   border: none;
@@ -1549,7 +1551,9 @@ button.copy-link.line-link {
 
 button.copy-link.icon:hover:not(:disabled),
 button.copy-link.line-link:hover:not(:disabled),
-button.copy-link.copied {
+button.copy-link.copied,
+.diff button.resolved-marker:hover:not(:disabled),
+.diff button.resolved-marker[aria-expanded='true'] {
   background: none;
   color: var(--accent);
 }
@@ -1568,6 +1572,42 @@ button.copy-link.failed {
 .diff tr:hover .line-link,
 .diff .line-link:is(.copied, .failed) {
   opacity: 1;
+}
+
+.diff.has-markers {
+  --diff-gutter-columns: 9;
+}
+
+.diff.has-markers .diff-gutter {
+  position: relative;
+}
+
+.diff.has-markers .line-link {
+  left: calc(2ch + 4px);
+}
+
+.diff button.resolved-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0;
+  font: inherit;
+  line-height: 1;
+}
+
+.resolved-marker-count {
+  align-self: flex-start;
+  margin-top: 1px;
+  font-size: 9px;
+}
+
+.resolved-marker-icon {
+  width: 12px;
+  height: 12px;
 }
 
 .diff tr:is(.row-target, .row-target-old, .row-target-new) {

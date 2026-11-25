@@ -17,13 +17,14 @@ import { isResolved } from '../review/threadPlacement'
 interface Props {
   reviewId: number
   thread: Thread
+  startCollapsed?: boolean
 }
 
-export function ThreadView({ reviewId, thread }: Props) {
+export function ThreadView({ reviewId, thread, startCollapsed }: Props) {
   const resolved = isResolved(thread)
   const { ref: linkedRef, linked } = useLinkedScroll<HTMLDivElement>(threadElementId(thread.id))
   const linkedLines = targetsThreadLines(useLinkedTarget(), thread)
-  const [collapsed, setCollapsed] = useState(resolved)
+  const [collapsed, setCollapsed] = useState(startCollapsed ?? resolved)
   if ((linked || linkedLines) && collapsed) {
     setCollapsed(false)
   }

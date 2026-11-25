@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { DiffRow, Thread, Unit, UnitDiff } from '../api/types'
 import type { CommentTarget } from '../components/UnitCard'
 import { rowKey } from './selection'
-import { draftAnchor, draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, nextDraft, threadRow } from './threadPlacement'
+import { draftAnchor, draftEndRow, draftRequest, draftRowKeys, finishSelection, isInline, nextDraft, shownResolvedAfter, threadRow, threadsByRowKey } from './threadPlacement'
 
 function row(change: DiffRow['change'], oldIndex: number | null, newIndex: number | null, text: string): DiffRow {
   return {
@@ -115,6 +115,41 @@ describe('threadRow and isInline', () => {
   it('keeps outdated threads out of the diff', () => {
     expect(isInline(thread('head', 1))).toBe(true)
     expect(isInline(thread('head', null, 1, true))).toBe(false)
+  })
+})
+
+describe('threadsByRowKey', () => {
+  it('groups threads by the row they sit under and leaves out those without a row', () => {
+    const changeKeyOf = (row: DiffRow) => (row.text === 'e' ? undefined : row.text)
+    const grouped = threadsByRowKey(
+      [{ ...thread('head', 1), id: 't1' }, { ...thread('head', 1), id: 't2' }, { ...thread('head', 2), id: 't3' }, { ...thread('head', 3), id: 't4' }, { ...thread('base', 1), id: 't5' }],
+      diff('approved'),
+      changeKeyOf,
+    )
+
+    expect([...grouped].map(([key, threads]) => [key, threads.map((item) => item.id)])).toEqual([
+      ['c', ['t1', 't2']],
+      ['d', ['t3']],
+    ])
+  })
+})
+
+describe('shownResolvedAfter', () => {
+  const open = (id: string): Thread => ({ ...thread('head', 1), id })
+  const resolved = (id: string): Thread => ({ ...open(id), status: 'resolved' })
+
+  it('keeps a thread shown when it is resolved while open in the code', () => {
+    expect(shownResolvedAfter(new Set(), [open('t1'), resolved('t2')], [resolved('t1'), resolved('t2')])).toEqual(new Set(['t1']))
+  })
+
+  it('keeps the resolved threads already shown and forgets the reopened or deleted ones', () => {
+    const shown = new Set(['t1', 't2', 't3'])
+
+    expect(shownResolvedAfter(shown, [resolved('t1'), resolved('t2'), resolved('t3')], [resolved('t1'), open('t2')])).toEqual(new Set(['t1']))
+  })
+
+  it('folds the threads that were already resolved when first loaded', () => {
+    expect(shownResolvedAfter(new Set(), [], [resolved('t1')])).toEqual(new Set())
   })
 })
 

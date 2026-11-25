@@ -262,6 +262,10 @@ export function targetsThreadLines(target: FocusTarget | null, thread: Thread): 
   return target?.line !== undefined && anchor !== null && target.unitId === anchor.unit_id && target.line === anchor.file_line
 }
 
+export function targetsThread(target: FocusTarget | null, thread: Thread): boolean {
+  return target?.elementId === threadElementId(thread.id) || targetsThreadLines(target, thread)
+}
+
 const USER_INPUT_EVENTS = ['wheel', 'touchmove', 'keydown', 'mousedown'] as const
 const MOVE_TOLERANCE_PX = 2
 const FOLLOW_LINK_MS = 15_000
