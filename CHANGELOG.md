@@ -8,6 +8,10 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 - Resolved threads no longer take a block inside the code: they fold into a small icon next to the line number of their line, with the number of resolved threads when several share it. A click on the icon shows them, with **Reopen**, and another folds them again. A thread resolved while open in the code stays there until folded, so a reply being written is not lost, and a link to a resolved thread or to its lines still shows it. Open threads and the conversation panel are unchanged ([#158](https://github.com/Spoki-App/bussola/issues/158)).
 
+### Fixed
+
+- Cmd/Ctrl+click on a name defined or used in a unit of the pull request goes to that unit even when **To review**, **Since my last review**, the search or the impact filter hides it, showing all units again as a link does. The line links of the AI review and the AI chat do the same. Cmd/Ctrl+click opened the file in a window instead, even after choosing a result marked **in review** in the list ([#160](https://github.com/Spoki-App/bussola/issues/160)).
+
 ## [0.4.0] - 2026-11-24
 
 ### Added

@@ -52,8 +52,10 @@ function serve(reply: NavigationReply, prepared: () => boolean = () => true) {
   return requests
 }
 
+const showUnit = vi.fn((unitId: number) => Promise.resolve(unitId !== 99))
+
 function Harness() {
-  const navigation = useCodeNavigation(1, 9, (unitId) => unitId === 4)
+  const navigation = useCodeNavigation(1, 9, showUnit)
   return (
     <>
       <button type="button" onClick={() => { navigation.navigate({ path: 'cart.py', side: 'head', line: 5, column: 12, point: { x: 40, y: 60 } }) }}>
@@ -102,6 +104,7 @@ describe('useCodeNavigation', () => {
 
   beforeEach(() => {
     window.localStorage.clear()
+    showUnit.mockClear()
   })
 
   afterEach(() => {
@@ -117,6 +120,41 @@ describe('useCodeNavigation', () => {
     expect(await screen.findByLabelText('target')).toHaveTextContent('4:1')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(Object.fromEntries(requests[0])).toEqual({ side: 'head', revision_id: '9', path: 'cart.py', line: '5', column: '12' })
+  })
+
+  it('asks the page to show the unit of a single target in the review, then jumps to it instead of opening the source', async () => {
+    serve(() => found([target('lib.py', 3, 5)]))
+    renderHarness()
+
+    expect(await screen.findByLabelText('target')).toHaveTextContent('5:3')
+    expect(showUnit).toHaveBeenCalledExactlyOnceWith(5)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('asks the page to show the unit of a target in the review chosen in the list, then jumps to it', async () => {
+    serve(() => found([target('lib.py', 1, 4), target('cart.py', 5, 7, 'usage')]))
+    renderHarness()
+
+    const popup = await screen.findByRole('dialog', { name: 'Definitions of price' })
+    fireEvent.click(within(popup).getByRole('button', { name: /^lib\.py:1/ }))
+    await waitFor(() => { expect(screen.getByLabelText('target')).toHaveTextContent('4:1') })
+    expect(showUnit).toHaveBeenCalledExactlyOnceWith(4)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cmd+click price' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Definitions of price' })).getByRole('button', { name: /^cart\.py:5/ }))
+    await waitFor(() => { expect(screen.getByLabelText('target')).toHaveTextContent('7:5') })
+    expect(showUnit).toHaveBeenLastCalledWith(7)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('opens the source of a target whose unit the page cannot show, keeping the current target', async () => {
+    serve(() => found([target('lib.py', 1, 99)]))
+    renderHarness()
+
+    const modal = await screen.findByRole('dialog', { name: 'lib.py:1' })
+    expect(await within(modal).findByRole('region', { name: 'Source of lib.py' })).toHaveTextContent('def price(item):')
+    expect(showUnit).toHaveBeenCalledExactlyOnceWith(99)
+    expect(screen.getByLabelText('target')).toHaveTextContent('none')
   })
 
   it('lists definitions first and usages by file, marks what is in the review and works with the keyboard', async () => {
@@ -144,7 +182,7 @@ describe('useCodeNavigation', () => {
     fireEvent.keyDown(popup, { key: 'ArrowDown' })
     expect(entries[0]).toHaveFocus()
     fireEvent.click(entries[0])
-    expect(screen.getByLabelText('target')).toHaveTextContent('4:1')
+    await waitFor(() => { expect(screen.getByLabelText('target')).toHaveTextContent('4:1') })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
@@ -373,7 +411,7 @@ describe('useCodeNavigation', () => {
       }
       return found(params.get('line') === '5' ? [target('lib.py', 1, 4)] : [])
     })
-    const { result } = renderHook(() => useCodeNavigation(1, 9, () => true), {
+    const { result } = renderHook(() => useCodeNavigation(1, 9, showUnit), {
       wrapper: ({ children }) => <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>,
     })
     const ask = (line: number, column: number) => result.current.canNavigate({ path: 'cart.py', side: 'head', line, column })

@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { MergeOptions, ReviewDetail, SyncResult } from '../api/types'
+import type { SourceFile } from '../api/navigation'
+import type { AiChatMessage, MergeOptions, ReviewDetail, SyncResult, Unit, UnitDiff } from '../api/types'
 import { ReviewPage, type ReviewExtensions } from './ReviewPage'
 
 const revision = { id: 2, number: 1, head_sha: 'b', base_sha: 'a', merge_base_sha: 'a', created_at: '2026-11-04T10:00:00Z' }
@@ -328,5 +329,122 @@ describe('ReviewPage submit review', () => {
 
     expect(await screen.findByText('GitHub refused the review')).toBeInTheDocument()
     expect(posts).toEqual(STEPS.slice(0, 1))
+  })
+})
+
+describe('ReviewPage code navigation', () => {
+  const unit: Unit = {
+    id: 7,
+    revision_id: 2,
+    path: 'app.py',
+    old_path: null,
+    module: 'app',
+    kind: 'function',
+    qualified_name: 'total',
+    state: 'approved',
+    change_type: 'modified',
+    base_changed: false,
+    approval_id: 'a1',
+    row_approvable: true,
+    rows_total: 2,
+    rows_approved: 2,
+    binary: false,
+    image: false,
+    todo: false,
+    action: 'revoke',
+    open_threads: 0,
+    head_start: 1,
+    head_end: 2,
+  }
+  const diff: UnitDiff = { unit_id: 7, mode: 'base', available_modes: ['base'], approved_text_unavailable: false, binary: false, unified: '', rows: [] }
+  const answer = (unitId: number): AiChatMessage => ({
+    id: 1,
+    role: 'assistant',
+    body: 'See [the total](#after:app.py:2).',
+    snippets: [],
+    lookups: [],
+    comments: [],
+    links: [{ path: 'app.py', side: 'head', line: 2, unit_id: unitId }],
+    provider_label: null,
+    model: null,
+    effort: null,
+    created_at: '2026-11-09T10:00:05Z',
+  })
+  const source: SourceFile = { path: 'app.py', side: 'head', commit: 'b', text: 'def total(items):\n    return sum(items)\n', url: null }
+
+  function serve({ toReview, linkedUnitId }: { toReview: Unit[]; linkedUnitId: number }) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url === '/api/reviews/3') {
+          return Promise.resolve(Response.json(reviewWithTitle('feat: totals')))
+        }
+        if (url.startsWith('/api/reviews/3/units?')) {
+          return Promise.resolve(Response.json(url.includes('filter=all') ? [unit] : toReview))
+        }
+        if (url.startsWith('/api/reviews/3/units/7/diff')) {
+          return Promise.resolve(Response.json(diff))
+        }
+        if (url.startsWith('/api/reviews/3/source?')) {
+          return Promise.resolve(Response.json(source))
+        }
+        return Promise.resolve(Response.json(url === '/api/reviews/3/ai-chat' ? [answer(linkedUnitId)] : []))
+      }),
+    )
+  }
+
+  async function searchFor(text: string) {
+    renderPage({ sidePanel: { label: 'conversation', count: 0, content: null } })
+    const search = await screen.findByRole('searchbox', { name: 'Find units by module, name or path' })
+    fireEvent.change(search, { target: { value: text } })
+    expect(screen.getByRole('tab', { name: 'To review' })).toHaveAttribute('aria-selected', 'true')
+    return search
+  }
+
+  beforeEach(() => {
+    window.localStorage.setItem('bussola.unitFilter', 'todo')
+    window.localStorage.setItem('bussola.sidePanelTab', 'chat')
+    window.localStorage.setItem('bussola.sidePanelHidden', 'false')
+    Element.prototype.scrollIntoView = vi.fn()
+  })
+
+  afterEach(() => {
+    window.localStorage.clear()
+    vi.unstubAllGlobals()
+  })
+
+  it('shows every unit when a line of the review hidden by the view is opened, and focuses its unit', async () => {
+    serve({ toReview: [], linkedUnitId: 7 })
+    const search = await searchFor('nothing matches')
+
+    fireEvent.click(await screen.findByText('the total'))
+
+    await waitFor(() => { expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true') })
+    expect(search).toHaveValue('')
+    await waitFor(() => { expect(document.getElementById('unit-7')).toHaveClass('focused') })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('keeps the view when the unit of the line is already shown', async () => {
+    serve({ toReview: [{ ...unit, state: 'changed', todo: true, action: 'approve' }], linkedUnitId: 7 })
+    const search = await searchFor('total')
+
+    fireEvent.click(await screen.findByText('the total'))
+
+    await waitFor(() => { expect(document.getElementById('unit-7')).toHaveClass('focused') })
+    expect(screen.getByRole('tab', { name: 'To review' })).toHaveAttribute('aria-selected', 'true')
+    expect(search).toHaveValue('total')
+  })
+
+  it('opens the source of a line whose unit is not in the reviewed revision and keeps the view', async () => {
+    serve({ toReview: [], linkedUnitId: 99 })
+    const search = await searchFor('nothing matches')
+
+    fireEvent.click(await screen.findByText('the total'))
+
+    const modal = await screen.findByRole('dialog', { name: 'app.py:2' })
+    expect(await within(modal).findByRole('region', { name: 'Source of app.py' })).toHaveTextContent('def total(items):')
+    expect(screen.getByRole('tab', { name: 'To review' })).toHaveAttribute('aria-selected', 'true')
+    expect(search).toHaveValue('nothing matches')
   })
 })

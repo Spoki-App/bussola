@@ -55,31 +55,45 @@ function takeHint(hint: ServerHint | null): ServerHint | null {
   return hint
 }
 
-export function useCodeNavigation(reviewId: number, revisionId: number | undefined, hasUnit: (unitId: number) => boolean): CodeNavigation {
+export function useCodeNavigation(reviewId: number, revisionId: number | undefined, showUnit: (unitId: number) => Promise<boolean>): CodeNavigation {
   usePrepareNavigation(reviewId, revisionId)
   const queryClient = useQueryClient()
-  const unitShown = useRef(hasUnit)
+  const latestShowUnit = useRef(showUnit)
   useEffect(() => {
-    unitShown.current = hasUnit
+    latestShowUnit.current = showUnit
   })
   const [popup, setPopup] = useState<Popup | null>(null)
   const [stack, setStack] = useState<CodeLocation[]>([])
   const [target, setTarget] = useState<UnitTarget | null>(null)
   const [hint, setHint] = useState<ServerHint | null>(null)
   const latest = useRef(0)
-  const inPage = useCallback((found: CodeTarget): found is CodeTarget & { unit_id: number } => found.unit_id !== null && unitShown.current(found.unit_id), [])
+  const latestReveal = useRef(0)
 
-  const reveal = useCallback(
-    (found: CodeTarget) => {
-      if (inPage(found)) {
-        setStack([])
-        setTarget({ unitId: found.unit_id, line: found.line, side: found.side })
-        return
-      }
+  const reveal = useCallback((found: CodeTarget) => {
+    latestReveal.current += 1
+    const id = latestReveal.current
+    const openSource = () => {
       setStack((current) => [...current, { path: found.path, line: found.line, side: found.side }])
-    },
-    [inPage],
-  )
+    }
+    const unitId = found.unit_id
+    if (unitId === null) {
+      openSource()
+      return
+    }
+    void latestShowUnit.current(unitId)
+      .catch(() => false)
+      .then((shown) => {
+        if (latestReveal.current !== id) {
+          return
+        }
+        if (!shown) {
+          openSource()
+          return
+        }
+        setStack([])
+        setTarget({ unitId, line: found.line, side: found.side })
+      })
+  }, [])
 
   const canNavigate = useCallback(
     (request: NavigationRequest) => {
