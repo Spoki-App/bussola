@@ -1128,7 +1128,16 @@ button.side-panel-expand:hover:not(:disabled) {
 .side-panel-backdrop {
   position: fixed;
   inset: 0;
+  overflow-y: scroll;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
   background: rgba(14, 20, 36, 0.5);
+}
+
+.side-panel-backdrop::after {
+  content: '';
+  display: block;
+  height: calc(100% + 1px);
 }
 
 .side-panel.expanded .side-panel-frame {
