@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useDescriptions } from '../api/descriptions'
@@ -15,6 +15,7 @@ import { DiffLayoutSwitch } from '../components/DiffLayoutPanel'
 import { ExternalLink } from '../components/ExternalLink'
 import { FileTree } from '../components/FileTree'
 import { GitHubSyncStatus } from '../components/GitHubSyncStatus'
+import { Icon, IconButton } from '../components/IconButton'
 import { LinkPullRequest } from '../components/LinkPullRequest'
 import { MergeDialog } from '../components/MergeDialog'
 import { PullRequestDescription } from '../components/PullRequestDescription'
@@ -26,7 +27,8 @@ import { UnitCard, type CommentTarget, type UnitActions } from '../components/Un
 import { UnitTree } from '../components/UnitTree'
 import { UnitWidthButton } from '../components/UnitWidthPanel'
 import { useAiReview } from '../hooks/useAiReview'
-import { useCodeNavigation } from '../hooks/useCodeNavigation'
+import { useCodeNavigation, type CodeTarget } from '../hooks/useCodeNavigation'
+import { useExpandablePanel } from '../hooks/useExpandablePanel'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useRateImpact } from '../hooks/useRateImpact'
 import { Link } from '../Link'
@@ -99,7 +101,7 @@ function syncLabel(review: ReviewDetail, pending: boolean): string {
   return review.pull_request && review.unsent_comments > 0 ? `Sync \u00b7 ${String(review.unsent_comments)} to send` : 'Sync'
 }
 
-function ReviewHeader({ review }: { review: ReviewDetail }) {
+function ReviewHeader({ review, shortcutsOff }: { review: ReviewDetail; shortcutsOff: boolean }) {
   const isPullRequest = review.pull_request !== null
   const makeLink = reviewLinkMaker(review.pull_request?.url)
   const [message, setMessage] = useState<string | null>(null)
@@ -134,7 +136,7 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
       () => { toStep('sync-failed') },
     )
   }
-  useKeyboardShortcuts({ r: runSync })
+  useKeyboardShortcuts(shortcutsOff ? {} : { r: runSync })
   const needsLink = synced !== null && !isPullRequest && synced.unsent_comments > 0
 
   return (
@@ -258,6 +260,22 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const [focusedId, setFocusedId] = useState<number | null>(null)
   const actions = useRef(new Map<number, UnitActions>())
   const [panelHidden, setPanelHidden] = useState(loadPanelHidden)
+  const { expanded: panelExpanded, expand: expandPanel, collapse: collapsePanel, columnRef: panelColumnRef, frameRef: panelFrameRef, triggerRef: panelTriggerRef, closeButtonRef: panelCloseRef, headerRef: panelHeaderRef, contentRef: panelContentRef, keepTabInside } = useExpandablePanel()
+  const showCode = navigation.show
+  const showCodeFromPanel = useCallback(
+    (target: CodeTarget) => {
+      if (target.unit_id !== null) {
+        collapsePanel()
+      }
+      showCode(target)
+    },
+    [collapsePanel, showCode],
+  )
+  const leavePanelWindowFor = useEffectEvent((target: FocusTarget) => {
+    if (target.unitId !== null) {
+      collapsePanel()
+    }
+  })
   const [filesHidden, setFilesHidden] = useState(() => readStored(FILES_HIDDEN_KEY) === 'true')
   const [appliedLink, setAppliedLink] = useState<{ target: FocusTarget | null } | null>(null)
   const { link, sidePanel } = extensions
@@ -320,6 +338,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     if (appliedLink.target === null) {
       return undefined
     }
+    leavePanelWindowFor(appliedLink.target)
     linkScroll.start(appliedLink.target)
     const stop = followLink(linkScroll)
     return () => {
@@ -351,7 +370,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const focusedIndex = focusedPosition(unitList, focusedId)
   const focusedUnit = focusedIndex < 0 ? undefined : unitList[focusedIndex]
 
-  useKeyboardShortcuts({
+  useKeyboardShortcuts(panelExpanded ? { t: collapsePanel } : {
     j: () => { focus(focusedIndex + 1) },
     k: () => { focus(focusedIndex - 1) },
     n: () => {
@@ -406,7 +425,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
 
   return (
     <div className={columns === undefined ? 'review-page full-width' : 'review-page fixed-width'}>
-      <ReviewHeader review={data} />
+      <ReviewHeader review={data} shortcutsOff={panelExpanded} />
       <div className={`review-overview${data.pull_request ? ' with-description' : ''}`}>
         {data.pull_request && <PullRequestDescription pull={data.pull_request} />}
         <section className="review-summary">
@@ -486,26 +505,56 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                 ))}
               </main>
               {sidePanel && (
-                <aside className="side-panel" aria-label={sidePanel.label}>
-                  <button
-                    type="button"
-                    className="sidebar-toggle"
-                    aria-expanded={!panelHidden}
-                    aria-controls="side-panel-content"
-                    aria-label={panelHidden ? `Show ${sidePanel.label} (${String(sidePanel.count)} open)` : `Hide ${sidePanel.label}`}
-                    title={`${panelHidden ? 'Show' : 'Hide'} ${sidePanel.label}. Shortcut: t`}
-                    onClick={togglePanel}
+                <aside ref={panelColumnRef} className={panelExpanded ? 'side-panel expanded' : 'side-panel'} aria-label={sidePanel.label}>
+                  {panelExpanded && <div className="side-panel-backdrop" aria-hidden="true" onMouseDown={(event) => { event.preventDefault() }} onClick={collapsePanel} />}
+                  <div
+                    ref={panelFrameRef}
+                    className="side-panel-frame"
+                    role={panelExpanded ? 'dialog' : undefined}
+                    aria-modal={panelExpanded || undefined}
+                    aria-label={panelExpanded ? sidePanel.label : undefined}
+                    onKeyDown={keepTabInside}
                   >
-                    <SidebarIcon side="right" />
-                    {panelHidden && sidePanel.count > 0 && <span className="side-panel-count">{sidePanel.count}</span>}
-                  </button>
-                  <div id="side-panel-content" hidden={panelHidden}>
-                    <Segmented label="Side panel" labels={PANEL_TABS} value={panelTab} onChange={choosePanelTab} />
-                    {panelTab === 'chat' ? (
-                      <AiChat reviewId={reviewId} repoId={data.repo_id} snippets={chatSnippets} onSnippetsChange={setChatSnippets} onShowLine={navigation.show} />
-                    ) : (
-                      sidePanel.content
-                    )}
+                    <div ref={panelHeaderRef} className="side-panel-header">
+                      {panelExpanded ? (
+                        <button ref={panelCloseRef} type="button" className="link" title="Back to the column. Shortcut: Esc" onClick={collapsePanel}>
+                          Close
+                        </button>
+                      ) : (
+                        <>
+                          {!panelHidden && (
+                            <IconButton
+                              ref={panelTriggerRef}
+                              className="side-panel-expand"
+                              label={`Expand ${sidePanel.label}`}
+                              description="Open it in a wide window at full height"
+                              icon={<ExpandIcon />}
+                              onClick={expandPanel}
+                            />
+                          )}
+                          <button
+                            type="button"
+                            className="sidebar-toggle"
+                            aria-expanded={!panelHidden}
+                            aria-controls="side-panel-content"
+                            aria-label={panelHidden ? `Show ${sidePanel.label} (${String(sidePanel.count)} open)` : `Hide ${sidePanel.label}`}
+                            title={`${panelHidden ? 'Show' : 'Hide'} ${sidePanel.label}. Shortcut: t`}
+                            onClick={togglePanel}
+                          >
+                            <SidebarIcon side="right" />
+                            {panelHidden && sidePanel.count > 0 && <span className="side-panel-count">{sidePanel.count}</span>}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    <div ref={panelContentRef} id="side-panel-content" hidden={panelHidden}>
+                      <Segmented label="Side panel" labels={PANEL_TABS} value={panelTab} onChange={choosePanelTab} />
+                      {panelTab === 'chat' ? (
+                        <AiChat reviewId={reviewId} repoId={data.repo_id} snippets={chatSnippets} onSnippetsChange={setChatSnippets} onShowLine={showCodeFromPanel} />
+                      ) : (
+                        sidePanel.content
+                      )}
+                    </div>
                   </div>
                 </aside>
               )}
@@ -523,6 +572,14 @@ function emptyMessage(filter: UnitFilter, query: string, impactFilter: ImpactFil
     return impactFilter === 'all' || query.trim() ? `No units match "${query.trim()}".` : 'No units have this impact.'
   }
   return filter === 'all' ? 'No changes between the branches.' : 'Nothing to review here.'
+}
+
+function ExpandIcon() {
+  return (
+    <Icon>
+      <path d="M9.5 2.5h4v4M13.5 2.5L9 7M6.5 13.5h-4v-4M2.5 13.5L7 9" />
+    </Icon>
+  )
 }
 
 function SidebarIcon({ side = 'left' }: { side?: 'left' | 'right' }) {

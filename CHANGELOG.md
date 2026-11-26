@@ -4,6 +4,10 @@ All notable changes to bussola are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Added
+
+- The conversation panel on the right of the review page opens in a wide window at full height, for long threads, code in comments and AI chat answers: the expand button next to **Hide** in its header opens it, and Esc, **Close** or a click outside it bring it back to the column. It is the same panel, not a copy, so the tab, filters, expanded threads, a reply or chat message being written and a text selection stay as they were, and the thread at the top stays at the top in both directions. While it is open the keyboard stays inside it, the review shortcuts do not act on the page behind it, `t` closes it, Esc in a text field leaves it open, and a link from the AI chat or a thread to code in the review closes it so the code shows ([#162](https://github.com/Spoki-App/bussola/issues/162)).
+
 ### Changed
 
 - Resolved threads no longer take a block inside the code: they fold into a small icon next to the line number of their line, with the number of resolved threads when several share it. A click on the icon shows them, with **Reopen**, and another folds them again. A thread resolved while open in the code stays there until folded, so a reply being written is not lost, and a link to a resolved thread or to its lines still shows it. Open threads and the conversation panel are unchanged ([#158](https://github.com/Spoki-App/bussola/issues/158)).

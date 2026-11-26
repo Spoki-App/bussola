@@ -4,6 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 import type { SourceFile } from '../api/navigation'
 import type { AiChatMessage, MergeOptions, ReviewDetail, SyncResult, Unit, UnitDiff } from '../api/types'
+import type { PendingLink } from '../review/linkFocus'
 import { ReviewPage, type ReviewExtensions } from './ReviewPage'
 
 const revision = { id: 2, number: 1, head_sha: 'b', base_sha: 'a', merge_base_sha: 'a', created_at: '2026-11-04T10:00:00Z' }
@@ -176,6 +177,111 @@ describe('ReviewPage conversation panel', () => {
     fireEvent.keyDown(window, { key: 't' })
     expect(screen.getByText('Thread list')).not.toBeVisible()
     expect(window.localStorage.getItem('bussola.sidePanelHidden')).toBe('true')
+  })
+
+  it('opens the panel in a full-height window and closes it with Esc, the close button or the backdrop, giving focus back to the control', async () => {
+    window.localStorage.setItem('bussola.sidePanelHidden', 'false')
+    renderPage(extensions)
+    await screen.findByRole('button', { name: 'Expand conversation' })
+    const closeWays = [
+      () => { fireEvent.keyDown(screen.getByRole('button', { name: 'Close' }), { key: 'Escape' }) },
+      () => { fireEvent.click(screen.getByRole('button', { name: 'Close' })) },
+      () => {
+        const backdrop = document.querySelector('.side-panel-backdrop')
+        if (backdrop) {
+          fireEvent.click(backdrop)
+        }
+      },
+    ]
+
+    for (const close of closeWays) {
+      fireEvent.click(screen.getByRole('button', { name: 'Expand conversation' }))
+
+      const dialog = screen.getByRole('dialog', { name: 'conversation' })
+      expect(dialog).toHaveAttribute('aria-modal', 'true')
+      expect(within(dialog).getByText('Thread list')).toBeVisible()
+      expect(within(dialog).getByRole('button', { name: 'Close' })).toHaveFocus()
+      expect(screen.queryByRole('button', { name: 'Hide conversation' })).not.toBeInTheDocument()
+
+      close()
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Expand conversation' })).toHaveFocus()
+      expect(screen.getByText('Thread list')).toBeVisible()
+    }
+  })
+
+  it('keeps the keyboard focus inside the window while it is open, and t closes it', async () => {
+    window.localStorage.setItem('bussola.sidePanelHidden', 'false')
+    renderPage(extensions)
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand conversation' }))
+    const close = screen.getByRole('button', { name: 'Close' })
+    const comment = screen.getByRole('textbox', { name: 'Review comment' })
+
+    comment.focus()
+    fireEvent.keyDown(comment, { key: 'Tab' })
+    expect(close).toHaveFocus()
+
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true })
+    expect(comment).toHaveFocus()
+
+    screen.getByRole('searchbox').focus()
+    expect(close).toHaveFocus()
+
+    fireEvent.keyDown(window, { key: 'r' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => url === '/api/reviews/3/sync')).toBe(false)
+
+    fireEvent.keyDown(window, { key: 't' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('Thread list')).toBeVisible()
+    expect(window.localStorage.getItem('bussola.sidePanelHidden')).toBe('false')
+  })
+
+  it('keeps what is in the panel when it moves to the window and back, and Esc in a text field leaves it open', async () => {
+    window.localStorage.setItem('bussola.sidePanelHidden', 'false')
+    renderPage(extensions)
+    const comment = await screen.findByRole('textbox', { name: 'Review comment' })
+    fireEvent.change(comment, { target: { value: 'Not sent yet' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand conversation' }))
+    expect(within(screen.getByRole('dialog')).getByRole('textbox', { name: 'Review comment' })).toBe(comment)
+
+    fireEvent.keyDown(comment, { key: 'Escape' })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    fireEvent.change(comment, { target: { value: 'Not sent yet, longer' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+
+    expect(screen.getByRole('textbox', { name: 'Review comment' })).toBe(comment)
+    expect(comment).toHaveValue('Not sent yet, longer')
+  })
+
+  it('closes the window when a link shows code in the review, and keeps it for a thread of the panel', async () => {
+    window.localStorage.setItem('bussola.sidePanelHidden', 'false')
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const page = (link?: PendingLink) => (
+      <QueryClientProvider client={client}>
+        <ReviewPage reviewId={3} extensions={{ ...extensions, link }} />
+      </QueryClientProvider>
+    )
+    const { rerender } = render(page())
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand conversation' }))
+
+    rerender(page({ key: 'thread', ready: true, resolve: () => ({ unitId: null, elementId: 'thread-1' }) }))
+    expect(screen.getByRole('dialog', { name: 'conversation' })).toBeInTheDocument()
+
+    rerender(page({ key: 'code', ready: true, resolve: () => ({ unitId: 7, elementId: 'unit-7' }) }))
+    await waitFor(() => { expect(screen.queryByRole('dialog')).not.toBeInTheDocument() })
+    expect(screen.getByText('Thread list')).toBeVisible()
+  })
+
+  it('offers the window only while the panel is shown', async () => {
+    window.localStorage.setItem('bussola.sidePanelHidden', 'true')
+    renderPage(extensions)
+    await screen.findByRole('button', { name: 'Show conversation (2 open)' })
+
+    expect(screen.queryByRole('button', { name: 'Expand conversation' })).not.toBeInTheDocument()
   })
 })
 

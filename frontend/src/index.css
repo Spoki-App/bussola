@@ -1090,9 +1090,81 @@ button.busy {
   padding: 12px 6px;
 }
 
-.side-panel > .sidebar-toggle {
+.side-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.side-panel-header > .sidebar-toggle {
   width: fit-content;
-  margin-left: auto;
+}
+
+button.side-panel-expand {
+  min-height: 0;
+  margin-bottom: 8px;
+  padding: 0 6px;
+  border: none;
+  background: none;
+  color: var(--muted);
+}
+
+button.side-panel-expand:hover:not(:disabled) {
+  background: var(--bg-sunken);
+  color: var(--text);
+}
+
+.side-panel-expand .action-icon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.6;
+}
+
+.review-layout .side-panel.expanded {
+  z-index: 30;
+}
+
+.side-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  overflow-y: scroll;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  background: rgba(14, 20, 36, 0.5);
+}
+
+.side-panel-backdrop::after {
+  content: '';
+  display: block;
+  height: calc(100% + 1px);
+}
+
+.side-panel.expanded .side-panel-frame {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  width: min(880px, calc(100vw - 32px));
+  height: 100vh;
+  margin: 0 auto;
+  padding: 0 32px 32px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-right: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+  box-shadow: var(--shadow-dialog);
+}
+
+.side-panel.expanded .side-panel-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin: 0 -32px 8px;
+  padding: 12px 32px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
 }
 
 .panel-hidden .side-panel {
