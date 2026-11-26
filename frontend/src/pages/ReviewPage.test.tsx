@@ -4,6 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 import type { SourceFile } from '../api/navigation'
 import type { AiChatMessage, MergeOptions, ReviewDetail, SyncResult, Unit, UnitDiff } from '../api/types'
+import type { PendingLink } from '../review/linkFocus'
 import { ReviewPage, type ReviewExtensions } from './ReviewPage'
 
 const revision = { id: 2, number: 1, head_sha: 'b', base_sha: 'a', merge_base_sha: 'a', created_at: '2026-11-04T10:00:00Z' }
@@ -254,6 +255,25 @@ describe('ReviewPage conversation panel', () => {
 
     expect(screen.getByRole('textbox', { name: 'Review comment' })).toBe(comment)
     expect(comment).toHaveValue('Not sent yet, longer')
+  })
+
+  it('closes the window when a link shows code in the review, and keeps it for a thread of the panel', async () => {
+    window.localStorage.setItem('bussola.sidePanelHidden', 'false')
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const page = (link?: PendingLink) => (
+      <QueryClientProvider client={client}>
+        <ReviewPage reviewId={3} extensions={{ ...extensions, link }} />
+      </QueryClientProvider>
+    )
+    const { rerender } = render(page())
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand conversation' }))
+
+    rerender(page({ key: 'thread', ready: true, resolve: () => ({ unitId: null, elementId: 'thread-1' }) }))
+    expect(screen.getByRole('dialog', { name: 'conversation' })).toBeInTheDocument()
+
+    rerender(page({ key: 'code', ready: true, resolve: () => ({ unitId: 7, elementId: 'unit-7' }) }))
+    await waitFor(() => { expect(screen.queryByRole('dialog')).not.toBeInTheDocument() })
+    expect(screen.getByText('Thread list')).toBeVisible()
   })
 
   it('offers the window only while the panel is shown', async () => {

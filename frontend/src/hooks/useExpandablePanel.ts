@@ -3,10 +3,10 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Keyboar
 import { captureScrollAnchor, restoreScrollAnchor, type ScrollAnchor } from '../review/scrollAnchor'
 import { isTyping } from './useKeyboardShortcuts'
 
-const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]'
+const FOCUSABLE = 'a[href], summary, button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]'
 
 export function focusableIn(root: Element): HTMLElement[] {
-  return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((element) => !element.closest('[hidden], [inert]'))
+  return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((element) => !element.closest('[hidden], [inert], details:not([open]) > :not(summary)'))
 }
 
 function insideOtherDialog(target: EventTarget | null): boolean {

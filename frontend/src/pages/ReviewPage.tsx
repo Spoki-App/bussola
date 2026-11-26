@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
 import { describeError } from '../api/client'
 import { useDescriptions } from '../api/descriptions'
@@ -27,7 +27,7 @@ import { UnitCard, type CommentTarget, type UnitActions } from '../components/Un
 import { UnitTree } from '../components/UnitTree'
 import { UnitWidthButton } from '../components/UnitWidthPanel'
 import { useAiReview } from '../hooks/useAiReview'
-import { useCodeNavigation } from '../hooks/useCodeNavigation'
+import { useCodeNavigation, type CodeTarget } from '../hooks/useCodeNavigation'
 import { useExpandablePanel } from '../hooks/useExpandablePanel'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useRateImpact } from '../hooks/useRateImpact'
@@ -261,6 +261,21 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
   const actions = useRef(new Map<number, UnitActions>())
   const [panelHidden, setPanelHidden] = useState(loadPanelHidden)
   const { expanded: panelExpanded, expand: expandPanel, collapse: collapsePanel, columnRef: panelColumnRef, frameRef: panelFrameRef, triggerRef: panelTriggerRef, closeButtonRef: panelCloseRef, headerRef: panelHeaderRef, contentRef: panelContentRef, keepTabInside } = useExpandablePanel()
+  const showCode = navigation.show
+  const showCodeFromPanel = useCallback(
+    (target: CodeTarget) => {
+      if (target.unit_id !== null) {
+        collapsePanel()
+      }
+      showCode(target)
+    },
+    [collapsePanel, showCode],
+  )
+  const leavePanelWindowFor = useEffectEvent((target: FocusTarget) => {
+    if (target.unitId !== null) {
+      collapsePanel()
+    }
+  })
   const [filesHidden, setFilesHidden] = useState(() => readStored(FILES_HIDDEN_KEY) === 'true')
   const [appliedLink, setAppliedLink] = useState<{ target: FocusTarget | null } | null>(null)
   const { link, sidePanel } = extensions
@@ -323,6 +338,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
     if (appliedLink.target === null) {
       return undefined
     }
+    leavePanelWindowFor(appliedLink.target)
     linkScroll.start(appliedLink.target)
     const stop = followLink(linkScroll)
     return () => {
@@ -534,7 +550,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
                     <div ref={panelContentRef} id="side-panel-content" hidden={panelHidden}>
                       <Segmented label="Side panel" labels={PANEL_TABS} value={panelTab} onChange={choosePanelTab} />
                       {panelTab === 'chat' ? (
-                        <AiChat reviewId={reviewId} repoId={data.repo_id} snippets={chatSnippets} onSnippetsChange={setChatSnippets} onShowLine={navigation.show} />
+                        <AiChat reviewId={reviewId} repoId={data.repo_id} snippets={chatSnippets} onSnippetsChange={setChatSnippets} onShowLine={showCodeFromPanel} />
                       ) : (
                         sidePanel.content
                       )}

@@ -136,6 +136,10 @@ function hasTextSelection(): boolean {
   return window.getSelection()?.isCollapsed === false
 }
 
+function inModal(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest('[aria-modal="true"], dialog[open]') !== null
+}
+
 function gutterSide(row: DiffRow): GutterSide {
   return row.change === 'removed' ? 'old' : 'new'
 }
@@ -216,7 +220,7 @@ export function UnitDiffView({ diff, path, selectable, selected, onRowClick, onL
       }
     }
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isTyping(event.target)) {
+      if (event.key === 'Escape' && !isTyping(event.target) && !inModal(event.target)) {
         setOccurrence(null)
       }
     }
