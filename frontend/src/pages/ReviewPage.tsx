@@ -101,7 +101,7 @@ function syncLabel(review: ReviewDetail, pending: boolean): string {
   return review.pull_request && review.unsent_comments > 0 ? `Sync \u00b7 ${String(review.unsent_comments)} to send` : 'Sync'
 }
 
-function ReviewHeader({ review }: { review: ReviewDetail }) {
+function ReviewHeader({ review, shortcutsOff }: { review: ReviewDetail; shortcutsOff: boolean }) {
   const isPullRequest = review.pull_request !== null
   const makeLink = reviewLinkMaker(review.pull_request?.url)
   const [message, setMessage] = useState<string | null>(null)
@@ -136,7 +136,7 @@ function ReviewHeader({ review }: { review: ReviewDetail }) {
       () => { toStep('sync-failed') },
     )
   }
-  useKeyboardShortcuts({ r: runSync })
+  useKeyboardShortcuts(shortcutsOff ? {} : { r: runSync })
   const needsLink = synced !== null && !isPullRequest && synced.unsent_comments > 0
 
   return (
@@ -409,7 +409,7 @@ export function ReviewPage({ reviewId, extensions = {} }: Props) {
 
   return (
     <div className={columns === undefined ? 'review-page full-width' : 'review-page fixed-width'}>
-      <ReviewHeader review={data} />
+      <ReviewHeader review={data} shortcutsOff={panelExpanded} />
       <div className={`review-overview${data.pull_request ? ' with-description' : ''}`}>
         {data.pull_request && <PullRequestDescription pull={data.pull_request} />}
         <section className="review-summary">

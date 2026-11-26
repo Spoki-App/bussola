@@ -227,6 +227,10 @@ describe('ReviewPage conversation panel', () => {
     screen.getByRole('searchbox').focus()
     expect(close).toHaveFocus()
 
+    fireEvent.keyDown(window, { key: 'r' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => url === '/api/reviews/3/sync')).toBe(false)
+
     fireEvent.keyDown(window, { key: 't' })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByText('Thread list')).toBeVisible()
