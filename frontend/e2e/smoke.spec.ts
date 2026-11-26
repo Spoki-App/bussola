@@ -206,6 +206,30 @@ test('the conversation toggle sits on the right, and the hidden panel leaves no 
   expect(await gapToRight(/^Hide conversation/)).toBeLessThanOrEqual(16)
 })
 
+test('the conversation panel opens in a centered full-height window and comes back to the column', async ({ page }) => {
+  await page.goto(`/?token=${E2E_TOKEN}`)
+  await demoReviewLink(page).click()
+  const column = page.locator('.side-panel')
+  const columnWidth = (await column.boundingBox())?.width ?? 0
+
+  await column.getByRole('button', { name: 'Expand conversation' }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'conversation' })
+  await expect(dialog.getByRole('button', { name: 'Close' })).toBeFocused()
+  const box = await dialog.boundingBox()
+  const viewport = page.viewportSize()
+  expect(box?.y).toBe(0)
+  expect(box?.height).toBe(viewport?.height)
+  expect(box?.width).toBeGreaterThan(columnWidth * 2)
+  expect(Math.abs((box?.x ?? 0) * 2 + (box?.width ?? 0) - (viewport?.width ?? 0))).toBeLessThanOrEqual(1)
+
+  await page.keyboard.press('Escape')
+
+  await expect(dialog).toHaveCount(0)
+  await expect(column.getByRole('button', { name: 'Expand conversation' })).toBeFocused()
+  expect((await column.boundingBox())?.width).toBe(columnWidth)
+})
+
 test('the unit filter and the diff layout are kept after a reload and in a new tab', async ({ page, context }) => {
   await page.goto(`/?token=${E2E_TOKEN}`)
   await demoReviewLink(page).click()
