@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.65.0",
+    "@playwright/test": "^1.65.1",
     "@testing-library/jest-dom": "^8.0.0",
     "@testing-library/react": "^16.3.3",
     "@types/diff-match-patch": "^1.0.36",
